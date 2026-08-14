@@ -178,7 +178,8 @@ impl TerminalBackend {
             .name(format!("pty_event_subscription_{}", id))
             .spawn(move || {
                 while let Ok(event) = event_receiver.recv() {
-                    if pty_event_proxy_sender.send((id, event.clone())).is_err() {
+                    if pty_event_proxy_sender.send((id, event.clone())).is_err()
+                    {
                         break;
                     }
                     app_context.request_repaint();
