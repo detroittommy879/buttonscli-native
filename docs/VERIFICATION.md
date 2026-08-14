@@ -22,7 +22,9 @@ verbatim, all 26 scalable font files have catalog entries, legacy font aliases
 sanitize safely, and cross-platform shell-title extraction remains stable. The
 test suite also covers one-ID preference migration, proves that unchecked
 theme-apply sections remain unchanged, and preserves terminal bold-weight plus
-bright-ANSI settings. The WASM package contains generated
+bright-ANSI settings. Preset tests cover old-preference migration, validated
+add/edit/delete state, and the exact difference between immediate execution and
+type-only templates. The WASM package contains generated
 JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 
@@ -59,6 +61,13 @@ and rendered the full embedded font pack. Closing that development build through
 the window manager exposed an event-forwarder shutdown panic; the adapter now
 terminates quietly when the application channel closes, and the regression is
 covered by the repeated close smoke test.
+
+The preset pass launched the native window and confirmed that the six
+platform-aware starter presets and per-button action affordances render in the
+top dock without obscuring the terminal. Closing through the window manager
+again stopped both the application and its login-shell child cleanly. Preset
+editor mutations and type-only payload behavior are covered by the automated
+tests above.
 
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
