@@ -36,4 +36,5 @@ Architecture decisions, verified behavior, and honest remaining gaps live in
 
 ## License
 
-Dual-licensed under MIT or Apache-2.0, at your option.
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
+option.

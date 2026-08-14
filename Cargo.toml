@@ -5,7 +5,6 @@ edition = "2021"
 rust-version = "1.85"
 description = "A fast, native terminal workspace"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/buttonscli/buttonscli-native"
 keywords = ["terminal", "emulator", "egui", "alacritty"]
 categories = ["command-line-utilities", "gui"]
 
