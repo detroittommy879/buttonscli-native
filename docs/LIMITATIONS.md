@@ -17,15 +17,19 @@ not a backlog disguised as release notes.
 
 - Pane layouts currently support one or two visible shells. Tabs can hold more
   sessions, but the legacy app's arbitrary grid of up to ten panes is not ported.
-- Theme support intentionally starts with four authored native themes rather
-  than the legacy theme gallery, shader lab, animated noise, and hundreds of
-  imported Gogh themes.
+- All 555 legacy theme selections are present, but animated gradients, CRT/static
+  post-processing, wallpaper drawing, and the theme designer are not rendered
+  yet. Their original fields remain in the embedded JSON migration assets.
+- The 19 bundled font families work offline. The legacy opt-in Google Fonts
+  catalog and arbitrary custom font-stack editor are not wired to a native font
+  downloader yet; online-only names in imported themes safely fall back to a
+  bundled family.
 - Shell sessions use `$SHELL -l` on Unix and `%COMSPEC%` on Windows. A graphical
   shell/profile chooser is still future work.
 - Tab rename/undo, preset CRUD, profile switching, SSH presets, detached
   settings, AI Help, the loopback automation API, localization, accounts, and
   updater/release infrastructure are not part of this lean core yet.
-- Images, complex emoji fallback, sixel graphics, ligatures across cells, and
+- Images, color emoji rendering, sixel graphics, ligatures across cells, and
   advanced IME behavior need focused renderer tests.
 
 ## Dependency constraints
@@ -39,4 +43,3 @@ not a backlog disguised as release notes.
   Rust 1.97 unless extra features are enabled. The manifest disables that
   optional second optimization pass; the Rust compiler's release optimization
   remains enabled.
-
