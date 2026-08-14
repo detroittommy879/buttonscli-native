@@ -1,4 +1,6 @@
 use crate::fonts::{self, FontZone, Typography};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 use serde::{Deserialize, Serialize};
@@ -25,6 +27,12 @@ const PRESETS: [(&str, &str); 7] = [
 #[serde(default)]
 struct Preferences {
     theme_id: String,
+    app_theme_id: String,
+    terminal_theme_id: String,
+    gradient_theme_id: String,
+    effects_theme_id: String,
+    theme_apply: ThemeApplyScopes,
+    calm_mode: bool,
     typography: Typography,
     show_sidebar: bool,
     show_presets: bool,
@@ -34,9 +42,52 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             theme_id: "basic2".into(),
+            app_theme_id: String::new(),
+            terminal_theme_id: String::new(),
+            gradient_theme_id: String::new(),
+            effects_theme_id: String::new(),
+            theme_apply: ThemeApplyScopes::default(),
+            calm_mode: false,
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
+        }
+    }
+}
+
+impl Preferences {
+    fn normalize_theme_sources(&mut self) {
+        for source in [
+            &mut self.app_theme_id,
+            &mut self.terminal_theme_id,
+            &mut self.gradient_theme_id,
+            &mut self.effects_theme_id,
+        ] {
+            if source.is_empty() {
+                source.clone_from(&self.theme_id);
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+struct ThemeApplyScopes {
+    app: bool,
+    terminal: bool,
+    fonts: bool,
+    gradient: bool,
+    effects: bool,
+}
+
+impl Default for ThemeApplyScopes {
+    fn default() -> Self {
+        Self {
+            app: true,
+            terminal: true,
+            fonts: true,
+            gradient: true,
+            effects: true,
         }
     }
 }
@@ -92,10 +143,11 @@ enum PaneLayout {
 
 impl ButtonsApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let preferences = cc
+        let mut preferences: Preferences = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
+        preferences.normalize_theme_sources();
         #[allow(unused_mut)]
         let mut app = Self::empty(preferences);
         fonts::install(&cc.egui_ctx);
@@ -147,7 +199,7 @@ impl ButtonsApp {
     }
 
     fn apply_style(&self, ctx: &egui::Context) {
-        let colors = &self.active_theme().colors;
+        let colors = &self.active_app_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
         visuals.window_fill = colors.panel;
@@ -188,12 +240,36 @@ impl ButtonsApp {
         ctx.set_style(style);
     }
 
-    fn active_theme(&self) -> &ThemeDefinition {
-        self.themes.get(&self.preferences.theme_id)
+    fn active_app_theme(&self) -> &ThemeDefinition {
+        self.themes.get(&self.preferences.app_theme_id)
     }
 
     fn colors(&self) -> AppColors {
-        self.active_theme().colors.clone()
+        self.active_app_theme().colors.clone()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn terminal_presentation(&self) -> ThemeDefinition {
+        let mut theme = self.themes.get(&self.preferences.terminal_theme_id).clone();
+        let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
+        let effects = &self.themes.get(&self.preferences.effects_theme_id).effects;
+        theme.effects = TerminalEffects {
+            gradient: gradient.gradient,
+            gradient_animation: gradient.gradient_animation && !self.preferences.calm_mode,
+            static_opacity: if self.preferences.calm_mode {
+                0.0
+            } else {
+                effects.static_opacity
+            },
+            static_density: effects.static_density,
+            scanlines_strength: if self.preferences.calm_mode {
+                0.0
+            } else {
+                effects.scanlines_strength
+            },
+            scanlines_period: effects.scanlines_period,
+        };
+        theme
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -329,7 +405,7 @@ impl ButtonsApp {
         let primary = self.primary.min(self.tabs.len() - 1);
         let focused = self.focused;
         let terminal_font = fonts::font_id(&self.preferences.typography.terminal);
-        let theme = self.active_theme().clone();
+        let theme = self.terminal_presentation();
         let modal_open = self.show_settings || self.show_about;
         let mut clicked = None;
 
@@ -802,7 +878,7 @@ impl ButtonsApp {
         if !self.show_settings {
             return;
         }
-        let old_theme = self.preferences.theme_id.clone();
+        let old_app_theme = self.preferences.app_theme_id.clone();
         let old_typography = self.preferences.typography.clone();
         let mut open = self.show_settings;
         let settings_colors = self.colors();
@@ -836,7 +912,9 @@ impl ButtonsApp {
                 }
             });
         self.show_settings = open;
-        if old_theme != self.preferences.theme_id || old_typography != self.preferences.typography {
+        if old_app_theme != self.preferences.app_theme_id
+            || old_typography != self.preferences.typography
+        {
             self.apply_style(ctx);
         }
     }
@@ -853,6 +931,17 @@ impl ButtonsApp {
             ))
             .color(colors.muted),
         );
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Apply:");
+            ui.checkbox(&mut self.preferences.theme_apply.app, "App chrome");
+            ui.checkbox(
+                &mut self.preferences.theme_apply.terminal,
+                "Terminal colors",
+            );
+            ui.checkbox(&mut self.preferences.theme_apply.fonts, "Fonts");
+            ui.checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
+            ui.checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
+        });
         ui.add_space(6.0);
         ui.add(
             egui::TextEdit::singleline(&mut self.theme_search)
@@ -939,19 +1028,33 @@ impl ButtonsApp {
                                             }
                                         });
                                         ui.add_space(5.0);
-                                        if ui
-                                            .add_sized(
-                                                [88.0, 26.0],
-                                                egui::Button::new(if selected {
-                                                    "Applied"
-                                                } else {
-                                                    "Apply"
-                                                }),
-                                            )
-                                            .clicked()
-                                        {
-                                            apply = Some(index);
-                                        }
+                                        ui.horizontal(|ui| {
+                                            if ui
+                                                .add_sized(
+                                                    [78.0, 26.0],
+                                                    egui::Button::new(if selected {
+                                                        "Applied"
+                                                    } else {
+                                                        "Apply"
+                                                    }),
+                                                )
+                                                .clicked()
+                                            {
+                                                apply = Some((index, false));
+                                            }
+                                            if ui
+                                                .add_sized(
+                                                    [78.0, 26.0],
+                                                    egui::Button::new("Calm"),
+                                                )
+                                                .on_hover_text(
+                                                    "Apply selected sections without animation or noise",
+                                                )
+                                                .clicked()
+                                            {
+                                                apply = Some((index, true));
+                                            }
+                                        });
                                     });
                                 },
                             );
@@ -962,12 +1065,34 @@ impl ButtonsApp {
                     });
             });
 
-        if let Some(index) = apply {
-            let theme = self.themes.all()[index].clone();
-            self.preferences.theme_id = theme.id;
+        if let Some((index, calm)) = apply {
+            self.apply_theme(index, calm);
+        }
+    }
+
+    fn apply_theme(&mut self, index: usize, calm: bool) {
+        let theme = self.themes.all()[index].clone();
+        let id = theme.id.clone();
+        self.preferences.theme_id = id.clone();
+        if self.preferences.theme_apply.app {
+            self.preferences.app_theme_id = id.clone();
+        }
+        if self.preferences.theme_apply.terminal {
+            self.preferences.terminal_theme_id = id.clone();
+        }
+        if self.preferences.theme_apply.gradient {
+            self.preferences.gradient_theme_id = id.clone();
+        }
+        if self.preferences.theme_apply.effects {
+            self.preferences.effects_theme_id = id;
+        }
+        if self.preferences.theme_apply.fonts {
             if let Some(typography) = theme.typography {
                 self.preferences.typography = typography;
             }
+        }
+        if self.preferences.theme_apply.gradient || self.preferences.theme_apply.effects {
+            self.preferences.calm_mode = calm;
         }
     }
 
@@ -1368,5 +1493,49 @@ impl eframe::App for ButtonsApp {
     #[cfg(target_arch = "wasm32")]
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
         Some(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_preferences_migrate_one_theme_to_all_sources() {
+        let mut preferences = Preferences {
+            theme_id: "aurora".into(),
+            ..Default::default()
+        };
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.app_theme_id, "aurora");
+        assert_eq!(preferences.terminal_theme_id, "aurora");
+        assert_eq!(preferences.gradient_theme_id, "aurora");
+        assert_eq!(preferences.effects_theme_id, "aurora");
+    }
+
+    #[test]
+    fn scoped_theme_apply_preserves_unchecked_sections() {
+        let mut preferences = Preferences {
+            theme_apply: ThemeApplyScopes {
+                app: true,
+                terminal: false,
+                fonts: false,
+                gradient: false,
+                effects: false,
+            },
+            ..Default::default()
+        };
+        preferences.normalize_theme_sources();
+        let mut app = ButtonsApp::empty(preferences);
+        let index = app
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == "aurora")
+            .unwrap();
+        app.apply_theme(index, false);
+        assert_eq!(app.preferences.app_theme_id, "aurora");
+        assert_eq!(app.preferences.terminal_theme_id, "basic2");
+        assert_eq!(app.preferences.gradient_theme_id, "basic2");
     }
 }
