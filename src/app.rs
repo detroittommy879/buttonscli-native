@@ -505,11 +505,13 @@ impl ButtonsApp {
             format!("Automatic ({automatic})"),
             "Use the operating system default".into(),
         )];
-        options.extend(
-            self.detected_shells
-                .iter()
-                .map(|shell| (shell.id.clone(), shell.label.clone(), shell.command.clone())),
-        );
+        options.extend(self.detected_shells.iter().map(|shell| {
+            (
+                shell.id.clone(),
+                format!("{} — {}", shell.label, shell.command),
+                shell.command.clone(),
+            )
+        }));
         options.extend(
             self.preferences
                 .custom_shell_profiles
@@ -1809,27 +1811,35 @@ impl ButtonsApp {
                 .corner_radius(5.0)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Label");
-                        ui.add(
-                            egui::TextEdit::singleline(&mut profile.label)
-                                .hint_text("MSYS2 UCRT64")
-                                .desired_width(180.0),
-                        );
-                        ui.label("Command line");
-                        ui.add(
-                            egui::TextEdit::singleline(&mut profile.command)
-                                .hint_text("/usr/bin/fish or pwsh.exe -NoLogo")
-                                .desired_width(f32::INFINITY),
-                        );
-                    });
-                    ui.horizontal(|ui| {
-                        ui.label("Working directory override");
-                        ui.add(
-                            egui::TextEdit::singleline(&mut profile.working_directory)
-                                .hint_text("Use workspace default")
-                                .desired_width(f32::INFINITY),
-                        );
+                    egui::Grid::new(("custom-shell-profile", &profile.id))
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Label");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.label)
+                                    .hint_text("MSYS2 UCRT64")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                            ui.label("Command line");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.command)
+                                    .hint_text("/usr/bin/fish or pwsh.exe -NoLogo")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                            ui.label("Working directory override");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.working_directory)
+                                    .hint_text("Use workspace default")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                        });
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.button("Remove").clicked() {
+                            remove = Some(index);
+                        }
                         if ui
                             .add_enabled(
                                 !profile.command.trim().is_empty(),
@@ -1839,9 +1849,11 @@ impl ButtonsApp {
                         {
                             launch = Some(profile.id.clone());
                         }
-                        if ui.button("Remove").clicked() {
-                            remove = Some(index);
-                        }
+                        ui.label(
+                            RichText::new("Launch this profile now")
+                                .small()
+                                .color(colors.muted),
+                        );
                     });
                 });
             ui.add_space(6.0);

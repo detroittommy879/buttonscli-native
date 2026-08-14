@@ -149,11 +149,18 @@ pub fn detected_shells() -> Vec<DetectedShell> {
     #[cfg(windows)]
     {
         if let Ok(system_root) = std::env::var("SystemRoot") {
-            commands.push(format!(
-                r"{system_root}\System32\WindowsPowerShell\v1.0\powershell.exe"
-            ));
+            let powershell =
+                format!(r"{system_root}\System32\WindowsPowerShell\v1.0\powershell.exe");
+            if Path::new(&powershell).is_file() {
+                commands.push(powershell);
+            }
         }
-        commands.extend(["pwsh.exe".into(), "cmd.exe".into()]);
+        commands.extend(
+            ["pwsh.exe", "cmd.exe"]
+                .into_iter()
+                .filter(|command| executable_on_path(command))
+                .map(str::to_owned),
+        );
     }
 
     let mut seen = HashSet::new();
@@ -173,6 +180,15 @@ pub fn detected_shells() -> Vec<DetectedShell> {
             command,
         })
         .collect()
+}
+
+#[cfg(windows)]
+fn executable_on_path(command: &str) -> bool {
+    std::env::var_os("PATH")
+        .map(|paths| {
+            std::env::split_paths(&paths).any(|directory| directory.join(command).is_file())
+        })
+        .unwrap_or(false)
 }
 
 fn split_command_line(input: &str) -> anyhow::Result<(String, Vec<String>)> {
