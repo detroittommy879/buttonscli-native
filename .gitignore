@@ -1,0 +1,11 @@
+/target/
+/dist/
+/web/pkg/
+/.idea/
+/.vscode/
+*.log
+*.profraw
+
+# Working notes, credentials, release keys, and non-public research belong here.
+/.private/
+
