@@ -77,6 +77,11 @@ typography zones mirror the legacy model. Online-only font names found in old
 themes are sanitized to a bundled equivalent while Google loading is disabled,
 matching the legacy application's offline behavior.
 
+Terminal typography carries separate regular and bold `FontId`s into the cell
+renderer. Bold cells select the nearest packaged weight without changing cell
+metrics, and the legacy bright-ANSI toggle promotes the eight normal named/indexed
+colors to their exact bright palette entries.
+
 ## Dependency policy
 
 Direct dependencies must be permissively licensed. Dependencies are pinned to
