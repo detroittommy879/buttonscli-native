@@ -445,6 +445,12 @@ fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography>
             parse_zone(&value["terminal"], defaults.terminal, true),
             true,
         ),
+        terminal_bold_weight: number_at(terminal_theme, "fontWeightBold")
+            .unwrap_or(defaults.terminal_bold_weight as f64) as u16,
+        draw_bold_bright: terminal_theme
+            .get("drawBoldTextInBrightColors")
+            .and_then(Value::as_bool)
+            .unwrap_or(defaults.draw_bold_bright),
     })
 }
 
@@ -620,5 +626,8 @@ mod tests {
         assert_eq!(theme.terminal_colors.red, "#cd3131");
         assert_eq!(theme.terminal_colors.bright_cyan, "#29b8db");
         assert!(theme.effects.gradient.is_some());
+        let typography = theme.typography.as_ref().unwrap();
+        assert_eq!(typography.terminal_bold_weight, 700);
+        assert!(typography.draw_bold_bright);
     }
 }

@@ -223,6 +223,8 @@ pub struct Typography {
     pub assistant: FontZone,
     pub status_bar: FontZone,
     pub terminal: FontZone,
+    pub terminal_bold_weight: u16,
+    pub draw_bold_bright: bool,
 }
 
 impl Default for Typography {
@@ -265,6 +267,8 @@ impl Default for Typography {
                 weight: 300,
                 ..Default::default()
             },
+            terminal_bold_weight: 700,
+            draw_bold_bright: true,
         }
     }
 }
@@ -381,6 +385,12 @@ pub fn font_family(zone: &FontZone) -> FontFamily {
 
 pub fn font_id(zone: &FontZone) -> FontId {
     FontId::new(zone.size, font_family(zone))
+}
+
+pub fn resolved_weight(family: &str, requested: u16) -> u16 {
+    nearest_face(family, requested)
+        .map(|face| face.weight)
+        .unwrap_or(requested)
 }
 
 fn nearest_face(family: &str, weight: u16) -> Option<&'static FontFace> {

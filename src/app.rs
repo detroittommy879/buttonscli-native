@@ -405,6 +405,10 @@ impl ButtonsApp {
         let primary = self.primary.min(self.tabs.len() - 1);
         let focused = self.focused;
         let terminal_font = fonts::font_id(&self.preferences.typography.terminal);
+        let mut bold_zone = self.preferences.typography.terminal.clone();
+        bold_zone.weight = self.preferences.typography.terminal_bold_weight;
+        let terminal_bold_font = fonts::font_id(&bold_zone);
+        let draw_bold_bright = self.preferences.typography.draw_bold_bright;
         let theme = self.terminal_presentation();
         let modal_open = self.show_settings || self.show_about;
         let mut clicked = None;
@@ -416,6 +420,8 @@ impl ButtonsApp {
                     &mut self.tabs[primary],
                     focused == primary && !modal_open,
                     terminal_font.clone(),
+                    terminal_bold_font.clone(),
+                    draw_bold_bright,
                     &theme,
                 );
                 if response.clicked() {
@@ -431,6 +437,8 @@ impl ButtonsApp {
                         first,
                         focused == primary && !modal_open,
                         terminal_font.clone(),
+                        terminal_bold_font.clone(),
+                        draw_bold_bright,
                         &theme,
                     )
                     .clicked()
@@ -442,6 +450,8 @@ impl ButtonsApp {
                         second,
                         focused == secondary && !modal_open,
                         terminal_font.clone(),
+                        terminal_bold_font.clone(),
+                        draw_bold_bright,
                         &theme,
                     )
                     .clicked()
@@ -460,6 +470,8 @@ impl ButtonsApp {
                         first,
                         focused == primary && !modal_open,
                         terminal_font.clone(),
+                        terminal_bold_font.clone(),
+                        draw_bold_bright,
                         &theme,
                     )
                     .clicked()
@@ -474,6 +486,8 @@ impl ButtonsApp {
                         second,
                         focused == secondary && !modal_open,
                         terminal_font.clone(),
+                        terminal_bold_font.clone(),
+                        draw_bold_bright,
                         &theme,
                     )
                     .clicked()
@@ -1156,6 +1170,38 @@ impl ButtonsApp {
                 &mut self.preferences.typography.terminal,
                 true,
             );
+            egui::Frame::new()
+                .fill(ui.visuals().faint_bg_color)
+                .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                .corner_radius(5.0)
+                .inner_margin(10.0)
+                .show(ui, |ui| {
+                    ui.label(RichText::new("Terminal bold rendering").strong());
+                    ui.horizontal_wrapped(|ui| {
+                        let family = self.preferences.typography.terminal.family.clone();
+                        let requested = self.preferences.typography.terminal_bold_weight;
+                        let resolved = fonts::resolved_weight(&family, requested);
+                        egui::ComboBox::from_id_salt("terminal-bold-weight")
+                            .selected_text(if requested == resolved {
+                                format!("{requested} bold weight")
+                            } else {
+                                format!("{requested} requested → {resolved} file")
+                            })
+                            .show_ui(ui, |ui| {
+                                for weight in fonts::weights_for(&family) {
+                                    ui.selectable_value(
+                                        &mut self.preferences.typography.terminal_bold_weight,
+                                        weight,
+                                        weight.to_string(),
+                                    );
+                                }
+                            });
+                        ui.checkbox(
+                            &mut self.preferences.typography.draw_bold_bright,
+                            "Use bright ANSI colors for bold text",
+                        );
+                    });
+                });
         });
     }
 
@@ -1334,10 +1380,13 @@ fn terminal_surface(
     tab: &mut TerminalTab,
     focused: bool,
     terminal_font_id: FontId,
+    terminal_bold_font_id: FontId,
+    draw_bold_bright: bool,
     theme: &ThemeDefinition,
 ) -> egui::Response {
     let terminal_font = TerminalFont::new(FontSettings {
         font_type: terminal_font_id,
+        bold_font_type: Some(terminal_bold_font_id),
     });
     let time = ui.input(|input| input.time) as f32;
     let gradient = theme.effects.gradient.map(|colors| {
@@ -1357,7 +1406,8 @@ fn terminal_surface(
         .set_focus(focused)
         .set_font(terminal_font)
         .set_theme(theme.terminal())
-        .set_background_gradient(gradient);
+        .set_background_gradient(gradient)
+        .set_draw_bold_bright(draw_bold_bright);
     let response = ui.add(terminal);
     paint_terminal_effects(ui, response.rect, theme, tab.id, time);
     response
