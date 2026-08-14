@@ -36,3 +36,9 @@ cargo build --target wasm32-unknown-unknown --release --no-default-features
 
 The `--no-default-features` switch omits the desktop executable so its output
 name cannot collide with the library WebAssembly module.
+
+The manifest currently disables wasm-pack's optional `wasm-opt` pass because
+wasm-pack 0.15's downloaded Binaryen validator rejects the bulk-memory and
+saturating-conversion instructions emitted by Rust 1.97. Cargo still builds the
+module with the normal release optimizations. Re-enable the second pass after
+wasm-pack ships a compatible Binaryen build.
