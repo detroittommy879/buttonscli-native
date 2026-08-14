@@ -11,6 +11,7 @@ use egui_term::{FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 
+#[cfg(not(target_arch = "wasm32"))]
 const PRESETS: [(&str, &str); 7] = [
     ("Clear", "clear"),
     ("Files", "ls -la"),
@@ -44,6 +45,7 @@ pub struct ButtonsApp {
     preferences: Preferences,
     show_settings: bool,
     show_about: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -56,6 +58,10 @@ pub struct ButtonsApp {
     events_tx: Sender<(u64, PtyEvent)>,
     #[cfg(not(target_arch = "wasm32"))]
     events_rx: Receiver<(u64, PtyEvent)>,
+    #[cfg(target_arch = "wasm32")]
+    demo_lines: Vec<String>,
+    #[cfg(target_arch = "wasm32")]
+    demo_input: String,
 }
 
 impl ButtonsApp {
@@ -64,6 +70,7 @@ impl ButtonsApp {
             .storage
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
+        #[allow(unused_mut)]
         let mut app = Self::empty(preferences);
         Self::install_fonts(&cc.egui_ctx);
         app.apply_style(&cc.egui_ctx);
@@ -79,6 +86,7 @@ impl ButtonsApp {
             preferences,
             show_settings: false,
             show_about: false,
+            #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -91,6 +99,15 @@ impl ButtonsApp {
             events_tx,
             #[cfg(not(target_arch = "wasm32"))]
             events_rx,
+            #[cfg(target_arch = "wasm32")]
+            demo_lines: vec![
+                "ButtonsCLI browser sandbox".into(),
+                "Native speed. Familiar workflow. Zero access to your local machine.".into(),
+                "".into(),
+                "Type 'help' to explore the demo.".into(),
+            ],
+            #[cfg(target_arch = "wasm32")]
+            demo_input: String::new(),
         }
     }
 
@@ -183,6 +200,85 @@ impl ButtonsApp {
         if let Some(tab) = self.tabs.get_mut(self.active) {
             tab.run(command);
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn run_demo_command(&mut self, command: &str) {
+        let command = command.trim();
+        if command.is_empty() {
+            return;
+        }
+        self.demo_lines
+            .push(format!("visitor@buttonscli:~$ {command}"));
+        match command {
+            "clear" => self.demo_lines.clear(),
+            "help" => self.demo_lines.extend([
+                "Try: ls, git status, uname -a, colors, clear".into(),
+                "This sandbox is local and deterministic; it never opens a real shell.".into(),
+            ]),
+            "ls" | "ls -la" => self.demo_lines.extend([
+                "drwxr-xr-x  src".into(),
+                "drwxr-xr-x  docs".into(),
+                "-rw-r--r--  Cargo.toml".into(),
+                "-rw-r--r--  README.md".into(),
+            ]),
+            "git status" => self.demo_lines.extend([
+                "On branch main".into(),
+                "nothing to commit, working tree clean".into(),
+            ]),
+            "uname" | "uname -a" => self
+                .demo_lines
+                .push("ButtonsCLI wasm32 browser-demo #1 SMP".into()),
+            "colors" => self.demo_lines.extend([
+                "red  green  yellow  blue  magenta  cyan".into(),
+                "Four native themes are available from Settings.".into(),
+            ]),
+            other => self
+                .demo_lines
+                .push(format!("demo: {other}: command not found")),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn web_demo(&mut self, ui: &mut egui::Ui) {
+        let colors = self.preferences.theme.colors();
+        ui.label(
+            RichText::new("SANDBOX TERMINAL")
+                .strong()
+                .color(colors.accent),
+        );
+        ui.label(
+            RichText::new("A safe in-browser preview — commands never leave this page")
+                .small()
+                .color(colors.muted),
+        );
+        ui.separator();
+        egui::ScrollArea::vertical()
+            .stick_to_bottom(true)
+            .auto_shrink([false, false])
+            .max_height((ui.available_height() - 52.0).max(120.0))
+            .show(ui, |ui| {
+                for line in &self.demo_lines {
+                    ui.label(RichText::new(line).monospace().color(colors.text));
+                }
+            });
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("$").monospace().color(colors.accent));
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut self.demo_input)
+                    .font(FontId::monospace(self.preferences.font_size))
+                    .hint_text("type help")
+                    .desired_width(f32::INFINITY),
+            );
+            let submit =
+                response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+            if submit || ui.button("Run").clicked() {
+                let command = std::mem::take(&mut self.demo_input);
+                self.run_demo_command(&command);
+                response.request_focus();
+            }
+        });
     }
 
     fn top_menu(&mut self, ctx: &egui::Context) {
@@ -405,9 +501,13 @@ impl ButtonsApp {
                     ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
                     ui.label(
-                        RichText::new("Alacritty engine")
-                            .small()
-                            .color(colors.muted),
+                        RichText::new(if cfg!(target_arch = "wasm32") {
+                            "sandbox replay engine"
+                        } else {
+                            "Alacritty engine"
+                        })
+                        .small()
+                        .color(colors.muted),
                     );
                     ui.separator();
                     ui.label(
@@ -571,16 +671,27 @@ impl eframe::App for ButtonsApp {
                         }
                     });
                 }
+                #[cfg(target_arch = "wasm32")]
+                self.web_demo(ui);
             });
 
         self.settings_window(ctx);
         self.about_window(ctx);
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
         for tab in &mut self.tabs {
             tab.request_exit();
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {}
+
+    #[cfg(target_arch = "wasm32")]
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
     }
 }

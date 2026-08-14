@@ -19,3 +19,27 @@ The first checkpoint is deliberately boring in the best way: a clean local Git
 repository, an open-source-ready license and README, architecture notes, and a
 private ignored directory for anything that must not ship.
 
+## 2026-08-14 — The first real terminal
+
+The native window now owns a real login shell through Alacritty's PTY/event-loop
+stack. Input, output, live grid resize, scrollback, selection, tab creation,
+theme changes, font scaling, command presets, settings persistence, and clean
+window exit all work in one process. A manual X11 smoke test resized the window,
+generated 220 output lines, scrolled backward through the terminal grid, and
+copied a multiline selection back into the shell.
+
+That clipboard test caught a useful upstream adapter flaw: its declared
+Ctrl+Shift+C/V bindings did not dispatch the actions, and pasted text could be
+mistaken for Ctrl+V when the asynchronous clipboard response arrived after the
+modifier keys were released. The small MIT adapter is now vendored with a
+focused fix and its original license retained. JetBrains Mono is bundled under
+the SIL Open Font License so cell metrics and the reference look are stable.
+
+## 2026-08-14 — One UI, safe browser demo
+
+The application was split into a reusable Rust library and a desktop launcher.
+On desktop the terminal surface owns an actual PTY. On `wasm32` the same egui
+chrome instead renders an interactive, deterministic command sandbox. This is a
+deliberate product boundary: the website can offer a convincing trial without
+claiming or attempting access to a visitor's machine. A release-mode WASM build
+now succeeds; the raw module is 4.4 MiB before `wasm-opt`/gzip or Brotli.

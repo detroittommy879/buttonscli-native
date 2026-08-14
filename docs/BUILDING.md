@@ -21,6 +21,18 @@ These targets are architectural commitments, but are not yet verified in CI.
 ## Web demo
 
 The browser target reuses the product chrome with a sandboxed scripted terminal.
-It is not a remote shell. Build instructions will be added with the first
-verified WASM milestone.
+It is not a remote shell. Install `wasm-pack`, then run:
 
+```sh
+wasm-pack build --target web --out-dir web/pkg --no-default-features
+python3 -m http.server --directory web 8080
+```
+
+The lower-level compilation gate is:
+
+```sh
+cargo build --target wasm32-unknown-unknown --release --no-default-features
+```
+
+The `--no-default-features` switch omits the desktop executable so its output
+name cannot collide with the library WebAssembly module.
