@@ -8,16 +8,28 @@
       html, body { margin: 0; width: 100%; height: 100%; background: #090c16; }
       body { overflow: hidden; }
       canvas { width: 100%; height: 100%; display: block; }
+      #fallback { display: none; box-sizing: border-box; height: 100%; padding: 3rem;
+        color: #dce4f2; font: 16px/1.6 system-ui, sans-serif; }
+      #fallback strong { color: #38bdf8; }
     </style>
   </head>
   <body>
     <canvas id="buttonscli_canvas"></canvas>
+    <div id="fallback"><strong>ButtonsCLI needs WebGL.</strong><br />
+      This browser or virtual machine has graphics acceleration disabled. Try a
+      current hardware-accelerated browser to run the interactive demo.</div>
     <script type="module">
       import init, { WebHandle } from "./pkg/buttonscli.js";
-      await init();
-      const app = new WebHandle();
-      await app.start(document.getElementById("buttonscli_canvas"));
-      window.buttonscli = app;
+      try {
+        await init();
+        const app = new WebHandle();
+        await app.start(document.getElementById("buttonscli_canvas"));
+        window.buttonscli = app;
+      } catch (error) {
+        document.getElementById("buttonscli_canvas").style.display = "none";
+        document.getElementById("fallback").style.display = "block";
+        console.error("ButtonsCLI web demo failed to start", error);
+      }
     </script>
   </body>
 </html>

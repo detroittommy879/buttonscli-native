@@ -47,3 +47,9 @@ strip = "symbols"
 
 [profile.dev]
 debug = 1
+
+# wasm-pack 0.15 currently downloads a Binaryen build whose validator does not
+# enable the bulk-memory instructions emitted by Rust 1.97. The Rust release
+# profile is still optimized; skip only wasm-pack's incompatible second pass.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
