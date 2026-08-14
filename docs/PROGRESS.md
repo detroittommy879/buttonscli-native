@@ -209,3 +209,17 @@ to ten leaves, while preference round-trip coverage protects saved ratios. In
 the X11 smoke pass, moving only the top row divider of a four-PTY grid left the
 bottom row unchanged. The asymmetric layout returned after a normal restart,
 and both shutdown passes removed all four Bash children.
+
+## 2026-08-14 — Legacy gradient geometry
+
+Terminal gradients now preserve their source geometry. Linear themes honor the
+stored angle, radial themes render concentric multi-stop rings around the named
+position, and conic themes render a smooth angular fan with the configured
+rotation. These meshes remain behind default terminal cells, so applications
+that deliberately paint an ANSI background still win.
+
+Focused coverage identifies representative radial and conic themes from the
+embedded legacy catalog. The X11 pass applied `Prismatic Stage`, confirmed its
+centered 90-degree conic sweep in a real Bash terminal, and verified clean child
+shutdown. Repeating geometry and user-facing gradient editing remain explicit
+items in the visual backlog.

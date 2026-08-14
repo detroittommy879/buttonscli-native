@@ -18,11 +18,12 @@ not a backlog disguised as release notes.
 - Pane layouts arrange up to ten live shells as columns, rows, or a balanced
   recursive split tree. Every branch has a draggable divider, stores its ratio,
   and can be returned to balanced defaults from the status bar.
-- All 555 legacy theme selections are present. Linear/multi-stop terminal
-  gradients, animated drift, static, and scanlines render natively; radial and
-  conic geometry, hsync warp, TV/simple noise variants, glow, wallpaper drawing,
-  and the theme designer are not rendered yet. Their original fields remain in
-  the embedded JSON migration assets.
+- All 555 legacy theme selections are present. Linear, radial, and conic
+  multi-stop terminal gradients preserve their angle/position; animated drift,
+  static, and scanlines also render natively. Repeating gradients, hsync warp,
+  TV/simple noise variants, glow, wallpaper drawing, and the theme designer are
+  not rendered yet. Their original fields remain in the embedded JSON migration
+  assets.
 - The 19 bundled font families work offline. The legacy opt-in Google Fonts
   catalog and arbitrary custom font-stack editor are not wired to a native font
   downloader yet; online-only names in imported themes safely fall back to a
