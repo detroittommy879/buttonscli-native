@@ -1,7 +1,6 @@
-use crate::theme::ThemeId;
-use egui::{
-    Align, Color32, FontData, FontDefinitions, FontFamily, FontId, Layout, RichText, Stroke, Vec2,
-};
+use crate::fonts::{self, FontZone, Typography};
+use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
+use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -23,9 +22,10 @@ const PRESETS: [(&str, &str); 7] = [
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(default)]
 struct Preferences {
-    theme: ThemeId,
-    font_size: f32,
+    theme_id: String,
+    typography: Typography,
     show_sidebar: bool,
     show_presets: bool,
 }
@@ -33,8 +33,8 @@ struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            theme: ThemeId::Midnight,
-            font_size: 15.0,
+            theme_id: "basic2".into(),
+            typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
         }
@@ -43,6 +43,9 @@ impl Default for Preferences {
 
 pub struct ButtonsApp {
     preferences: Preferences,
+    themes: ThemeCatalog,
+    theme_search: String,
+    settings_tab: SettingsTab,
     show_settings: bool,
     show_about: bool,
     #[cfg(not(target_arch = "wasm32"))]
@@ -70,6 +73,14 @@ pub struct ButtonsApp {
     demo_input: String,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum SettingsTab {
+    #[default]
+    Themes,
+    Fonts,
+    Workspace,
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum PaneLayout {
@@ -87,7 +98,7 @@ impl ButtonsApp {
             .unwrap_or_default();
         #[allow(unused_mut)]
         let mut app = Self::empty(preferences);
-        Self::install_fonts(&cc.egui_ctx);
+        fonts::install(&cc.egui_ctx);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
@@ -99,6 +110,9 @@ impl ButtonsApp {
         let (events_tx, events_rx) = mpsc::channel();
         Self {
             preferences,
+            themes: ThemeCatalog::load(),
+            theme_search: String::new(),
+            settings_tab: SettingsTab::Themes,
             show_settings: false,
             show_about: false,
             #[cfg(not(target_arch = "wasm32"))]
@@ -133,7 +147,7 @@ impl ButtonsApp {
     }
 
     fn apply_style(&self, ctx: &egui::Context) {
-        let colors = self.preferences.theme.colors();
+        let colors = &self.active_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
         visuals.window_fill = colors.panel;
@@ -159,23 +173,27 @@ impl ButtonsApp {
         style.spacing.item_spacing = Vec2::new(7.0, 6.0);
         style.spacing.button_padding = Vec2::new(10.0, 5.0);
         style.visuals.window_corner_radius = 6.0.into();
+        let shell = &self.preferences.typography.shell;
+        for (text_style, scale) in [
+            (TextStyle::Heading, 1.45),
+            (TextStyle::Body, 1.0),
+            (TextStyle::Button, 1.0),
+            (TextStyle::Small, 0.86),
+        ] {
+            style.text_styles.insert(
+                text_style,
+                FontId::new((shell.size * scale).max(8.0), fonts::font_family(shell)),
+            );
+        }
         ctx.set_style(style);
     }
 
-    fn install_fonts(ctx: &egui::Context) {
-        let mut fonts = FontDefinitions::default();
-        fonts.font_data.insert(
-            "JetBrains Mono".to_owned(),
-            std::sync::Arc::new(FontData::from_static(include_bytes!(
-                "../assets/fonts/JetBrainsMono-Regular.ttf"
-            ))),
-        );
-        fonts
-            .families
-            .entry(FontFamily::Monospace)
-            .or_default()
-            .insert(0, "JetBrains Mono".to_owned());
-        ctx.set_fonts(fonts);
+    fn active_theme(&self) -> &ThemeDefinition {
+        self.themes.get(&self.preferences.theme_id)
+    }
+
+    fn colors(&self) -> AppColors {
+        self.active_theme().colors.clone()
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -310,8 +328,8 @@ impl ButtonsApp {
 
         let primary = self.primary.min(self.tabs.len() - 1);
         let focused = self.focused;
-        let font_size = self.preferences.font_size;
-        let theme = self.preferences.theme;
+        let terminal_font = fonts::font_id(&self.preferences.typography.terminal);
+        let theme = self.active_theme().clone();
         let modal_open = self.show_settings || self.show_about;
         let mut clicked = None;
 
@@ -321,8 +339,8 @@ impl ButtonsApp {
                     ui,
                     &mut self.tabs[primary],
                     focused == primary && !modal_open,
-                    font_size,
-                    theme,
+                    terminal_font.clone(),
+                    &theme,
                 );
                 if response.clicked() {
                     clicked = Some(primary);
@@ -336,8 +354,8 @@ impl ButtonsApp {
                         &mut columns[0],
                         first,
                         focused == primary && !modal_open,
-                        font_size,
-                        theme,
+                        terminal_font.clone(),
+                        &theme,
                     )
                     .clicked()
                     {
@@ -347,8 +365,8 @@ impl ButtonsApp {
                         &mut columns[1],
                         second,
                         focused == secondary && !modal_open,
-                        font_size,
-                        theme,
+                        terminal_font.clone(),
+                        &theme,
                     )
                     .clicked()
                     {
@@ -365,8 +383,8 @@ impl ButtonsApp {
                         pane,
                         first,
                         focused == primary && !modal_open,
-                        font_size,
-                        theme,
+                        terminal_font.clone(),
+                        &theme,
                     )
                     .clicked()
                     {
@@ -379,8 +397,8 @@ impl ButtonsApp {
                         pane,
                         second,
                         focused == secondary && !modal_open,
-                        font_size,
-                        theme,
+                        terminal_font.clone(),
+                        &theme,
                     )
                     .clicked()
                     {
@@ -434,7 +452,7 @@ impl ButtonsApp {
 
     #[cfg(target_arch = "wasm32")]
     fn web_demo(&mut self, ui: &mut egui::Ui) {
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         ui.label(
             RichText::new("SANDBOX TERMINAL")
                 .strong()
@@ -460,7 +478,7 @@ impl ButtonsApp {
             ui.label(RichText::new("$").monospace().color(colors.accent));
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.demo_input)
-                    .font(FontId::monospace(self.preferences.font_size))
+                    .font(fonts::font_id(&self.preferences.typography.terminal))
                     .hint_text("type help")
                     .desired_width(f32::INFINITY),
             );
@@ -475,7 +493,7 @@ impl ButtonsApp {
     }
 
     fn top_menu(&mut self, ctx: &egui::Context) {
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::TopBottomPanel::top("menu")
             .exact_height(31.0)
             .frame(
@@ -484,6 +502,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(8, 3)),
             )
             .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.shell);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("B").strong().color(colors.accent).size(12.0));
                     ui.label(
@@ -532,15 +551,16 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn tab_bar(&mut self, ctx: &egui::Context) {
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::TopBottomPanel::top("tabs")
             .exact_height(40.0)
             .frame(
                 egui::Frame::new()
-                    .fill(colors.panel)
+                    .fill(colors.tabs_background)
                     .inner_margin(egui::Margin::symmetric(8, 5)),
             )
             .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.tabs);
                 let mut close = None;
                 let mut activate = None;
                 ui.horizontal(|ui| {
@@ -559,10 +579,18 @@ impl ButtonsApp {
                         } else {
                             colors.muted
                         }))
-                        .fill(if active { colors.canvas } else { colors.raised })
+                        .fill(if active {
+                            colors.tabs_active
+                        } else {
+                            colors.tabs_idle
+                        })
                         .stroke(Stroke::new(
                             1.0_f32,
-                            if active { colors.accent } else { colors.border },
+                            if active {
+                                colors.tabs_border
+                            } else {
+                                colors.border
+                            },
                         ));
                         if ui.add_sized([150.0, 28.0], button).clicked() {
                             activate = Some(index);
@@ -597,7 +625,7 @@ impl ButtonsApp {
         if !self.preferences.show_presets {
             return;
         }
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::TopBottomPanel::top("presets")
             .exact_height(38.0)
             .frame(
@@ -606,6 +634,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(8, 4)),
             )
             .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.preset_dock);
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         for (label, command) in PRESETS {
@@ -623,13 +652,18 @@ impl ButtonsApp {
         if !self.preferences.show_sidebar {
             return;
         }
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::SidePanel::left("command_dock")
             .default_width(220.0)
             .width_range(160.0..=340.0)
             .resizable(true)
-            .frame(egui::Frame::new().fill(colors.panel).inner_margin(10.0))
+            .frame(
+                egui::Frame::new()
+                    .fill(colors.dock_background)
+                    .inner_margin(10.0),
+            )
             .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.preset_dock);
                 ui.horizontal(|ui| {
                     ui.label(
                         RichText::new("COMMAND DOCK")
@@ -688,15 +722,17 @@ impl ButtonsApp {
     }
 
     fn status_bar(&mut self, ctx: &egui::Context) {
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::TopBottomPanel::bottom("status")
             .exact_height(31.0)
             .frame(
                 egui::Frame::new()
-                    .fill(colors.raised)
+                    .fill(colors.status_background)
+                    .stroke(Stroke::new(1.0_f32, colors.status_border))
                     .inner_margin(egui::Margin::symmetric(9, 4)),
             )
             .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.status_bar);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
@@ -707,13 +743,16 @@ impl ButtonsApp {
                             "Alacritty engine"
                         })
                         .small()
-                        .color(colors.muted),
+                        .color(colors.status_text),
                     );
                     ui.separator();
                     ui.label(
-                        RichText::new(format!("{} px", self.preferences.font_size as i32))
-                            .small()
-                            .color(colors.muted),
+                        RichText::new(format!(
+                            "{} px",
+                            self.preferences.typography.terminal.size as i32
+                        ))
+                        .small()
+                        .color(colors.muted),
                     );
                     #[cfg(not(target_arch = "wasm32"))]
                     {
@@ -746,12 +785,12 @@ impl ButtonsApp {
                             self.show_settings = true;
                         }
                         if ui.small_button("+").clicked() {
-                            self.preferences.font_size =
-                                (self.preferences.font_size + 1.0).min(28.0);
+                            self.preferences.typography.terminal.size =
+                                (self.preferences.typography.terminal.size + 1.0).min(32.0);
                         }
                         if ui.small_button("−").clicked() {
-                            self.preferences.font_size =
-                                (self.preferences.font_size - 1.0).max(9.0);
+                            self.preferences.typography.terminal.size =
+                                (self.preferences.typography.terminal.size - 1.0).max(8.0);
                         }
                         ui.label(RichText::new("100%").small().color(colors.muted));
                     });
@@ -763,40 +802,244 @@ impl ButtonsApp {
         if !self.show_settings {
             return;
         }
-        let old_theme = self.preferences.theme;
+        let old_theme = self.preferences.theme_id.clone();
+        let old_typography = self.preferences.typography.clone();
+        let mut open = self.show_settings;
+        let settings_colors = self.colors();
         egui::Window::new("ButtonsCLI Settings")
-            .open(&mut self.show_settings)
-            .default_width(520.0)
+            .open(&mut open)
+            .default_size([980.0, 760.0])
+            .min_width(720.0)
             .resizable(true)
             .collapsible(false)
+            .frame(
+                egui::Frame::window(&ctx.style())
+                    .fill(settings_colors.settings_background)
+                    .stroke(Stroke::new(1.0_f32, settings_colors.accent_alt)),
+            )
             .show(ctx, |ui| {
-                ui.heading("Appearance");
-                ui.label("Choose a calm native theme. Terminal colors update without restarting the shell.");
-                ui.add_space(8.0);
-                ui.horizontal_wrapped(|ui| {
-                    for theme in ThemeId::ALL {
-                        let colors = theme.colors();
-                        let selected = theme == self.preferences.theme;
-                        let button = egui::Button::new(RichText::new(theme.name()).color(colors.text))
-                            .fill(colors.raised)
-                            .stroke(Stroke::new(2.0_f32, if selected { colors.accent } else { colors.border }));
-                        if ui.add_sized([112.0, 54.0], button).clicked() {
-                            self.preferences.theme = theme;
-                        }
-                    }
+                apply_zone_style(ui, &self.preferences.typography.settings);
+                ui.horizontal(|ui| {
+                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Themes, "Themes");
+                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Fonts, "Fonts");
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Workspace,
+                        "Workspace",
+                    );
                 });
-                ui.add_space(14.0);
-                ui.heading("Terminal font");
-                ui.add(egui::Slider::new(&mut self.preferences.font_size, 9.0..=28.0).suffix(" px"));
-                ui.label("JetBrains Mono compatible metrics; system fallback is used for missing glyphs.");
-                ui.add_space(14.0);
-                ui.heading("Workspace");
-                ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-                ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+                ui.separator();
+                match self.settings_tab {
+                    SettingsTab::Themes => self.theme_settings(ui),
+                    SettingsTab::Fonts => self.font_settings(ui),
+                    SettingsTab::Workspace => self.workspace_settings(ui),
+                }
             });
-        if old_theme != self.preferences.theme {
+        self.show_settings = open;
+        if old_theme != self.preferences.theme_id || old_typography != self.preferences.typography {
             self.apply_style(ctx);
         }
+    }
+
+    fn theme_settings(&mut self, ui: &mut egui::Ui) {
+        let colors = self.colors();
+        ui.heading("Theme Library");
+        ui.label(
+            RichText::new(format!(
+                "{} themes available · {} legacy selections · {} original theme files loaded",
+                self.themes.all().len(),
+                self.themes.legacy_count(),
+                self.themes.bundle_count()
+            ))
+            .color(colors.muted),
+        );
+        ui.add_space(6.0);
+        ui.add(
+            egui::TextEdit::singleline(&mut self.theme_search)
+                .hint_text("Search name, id, or description…")
+                .desired_width(f32::INFINITY),
+        );
+
+        let needle = self.theme_search.trim().to_ascii_lowercase();
+        let matches: Vec<usize> = self
+            .themes
+            .all()
+            .iter()
+            .enumerate()
+            .filter(|(_, theme)| {
+                needle.is_empty()
+                    || theme.name.to_ascii_lowercase().contains(&needle)
+                    || theme.id.to_ascii_lowercase().contains(&needle)
+                    || theme.description.to_ascii_lowercase().contains(&needle)
+            })
+            .map(|(index, _)| index)
+            .collect();
+        ui.label(
+            RichText::new(format!("{} results", matches.len()))
+                .small()
+                .color(colors.muted),
+        );
+
+        let mut apply = None;
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                let card_width = 276.0;
+                egui::Grid::new("theme-card-grid")
+                    .num_columns(3)
+                    .spacing([8.0, 8.0])
+                    .show(ui, |ui| {
+                        for (position, index) in matches.into_iter().enumerate() {
+                            let theme = &self.themes.all()[index];
+                            let selected = theme.id == self.preferences.theme_id;
+                            let frame = egui::Frame::new()
+                                .fill(theme.colors.settings_background)
+                                .stroke(Stroke::new(
+                                    if selected { 2.0_f32 } else { 1.0_f32 },
+                                    if selected {
+                                        theme.colors.accent
+                                    } else {
+                                        theme.colors.border
+                                    },
+                                ))
+                                .corner_radius(6.0)
+                                .inner_margin(10.0);
+                        ui.allocate_ui_with_layout(
+                            Vec2::new(card_width, 142.0),
+                            Layout::top_down(Align::Min),
+                            |ui| {
+                            frame.show(ui, |ui| {
+                                    ui.set_min_size(Vec2::new(card_width - 20.0, 122.0));
+                                    ui.set_max_width(card_width - 20.0);
+                                    ui.label(
+                                        RichText::new(&theme.name)
+                                            .strong()
+                                            .color(theme.colors.text),
+                                    );
+                                    ui.label(
+                                        RichText::new(&theme.description)
+                                            .small()
+                                            .color(theme.colors.muted),
+                                    );
+                                    ui.add_space(5.0);
+                                    ui.horizontal(|ui| {
+                                        for swatch in [
+                                            theme.colors.canvas,
+                                            theme.colors.panel,
+                                            theme.colors.accent,
+                                            theme.colors.accent_alt,
+                                            parse_terminal_swatch(&theme.terminal_colors.red),
+                                            parse_terminal_swatch(&theme.terminal_colors.green),
+                                        ] {
+                                            let (rect, _) = ui.allocate_exact_size(
+                                                Vec2::splat(16.0),
+                                                egui::Sense::hover(),
+                                            );
+                                            ui.painter().rect_filled(rect, 3.0, swatch);
+                                        }
+                                    });
+                                    ui.add_space(5.0);
+                                    if ui
+                                        .add_sized(
+                                            [88.0, 26.0],
+                                            egui::Button::new(if selected {
+                                                "Applied"
+                                            } else {
+                                                "Apply"
+                                            }),
+                                        )
+                                        .clicked()
+                                    {
+                                        apply = Some(index);
+                                    }
+                            });
+                        },
+                        );
+                            if position % 3 == 2 {
+                                ui.end_row();
+                            }
+                        }
+                    });
+            });
+
+        if let Some(index) = apply {
+            let theme = self.themes.all()[index].clone();
+            self.preferences.theme_id = theme.id;
+            if let Some(typography) = theme.typography {
+                self.preferences.typography = typography;
+            }
+        }
+    }
+
+    fn font_settings(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Fonts");
+        ui.label("Every bundled face is loaded locally. Each area can use its own family, real file weight, and size.");
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Use Shell UI font across the app").clicked() {
+                let source = self.preferences.typography.shell.clone();
+                sync_zone(&source, &mut self.preferences.typography.tabs);
+                sync_zone(&source, &mut self.preferences.typography.preset_dock);
+                sync_zone(&source, &mut self.preferences.typography.settings);
+                sync_zone(&source, &mut self.preferences.typography.assistant);
+                sync_zone(&source, &mut self.preferences.typography.status_bar);
+            }
+            if ui.button("Use AI Help font across the app").clicked() {
+                let source = self.preferences.typography.assistant.clone();
+                sync_zone(&source, &mut self.preferences.typography.shell);
+                sync_zone(&source, &mut self.preferences.typography.tabs);
+                sync_zone(&source, &mut self.preferences.typography.preset_dock);
+                sync_zone(&source, &mut self.preferences.typography.settings);
+                sync_zone(&source, &mut self.preferences.typography.status_bar);
+            }
+        });
+        ui.separator();
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            font_zone_editor(
+                ui,
+                "Shell / UI",
+                &mut self.preferences.typography.shell,
+                false,
+            );
+            font_zone_editor(ui, "Tabs", &mut self.preferences.typography.tabs, false);
+            font_zone_editor(
+                ui,
+                "Command Dock",
+                &mut self.preferences.typography.preset_dock,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                "Settings Dialog",
+                &mut self.preferences.typography.settings,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                "AI Help Window",
+                &mut self.preferences.typography.assistant,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                "Status Bar",
+                &mut self.preferences.typography.status_bar,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                "Terminal",
+                &mut self.preferences.typography.terminal,
+                true,
+            );
+        });
+    }
+
+    fn workspace_settings(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Workspace");
+        ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
+        ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+        ui.add_space(12.0);
+        ui.label("Preferences are saved locally and restored on the next launch.");
     }
 
     fn about_window(&mut self, ctx: &egui::Context) {
@@ -854,16 +1097,122 @@ impl ButtonsApp {
     }
 }
 
+fn sync_zone(source: &FontZone, target: &mut FontZone) {
+    let size = target.size;
+    *target = source.clone();
+    target.size = size;
+}
+
+fn apply_zone_style(ui: &mut egui::Ui, zone: &FontZone) {
+    for (text_style, scale) in [
+        (TextStyle::Heading, 1.35),
+        (TextStyle::Body, 1.0),
+        (TextStyle::Button, 1.0),
+        (TextStyle::Small, 0.86),
+    ] {
+        ui.style_mut().text_styles.insert(
+            text_style,
+            FontId::new((zone.size * scale).max(8.0), fonts::font_family(zone)),
+        );
+    }
+}
+
+fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospace_only: bool) {
+    egui::Frame::new()
+        .fill(ui.visuals().faint_bg_color)
+        .stroke(ui.visuals().widgets.inactive.bg_stroke)
+        .corner_radius(5.0)
+        .inner_margin(10.0)
+        .show(ui, |ui| {
+            ui.set_min_width((ui.available_width() - 24.0).max(420.0));
+            ui.label(RichText::new(label).strong().font(fonts::font_id(zone)));
+            ui.horizontal_wrapped(|ui| {
+                egui::ComboBox::from_id_salt(("font-family", label))
+                    .selected_text(
+                        RichText::new(&zone.family)
+                            .font(FontId::new(13.0, fonts::font_family(zone))),
+                    )
+                    .width(270.0)
+                    .show_ui(ui, |ui| {
+                        for family in fonts::family_names(monospace_only) {
+                            let mut preview = zone.clone();
+                            preview.family = family.into();
+                            if ui
+                                .selectable_label(
+                                    zone.family == family,
+                                    RichText::new(family)
+                                        .font(FontId::new(13.0, fonts::font_family(&preview))),
+                                )
+                                .clicked()
+                            {
+                                zone.family = family.into();
+                                if !fonts::weights_for(family).contains(&zone.weight) {
+                                    zone.weight = *fonts::weights_for(family)
+                                        .iter()
+                                        .min_by_key(|weight| weight.abs_diff(400))
+                                        .unwrap_or(&400);
+                                }
+                            }
+                        }
+                    });
+
+                let weights = fonts::weights_for(&zone.family);
+                egui::ComboBox::from_id_salt(("font-weight", label))
+                    .selected_text(format!("{} weight", zone.weight))
+                    .show_ui(ui, |ui| {
+                        for weight in weights {
+                            ui.selectable_value(&mut zone.weight, weight, weight.to_string());
+                        }
+                    });
+                ui.add(egui::Slider::new(&mut zone.size, 8.0..=32.0).suffix(" px"));
+                if !monospace_only {
+                    ui.add(
+                        egui::Slider::new(&mut zone.letter_spacing, -1.0..=4.0).suffix(" spacing"),
+                    );
+                }
+            });
+            let files: Vec<_> = fonts::FONT_FACES
+                .iter()
+                .filter(|face| face.family == zone.family)
+                .map(|face| face.file)
+                .collect();
+            ui.label(
+                RichText::new(format!("Loaded from {}", files.join(", ")))
+                    .small()
+                    .color(ui.visuals().weak_text_color()),
+            );
+            ui.label(
+                RichText::new("The quick brown fox · 0123456789 · ~/project $ cargo run")
+                    .font(fonts::font_id(zone)),
+            );
+        });
+    ui.add_space(8.0);
+}
+
+fn parse_terminal_swatch(value: &str) -> Color32 {
+    let hex = value.strip_prefix('#').unwrap_or(value);
+    if hex.len() >= 6 {
+        if let (Ok(r), Ok(g), Ok(b)) = (
+            u8::from_str_radix(&hex[0..2], 16),
+            u8::from_str_radix(&hex[2..4], 16),
+            u8::from_str_radix(&hex[4..6], 16),
+        ) {
+            return Color32::from_rgb(r, g, b);
+        }
+    }
+    Color32::GRAY
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn terminal_surface(
     ui: &mut egui::Ui,
     tab: &mut TerminalTab,
     focused: bool,
-    font_size: f32,
-    theme: ThemeId,
+    terminal_font_id: FontId,
+    theme: &ThemeDefinition,
 ) -> egui::Response {
     let terminal_font = TerminalFont::new(FontSettings {
-        font_type: FontId::monospace(font_size),
+        font_type: terminal_font_id,
     });
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(focused)
@@ -906,7 +1255,7 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.sidebar(ctx);
 
-        let colors = self.preferences.theme.colors();
+        let colors = self.colors();
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(colors.canvas).inner_margin(8.0))
             .show(ctx, |ui| {
