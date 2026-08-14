@@ -20,7 +20,9 @@ The native tests prove that all 127 theme documents parse, the combined legacy
 catalog contains exactly 555 selections, representative ANSI values survive
 verbatim, all 26 scalable font files have catalog entries, legacy font aliases
 sanitize safely, and cross-platform shell-title extraction remains stable. The
-WASM package contains generated JavaScript/TypeScript bindings and a 33,475,638
+test suite also covers one-ID preference migration and proves that unchecked
+theme-apply sections remain unchanged. The WASM package contains generated
+JavaScript/TypeScript bindings and a 33,475,638
 byte uncompressed module before HTTP compression.
 
 The stripped native release executable is 43,519,064 bytes with the complete

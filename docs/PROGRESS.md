@@ -102,3 +102,12 @@ background cells remain correct. Animated themes drift their gradient colors;
 static and scanline values are normalized from the legacy percentage scale and
 painted as bounded overlays. A screenshot check of `basic2` confirmed its dark
 red/black terminal gradient behind live Bash output.
+
+## 2026-08-14 — Scoped and calm theme application
+
+Theme cards now expose the legacy five-part apply scope: app chrome, terminal
+colors, fonts, gradients, and special effects. Each part keeps its own persisted
+source theme, so mixing a favorite terminal palette with another theme's chrome
+is real state rather than a temporary preview. Calm apply preserves the selected
+colors while suppressing motion, static, and scanlines. Migration and partial
+apply behavior have focused unit coverage.
