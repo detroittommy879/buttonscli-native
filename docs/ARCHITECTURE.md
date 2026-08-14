@@ -45,6 +45,29 @@ visitor's local PTY.
   close remaps the primary, secondary, and focused indices together so the UI
   never retains a dangling terminal reference.
 
+## Visual asset system
+
+The original theme data remains data. A build script embeds 127 saved-theme
+JSON documents without rewriting them, and a checked-in migration artifact
+captures the 428 themes that the legacy TypeScript generated from its core,
+curated V5, and Gogh catalogs. The Rust importer is intentionally permissive:
+it reads supported colors and typography while leaving historical extra fields
+in the source artifacts. The runtime catalog therefore contains all 555 legacy
+selections plus four native recovery themes.
+
+Each theme maps its app shell, tabs, command dock, settings, and status surfaces
+separately. Terminal foreground/background and all 16 normal/bright ANSI colors
+are passed to `egui_term` verbatim. Unsupported gradients and post-processing
+effects are not approximated as flat colors; their source data remains bundled
+for the renderer work described in `LIMITATIONS.md`.
+
+All 26 legacy font binaries are embedded and registered once at startup. Named
+egui families point to real face files, the closest packaged weight is selected,
+and symbol plus broad Unicode faces form the fallback chain. Seven persisted
+typography zones mirror the legacy model. Online-only font names found in old
+themes are sanitized to a bundled equivalent while Google loading is disabled,
+matching the legacy application's offline behavior.
+
 ## Dependency policy
 
 Direct dependencies must be permissively licensed. Dependencies are pinned to

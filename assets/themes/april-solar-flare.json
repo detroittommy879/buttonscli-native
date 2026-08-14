@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "april-solar-flare",
+    "name": "April Solar Flare",
+    "description": "Bright and intense red-orange theme with crisp white text.",
+    "createdAt": "2026-04-11T06:14:00.000Z",
+    "updatedAt": "2026-04-11T06:14:00.000Z"
+  },
+  "theme": {
+    "mode": "system",
+    "app": {
+      "shell": {
+        "background": "#1f0906",
+        "backgroundSecondary": "#2a0c08",
+        "border": "#631c12",
+        "textMain": "#ffedeb",
+        "textDim": "#cfaaa5",
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "shadowColor": "rgba(10, 2, 1, 0.45)"
+      },
+      "tabs": {
+        "background": "#240a07",
+        "idleBackground": "#2f0d09",
+        "activeBackground": "#1f0906",
+        "hoverBackground": "#3b110c",
+        "activeBorder": "#ffb433",
+        "textActive": "#ffffff",
+        "textIdle": "#b89591",
+        "height": 35,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 5
+      },
+      "presetDock": {
+        "background": "#260b08",
+        "headerBackground": "#310e0a",
+        "buttonBackground": "#3f120d",
+        "buttonHover": "#4e1710",
+        "widthAccent": "#ffdd33",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#290c08",
+        "headerBackground": "#340f0b",
+        "buttonBackground": "#42130e",
+        "buttonHover": "#521811",
+        "widthAccent": "#ff4d33",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#2b0d09",
+        "headerBackground": "#38100c",
+        "buttonBackground": "#46140f",
+        "buttonHover": "#561a13",
+        "widthAccent": "#ffb433",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#2a0c08",
+        "text": "#ebd2ce",
+        "accent": "#ffdd33",
+        "border": "#4a150e",
+        "height": 25
+      },
+      "controls": {
+        "buttonRadius": 5,
+        "buttonPaddingX": 15,
+        "buttonPaddingY": 8,
+        "inputRadius": 5,
+        "inputBorder": "#631c12",
+        "inputBackground": "#310e0a",
+        "focusRing": "rgba(255, 77, 51, 0.2)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "compact",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "monospace",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "googleFont": "",
+      "background": "#1a0705",
+      "foreground": "#efdad7",
+      "cursor": "#ffdd33",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#6e2116",
+      "useGradient": false,
+      "gradientAnimation": false,
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#310e0a",
+        "red": "#ff4d33",
+        "green": "#b4ff33",
+        "yellow": "#ffb433",
+        "blue": "#3399ff",
+        "magenta": "#ff33a1",
+        "cyan": "#33ffdd",
+        "white": "#ffedeb",
+        "brightBlack": "#662820",
+        "brightRed": "#ff7561",
+        "brightGreen": "#caff61",
+        "brightYellow": "#ffc561",
+        "brightBlue": "#61adff",
+        "brightMagenta": "#ff61b8",
+        "brightCyan": "#61ffe5",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      }
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "hsyncEnabled": false,
+    "tvNoiseEnabled": false,
+    "simpleNoiseEnabled": false,
+    "rowBandingEnabled": false
+  }
+}

@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "vampires_court",
+    "name": "Vampire's Court",
+    "description": "A regal, gothic interpretation. Stark whites and pale silvers over crimson-tinted pitch black, featuring an entirely blood-and-gold color palette.",
+    "createdAt": "2026-04-20T16:00:56.965Z",
+    "updatedAt": "2026-04-20T16:00:56.965Z"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#1a110f",
+        "backgroundSecondary": "#332816",
+        "border": "#473a1c",
+        "textMain": "#cccccc",
+        "textDim": "#858585",
+        "accent": "#e7cd4b",
+        "accentHover": "#ebd66b",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "borderColor": "#222222",
+        "foreground": "#f0e6d2"
+      },
+      "tabs": {
+        "background": "#252526",
+        "idleBackground": "#2d2d30",
+        "activeBackground": "#2a1828",
+        "hoverBackground": "#2a2d2e",
+        "activeBorder": "#007acc",
+        "textActive": "#cccccc",
+        "textIdle": "#858585",
+        "height": 36,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 4,
+        "inactiveBackground": "#1a101a",
+        "backgroundColor": "#000000",
+        "foregroundColor": "#666666",
+        "activeBackgroundColor": "#0F0202",
+        "activeForegroundColor": "#FF0000",
+        "activeBorderColor": "#D4AF37"
+      },
+      "presetDock": {
+        "background": "#252526",
+        "headerBackground": "#2d2d30",
+        "buttonBackground": "#413e3e",
+        "buttonHover": "#c2aeae",
+        "widthAccent": "#000305",
+        "padding": 10,
+        "itemGap": 8,
+        "activeBackground": "#FFFFFF",
+        "activeForeground": "#1E2536",
+        "border": "#CDD8EA",
+        "foreground": "#394866"
+      },
+      "settings": "#0f0f0f",
+      "assistant": {
+        "background": "#1e1e1e",
+        "headerBackground": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "widthAccent": "#007acc",
+        "padding": 12,
+        "itemGap": 8,
+        "backgroundColor": "#1A0303",
+        "foregroundColor": "#EAEAEA",
+        "headerBackgroundColor": "#2B0505",
+        "headerForegroundColor": "#D4AF37"
+      },
+      "statusBar": {
+        "background": "#1f141f",
+        "text": "#ffffff",
+        "accent": "#0098ff",
+        "border": "#3c3c3c",
+        "height": 24,
+        "foreground": "#e6d8b8",
+        "backgroundColor": "#800000",
+        "foregroundColor": "#FFFFFF"
+      },
+      "controls": {
+        "buttonRadius": 4,
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "inputRadius": 4,
+        "inputBorder": "#3c3c3c",
+        "inputBackground": "#3c3c3c",
+        "focusRing": "rgba(0, 122, 204, 0.4)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "default",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "googleFont": "",
+      "background": "#1a110f",
+      "foreground": "#f0e6d2",
+      "cursor": "#d4a84f",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#706028",
+      "useGradient": true,
+      "gradientAnimation": false,
+      "gradientType": "linear",
+      "gradientColors": [
+        "#1a110f",
+        "#3b2f19",
+        "#211611"
+      ],
+      "gradientStart": "#1a110f",
+      "gradientEnd": "#211611",
+      "gradientColorC": "#3b2f19",
+      "gradientColorD": "#211611",
+      "gradientAngle": 0,
+      "gradientSpeed": 4,
+      "gradientRadialShape": "circle",
+      "gradientRadialPosition": "center",
+      "cursorBlink": true,
+      "ansiColors": {
+        "0": "#484855",
+        "1": "#6A0DAD",
+        "2": "#004E66",
+        "3": "#ea865f",
+        "4": "#41425c",
+        "5": "#830083",
+        "6": "#38495a",
+        "7": "#C0C0C0",
+        "8": "#40415d",
+        "9": "#5f1d9c",
+        "10": "#004d67",
+        "11": "#FF7518",
+        "12": "#40416c",
+        "13": "#7f2345",
+        "14": "#71a9ab",
+        "15": "#F5F5F5",
+        "black": "#321616",
+        "red": "#FF0000",
+        "green": "#D4AF37",
+        "yellow": "#C0C0C0",
+        "blue": "#68366c",
+        "magenta": "#870e0e",
+        "cyan": "#FF4500",
+        "white": "#FFFFFF",
+        "brightBlack": "#4D1111",
+        "brightRed": "#FF3333",
+        "brightGreen": "#E5C158",
+        "brightYellow": "#E0E0E0",
+        "brightBlue": "#732778",
+        "brightMagenta": "#A61919",
+        "brightCyan": "#FF6347",
+        "brightWhite": "#F8F8F8"
+      },
+      "gradient": {
+        "angle": 180,
+        "colors": [
+          "#110A13",
+          "#1A0F1F",
+          "#25142C"
+        ],
+        "from": "#101319",
+        "stops": [
+          "#1A1F34",
+          "#1B2438",
+          "#14212F"
+        ],
+        "to": "#11141B",
+        "type": "radial"
+      },
+      "gradientDirection": "radial"
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'cnr Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'IBM Plex Mono', 'Consolas', monospace",
+        "googleFont": "IBM Plex Mono",
+        "fontSize": 18,
+        "fontWeight": 300,
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'Anonymous Pro', 'Courier New', monospace",
+        "googleFont": "Anonymous Pro",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 300,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "'Commit Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 300,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      },
+      "fontFamily": "Space Mono, monospace",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": "-0.2px"
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "staticIntensity": 50,
+    "staticDensity": 60,
+    "staticAmplitude": 55,
+    "staticOpacity": 18,
+    "staticBrightness": 42,
+    "scanlinesEnabled": false,
+    "scanlinesStrength": 28,
+    "scanlinesPeriod": 4,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 18,
+    "hsyncWavePeriod": 72,
+    "hsyncSpeed": 28,
+    "hsyncUseGpu": true,
+    "hsyncDebugPanel": false,
+    "tvNoiseEnabled": false,
+    "tvNoiseAmount": 36,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseAmount": 7,
+    "simpleNoiseResolution": 50,
+    "simpleNoiseFps": 120,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseIdleEnabled": true,
+    "simpleNoiseIdleAmount": 42,
+    "simpleNoiseIdleDelaySeconds": 142,
+    "simpleNoiseIdleRampSeconds": 6,
+    "rowBandingEnabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingOpacity": 6
+  }
+}

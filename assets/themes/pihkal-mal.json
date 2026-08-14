@@ -1,0 +1,283 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pihkal-mal",
+    "name": "Pihkal: MAL",
+    "description": "A psychedelic rave theme with high-contrast, saturated colors and a repeating conic gradient for a trippy effect.",
+    "createdAt": "2026-04-18T13:03:53.150Z",
+    "updatedAt": "2026-04-18T13:03:53.150Z"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#150f16",
+        "backgroundSecondary": "#2e211a",
+        "border": "#442f1e",
+        "textMain": "#f9eee2",
+        "textDim": "#b49a81",
+        "accent": "#e9a23b",
+        "accentHover": "#ecc893",
+        "shadowColor": "rgba(0, 0, 0, 0.58)",
+        "foreground": "#f0f0f0",
+        "borderColor": "#C800C8"
+      },
+      "tabs": {
+        "background": "#2a1a4a",
+        "idleBackground": "#181310",
+        "activeBackground": "#434219",
+        "hoverBackground": "#41311b",
+        "activeBorder": "#f1b24b",
+        "textActive": "#f9eee2",
+        "textIdle": "#b49a81",
+        "height": 34,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 5,
+        "foreground": "#ff00aa",
+        "activeForeground": "#000000",
+        "inactiveBackground": "#140A19",
+        "inactiveForeground": "#D0A7DA",
+        "border": "#2A3140",
+        "separator": "#CBD5E6",
+        "active": {
+          "background": "#111111",
+          "foreground": "#E0E0E0",
+          "borderColor": "#444444"
+        },
+        "activeTabBackground": "#0a0000",
+        "activeTabForeground": "#cc0000",
+        "inactiveTabForeground": "#a39b9b",
+        "activeBorderColor": "#000000"
+      },
+      "presetDock": {
+        "background": "#1a1511",
+        "headerBackground": "#181310",
+        "buttonBackground": "#15110d",
+        "buttonHover": "#4a381c",
+        "widthAccent": "#f1b24b",
+        "padding": 10,
+        "itemGap": 8,
+        "foreground": "#394866",
+        "activeBackground": "#FFFFFF",
+        "activeForeground": "#1E2536",
+        "border": "#CDD8EA"
+      },
+      "settings": {
+        "background": "#120a24",
+        "headerBackground": "#181310",
+        "buttonBackground": "#15110d",
+        "buttonHover": "#4a381c",
+        "widthAccent": "#f1b24b",
+        "padding": 16,
+        "itemGap": 12,
+        "foreground": "#f0f0f0",
+        "card": "#161D28",
+        "accent": "#6DE36A",
+        "section": "#8A691F",
+        "sectionBackground": "#151A24",
+        "cardBackground": "#FFFFFF",
+        "cardForeground": "#223048",
+        "border": "#D0DBEC",
+        "inputBackground": "#FCFDFF",
+        "inputForeground": "#223148",
+        "accentBackground": "#4D72A8",
+        "accentForeground": "#FFFFFF"
+      },
+      "assistant": {
+        "background": "#2a1a4a",
+        "headerBackground": "#1a1511",
+        "buttonBackground": "#15110d",
+        "buttonHover": "#4a381c",
+        "widthAccent": "#f1b24b",
+        "padding": 12,
+        "itemGap": 8,
+        "foreground": "#f0f0f0",
+        "accent": "#FF6EA8",
+        "cardBackground": "#FFFFFF",
+        "cardForeground": "#24324B",
+        "border": "#D2DDEE",
+        "inputBackground": "#FBFDFF",
+        "inputForeground": "#223149"
+      },
+      "statusBar": {
+        "background": "#301e0d",
+        "text": "#f9eee2",
+        "accent": "#ffd083",
+        "border": "#6b5037",
+        "height": 24,
+        "foreground": "#000000",
+        "borderColor": "#222222"
+      },
+      "controls": {
+        "buttonRadius": 4,
+        "buttonPaddingX": 14,
+        "buttonPaddingY": 8,
+        "inputRadius": 4,
+        "inputBorder": "#6b5037",
+        "inputBackground": "#15110d",
+        "focusRing": "rgba(241, 178, 75, 0.22)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "default",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'Red Hat Mono', 'Consolas', monospace",
+      "fontSize": 14,
+      "fontWeight": 400,
+      "googleFont": "Red Hat Mono",
+      "background": "#140e1a",
+      "foreground": "#f0f0f0",
+      "cursor": "#ff00aa",
+      "cursorAccent": "#100c09",
+      "selectionBackground": "#6d4c28",
+      "useGradient": true,
+      "gradientAnimation": false,
+      "gradientType": "linear",
+      "gradientColors": [
+        "#150f16",
+        "#2b1b17",
+        "#51331d"
+      ],
+      "gradientStart": "#150f16",
+      "gradientEnd": "#51331d",
+      "gradientColorC": "#2b1b17",
+      "gradientColorD": "#51331d",
+      "gradientAngle": 45,
+      "gradientSpeed": 11,
+      "gradientRadialShape": "circle",
+      "gradientRadialPosition": "center",
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#241c17",
+        "red": "#de694b",
+        "green": "#7ab56b",
+        "yellow": "#f1b24b",
+        "blue": "#6b8fe2",
+        "magenta": "#b37ae6",
+        "cyan": "#5fc2c2",
+        "white": "#f8ede3",
+        "brightBlack": "#6e6966",
+        "brightRed": "#e7907a",
+        "brightGreen": "#9dc891",
+        "brightYellow": "#f4c476",
+        "brightBlue": "#8faae9",
+        "brightMagenta": "#c59aec",
+        "brightCyan": "#82cfcf",
+        "brightWhite": "#f9f0e7"
+      },
+      "gradient": {
+        "from": "#101319",
+        "to": "#11141B",
+        "type": "radial",
+        "colors": [
+          "#110A13",
+          "#1A0F1F",
+          "#25142C"
+        ],
+        "angle": 180,
+        "stops": [
+          "#1A1F34",
+          "#1B2438",
+          "#14212F"
+        ]
+      },
+      "gradientDirection": "diagonal"
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Roboto Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "'monof56 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Red Hat Mono', 'Consolas', monospace",
+        "googleFont": "Red Hat Mono",
+        "fontSize": 14,
+        "fontWeight": 400
+      },
+      "fontWeight": "bold",
+      "fontFamily": "'JetBrains Mono', monospace",
+      "fontSize": 14,
+      "letterSpacing": "-0.2px"
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "staticIntensity": 50,
+    "staticDensity": 60,
+    "staticAmplitude": 55,
+    "staticOpacity": 18,
+    "staticBrightness": 42,
+    "scanlinesEnabled": false,
+    "scanlinesStrength": 28,
+    "scanlinesPeriod": 4,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 18,
+    "hsyncWavePeriod": 72,
+    "hsyncSpeed": 28,
+    "hsyncUseGpu": true,
+    "hsyncDebugPanel": false,
+    "tvNoiseEnabled": false,
+    "tvNoiseAmount": 36,
+    "simpleNoiseEnabled": true,
+    "simpleNoiseAmount": 10,
+    "simpleNoiseResolution": 68,
+    "simpleNoiseFps": 20,
+    "simpleNoiseMinBrightness": 32,
+    "simpleNoiseMaxBrightness": 68,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleAmount": 50,
+    "simpleNoiseIdleDelaySeconds": 60,
+    "simpleNoiseIdleRampSeconds": 6,
+    "rowBandingEnabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingOpacity": 6
+  }
+}

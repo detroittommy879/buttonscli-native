@@ -176,15 +176,14 @@ impl TerminalBackend {
         let _pty_event_loop_thread = pty_event_loop.spawn();
         let _pty_event_subscription = std::thread::Builder::new()
             .name(format!("pty_event_subscription_{}", id))
-            .spawn(move || loop {
-                if let Ok(event) = event_receiver.recv() {
-                    pty_event_proxy_sender
-                        .send((id, event.clone()))
-                        .unwrap_or_else(|_| {
-                            panic!("pty_event_subscription_{}: sending PtyEvent is failed", id)
-                        });
-                    app_context.clone().request_repaint();
-                    if let Event::Exit = event {
+            .spawn(move || {
+                while let Ok(event) = event_receiver.recv() {
+                    if pty_event_proxy_sender.send((id, event.clone())).is_err()
+                    {
+                        break;
+                    }
+                    app_context.request_repaint();
+                    if matches!(event, Event::Exit) {
                         break;
                     }
                 }

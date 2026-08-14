@@ -16,14 +16,17 @@ wasm-pack build --target web --out-dir web/pkg --no-default-features
 cargo build --release
 ```
 
-The native tests cover stable theme metadata, basic color contrast invariants,
-and cross-platform shell-title extraction. The WASM package contains generated
-JavaScript/TypeScript bindings and a 3.4 MB uncompressed module before HTTP
-compression.
+The native tests prove that all 127 theme documents parse, the combined legacy
+catalog contains exactly 555 selections, representative ANSI values survive
+verbatim, all 26 scalable font files have catalog entries, legacy font aliases
+sanitize safely, and cross-platform shell-title extraction remains stable. The
+WASM package contains generated JavaScript/TypeScript bindings and a 33,475,638
+byte uncompressed module before HTTP compression.
 
-The stripped native release executable is 13,361,544 bytes. On this
-software-rendered VM, a clean launch reached a discoverable X11 window in 572
-ms. This is a coarse end-to-end observation rather than a controlled benchmark.
+The stripped native release executable is 43,519,064 bytes with the complete
+offline font and theme payload. On this software-rendered VM, a warm launch
+reached a discoverable X11 window in 241 ms. This is a coarse end-to-end
+observation rather than a controlled benchmark.
 
 ## Manual desktop smoke test
 
@@ -47,8 +50,16 @@ real X11 window:
 The final lifecycle check repeated step 7 against the optimized release binary:
 the window, application PID, and Bash child PID all disappeared cleanly.
 
+The visual-parity pass additionally opened the rebuilt Settings window on X11,
+confirmed the 559-entry combined theme browser (555 legacy plus four native),
+and rendered the full embedded font pack. Closing that development build through
+the window manager exposed an event-forwarder shutdown panic; the adapter now
+terminates quietly when the application channel closes, and the regression is
+covered by the repeated close smoke test.
+
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
-journal.
+journal. The parity pass includes `native-theme-library.png` and
+`native-font-settings.png`.
 
 ## Browser smoke test
 

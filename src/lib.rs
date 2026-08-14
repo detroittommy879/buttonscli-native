@@ -1,4 +1,5 @@
 pub mod app;
+pub mod fonts;
 pub mod theme;
 
 #[cfg(not(target_arch = "wasm32"))]

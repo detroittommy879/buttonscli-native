@@ -72,3 +72,23 @@ browser has WebGL disabled, which originally left a blank canvas after eframe
 reported the missing capability. The host page now catches that startup error
 and presents a styled compatibility explanation. The canvas path remains marked
 unverified until it is exercised on a WebGL-enabled browser.
+
+## 2026-08-14 — Font and theme parity pass
+
+The reduced four-theme/one-font prototype was replaced with the legacy visual
+asset system. The repository now carries the original 127 theme documents and
+26 font binaries with their shipped notices. A migration tool evaluated the
+legacy TypeScript catalog and froze its 428 generated presets, bringing the
+native searchable browser to all 555 original choices. Theme application now
+updates distinct shell surfaces, the terminal foreground/background, every
+normal and bright ANSI color, and bundled typography without restarting or
+clearing a shell.
+
+Settings now has dedicated Themes, Fonts, and Workspace pages. Fonts are live
+and independently persisted for the same seven zones as the legacy app, with
+real packaged weights, file provenance, sample rendering, and whole-app sync
+actions. Manual X11 inspection confirmed that the 27 MB font pack initializes
+without a rasterizer failure and that `basic2` changes the native chrome and
+terminal metrics on first launch. That close test also exposed and fixed a
+vendored event-forwarder panic when the app event channel disappears during
+shutdown.

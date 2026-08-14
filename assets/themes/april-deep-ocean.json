@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "april-deep-ocean",
+    "name": "April Deep Ocean",
+    "description": "Submarine aesthetics with deep blues and bioluminescent teal.",
+    "createdAt": "2026-04-11T06:15:00.000Z",
+    "updatedAt": "2026-04-11T06:15:00.000Z"
+  },
+  "theme": {
+    "mode": "system",
+    "app": {
+      "shell": {
+        "background": "#040b14",
+        "backgroundSecondary": "#06101c",
+        "border": "#132d4a",
+        "textMain": "#d9ecff",
+        "textDim": "#8babc7",
+        "accent": "#00f0ff",
+        "accentHover": "#4dffff",
+        "shadowColor": "rgba(0, 3, 8, 0.5)"
+      },
+      "tabs": {
+        "background": "#050d17",
+        "idleBackground": "#081321",
+        "activeBackground": "#040b14",
+        "hoverBackground": "#0a182a",
+        "activeBorder": "#00f0ff",
+        "textActive": "#ffffff",
+        "textIdle": "#7b99b5",
+        "height": 35,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 6
+      },
+      "presetDock": {
+        "background": "#060f1a",
+        "headerBackground": "#091524",
+        "buttonBackground": "#0d1d31",
+        "buttonHover": "#11263f",
+        "widthAccent": "#00aaff",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#07101d",
+        "headerBackground": "#0a1727",
+        "buttonBackground": "#0e1f34",
+        "buttonHover": "#132943",
+        "widthAccent": "#00f0ff",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#07111f",
+        "headerBackground": "#0b1829",
+        "buttonBackground": "#0f2138",
+        "buttonHover": "#142c47",
+        "widthAccent": "#00ffd5",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#06101c",
+        "text": "#b0c9e2",
+        "accent": "#00ffd5",
+        "border": "#0e223a",
+        "height": 25
+      },
+      "controls": {
+        "buttonRadius": 5,
+        "buttonPaddingX": 15,
+        "buttonPaddingY": 8,
+        "inputRadius": 5,
+        "inputBorder": "#132d4a",
+        "inputBackground": "#091524",
+        "focusRing": "rgba(0, 240, 255, 0.2)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "compact",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "monospace",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "googleFont": "",
+      "background": "#030910",
+      "foreground": "#c4dcf2",
+      "cursor": "#00f0ff",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#163a5f",
+      "useGradient": false,
+      "gradientAnimation": false,
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#091524",
+        "red": "#ff4d6a",
+        "green": "#00ffd5",
+        "yellow": "#ffb800",
+        "blue": "#00aaff",
+        "magenta": "#aa00ff",
+        "cyan": "#00f0ff",
+        "white": "#d9ecff",
+        "brightBlack": "#26486a",
+        "brightRed": "#ff7c92",
+        "brightGreen": "#4dffdf",
+        "brightYellow": "#ffd64d",
+        "brightBlue": "#4dc2ff",
+        "brightMagenta": "#c24dff",
+        "brightCyan": "#4dffff",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      }
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "hsyncEnabled": false,
+    "tvNoiseEnabled": false,
+    "simpleNoiseEnabled": false,
+    "rowBandingEnabled": false
+  }
+}
