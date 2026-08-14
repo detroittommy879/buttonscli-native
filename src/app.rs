@@ -51,7 +51,13 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
-    active: usize,
+    primary: usize,
+    #[cfg(not(target_arch = "wasm32"))]
+    secondary: Option<usize>,
+    #[cfg(not(target_arch = "wasm32"))]
+    focused: usize,
+    #[cfg(not(target_arch = "wasm32"))]
+    pane_layout: PaneLayout,
     #[cfg(not(target_arch = "wasm32"))]
     next_id: u64,
     #[cfg(not(target_arch = "wasm32"))]
@@ -62,6 +68,15 @@ pub struct ButtonsApp {
     demo_lines: Vec<String>,
     #[cfg(target_arch = "wasm32")]
     demo_input: String,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum PaneLayout {
+    #[default]
+    Single,
+    SideBySide,
+    Stacked,
 }
 
 impl ButtonsApp {
@@ -92,7 +107,13 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
-            active: 0,
+            primary: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            secondary: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            focused: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            pane_layout: PaneLayout::Single,
             #[cfg(not(target_arch = "wasm32"))]
             next_id: 1,
             #[cfg(not(target_arch = "wasm32"))]
@@ -164,7 +185,14 @@ impl ButtonsApp {
         match TerminalTab::spawn(id, context, self.events_tx.clone()) {
             Ok(tab) => {
                 self.tabs.push(tab);
-                self.active = self.tabs.len() - 1;
+                let index = self.tabs.len() - 1;
+                if self.tabs.len() == 1 || self.pane_layout == PaneLayout::Single {
+                    self.primary = index;
+                    self.secondary = None;
+                } else {
+                    self.secondary = Some(index);
+                }
+                self.focused = index;
                 self.notice = None;
             }
             Err(error) => self.notice = Some(format!("Could not start shell: {error}")),
@@ -179,7 +207,41 @@ impl ButtonsApp {
         if index < self.tabs.len() {
             self.tabs.remove(index);
         }
-        self.active = self.active.min(self.tabs.len().saturating_sub(1));
+        if self.tabs.is_empty() {
+            self.primary = 0;
+            self.secondary = None;
+            self.focused = 0;
+            self.pane_layout = PaneLayout::Single;
+            return;
+        }
+
+        let adjust = |slot: usize| {
+            if slot == index {
+                None
+            } else if slot > index {
+                Some(slot - 1)
+            } else {
+                Some(slot)
+            }
+        };
+        let old_secondary = self.secondary;
+        self.primary = adjust(self.primary)
+            .or_else(|| old_secondary.and_then(adjust))
+            .unwrap_or(0)
+            .min(self.tabs.len() - 1);
+        self.secondary = old_secondary
+            .and_then(adjust)
+            .filter(|slot| *slot != self.primary && *slot < self.tabs.len());
+        self.focused = adjust(self.focused)
+            .unwrap_or(self.primary)
+            .min(self.tabs.len() - 1);
+
+        if self.pane_layout != PaneLayout::Single && self.secondary.is_none() {
+            self.secondary = (0..self.tabs.len()).find(|slot| *slot != self.primary);
+        }
+        if self.secondary.is_none() {
+            self.pane_layout = PaneLayout::Single;
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -197,8 +259,139 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn run_command(&mut self, command: &str) {
-        if let Some(tab) = self.tabs.get_mut(self.active) {
+        if let Some(tab) = self.tabs.get_mut(self.focused) {
             tab.run(command);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_pane_layout(&mut self, layout: PaneLayout, context: &egui::Context) {
+        self.pane_layout = layout;
+        if layout == PaneLayout::Single {
+            self.primary = self.focused.min(self.tabs.len().saturating_sub(1));
+            self.secondary = None;
+            return;
+        }
+
+        self.primary = self.focused.min(self.tabs.len().saturating_sub(1));
+        self.secondary = (0..self.tabs.len()).find(|slot| *slot != self.primary);
+        if self.secondary.is_none() {
+            self.open_tab(context.clone());
+        }
+        if let Some(secondary) = self.secondary {
+            self.focused = secondary;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn activate_tab(&mut self, index: usize) {
+        if self.pane_layout == PaneLayout::Single {
+            self.primary = index;
+        } else if Some(index) != self.secondary && index != self.primary {
+            if self.focused == self.primary {
+                self.primary = index;
+            } else {
+                self.secondary = Some(index);
+            }
+        }
+        self.focused = index;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn terminal_workspace(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
+        if self.tabs.is_empty() {
+            ui.centered_and_justified(|ui| {
+                if ui.button("Open a terminal").clicked() {
+                    self.open_tab(context.clone());
+                }
+            });
+            return;
+        }
+
+        let primary = self.primary.min(self.tabs.len() - 1);
+        let focused = self.focused;
+        let font_size = self.preferences.font_size;
+        let theme = self.preferences.theme;
+        let modal_open = self.show_settings || self.show_about;
+        let mut clicked = None;
+
+        match (self.pane_layout, self.secondary) {
+            (PaneLayout::Single, _) | (_, None) => {
+                let response = terminal_surface(
+                    ui,
+                    &mut self.tabs[primary],
+                    focused == primary && !modal_open,
+                    font_size,
+                    theme,
+                );
+                if response.clicked() {
+                    clicked = Some(primary);
+                }
+            }
+            (PaneLayout::SideBySide, Some(secondary)) => {
+                let secondary = secondary.min(self.tabs.len() - 1);
+                let (first, second) = two_tabs_mut(&mut self.tabs, primary, secondary);
+                ui.columns(2, |columns| {
+                    if terminal_surface(
+                        &mut columns[0],
+                        first,
+                        focused == primary && !modal_open,
+                        font_size,
+                        theme,
+                    )
+                    .clicked()
+                    {
+                        clicked = Some(primary);
+                    }
+                    if terminal_surface(
+                        &mut columns[1],
+                        second,
+                        focused == secondary && !modal_open,
+                        font_size,
+                        theme,
+                    )
+                    .clicked()
+                    {
+                        clicked = Some(secondary);
+                    }
+                });
+            }
+            (PaneLayout::Stacked, Some(secondary)) => {
+                let secondary = secondary.min(self.tabs.len() - 1);
+                let (first, second) = two_tabs_mut(&mut self.tabs, primary, secondary);
+                let pane_height = ((ui.available_height() - 8.0) / 2.0).max(80.0);
+                ui.allocate_ui(Vec2::new(ui.available_width(), pane_height), |pane| {
+                    if terminal_surface(
+                        pane,
+                        first,
+                        focused == primary && !modal_open,
+                        font_size,
+                        theme,
+                    )
+                    .clicked()
+                    {
+                        clicked = Some(primary);
+                    }
+                });
+                ui.separator();
+                ui.allocate_ui(Vec2::new(ui.available_width(), pane_height), |pane| {
+                    if terminal_surface(
+                        pane,
+                        second,
+                        focused == secondary && !modal_open,
+                        font_size,
+                        theme,
+                    )
+                    .clicked()
+                    {
+                        clicked = Some(secondary);
+                    }
+                });
+            }
+        }
+
+        if let Some(index) = clicked {
+            self.focused = index;
         }
     }
 
@@ -349,11 +542,15 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 let mut close = None;
+                let mut activate = None;
                 ui.horizontal(|ui| {
                     for (index, tab) in self.tabs.iter().enumerate() {
-                        let active = index == self.active;
+                        let active = index == self.focused;
+                        let visible = index == self.primary || Some(index) == self.secondary;
                         let label = if tab.exited {
                             format!("{}  · exited", tab.title)
+                        } else if visible && !active {
+                            format!("{}  · visible", tab.title)
                         } else {
                             tab.title.clone()
                         };
@@ -368,7 +565,7 @@ impl ButtonsApp {
                             if active { colors.accent } else { colors.border },
                         ));
                         if ui.add_sized([150.0, 28.0], button).clicked() {
-                            self.active = index;
+                            activate = Some(index);
                         }
                         if ui
                             .small_button("×")
@@ -386,6 +583,9 @@ impl ButtonsApp {
                         self.open_tab(ctx.clone());
                     }
                 });
+                if let Some(index) = activate {
+                    self.activate_tab(index);
+                }
                 if let Some(index) = close {
                     self.close_tab(index);
                 }
@@ -515,6 +715,32 @@ impl ButtonsApp {
                             .small()
                             .color(colors.muted),
                     );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        ui.separator();
+                        ui.label(RichText::new("Panes").small().color(colors.muted));
+                        if ui
+                            .selectable_label(self.pane_layout == PaneLayout::Single, "1")
+                            .on_hover_text("Single pane")
+                            .clicked()
+                        {
+                            self.set_pane_layout(PaneLayout::Single, ctx);
+                        }
+                        if ui
+                            .selectable_label(self.pane_layout == PaneLayout::SideBySide, "SIDE")
+                            .on_hover_text("Side-by-side panes")
+                            .clicked()
+                        {
+                            self.set_pane_layout(PaneLayout::SideBySide, ctx);
+                        }
+                        if ui
+                            .selectable_label(self.pane_layout == PaneLayout::Stacked, "STACK")
+                            .on_hover_text("Stacked panes")
+                            .clicked()
+                        {
+                            self.set_pane_layout(PaneLayout::Stacked, ctx);
+                        }
+                    }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui.small_button("Settings").clicked() {
                             self.show_settings = true;
@@ -604,10 +830,10 @@ impl ButtonsApp {
                 self.open_tab(ctx.clone());
             }
             if close_tab && !self.tabs.is_empty() {
-                self.close_tab(self.active);
+                self.close_tab(self.focused);
             }
             if copy {
-                if let Some(tab) = self.tabs.get(self.active) {
+                if let Some(tab) = self.tabs.get(self.focused) {
                     let selected = tab.backend.selectable_content();
                     if !selected.is_empty() {
                         ctx.copy_text(selected);
@@ -625,6 +851,40 @@ impl ButtonsApp {
         if quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn terminal_surface(
+    ui: &mut egui::Ui,
+    tab: &mut TerminalTab,
+    focused: bool,
+    font_size: f32,
+    theme: ThemeId,
+) -> egui::Response {
+    let terminal_font = TerminalFont::new(FontSettings {
+        font_type: FontId::monospace(font_size),
+    });
+    let terminal = TerminalView::new(ui, &mut tab.backend)
+        .set_focus(focused)
+        .set_font(terminal_font)
+        .set_theme(theme.terminal());
+    ui.add(terminal)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn two_tabs_mut(
+    tabs: &mut [TerminalTab],
+    first: usize,
+    second: usize,
+) -> (&mut TerminalTab, &mut TerminalTab) {
+    assert_ne!(first, second, "split panes must reference different tabs");
+    if first < second {
+        let (left, right) = tabs.split_at_mut(second);
+        (&mut left[first], &mut right[0])
+    } else {
+        let (left, right) = tabs.split_at_mut(first);
+        (&mut right[0], &mut left[second])
     }
 }
 
@@ -655,22 +915,7 @@ impl eframe::App for ButtonsApp {
                     ui.add_space(8.0);
                 }
                 #[cfg(not(target_arch = "wasm32"))]
-                if let Some(tab) = self.tabs.get_mut(self.active) {
-                    let terminal_font = TerminalFont::new(FontSettings {
-                        font_type: FontId::monospace(self.preferences.font_size),
-                    });
-                    let terminal = TerminalView::new(ui, &mut tab.backend)
-                        .set_focus(!self.show_settings && !self.show_about)
-                        .set_font(terminal_font)
-                        .set_theme(self.preferences.theme.terminal());
-                    ui.add(terminal);
-                } else {
-                    ui.centered_and_justified(|ui| {
-                        if ui.button("Open a terminal").clicked() {
-                            self.open_tab(ctx.clone());
-                        }
-                    });
-                }
+                self.terminal_workspace(ui, ctx);
                 #[cfg(target_arch = "wasm32")]
                 self.web_demo(ui);
             });
