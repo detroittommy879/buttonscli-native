@@ -18,7 +18,7 @@ Current desktop features include:
 - detected and custom shell profiles with persisted default/per-tab selection,
   arguments, and working directories;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
-- a resizable command dock, editable persisted command presets with type/run
+- separate command and SSH docks, editable persisted presets with type/run
   behavior, and all 555 legacy theme selections with exact terminal ANSI palettes;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal,

@@ -24,7 +24,7 @@ constraints.
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
 | Tabs and sessions | Done | Keep lifecycle and pane-index regressions covered |
 | Pane layouts | Partial | Add nested/resizable splits beyond the 10-pane tiler |
-| Command presets | Done | Extend the same model to the separate SSH collection |
+| Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Import/edit/share plus full effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
 | Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
@@ -40,7 +40,7 @@ constraints.
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Columns, rows, and balanced grids add/remove/focus up to 10 visible sessions without corrupting tab mappings; nested and individually resizable splits remain. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
-| SSH presets | Missing | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
+| SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
 | Dock behavior | Partial | `src/components/PresetBar.tsx` | Top and left docks resize, collapse, auto-hide, and support compact wrapping without covering terminal content. |
 | Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Port every supported command, expose editable bindings, detect conflicts, and verify macOS/Windows modifier behavior. |
 | Status controls | Partial | `src/components/StatusBar.tsx` | Show live shell/tab/pane state and restore the useful layout, zoom, opacity, effect, and assistant controls. |
@@ -98,12 +98,11 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Add the separate SSH preset collection and focused-terminal workflow.
-2. Add nested/resizable split-tree editing to the new 10-pane state model.
-3. Finish non-AI visual editing/effects foundations.
-4. Build secure provider/key configuration, then AI Help.
-5. Version and secure the loopback automation API before adding CLI/MCP clients.
-6. Close platform, accessibility, localization, and release gaps continuously.
+1. Add nested/resizable split-tree editing to the new 10-pane state model.
+2. Finish non-AI visual editing/effects foundations.
+3. Build secure provider/key configuration, then AI Help.
+4. Version and secure the loopback automation API before adding CLI/MCP clients.
+5. Close platform, accessibility, localization, and release gaps continuously.
 
 ## Definition of done for a backlog row
 

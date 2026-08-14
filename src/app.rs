@@ -117,6 +117,7 @@ struct Preferences {
     show_sidebar: bool,
     show_presets: bool,
     presets: Vec<CommandPreset>,
+    ssh_presets: Vec<CommandPreset>,
     default_shell_id: String,
     default_working_directory: String,
     custom_shell_profiles: Vec<ShellProfile>,
@@ -136,6 +137,7 @@ impl Default for Preferences {
             show_sidebar: true,
             show_presets: true,
             presets: default_presets(),
+            ssh_presets: Vec::new(),
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
@@ -188,12 +190,14 @@ pub struct ButtonsApp {
     show_settings: bool,
     show_about: bool,
     show_preset_editor: bool,
+    preset_editor_collection: PresetCollection,
     editing_preset: Option<usize>,
     preset_label_draft: String,
     preset_command_draft: String,
     preset_send_enter_draft: bool,
     preset_editor_error: Option<String>,
     confirm_preset_reset: bool,
+    preset_settings_collection: PresetCollection,
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
@@ -239,10 +243,25 @@ enum SettingsTab {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PresetCollection {
+    Commands,
+    Ssh,
+}
+
+impl PresetCollection {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Commands => "Command",
+            Self::Ssh => "SSH",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PresetAction {
-    Run(usize),
-    Edit(usize),
-    Delete(usize),
+    Run(PresetCollection, usize),
+    Edit(PresetCollection, usize),
+    Delete(PresetCollection, usize),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -300,12 +319,14 @@ impl ButtonsApp {
             show_settings: false,
             show_about: false,
             show_preset_editor: false,
+            preset_editor_collection: PresetCollection::Commands,
             editing_preset: None,
             preset_label_draft: String::new(),
             preset_command_draft: String::new(),
             preset_send_enter_draft: true,
             preset_editor_error: None,
             confirm_preset_reset: false,
+            preset_settings_collection: PresetCollection::Commands,
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
@@ -693,8 +714,22 @@ impl ButtonsApp {
         }
     }
 
-    fn apply_preset(&mut self, index: usize) {
-        let Some(preset) = self.preferences.presets.get(index).cloned() else {
+    fn presets(&self, collection: PresetCollection) -> &[CommandPreset] {
+        match collection {
+            PresetCollection::Commands => &self.preferences.presets,
+            PresetCollection::Ssh => &self.preferences.ssh_presets,
+        }
+    }
+
+    fn presets_mut(&mut self, collection: PresetCollection) -> &mut Vec<CommandPreset> {
+        match collection {
+            PresetCollection::Commands => &mut self.preferences.presets,
+            PresetCollection::Ssh => &mut self.preferences.ssh_presets,
+        }
+    }
+
+    fn apply_preset(&mut self, collection: PresetCollection, index: usize) {
+        let Some(preset) = self.presets(collection).get(index).cloned() else {
             return;
         };
         #[cfg(not(target_arch = "wasm32"))]
@@ -709,7 +744,8 @@ impl ButtonsApp {
         }
     }
 
-    fn open_add_preset_editor(&mut self) {
+    fn open_add_preset_editor(&mut self, collection: PresetCollection) {
+        self.preset_editor_collection = collection;
         self.editing_preset = None;
         self.preset_label_draft.clear();
         self.preset_command_draft.clear();
@@ -718,13 +754,14 @@ impl ButtonsApp {
         self.show_preset_editor = true;
     }
 
-    fn open_edit_preset_editor(&mut self, index: usize) {
-        let Some(preset) = self.preferences.presets.get(index) else {
+    fn open_edit_preset_editor(&mut self, collection: PresetCollection, index: usize) {
+        let Some(preset) = self.presets(collection).get(index).cloned() else {
             return;
         };
+        self.preset_editor_collection = collection;
         self.editing_preset = Some(index);
-        self.preset_label_draft.clone_from(&preset.label);
-        self.preset_command_draft.clone_from(&preset.command);
+        self.preset_label_draft = preset.label;
+        self.preset_command_draft = preset.command;
         self.preset_send_enter_draft = preset.send_enter;
         self.preset_editor_error = None;
         self.show_preset_editor = true;
@@ -740,14 +777,15 @@ impl ButtonsApp {
             self.preset_editor_error = Some("Label and command are both required.".into());
             return false;
         };
+        let collection = self.preset_editor_collection;
         if let Some(index) = self.editing_preset {
-            let Some(existing) = self.preferences.presets.get_mut(index) else {
+            let Some(existing) = self.presets_mut(collection).get_mut(index) else {
                 self.preset_editor_error = Some("That preset no longer exists.".into());
                 return false;
             };
             *existing = preset;
         } else {
-            self.preferences.presets.push(preset);
+            self.presets_mut(collection).push(preset);
         }
         self.preset_editor_error = None;
         true
@@ -755,11 +793,14 @@ impl ButtonsApp {
 
     fn perform_preset_action(&mut self, action: PresetAction) {
         match action {
-            PresetAction::Run(index) => self.apply_preset(index),
-            PresetAction::Edit(index) => self.open_edit_preset_editor(index),
-            PresetAction::Delete(index) => {
-                if index < self.preferences.presets.len() {
-                    self.preferences.presets.remove(index);
+            PresetAction::Run(collection, index) => self.apply_preset(collection, index),
+            PresetAction::Edit(collection, index) => {
+                self.open_edit_preset_editor(collection, index);
+            }
+            PresetAction::Delete(collection, index) => {
+                let presets = self.presets_mut(collection);
+                if index < presets.len() {
+                    presets.remove(index);
                 }
             }
         }
@@ -1175,9 +1216,9 @@ impl ButtonsApp {
                                 .on_hover_text(preset_hover_text(preset))
                                 .clicked()
                             {
-                                action = Some(PresetAction::Run(index));
+                                action = Some(PresetAction::Run(PresetCollection::Commands, index));
                             }
-                            preset_action_menu(ui, index, &mut action);
+                            preset_action_menu(ui, PresetCollection::Commands, index, &mut action);
                         }
                         if ui.button("+").on_hover_text("Add a preset").clicked() {
                             add = true;
@@ -1188,7 +1229,7 @@ impl ButtonsApp {
                     self.perform_preset_action(action);
                 }
                 if add {
-                    self.open_add_preset_editor();
+                    self.open_add_preset_editor(PresetCollection::Commands);
                 }
             });
     }
@@ -1211,11 +1252,7 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.preset_dock);
                 ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("COMMAND DOCK")
-                            .strong()
-                            .color(colors.accent_alt),
-                    );
+                    ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui.small_button("‹").clicked() {
                             self.preferences.show_sidebar = false;
@@ -1224,13 +1261,21 @@ impl ButtonsApp {
                 });
                 ui.add_space(4.0);
                 ui.label(
-                    RichText::new("Fast actions for the focused terminal")
+                    RichText::new("Saved remote connections for the focused terminal")
                         .small()
                         .color(colors.muted),
                 );
                 ui.add_space(8.0);
-                let presets = self.preferences.presets.clone();
+                let presets = self.preferences.ssh_presets.clone();
                 let mut action = None;
+                if presets.is_empty() {
+                    ui.label(
+                        RichText::new("No SSH presets yet")
+                            .small()
+                            .color(colors.muted),
+                    );
+                    ui.add_space(4.0);
+                }
                 for (index, preset) in presets.iter().enumerate() {
                     ui.horizontal(|ui| {
                         let action_width = 24.0;
@@ -1240,19 +1285,19 @@ impl ButtonsApp {
                             .on_hover_text(preset_hover_text(preset))
                             .clicked()
                         {
-                            action = Some(PresetAction::Run(index));
+                            action = Some(PresetAction::Run(PresetCollection::Ssh, index));
                         }
-                        preset_action_menu(ui, index, &mut action);
+                        preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
                     });
                 }
                 if ui
                     .add_sized(
                         [ui.available_width(), 28.0],
-                        egui::Button::new("+ Add preset"),
+                        egui::Button::new("+ Add SSH preset"),
                     )
                     .clicked()
                 {
-                    self.open_add_preset_editor();
+                    self.open_add_preset_editor(PresetCollection::Ssh);
                 }
                 if let Some(action) = action {
                     self.perform_preset_action(action);
@@ -1868,23 +1913,43 @@ impl ButtonsApp {
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.heading("Command Presets");
+        ui.heading("Saved Presets");
         ui.label(
             RichText::new(
-                "Saved buttons target the focused terminal. Choose whether each button types its text or also presses Enter.",
+                "Command and SSH buttons are stored separately. Both target the focused terminal and can either type text or also press Enter.",
             )
             .color(colors.muted),
         );
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if ui.button("+ Add preset").clicked() {
-                self.open_add_preset_editor();
+            ui.selectable_value(
+                &mut self.preset_settings_collection,
+                PresetCollection::Commands,
+                format!("Commands ({})", self.preferences.presets.len()),
+            );
+            ui.selectable_value(
+                &mut self.preset_settings_collection,
+                PresetCollection::Ssh,
+                format!("SSH ({})", self.preferences.ssh_presets.len()),
+            );
+        });
+        ui.add_space(8.0);
+        let collection = self.preset_settings_collection;
+        ui.heading(format!("{} Presets", collection.label()));
+        ui.horizontal(|ui| {
+            if ui
+                .button(format!("+ Add {} preset", collection.label()))
+                .clicked()
+            {
+                self.open_add_preset_editor(collection);
             }
-            if ui.button("Restore starter presets").clicked() {
+            if collection == PresetCollection::Commands
+                && ui.button("Restore starter presets").clicked()
+            {
                 self.confirm_preset_reset = true;
             }
             ui.label(
-                RichText::new(format!("{} saved", self.preferences.presets.len()))
+                RichText::new(format!("{} saved", self.presets(collection).len()))
                     .small()
                     .color(colors.muted),
             );
@@ -1912,7 +1977,7 @@ impl ButtonsApp {
         }
 
         ui.add_space(8.0);
-        let presets = self.preferences.presets.clone();
+        let presets = self.presets(collection).to_vec();
         let mut action = None;
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
@@ -1945,13 +2010,13 @@ impl ButtonsApp {
                                 });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                     if ui.button("Delete").clicked() {
-                                        action = Some(PresetAction::Delete(index));
+                                        action = Some(PresetAction::Delete(collection, index));
                                     }
                                     if ui.button("Edit").clicked() {
-                                        action = Some(PresetAction::Edit(index));
+                                        action = Some(PresetAction::Edit(collection, index));
                                     }
                                     if ui.button("Run").clicked() {
-                                        action = Some(PresetAction::Run(index));
+                                        action = Some(PresetAction::Run(collection, index));
                                     }
                                 });
                             });
@@ -1972,9 +2037,9 @@ impl ButtonsApp {
         let mut save = false;
         let mut cancel = false;
         let title = if self.editing_preset.is_some() {
-            "Edit preset"
+            format!("Edit {} preset", self.preset_editor_collection.label())
         } else {
-            "Add preset"
+            format!("Add {} preset", self.preset_editor_collection.label())
         };
         egui::Window::new(title)
             .open(&mut open)
@@ -2479,19 +2544,24 @@ fn preset_hover_text(preset: &CommandPreset) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn preset_action_menu(ui: &mut egui::Ui, index: usize, action: &mut Option<PresetAction>) {
+fn preset_action_menu(
+    ui: &mut egui::Ui,
+    collection: PresetCollection,
+    index: usize,
+    action: &mut Option<PresetAction>,
+) {
     ui.menu_button("⋮", |ui| {
         if ui.button("Run").clicked() {
-            *action = Some(PresetAction::Run(index));
+            *action = Some(PresetAction::Run(collection, index));
             ui.close_menu();
         }
         if ui.button("Edit").clicked() {
-            *action = Some(PresetAction::Edit(index));
+            *action = Some(PresetAction::Edit(collection, index));
             ui.close_menu();
         }
         ui.separator();
         if ui.button("Delete").clicked() {
-            *action = Some(PresetAction::Delete(index));
+            *action = Some(PresetAction::Delete(collection, index));
             ui.close_menu();
         }
     });
@@ -2602,6 +2672,7 @@ mod tests {
         assert_eq!(preferences.presets, default_presets());
         assert_eq!(preferences.default_shell_id, "system");
         assert!(preferences.custom_shell_profiles.is_empty());
+        assert!(preferences.ssh_presets.is_empty());
         assert!(preferences
             .presets
             .iter()
@@ -2639,8 +2710,33 @@ mod tests {
         assert_eq!(app.preferences.presets[0].label, "Follow logs");
         assert!(app.preferences.presets[0].send_enter);
 
-        app.perform_preset_action(PresetAction::Delete(0));
+        app.perform_preset_action(PresetAction::Delete(PresetCollection::Commands, 0));
         assert!(app.preferences.presets.is_empty());
+    }
+
+    #[test]
+    fn ssh_presets_are_edited_independently() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let command_presets = app.preferences.presets.clone();
+
+        app.preset_editor_collection = PresetCollection::Ssh;
+        app.preset_label_draft = "Production".into();
+        app.preset_command_draft = "ssh deploy@example.test".into();
+        app.preset_send_enter_draft = false;
+        assert!(app.save_preset_draft());
+        assert_eq!(app.preferences.presets, command_presets);
+        assert_eq!(
+            app.preferences.ssh_presets,
+            vec![CommandPreset::new(
+                "Production",
+                "ssh deploy@example.test",
+                false
+            )]
+        );
+
+        app.perform_preset_action(PresetAction::Delete(PresetCollection::Ssh, 0));
+        assert!(app.preferences.ssh_presets.is_empty());
+        assert_eq!(app.preferences.presets, command_presets);
     }
 
     #[test]

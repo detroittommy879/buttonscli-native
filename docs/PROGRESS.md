@@ -180,3 +180,17 @@ directories surface as launch errors instead of silently falling back. Focused
 tests cover parsing, discovery, migration, persistence state, and error paths.
 The X11 smoke pass ran Bash and Dash simultaneously, confirmed both login-shell
 processes, checked the responsive profile editor, and verified clean shutdown.
+
+## 2026-08-14 — Separate SSH preset collection
+
+The left dock now matches the legacy data model instead of mirroring the general
+command buttons. It owns an independently persisted SSH collection with its own
+empty state, add/edit/delete actions, type-versus-run choice, and focused-pane
+delivery. The top bar remains the general command collection. Commands settings
+switches between the two libraries without mixing their mutations.
+
+Automated coverage proves old preferences migrate with an empty SSH library and
+that editing or deleting an SSH entry cannot modify command presets. The X11
+pass created a type-only entry, inserted it at a live Bash cursor without
+submitting, restarted the app, confirmed persistence, and verified clean parent
+and child shutdown.

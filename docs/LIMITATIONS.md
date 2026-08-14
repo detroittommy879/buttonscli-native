@@ -30,9 +30,9 @@ not a backlog disguised as release notes.
   profiles, default/per-tab selection, arguments, and working directories. The
   Linux paths have been exercised manually; Windows and macOS discovery and
   launch behavior still need their platform verification passes.
-- Profile switching, SSH presets, detached
-  settings, AI Help, the loopback automation API, localization, accounts, and
-  updater/release infrastructure are not part of this lean core yet.
+- Profile switching, detached settings, AI Help, the loopback automation API,
+  localization, accounts, and updater/release infrastructure are not part of
+  this lean core yet.
 - Images, color emoji rendering, sixel graphics, ligatures across cells, and
   advanced IME behavior need focused renderer tests.
 
