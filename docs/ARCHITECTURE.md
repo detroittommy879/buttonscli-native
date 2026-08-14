@@ -57,9 +57,12 @@ selections plus four native recovery themes.
 
 Each theme maps its app shell, tabs, command dock, settings, and status surfaces
 separately. Terminal foreground/background and all 16 normal/bright ANSI colors
-are passed to `egui_term` verbatim. Unsupported gradients and post-processing
-effects are not approximated as flat colors; their source data remains bundled
-for the renderer work described in `LIMITATIONS.md`.
+are passed to `egui_term` verbatim. Terminal gradients are rendered as a
+four-corner GPU mesh underneath default background cells, while explicit ANSI
+cell backgrounds remain opaque. Static and scanline effects are lightweight
+overlays; animation schedules repaint only for themes that request it. More
+specialized post-processing fields remain in the source assets for the renderer
+work described in `LIMITATIONS.md`.
 
 All 26 legacy font binaries are embedded and registered once at startup. Named
 egui families point to real face files, the closest packaged weight is selected,

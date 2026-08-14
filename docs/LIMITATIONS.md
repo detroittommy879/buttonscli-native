@@ -17,9 +17,11 @@ not a backlog disguised as release notes.
 
 - Pane layouts currently support one or two visible shells. Tabs can hold more
   sessions, but the legacy app's arbitrary grid of up to ten panes is not ported.
-- All 555 legacy theme selections are present, but animated gradients, CRT/static
-  post-processing, wallpaper drawing, and the theme designer are not rendered
-  yet. Their original fields remain in the embedded JSON migration assets.
+- All 555 legacy theme selections are present. Linear/multi-stop terminal
+  gradients, animated drift, static, and scanlines render natively; radial and
+  conic geometry, hsync warp, TV/simple noise variants, glow, wallpaper drawing,
+  and the theme designer are not rendered yet. Their original fields remain in
+  the embedded JSON migration assets.
 - The 19 bundled font families work offline. The legacy opt-in Google Fonts
   catalog and arbitrary custom font-stack editor are not wired to a native font
   downloader yet; online-only names in imported themes safely fall back to a
