@@ -15,8 +15,8 @@ not a backlog disguised as release notes.
 
 ## Product surface
 
-- Pane layouts currently support one or two visible shells. Tabs can hold more
-  sessions, but the legacy app's arbitrary grid of up to ten panes is not ported.
+- Pane layouts tile up to ten live shells as columns, rows, or a balanced grid.
+  The legacy app's nested, individually resizable split tree is not ported yet.
 - All 555 legacy theme selections are present. Linear/multi-stop terminal
   gradients, animated drift, static, and scanlines render natively; radial and
   conic geometry, hsync warp, TV/simple noise variants, glow, wallpaper drawing,

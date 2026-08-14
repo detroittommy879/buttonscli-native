@@ -75,6 +75,13 @@ the visible recent-close control to reopen it as a fresh PTY with its custom
 title restored. Unit tests cover forward and backward index remapping for every
 affected slot. Closing the window stopped the app and both shell children.
 
+The multi-pane pass selected balanced-grid mode, increased the live pane count
+to four, and wrote distinct markers into separate Bash sessions. It then raised
+the count to the supported maximum of ten, confirmed a 4-by-3 tiling and ten
+direct Bash children, and closed the window normally. The app and all ten child
+PIDs disappeared. Automated coverage checks grid dimensions through ten panes
+and visible/hidden close normalization.
+
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
 `native-font-settings.png`.
