@@ -163,3 +163,20 @@ ten real Bash PTYs in a 4-by-3 grid, wrote distinct output into separate panes,
 confirmed ten child processes, and then verified that window close removed all
 of them. Nested and individually resizable split trees remain tracked rather
 than being hidden by this milestone.
+
+## 2026-08-14 — Detected and custom shell profiles
+
+Terminal launch is no longer tied to one implicit environment shell. The native
+app discovers available shell executables, identifies each choice by its full
+path, and offers automatic, detected, and user-defined profiles both as a
+persisted workspace default and from the new-tab menu. Custom profiles accept a
+quoted command line plus an optional working-directory override; the workspace
+default directory is independently configurable. Launches execute the selected
+binary directly instead of interpolating user text through another shell.
+
+Closed-tab recovery remembers the selected profile while still starting a clean
+PTY. Invalid commands, unmatched quotes, missing executables, and missing
+directories surface as launch errors instead of silently falling back. Focused
+tests cover parsing, discovery, migration, persistence state, and error paths.
+The X11 smoke pass ran Bash and Dash simultaneously, confirmed both login-shell
+processes, checked the responsive profile editor, and verified clean shutdown.

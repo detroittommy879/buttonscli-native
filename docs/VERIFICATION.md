@@ -20,7 +20,10 @@ The native tests prove that all 127 theme documents parse, the combined legacy
 catalog contains exactly 555 selections, representative ANSI values survive
 verbatim, all 26 scalable font files have catalog entries, legacy font aliases
 sanitize safely, and cross-platform shell-title extraction remains stable. The
-test suite also covers one-ID preference migration, proves that unchecked
+shell-profile suite covers quoted command-line parsing, malformed input,
+discovery de-duplication, old-preference migration, custom launch resolution,
+missing executables/directories, and fallback after removing the selected
+default. The test suite also covers one-ID preference migration, proves that unchecked
 theme-apply sections remain unchanged, and preserves terminal bold-weight plus
 bright-ANSI settings. Preset tests cover old-preference migration, validated
 add/edit/delete state, and the exact difference between immediate execution and
@@ -81,6 +84,16 @@ the count to the supported maximum of ten, confirmed a 4-by-3 tiling and ten
 direct Bash children, and closed the window normally. The app and all ten child
 PIDs disappeared. Automated coverage checks grid dimensions through ten panes
 and visible/hidden close normalization.
+
+The shell-profile pass opened the per-tab profile menu, confirmed that detected
+shells were labeled with their executable paths, and launched `/usr/bin/dash`
+as a second real login-shell PTY alongside the default Bash session. Process
+inspection showed `/bin/bash -l` and `/usr/bin/dash -l` as direct children. The
+Workspace editor rendered its detected/custom/default controls at the minimum
+supported window size without hiding the command fields or actions. Closing the
+window normally removed the app and both shell children. Custom resolution,
+working-directory validation, and persistence are additionally covered by the
+automated tests above.
 
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and

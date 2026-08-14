@@ -38,7 +38,7 @@ constraints.
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
 | Session tabs | Done | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, reopen a recent close, and preserve the correct pane-to-tab mapping. |
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Columns, rows, and balanced grids add/remove/focus up to 10 visible sessions without corrupting tab mappings; nested and individually resizable splits remain. |
-| Shell profiles | Missing | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
+| Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Missing | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
 | Dock behavior | Partial | `src/components/PresetBar.tsx` | Top and left docks resize, collapse, auto-hide, and support compact wrapping without covering terminal content. |
@@ -98,7 +98,7 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Add shell profile discovery and launch selection.
+1. Add the separate SSH preset collection and focused-terminal workflow.
 2. Add nested/resizable split-tree editing to the new 10-pane state model.
 3. Finish non-AI visual editing/effects foundations.
 4. Build secure provider/key configuration, then AI Help.

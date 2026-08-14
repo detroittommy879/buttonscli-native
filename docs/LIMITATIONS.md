@@ -26,8 +26,10 @@ not a backlog disguised as release notes.
   catalog and arbitrary custom font-stack editor are not wired to a native font
   downloader yet; online-only names in imported themes safely fall back to a
   bundled family.
-- Shell sessions use `$SHELL -l` on Unix and `%COMSPEC%` on Windows. A graphical
-  shell/profile chooser is still future work.
+- Shell settings discover installed executables and support persisted custom
+  profiles, default/per-tab selection, arguments, and working directories. The
+  Linux paths have been exercised manually; Windows and macOS discovery and
+  launch behavior still need their platform verification passes.
 - Profile switching, SSH presets, detached
   settings, AI Help, the loopback automation API, localization, accounts, and
   updater/release infrastructure are not part of this lean core yet.
