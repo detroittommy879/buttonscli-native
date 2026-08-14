@@ -62,6 +62,13 @@ the window manager exposed an event-forwarder shutdown panic; the adapter now
 terminates quietly when the application channel closes, and the regression is
 covered by the repeated close smoke test.
 
+The preset pass launched the native window and confirmed that the six
+platform-aware starter presets and per-button action affordances render in the
+top dock without obscuring the terminal. Closing through the window manager
+again stopped both the application and its login-shell child cleanly. Preset
+editor mutations and type-only payload behavior are covered by the automated
+tests above.
+
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
 `native-font-settings.png`.
