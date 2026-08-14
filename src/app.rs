@@ -12,16 +12,75 @@ use egui_term::{FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 
-#[cfg(not(target_arch = "wasm32"))]
-const PRESETS: [(&str, &str); 7] = [
-    ("Clear", "clear"),
-    ("Files", "ls -la"),
-    ("Git status", "git status"),
-    ("Git log", "git log --oneline --decorate -12"),
-    ("Disk", "df -h"),
-    ("Processes", "ps aux --sort=-%cpu | head -15"),
-    ("Tree", "find . -maxdepth 2 -print | head -80"),
-];
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+struct CommandPreset {
+    label: String,
+    command: String,
+    send_enter: bool,
+}
+
+impl Default for CommandPreset {
+    fn default() -> Self {
+        Self {
+            label: "New preset".into(),
+            command: String::new(),
+            send_enter: true,
+        }
+    }
+}
+
+impl CommandPreset {
+    fn new(label: &str, command: &str, send_enter: bool) -> Self {
+        Self {
+            label: label.into(),
+            command: command.into(),
+            send_enter,
+        }
+    }
+
+    fn normalized(mut self) -> Option<Self> {
+        self.label = self.label.trim().to_owned();
+        self.command = self
+            .command
+            .trim_end_matches(&['\r', '\n'][..])
+            .trim()
+            .to_owned();
+        (!self.label.is_empty() && !self.command.is_empty()).then_some(self)
+    }
+
+    fn terminal_payload(&self) -> String {
+        if self.send_enter {
+            format!("{}\r", self.command)
+        } else {
+            self.command.clone()
+        }
+    }
+}
+
+fn default_presets() -> Vec<CommandPreset> {
+    #[cfg(windows)]
+    let (list_files, current_folder, disk_space) = (
+        "Get-ChildItem",
+        "Get-Location",
+        "Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize Name, Used, Free",
+    );
+    #[cfg(not(windows))]
+    let (list_files, current_folder, disk_space) = ("ls -la", "pwd", "df -h");
+
+    vec![
+        CommandPreset::new(
+            "Preset Intro",
+            "echo \"ButtonsCLI preset buttons can run repeated commands or paste templates for you to edit.\"",
+            true,
+        ),
+        CommandPreset::new("List Files", list_files, true),
+        CommandPreset::new("Current Folder", current_folder, true),
+        CommandPreset::new("Disk Space", disk_space, true),
+        CommandPreset::new("Git Status", "git status", true),
+        CommandPreset::new("SSH Template", "ssh user@your-vps-or-vm", false),
+    ]
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -36,6 +95,7 @@ struct Preferences {
     typography: Typography,
     show_sidebar: bool,
     show_presets: bool,
+    presets: Vec<CommandPreset>,
 }
 
 impl Default for Preferences {
@@ -51,6 +111,7 @@ impl Default for Preferences {
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
+            presets: default_presets(),
         }
     }
 }
@@ -99,6 +160,13 @@ pub struct ButtonsApp {
     settings_tab: SettingsTab,
     show_settings: bool,
     show_about: bool,
+    show_preset_editor: bool,
+    editing_preset: Option<usize>,
+    preset_label_draft: String,
+    preset_command_draft: String,
+    preset_send_enter_draft: bool,
+    preset_editor_error: Option<String>,
+    confirm_preset_reset: bool,
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
@@ -129,7 +197,15 @@ enum SettingsTab {
     #[default]
     Themes,
     Fonts,
+    Commands,
     Workspace,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PresetAction {
+    Run(usize),
+    Edit(usize),
+    Delete(usize),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -167,6 +243,13 @@ impl ButtonsApp {
             settings_tab: SettingsTab::Themes,
             show_settings: false,
             show_about: false,
+            show_preset_editor: false,
+            editing_preset: None,
+            preset_label_draft: String::new(),
+            preset_command_draft: String::new(),
+            preset_send_enter_draft: true,
+            preset_editor_error: None,
+            confirm_preset_reset: false,
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
@@ -355,6 +438,78 @@ impl ButtonsApp {
     fn run_command(&mut self, command: &str) {
         if let Some(tab) = self.tabs.get_mut(self.focused) {
             tab.run(command);
+        }
+    }
+
+    fn apply_preset(&mut self, index: usize) {
+        let Some(preset) = self.preferences.presets.get(index).cloned() else {
+            return;
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(tab) = self.tabs.get_mut(self.focused) {
+            tab.write(preset.terminal_payload());
+        }
+        #[cfg(target_arch = "wasm32")]
+        if preset.send_enter {
+            self.run_demo_command(&preset.command);
+        } else {
+            self.demo_input = preset.command;
+        }
+    }
+
+    fn open_add_preset_editor(&mut self) {
+        self.editing_preset = None;
+        self.preset_label_draft.clear();
+        self.preset_command_draft.clear();
+        self.preset_send_enter_draft = true;
+        self.preset_editor_error = None;
+        self.show_preset_editor = true;
+    }
+
+    fn open_edit_preset_editor(&mut self, index: usize) {
+        let Some(preset) = self.preferences.presets.get(index) else {
+            return;
+        };
+        self.editing_preset = Some(index);
+        self.preset_label_draft.clone_from(&preset.label);
+        self.preset_command_draft.clone_from(&preset.command);
+        self.preset_send_enter_draft = preset.send_enter;
+        self.preset_editor_error = None;
+        self.show_preset_editor = true;
+    }
+
+    fn save_preset_draft(&mut self) -> bool {
+        let preset = CommandPreset {
+            label: self.preset_label_draft.clone(),
+            command: self.preset_command_draft.clone(),
+            send_enter: self.preset_send_enter_draft,
+        };
+        let Some(preset) = preset.normalized() else {
+            self.preset_editor_error = Some("Label and command are both required.".into());
+            return false;
+        };
+        if let Some(index) = self.editing_preset {
+            let Some(existing) = self.preferences.presets.get_mut(index) else {
+                self.preset_editor_error = Some("That preset no longer exists.".into());
+                return false;
+            };
+            *existing = preset;
+        } else {
+            self.preferences.presets.push(preset);
+        }
+        self.preset_editor_error = None;
+        true
+    }
+
+    fn perform_preset_action(&mut self, action: PresetAction) {
+        match action {
+            PresetAction::Run(index) => self.apply_preset(index),
+            PresetAction::Edit(index) => self.open_edit_preset_editor(index),
+            PresetAction::Delete(index) => {
+                if index < self.preferences.presets.len() {
+                    self.preferences.presets.remove(index);
+                }
+            }
         }
     }
 
@@ -725,15 +880,32 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.preset_dock);
+                let presets = self.preferences.presets.clone();
+                let mut action = None;
+                let mut add = false;
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        for (label, command) in PRESETS {
-                            if ui.button(label).clicked() {
-                                self.run_command(command);
+                        for (index, preset) in presets.iter().enumerate() {
+                            if ui
+                                .button(&preset.label)
+                                .on_hover_text(preset_hover_text(preset))
+                                .clicked()
+                            {
+                                action = Some(PresetAction::Run(index));
                             }
+                            preset_action_menu(ui, index, &mut action);
+                        }
+                        if ui.button("+").on_hover_text("Add a preset").clicked() {
+                            add = true;
                         }
                     });
                 });
+                if let Some(action) = action {
+                    self.perform_preset_action(action);
+                }
+                if add {
+                    self.open_add_preset_editor();
+                }
             });
     }
 
@@ -773,13 +945,33 @@ impl ButtonsApp {
                         .color(colors.muted),
                 );
                 ui.add_space(8.0);
-                for (label, command) in PRESETS {
-                    if ui
-                        .add_sized([ui.available_width(), 30.0], egui::Button::new(label))
-                        .clicked()
-                    {
-                        self.run_command(command);
-                    }
+                let presets = self.preferences.presets.clone();
+                let mut action = None;
+                for (index, preset) in presets.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        let action_width = 24.0;
+                        let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
+                        if ui
+                            .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
+                            .on_hover_text(preset_hover_text(preset))
+                            .clicked()
+                        {
+                            action = Some(PresetAction::Run(index));
+                        }
+                        preset_action_menu(ui, index, &mut action);
+                    });
+                }
+                if ui
+                    .add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new("+ Add preset"),
+                    )
+                    .clicked()
+                {
+                    self.open_add_preset_editor();
+                }
+                if let Some(action) = action {
+                    self.perform_preset_action(action);
                 }
                 ui.add_space(12.0);
                 ui.separator();
@@ -912,6 +1104,7 @@ impl ButtonsApp {
                 ui.horizontal(|ui| {
                     ui.selectable_value(&mut self.settings_tab, SettingsTab::Themes, "Themes");
                     ui.selectable_value(&mut self.settings_tab, SettingsTab::Fonts, "Fonts");
+                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Commands, "Commands");
                     ui.selectable_value(
                         &mut self.settings_tab,
                         SettingsTab::Workspace,
@@ -922,6 +1115,7 @@ impl ButtonsApp {
                 match self.settings_tab {
                     SettingsTab::Themes => self.theme_settings(ui),
                     SettingsTab::Fonts => self.font_settings(ui),
+                    SettingsTab::Commands => self.command_settings(ui),
                     SettingsTab::Workspace => self.workspace_settings(ui),
                 }
             });
@@ -1213,6 +1407,170 @@ impl ButtonsApp {
         ui.label("Preferences are saved locally and restored on the next launch.");
     }
 
+    fn command_settings(&mut self, ui: &mut egui::Ui) {
+        let colors = self.colors();
+        ui.heading("Command Presets");
+        ui.label(
+            RichText::new(
+                "Saved buttons target the focused terminal. Choose whether each button types its text or also presses Enter.",
+            )
+            .color(colors.muted),
+        );
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if ui.button("+ Add preset").clicked() {
+                self.open_add_preset_editor();
+            }
+            if ui.button("Restore starter presets").clicked() {
+                self.confirm_preset_reset = true;
+            }
+            ui.label(
+                RichText::new(format!("{} saved", self.preferences.presets.len()))
+                    .small()
+                    .color(colors.muted),
+            );
+        });
+
+        if self.confirm_preset_reset {
+            ui.add_space(6.0);
+            egui::Frame::new()
+                .fill(colors.raised)
+                .stroke(Stroke::new(1.0_f32, colors.warning))
+                .corner_radius(5.0)
+                .inner_margin(8.0)
+                .show(ui, |ui| {
+                    ui.label("Replace every saved preset with the platform starter set?");
+                    ui.horizontal(|ui| {
+                        if ui.button("Confirm reset").clicked() {
+                            self.preferences.presets = default_presets();
+                            self.confirm_preset_reset = false;
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.confirm_preset_reset = false;
+                        }
+                    });
+                });
+        }
+
+        ui.add_space(8.0);
+        let presets = self.preferences.presets.clone();
+        let mut action = None;
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for (index, preset) in presets.iter().enumerate() {
+                    egui::Frame::new()
+                        .fill(colors.raised)
+                        .stroke(Stroke::new(1.0_f32, colors.border))
+                        .corner_radius(5.0)
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new(&preset.label).strong());
+                                    ui.label(
+                                        RichText::new(&preset.command)
+                                            .monospace()
+                                            .small()
+                                            .color(colors.muted),
+                                    );
+                                    ui.label(
+                                        RichText::new(if preset.send_enter {
+                                            "Runs immediately (sends Enter)"
+                                        } else {
+                                            "Types only (does not send Enter)"
+                                        })
+                                        .small()
+                                        .color(colors.accent_alt),
+                                    );
+                                });
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    if ui.button("Delete").clicked() {
+                                        action = Some(PresetAction::Delete(index));
+                                    }
+                                    if ui.button("Edit").clicked() {
+                                        action = Some(PresetAction::Edit(index));
+                                    }
+                                    if ui.button("Run").clicked() {
+                                        action = Some(PresetAction::Run(index));
+                                    }
+                                });
+                            });
+                        });
+                    ui.add_space(6.0);
+                }
+            });
+        if let Some(action) = action {
+            self.perform_preset_action(action);
+        }
+    }
+
+    fn preset_editor_window(&mut self, ctx: &egui::Context) {
+        if !self.show_preset_editor {
+            return;
+        }
+        let mut open = self.show_preset_editor;
+        let mut save = false;
+        let mut cancel = false;
+        let title = if self.editing_preset.is_some() {
+            "Edit preset"
+        } else {
+            "Add preset"
+        };
+        egui::Window::new(title)
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(520.0)
+            .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.settings);
+                ui.label("Button label");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.preset_label_draft)
+                        .hint_text("Git status")
+                        .desired_width(f32::INFINITY),
+                );
+                ui.add_space(8.0);
+                ui.label("Command or text");
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.preset_command_draft)
+                        .hint_text("git status")
+                        .desired_rows(4)
+                        .desired_width(f32::INFINITY),
+                );
+                ui.checkbox(&mut self.preset_send_enter_draft, "Send Enter after typing");
+                ui.label(
+                    RichText::new(if self.preset_send_enter_draft {
+                        "Clicking this button will execute the command immediately."
+                    } else {
+                        "Clicking this button will only type the text so it can be edited first."
+                    })
+                    .small()
+                    .color(ui.visuals().weak_text_color()),
+                );
+                if let Some(error) = &self.preset_editor_error {
+                    ui.add_space(6.0);
+                    ui.colored_label(ui.visuals().error_fg_color, error);
+                }
+                ui.add_space(10.0);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                    if ui.button("Save preset").clicked() {
+                        save = true;
+                    }
+                });
+            });
+        if save && self.save_preset_draft() {
+            open = false;
+        }
+        if cancel {
+            open = false;
+        }
+        self.show_preset_editor = open;
+    }
+
     fn about_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("About ButtonsCLI")
             .open(&mut self.show_about)
@@ -1493,6 +1851,32 @@ fn two_tabs_mut(
     }
 }
 
+fn preset_hover_text(preset: &CommandPreset) -> String {
+    if preset.send_enter {
+        format!("{}\nExecutes immediately", preset.command)
+    } else {
+        format!("{}\nTypes without pressing Enter", preset.command)
+    }
+}
+
+fn preset_action_menu(ui: &mut egui::Ui, index: usize, action: &mut Option<PresetAction>) {
+    ui.menu_button("⋮", |ui| {
+        if ui.button("Run").clicked() {
+            *action = Some(PresetAction::Run(index));
+            ui.close_menu();
+        }
+        if ui.button("Edit").clicked() {
+            *action = Some(PresetAction::Edit(index));
+            ui.close_menu();
+        }
+        ui.separator();
+        if ui.button("Delete").clicked() {
+            *action = Some(PresetAction::Delete(index));
+            ui.close_menu();
+        }
+    });
+}
+
 impl eframe::App for ButtonsApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, &self.preferences);
@@ -1526,6 +1910,7 @@ impl eframe::App for ButtonsApp {
             });
 
         self.settings_window(ctx);
+        self.preset_editor_window(ctx);
         self.about_window(ctx);
     }
 
@@ -1587,5 +1972,60 @@ mod tests {
         assert_eq!(app.preferences.app_theme_id, "aurora");
         assert_eq!(app.preferences.terminal_theme_id, "basic2");
         assert_eq!(app.preferences.gradient_theme_id, "basic2");
+    }
+
+    #[test]
+    fn old_preferences_receive_starter_presets() {
+        let preferences: Preferences = serde_json::from_str(r#"{"theme_id":"aurora"}"#).unwrap();
+        assert_eq!(preferences.presets, default_presets());
+        assert!(preferences
+            .presets
+            .iter()
+            .any(|preset| preset.label == "SSH Template" && !preset.send_enter));
+    }
+
+    #[test]
+    fn preset_payload_preserves_type_only_behavior() {
+        let run = CommandPreset::new("Status", "git status", true);
+        let insert = CommandPreset::new("SSH", "ssh user@example.test", false);
+        assert_eq!(run.terminal_payload(), "git status\r");
+        assert_eq!(insert.terminal_payload(), "ssh user@example.test");
+    }
+
+    #[test]
+    fn preset_drafts_add_edit_and_delete() {
+        let mut preferences = Preferences::default();
+        preferences.presets.clear();
+        let mut app = ButtonsApp::empty(preferences);
+
+        app.preset_label_draft = "  Logs  ".into();
+        app.preset_command_draft = " tail -f app.log\n\n".into();
+        app.preset_send_enter_draft = false;
+        assert!(app.save_preset_draft());
+        assert_eq!(
+            app.preferences.presets,
+            vec![CommandPreset::new("Logs", "tail -f app.log", false)]
+        );
+
+        app.editing_preset = Some(0);
+        app.preset_label_draft = "Follow logs".into();
+        app.preset_command_draft = "tail -f app.log".into();
+        app.preset_send_enter_draft = true;
+        assert!(app.save_preset_draft());
+        assert_eq!(app.preferences.presets[0].label, "Follow logs");
+        assert!(app.preferences.presets[0].send_enter);
+
+        app.perform_preset_action(PresetAction::Delete(0));
+        assert!(app.preferences.presets.is_empty());
+    }
+
+    #[test]
+    fn empty_preset_draft_is_rejected_without_mutation() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let original = app.preferences.presets.clone();
+        app.preset_label_draft = "Label".into();
+        assert!(!app.save_preset_draft());
+        assert_eq!(app.preferences.presets, original);
+        assert!(app.preset_editor_error.is_some());
     }
 }
