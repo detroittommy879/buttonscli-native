@@ -149,3 +149,17 @@ Moving a tab remaps focused, primary-pane, and secondary-pane indices as one
 operation. Forward and backward remapping have focused tests, and an X11 pass
 created two Bash sessions, renamed and reordered one, closed and reopened it,
 then confirmed normal child cleanup on window close.
+
+## 2026-08-14 — Ten live terminal panes
+
+The primary/secondary special case was replaced by an ordered visible-pane
+model capped at ten sessions. Status controls now add or remove panes and switch
+between column, row, and balanced-grid geometry. Selecting a hidden tab replaces
+the focused pane, while close and reorder remap every affected index without
+changing which terminal occupies the other cells.
+
+Grid sizing and close-state normalization have focused tests. The X11 pass tiled
+ten real Bash PTYs in a 4-by-3 grid, wrote distinct output into separate panes,
+confirmed ten child processes, and then verified that window close removed all
+of them. Nested and individually resizable split trees remain tracked rather
+than being hidden by this milestone.

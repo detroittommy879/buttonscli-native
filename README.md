@@ -12,7 +12,8 @@ sandboxed interactive demo and never exposes a visitor's local shell.
 Current desktop features include:
 
 - real local shell sessions with production VT parsing and scrollback;
-- native GPU-rendered tabs and single, side-by-side, or stacked pane layouts;
+- native GPU-rendered tabs and column, row, or balanced-grid layouts for up to
+  ten simultaneous terminal panes;
 - tab rename, reorder, and recent-close recovery with pane-safe index updates;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - a resizable command dock, editable persisted command presets with type/run
