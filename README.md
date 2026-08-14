@@ -18,6 +18,8 @@ Current desktop features include:
   selections with exact terminal ANSI palettes;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal;
+- theme-driven terminal gradients, animated color drift, static, and scanline
+  overlays rendered natively;
 - persistent appearance preferences and clean child-process shutdown.
 
 ## Development

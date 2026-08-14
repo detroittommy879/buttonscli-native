@@ -92,3 +92,13 @@ without a rasterizer failure and that `basic2` changes the native chrome and
 terminal metrics on first launch. That close test also exposed and fixed a
 vendored event-forwarder panic when the app event channel disappears during
 shutdown.
+
+## 2026-08-14 — Native gradient and CRT effects
+
+The terminal renderer now accepts a four-corner gradient mesh instead of
+flattening every legacy theme to one background color. Default terminal cells
+leave that mesh visible while applications that deliberately paint ANSI
+background cells remain correct. Animated themes drift their gradient colors;
+static and scanline values are normalized from the legacy percentage scale and
+painted as bounded overlays. A screenshot check of `basic2` confirmed its dark
+red/black terminal gradient behind live Bash output.
