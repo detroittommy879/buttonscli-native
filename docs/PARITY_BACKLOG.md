@@ -25,7 +25,7 @@ constraints.
 | Tabs and sessions | Done | Keep lifecycle and pane-index regressions covered |
 | Pane layouts | Done | Keep split-tree, ratio persistence, and lifecycle regressions covered |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
-| Themes and fonts | Partial | Import/edit/share plus full effect rendering and online fonts |
+| Themes and fonts | Partial | Import/edit/share plus remaining effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
 | Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
@@ -53,7 +53,7 @@ constraints.
 | Scoped and calm theme apply | Done | `src/services/themeDesignerService.ts` | App, terminal, fonts, gradients, and effects have independent persisted sources; calm mode suppresses motion/noise. |
 | Bundled fonts and typography zones | Done | `src/services/fontLoader.ts`, `src/data/fontCatalog.ts` | All 26 binaries form 19 selectable families with real weights across seven independently persisted zones. |
 | Online/system/custom fonts | Missing | `src/data/fontCatalog.ts`, `src/services/fontLoader.ts` | Offer the remaining legacy choices, show download/fallback state, cache safely where allowed, and support a custom stack without breaking offline startup. |
-| Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear rendering remains correct; add radial/conic geometry, position/angle controls, and animation parity. |
+| Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear, radial, and conic rendering preserve legacy type, angle, and named position; add repeating geometry, editable controls, and full animation parity. |
 | Terminal effects | Partial | `src/types/config.ts`, `src/components/HsyncDebugPanel.tsx` | Preserve current static/scanlines and add hsync warp, TV/simple/idle noise, row banding, glow, wallpaper, master switch, and focused-pane behavior. |
 | Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
 | Theme designer | Missing | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts` | Generate preview candidates, self-correct invalid output, selectively apply, keep/save, and expose provenance. |

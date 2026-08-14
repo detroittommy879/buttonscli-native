@@ -28,8 +28,9 @@ unchecked theme-apply sections remain unchanged, and preserves terminal
 bold-weight plus bright-ANSI settings. Preset tests cover old-preference
 migration, validated add/edit/delete state, collection isolation, and the exact difference between
 immediate execution and type-only templates. Pane tests cover recursive leaf
-preservation through ten terminals and persisted divider-ratio round trips. The
-WASM package contains generated
+preservation through ten terminals and persisted divider-ratio round trips.
+Gradient tests verify representative legacy radial and conic geometry. The WASM
+package contains generated
 JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 
@@ -110,6 +111,12 @@ branch; the bottom row remained balanced and every PTY resized in place. After
 closing normally, relaunching with the same isolated preferences, and returning
 to four panes, the asymmetric top-row ratio was restored. Both close cycles
 removed the app and all four child shells.
+
+The gradient-geometry pass applied the bundled `Prismatic Stage` theme and
+confirmed a centered conic sweep in the live terminal instead of the old
+four-corner approximation. Its 90-degree source angle was retained, terminal
+text remained readable, and normal window close removed the Bash child. The
+same parser path is covered for the radial `neon_monster_mash` theme.
 
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
