@@ -6,7 +6,7 @@ use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::terminal::TerminalTab;
+use crate::terminal::{DetectedShell, ShellLaunch, TerminalTab};
 #[cfg(not(target_arch = "wasm32"))]
 use egui_term::{FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
@@ -83,6 +83,26 @@ fn default_presets() -> Vec<CommandPreset> {
     ]
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+struct ShellProfile {
+    id: String,
+    label: String,
+    command: String,
+    working_directory: String,
+}
+
+impl Default for ShellProfile {
+    fn default() -> Self {
+        Self {
+            id: "custom-1".into(),
+            label: "Custom shell".into(),
+            command: String::new(),
+            working_directory: String::new(),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct Preferences {
@@ -97,6 +117,9 @@ struct Preferences {
     show_sidebar: bool,
     show_presets: bool,
     presets: Vec<CommandPreset>,
+    default_shell_id: String,
+    default_working_directory: String,
+    custom_shell_profiles: Vec<ShellProfile>,
 }
 
 impl Default for Preferences {
@@ -113,6 +136,9 @@ impl Default for Preferences {
             show_sidebar: true,
             show_presets: true,
             presets: default_presets(),
+            default_shell_id: "system".into(),
+            default_working_directory: String::new(),
+            custom_shell_profiles: Vec::new(),
         }
     }
 }
@@ -174,6 +200,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
+    detected_shells: Vec<DetectedShell>,
+    #[cfg(not(target_arch = "wasm32"))]
     recently_closed: Vec<ClosedTab>,
     #[cfg(not(target_arch = "wasm32"))]
     show_tab_rename: bool,
@@ -222,6 +250,7 @@ enum PresetAction {
 struct ClosedTab {
     title: String,
     had_custom_title: bool,
+    profile_id: String,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -282,6 +311,8 @@ impl ButtonsApp {
             notice: None,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            detected_shells: crate::terminal::detected_shells(),
             #[cfg(not(target_arch = "wasm32"))]
             recently_closed: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -392,9 +423,22 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn open_tab(&mut self, context: egui::Context) {
+        let profile_id = self.preferences.default_shell_id.clone();
+        self.open_tab_with_profile(context, &profile_id);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_tab_with_profile(&mut self, context: egui::Context, profile_id: &str) {
+        let launch = match self.shell_launch(profile_id) {
+            Ok(launch) => launch,
+            Err(error) => {
+                self.notice = Some(format!("Could not use shell profile: {error}"));
+                return;
+            }
+        };
         let id = self.next_id;
         self.next_id += 1;
-        match TerminalTab::spawn(id, context, self.events_tx.clone()) {
+        match TerminalTab::spawn(id, context, self.events_tx.clone(), launch) {
             Ok(tab) => {
                 self.tabs.push(tab);
                 let index = self.tabs.len() - 1;
@@ -412,6 +456,115 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn shell_launch(&self, profile_id: &str) -> anyhow::Result<ShellLaunch> {
+        let custom = self
+            .preferences
+            .custom_shell_profiles
+            .iter()
+            .find(|profile| profile.id == profile_id);
+        let working_directory = resolve_working_directory(
+            custom
+                .map(|profile| profile.working_directory.as_str())
+                .filter(|directory| !directory.trim().is_empty())
+                .unwrap_or(&self.preferences.default_working_directory),
+        )?;
+
+        if profile_id == "system" {
+            return Ok(ShellLaunch::system_default(working_directory));
+        }
+        if let Some(shell) = self
+            .detected_shells
+            .iter()
+            .find(|shell| shell.id == profile_id)
+        {
+            return Ok(ShellLaunch::for_executable(
+                shell.id.clone(),
+                shell.command.clone(),
+                working_directory,
+            ));
+        }
+        if let Some(profile) = custom {
+            return ShellLaunch::from_command_line(
+                profile.id.clone(),
+                &profile.command,
+                working_directory,
+            );
+        }
+        anyhow::bail!("saved shell profile `{profile_id}` is no longer available")
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn shell_menu_options(&self) -> Vec<(String, String, String)> {
+        let automatic = self
+            .detected_shells
+            .first()
+            .map(|shell| shell.label.as_str())
+            .unwrap_or("system shell");
+        let mut options = vec![(
+            "system".into(),
+            format!("Automatic ({automatic})"),
+            "Use the operating system default".into(),
+        )];
+        options.extend(self.detected_shells.iter().map(|shell| {
+            (
+                shell.id.clone(),
+                format!("{} — {}", shell.label, shell.command),
+                shell.command.clone(),
+            )
+        }));
+        options.extend(
+            self.preferences
+                .custom_shell_profiles
+                .iter()
+                .filter(|profile| {
+                    !profile.label.trim().is_empty() && !profile.command.trim().is_empty()
+                })
+                .map(|profile| {
+                    (
+                        profile.id.clone(),
+                        profile.label.trim().to_owned(),
+                        profile.command.trim().to_owned(),
+                    )
+                }),
+        );
+        options
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn add_custom_shell_profile(&mut self) {
+        let mut suffix = self.preferences.custom_shell_profiles.len() + 1;
+        let id = loop {
+            let candidate = format!("custom-{suffix}");
+            if !self
+                .preferences
+                .custom_shell_profiles
+                .iter()
+                .any(|profile| profile.id == candidate)
+            {
+                break candidate;
+            }
+            suffix += 1;
+        };
+        self.preferences.custom_shell_profiles.push(ShellProfile {
+            id,
+            label: "Custom shell".into(),
+            command: String::new(),
+            working_directory: String::new(),
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn remove_custom_shell_profile(&mut self, index: usize) {
+        if index >= self.preferences.custom_shell_profiles.len() {
+            return;
+        }
+        let removed = self.preferences.custom_shell_profiles.remove(index);
+        if self.preferences.default_shell_id == removed.id {
+            self.preferences.default_shell_id = "system".into();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn close_tab(&mut self, index: usize) {
         if index >= self.tabs.len() {
             return;
@@ -420,6 +573,7 @@ impl ButtonsApp {
         let closed = ClosedTab {
             title: tab.title.clone(),
             had_custom_title: tab.custom_title.is_some(),
+            profile_id: tab.profile_id.clone(),
         };
         tab.request_exit();
         self.recently_closed.push(closed);
@@ -446,7 +600,7 @@ impl ButtonsApp {
             return;
         };
         let previous_len = self.tabs.len();
-        self.open_tab(context);
+        self.open_tab_with_profile(context, &closed.profile_id);
         if self.tabs.len() == previous_len {
             self.recently_closed.push(closed);
             return;
@@ -847,6 +1001,23 @@ impl ButtonsApp {
                             ui.close_menu();
                         }
                         #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            let options = self.shell_menu_options();
+                            let mut launch = None;
+                            ui.menu_button("New terminal with…", |ui| {
+                                for (id, label, detail) in options {
+                                    if ui.button(label).on_hover_text(detail).clicked() {
+                                        launch = Some(id);
+                                        ui.close_menu();
+                                    }
+                                }
+                            });
+                            if let Some(profile_id) = launch {
+                                self.open_tab_with_profile(ctx.clone(), &profile_id);
+                                ui.close_menu();
+                            }
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .add_enabled(
                                 !self.recently_closed.is_empty(),
@@ -903,7 +1074,7 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.tabs);
                 let mut action = None;
-                let mut add = false;
+                let mut add = None;
                 let mut reopen = false;
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -945,13 +1116,17 @@ impl ButtonsApp {
                             }
                             tab_action_menu(ui, index, self.tabs.len(), &mut action);
                         }
-                        if ui
-                            .button(RichText::new("+").color(colors.accent))
-                            .on_hover_text("New terminal")
-                            .clicked()
-                        {
-                            add = true;
-                        }
+                        let options = self.shell_menu_options();
+                        ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
+                            for (id, label, detail) in options {
+                                if ui.button(label).on_hover_text(detail).clicked() {
+                                    add = Some(id);
+                                    ui.close_menu();
+                                }
+                            }
+                        })
+                        .response
+                        .on_hover_text("New terminal with a shell profile");
                         if !self.recently_closed.is_empty()
                             && ui
                                 .button("↶")
@@ -965,8 +1140,8 @@ impl ButtonsApp {
                 if let Some(action) = action {
                     self.perform_tab_action(action);
                 }
-                if add {
-                    self.open_tab(ctx.clone());
+                if let Some(profile_id) = add {
+                    self.open_tab_with_profile(ctx.clone(), &profile_id);
                 }
                 if reopen {
                     self.reopen_closed_tab(ctx.clone());
@@ -1537,10 +1712,158 @@ impl ButtonsApp {
 
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
         ui.heading("Workspace");
-        ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-        ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
-        ui.add_space(12.0);
-        ui.label("Preferences are saved locally and restored on the next launch.");
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
+                ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+                #[cfg(not(target_arch = "wasm32"))]
+                self.shell_settings(ui);
+                #[cfg(target_arch = "wasm32")]
+                {
+                    ui.add_space(12.0);
+                    ui.label("Shell profiles are available in the native desktop app.");
+                }
+                ui.add_space(12.0);
+                ui.label("Preferences are saved locally and restored on the next launch.");
+            });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn shell_settings(&mut self, ui: &mut egui::Ui) {
+        let colors = self.colors();
+        ui.add_space(14.0);
+        ui.separator();
+        ui.heading("Shell Profiles");
+        ui.label(
+            RichText::new(
+                "Choose the default for new terminals or select a different profile from the + menu. Commands launch directly—no extra shell interpolation.",
+            )
+            .color(colors.muted),
+        );
+        ui.add_space(6.0);
+
+        let options = self.shell_menu_options();
+        let selected_label = options
+            .iter()
+            .find(|(id, _, _)| id == &self.preferences.default_shell_id)
+            .map(|(_, label, _)| label.clone())
+            .unwrap_or_else(|| "Unavailable saved profile".into());
+        ui.horizontal(|ui| {
+            ui.label("Default shell");
+            egui::ComboBox::from_id_salt("default-shell-profile")
+                .selected_text(selected_label)
+                .show_ui(ui, |ui| {
+                    for (id, label, detail) in &options {
+                        ui.selectable_value(
+                            &mut self.preferences.default_shell_id,
+                            id.clone(),
+                            label,
+                        )
+                        .on_hover_text(detail);
+                    }
+                });
+        });
+        ui.label("Default working directory");
+        ui.add(
+            egui::TextEdit::singleline(&mut self.preferences.default_working_directory)
+                .hint_text("Current app directory (leave empty)")
+                .desired_width(f32::INFINITY),
+        );
+        ui.label(
+            RichText::new("Supports absolute paths, relative paths, and ~/… on desktop.")
+                .small()
+                .color(colors.muted),
+        );
+
+        ui.add_space(10.0);
+        ui.label(RichText::new("Detected shells").strong());
+        for shell in &self.detected_shells {
+            ui.horizontal(|ui| {
+                ui.label(&shell.label);
+                ui.label(
+                    RichText::new(&shell.command)
+                        .monospace()
+                        .small()
+                        .color(colors.muted),
+                );
+            });
+        }
+
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Custom shells").strong());
+            if ui.button("+ Add custom shell").clicked() {
+                self.add_custom_shell_profile();
+            }
+        });
+        let mut remove = None;
+        let mut launch = None;
+        for (index, profile) in self
+            .preferences
+            .custom_shell_profiles
+            .iter_mut()
+            .enumerate()
+        {
+            egui::Frame::new()
+                .fill(colors.raised)
+                .stroke(Stroke::new(1.0_f32, colors.border))
+                .corner_radius(5.0)
+                .inner_margin(10.0)
+                .show(ui, |ui| {
+                    egui::Grid::new(("custom-shell-profile", &profile.id))
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            ui.label("Label");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.label)
+                                    .hint_text("MSYS2 UCRT64")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                            ui.label("Command line");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.command)
+                                    .hint_text("/usr/bin/fish or pwsh.exe -NoLogo")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                            ui.label("Working directory override");
+                            ui.add(
+                                egui::TextEdit::singleline(&mut profile.working_directory)
+                                    .hint_text("Use workspace default")
+                                    .desired_width(f32::INFINITY),
+                            );
+                            ui.end_row();
+                        });
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui.button("Remove").clicked() {
+                            remove = Some(index);
+                        }
+                        if ui
+                            .add_enabled(
+                                !profile.command.trim().is_empty(),
+                                egui::Button::new("Open"),
+                            )
+                            .clicked()
+                        {
+                            launch = Some(profile.id.clone());
+                        }
+                        ui.label(
+                            RichText::new("Launch this profile now")
+                                .small()
+                                .color(colors.muted),
+                        );
+                    });
+                });
+            ui.add_space(6.0);
+        }
+        if let Some(index) = remove {
+            self.remove_custom_shell_profile(index);
+        }
+        if let Some(profile_id) = launch {
+            self.open_tab_with_profile(ui.ctx().clone(), &profile_id);
+        }
     }
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
@@ -2035,6 +2358,35 @@ fn pane_grid_dimensions(layout: PaneLayout, pane_count: usize) -> (usize, usize)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn resolve_working_directory(input: &str) -> anyhow::Result<Option<std::path::PathBuf>> {
+    let input = input.trim();
+    if input.is_empty() {
+        return Ok(std::env::current_dir().ok());
+    }
+    let mut path = if input == "~" || input.starts_with("~/") || input.starts_with("~\\") {
+        let home = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .ok_or_else(|| anyhow::anyhow!("home directory is not available"))?;
+        let suffix = input
+            .strip_prefix("~/")
+            .or_else(|| input.strip_prefix("~\\"))
+            .unwrap_or("");
+        std::path::PathBuf::from(home).join(suffix)
+    } else {
+        std::path::PathBuf::from(input)
+    };
+    if path.is_relative() {
+        path = std::env::current_dir()?.join(path);
+    }
+    anyhow::ensure!(
+        path.is_dir(),
+        "working directory `{}` does not exist or is not a directory",
+        path.display()
+    );
+    Ok(Some(path))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn remap_index_after_move(slot: usize, from: usize, to: usize) -> usize {
     if slot == from {
         to
@@ -2248,6 +2600,8 @@ mod tests {
     fn old_preferences_receive_starter_presets() {
         let preferences: Preferences = serde_json::from_str(r#"{"theme_id":"aurora"}"#).unwrap();
         assert_eq!(preferences.presets, default_presets());
+        assert_eq!(preferences.default_shell_id, "system");
+        assert!(preferences.custom_shell_profiles.is_empty());
         assert!(preferences
             .presets
             .iter()
@@ -2342,5 +2696,49 @@ mod tests {
         let (visible, focused) = pane_state_after_close(&[0, 1, 2], 1, 3, 3);
         assert_eq!(visible, vec![0, 1, 2]);
         assert_eq!(focused, 1);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn custom_shell_profile_resolves_command_arguments_and_directory() {
+        let mut preferences = Preferences::default();
+        preferences.custom_shell_profiles.push(ShellProfile {
+            id: "custom-test".into(),
+            label: "Test shell".into(),
+            command: "bash --noprofile".into(),
+            working_directory: ".".into(),
+        });
+        let app = ButtonsApp::empty(preferences);
+        let launch = app.shell_launch("custom-test").unwrap();
+        assert_eq!(launch.profile_id, "custom-test");
+        assert_eq!(launch.command, "bash");
+        assert_eq!(launch.args, ["--noprofile"]);
+        assert!(launch.working_directory.unwrap().is_dir());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn missing_shell_and_working_directory_report_errors() {
+        let app = ButtonsApp::empty(Preferences::default());
+        assert!(app.shell_launch("missing-profile").is_err());
+        assert!(resolve_working_directory("definitely/not/a/real/buttonscli/path").is_err());
+    }
+
+    #[test]
+    fn removing_default_custom_shell_falls_back_to_system() {
+        let mut preferences = Preferences {
+            default_shell_id: "custom-test".into(),
+            ..Default::default()
+        };
+        preferences.custom_shell_profiles.push(ShellProfile {
+            id: "custom-test".into(),
+            label: "Test".into(),
+            command: "bash".into(),
+            working_directory: String::new(),
+        });
+        let mut app = ButtonsApp::empty(preferences);
+        app.remove_custom_shell_profile(0);
+        assert_eq!(app.preferences.default_shell_id, "system");
+        assert!(app.preferences.custom_shell_profiles.is_empty());
     }
 }

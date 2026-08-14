@@ -15,6 +15,8 @@ Current desktop features include:
 - native GPU-rendered tabs and column, row, or balanced-grid layouts for up to
   ten simultaneous terminal panes;
 - tab rename, reorder, and recent-close recovery with pane-safe index updates;
+- detected and custom shell profiles with persisted default/per-tab selection,
+  arguments, and working directories;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - a resizable command dock, editable persisted command presets with type/run
   behavior, and all 555 legacy theme selections with exact terminal ANSI palettes;
