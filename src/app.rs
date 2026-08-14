@@ -1,5 +1,7 @@
 use crate::theme::ThemeId;
-use egui::{Align, Color32, FontId, Layout, RichText, Stroke, Vec2};
+use egui::{
+    Align, Color32, FontData, FontDefinitions, FontFamily, FontId, Layout, RichText, Stroke, Vec2,
+};
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -63,6 +65,7 @@ impl ButtonsApp {
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
         let mut app = Self::empty(preferences);
+        Self::install_fonts(&cc.egui_ctx);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
@@ -121,6 +124,22 @@ impl ButtonsApp {
         ctx.set_style(style);
     }
 
+    fn install_fonts(ctx: &egui::Context) {
+        let mut fonts = FontDefinitions::default();
+        fonts.font_data.insert(
+            "JetBrains Mono".to_owned(),
+            std::sync::Arc::new(FontData::from_static(include_bytes!(
+                "../assets/fonts/JetBrainsMono-Regular.ttf"
+            ))),
+        );
+        fonts
+            .families
+            .entry(FontFamily::Monospace)
+            .or_default()
+            .insert(0, "JetBrains Mono".to_owned());
+        ctx.set_fonts(fonts);
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn open_tab(&mut self, context: egui::Context) {
         let id = self.next_id;
@@ -177,7 +196,7 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("●").color(colors.accent).size(12.0));
+                    ui.label(RichText::new("B").strong().color(colors.accent).size(12.0));
                     ui.label(
                         RichText::new("BUTTONSCLI")
                             .strong()
@@ -264,7 +283,7 @@ impl ButtonsApp {
                         }
                     }
                     if ui
-                        .button(RichText::new("＋").color(colors.accent))
+                        .button(RichText::new("+").color(colors.accent))
                         .on_hover_text("New terminal")
                         .clicked()
                     {
@@ -383,7 +402,7 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("●  SHELL READY").small().color(colors.accent));
+                    ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
                     ui.label(
                         RichText::new("Alacritty engine")
@@ -468,11 +487,13 @@ impl ButtonsApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (new_tab, close_tab, settings, quit) = ctx.input(|input| {
+        let (new_tab, close_tab, copy, paste, settings, quit) = ctx.input(|input| {
             let command = input.modifiers.command && input.modifiers.shift;
             (
                 command && input.key_pressed(egui::Key::T),
                 command && input.key_pressed(egui::Key::W),
+                command && input.key_pressed(egui::Key::C),
+                command && input.key_pressed(egui::Key::V),
                 command && input.key_pressed(egui::Key::Comma),
                 command && input.key_pressed(egui::Key::Q),
             )
@@ -485,8 +506,19 @@ impl ButtonsApp {
             if close_tab && !self.tabs.is_empty() {
                 self.close_tab(self.active);
             }
+            if copy {
+                if let Some(tab) = self.tabs.get(self.active) {
+                    let selected = tab.backend.selectable_content();
+                    if !selected.is_empty() {
+                        ctx.copy_text(selected);
+                    }
+                }
+            }
+            if paste {
+                ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
+            }
         }
-        let _ = (new_tab, close_tab);
+        let _ = (new_tab, close_tab, copy, paste);
         if settings {
             self.show_settings = true;
         }

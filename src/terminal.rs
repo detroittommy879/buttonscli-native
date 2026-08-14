@@ -65,6 +65,17 @@ fn default_shell() -> (String, Vec<String>) {
     )
 }
 
+#[cfg(test)]
+mod tests {
+    use super::shell_title;
+
+    #[test]
+    fn shell_title_uses_executable_name() {
+        assert_eq!(shell_title("/usr/bin/fish"), "fish");
+        assert_eq!(shell_title("bash"), "bash");
+    }
+}
+
 #[cfg(windows)]
 fn default_shell() -> (String, Vec<String>) {
     (

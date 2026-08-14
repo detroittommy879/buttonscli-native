@@ -81,22 +81,22 @@ impl ThemeId {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn terminal(self) -> TerminalTheme {
         let colors = match self {
-            Self::Midnight => palette(
+            Self::Midnight => palette([
                 "#dce4f2", "#090c16", "#131827", "#ff6b8a", "#65d79b", "#f5c36a", "#6da8ff",
                 "#c792ea", "#55d9e5", "#c9d4e7",
-            ),
-            Self::CyberRose => palette(
+            ]),
+            Self::CyberRose => palette([
                 "#f7e2f2", "#110817", "#25102e", "#ff6e9f", "#8bd49c", "#ffcb6b", "#82aaff",
                 "#d783ff", "#70e1f5", "#ead9e7",
-            ),
-            Self::Aurora => palette(
+            ]),
+            Self::Aurora => palette([
                 "#d6f7ee", "#051318", "#0c272c", "#ff6b7a", "#71e6b2", "#e6d978", "#6cb6ff",
                 "#c792ea", "#57e6d3", "#cae8df",
-            ),
-            Self::Graphite => palette(
+            ]),
+            Self::Graphite => palette([
                 "#e2e4e8", "#121214", "#222327", "#ef6f78", "#8fcf8f", "#e5c07b", "#73a8f2",
                 "#c792ea", "#70cbd0", "#d5d7dc",
-            ),
+            ]),
         };
         TerminalTheme::new(Box::new(colors))
     }
@@ -116,18 +116,8 @@ pub struct AppColors {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn palette(
-    foreground: &str,
-    background: &str,
-    black: &str,
-    red: &str,
-    green: &str,
-    yellow: &str,
-    blue: &str,
-    magenta: &str,
-    cyan: &str,
-    white: &str,
-) -> ColorPalette {
+fn palette(colors: [&str; 10]) -> ColorPalette {
+    let [foreground, background, black, red, green, yellow, blue, magenta, cyan, white] = colors;
     ColorPalette {
         foreground: foreground.into(),
         background: background.into(),
@@ -157,5 +147,25 @@ fn palette(
         dim_magenta: "#725183".into(),
         dim_cyan: "#3e7479".into(),
         dim_white: "#828895".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ThemeId;
+
+    #[test]
+    fn theme_names_are_stable_and_unique() {
+        let names: Vec<_> = ThemeId::ALL.into_iter().map(ThemeId::name).collect();
+        assert_eq!(names, ["Midnight", "Cyber Rose", "Aurora", "Graphite"]);
+    }
+
+    #[test]
+    fn every_theme_has_contrasting_shell_colors() {
+        for theme in ThemeId::ALL {
+            let colors = theme.colors();
+            assert_ne!(colors.canvas, colors.text);
+            assert_ne!(colors.panel, colors.accent);
+        }
     }
 }
