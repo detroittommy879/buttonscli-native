@@ -49,6 +49,7 @@ impl CommandPreset {
         (!self.label.is_empty() && !self.command.is_empty()).then_some(self)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn terminal_payload(&self) -> String {
         if self.send_enter {
             format!("{}\r", self.command)
@@ -1851,6 +1852,7 @@ fn two_tabs_mut(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn preset_hover_text(preset: &CommandPreset) -> String {
     if preset.send_enter {
         format!("{}\nExecutes immediately", preset.command)
@@ -1859,6 +1861,7 @@ fn preset_hover_text(preset: &CommandPreset) -> String {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(ui: &mut egui::Ui, index: usize, action: &mut Option<PresetAction>) {
     ui.menu_button("⋮", |ui| {
         if ui.button("Run").clicked() {
