@@ -904,57 +904,57 @@ impl ButtonsApp {
                                 ))
                                 .corner_radius(6.0)
                                 .inner_margin(10.0);
-                        ui.allocate_ui_with_layout(
-                            Vec2::new(card_width, 142.0),
-                            Layout::top_down(Align::Min),
-                            |ui| {
-                            frame.show(ui, |ui| {
-                                    ui.set_min_size(Vec2::new(card_width - 20.0, 122.0));
-                                    ui.set_max_width(card_width - 20.0);
-                                    ui.label(
-                                        RichText::new(&theme.name)
-                                            .strong()
-                                            .color(theme.colors.text),
-                                    );
-                                    ui.label(
-                                        RichText::new(&theme.description)
-                                            .small()
-                                            .color(theme.colors.muted),
-                                    );
-                                    ui.add_space(5.0);
-                                    ui.horizontal(|ui| {
-                                        for swatch in [
-                                            theme.colors.canvas,
-                                            theme.colors.panel,
-                                            theme.colors.accent,
-                                            theme.colors.accent_alt,
-                                            parse_terminal_swatch(&theme.terminal_colors.red),
-                                            parse_terminal_swatch(&theme.terminal_colors.green),
-                                        ] {
-                                            let (rect, _) = ui.allocate_exact_size(
-                                                Vec2::splat(16.0),
-                                                egui::Sense::hover(),
-                                            );
-                                            ui.painter().rect_filled(rect, 3.0, swatch);
+                            ui.allocate_ui_with_layout(
+                                Vec2::new(card_width, 142.0),
+                                Layout::top_down(Align::Min),
+                                |ui| {
+                                    frame.show(ui, |ui| {
+                                        ui.set_min_size(Vec2::new(card_width - 20.0, 122.0));
+                                        ui.set_max_width(card_width - 20.0);
+                                        ui.label(
+                                            RichText::new(&theme.name)
+                                                .strong()
+                                                .color(theme.colors.text),
+                                        );
+                                        ui.label(
+                                            RichText::new(&theme.description)
+                                                .small()
+                                                .color(theme.colors.muted),
+                                        );
+                                        ui.add_space(5.0);
+                                        ui.horizontal(|ui| {
+                                            for swatch in [
+                                                theme.colors.canvas,
+                                                theme.colors.panel,
+                                                theme.colors.accent,
+                                                theme.colors.accent_alt,
+                                                parse_terminal_swatch(&theme.terminal_colors.red),
+                                                parse_terminal_swatch(&theme.terminal_colors.green),
+                                            ] {
+                                                let (rect, _) = ui.allocate_exact_size(
+                                                    Vec2::splat(16.0),
+                                                    egui::Sense::hover(),
+                                                );
+                                                ui.painter().rect_filled(rect, 3.0, swatch);
+                                            }
+                                        });
+                                        ui.add_space(5.0);
+                                        if ui
+                                            .add_sized(
+                                                [88.0, 26.0],
+                                                egui::Button::new(if selected {
+                                                    "Applied"
+                                                } else {
+                                                    "Apply"
+                                                }),
+                                            )
+                                            .clicked()
+                                        {
+                                            apply = Some(index);
                                         }
                                     });
-                                    ui.add_space(5.0);
-                                    if ui
-                                        .add_sized(
-                                            [88.0, 26.0],
-                                            egui::Button::new(if selected {
-                                                "Applied"
-                                            } else {
-                                                "Apply"
-                                            }),
-                                        )
-                                        .clicked()
-                                    {
-                                        apply = Some(index);
-                                    }
-                            });
-                        },
-                        );
+                                },
+                            );
                             if position % 3 == 2 {
                                 ui.end_row();
                             }
