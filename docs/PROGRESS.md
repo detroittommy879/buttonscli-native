@@ -58,3 +58,17 @@ each shell, then closed one tab and confirmed its bash child disappeared while
 the surviving shell stayed usable. Finally the window was closed through the
 desktop window manager (not by killing the test harness): the application and
 remaining child shell both exited within the polling window.
+
+## 2026-08-14 — Release audit
+
+The release audit rebuilt every target from the current main branch, reran
+formatting, tests, native and WASM clippy with warnings denied, generated the
+browser package, and linked the optimized Linux executable. The final stripped
+binary is 13.36 MB. It opened an X11 window in 572 ms on this software-rendered
+VM, then shut down its application and Bash PIDs cleanly through Alt+F4.
+
+Browser-driven local testing also influenced the shipped page: the connected VM
+browser has WebGL disabled, which originally left a blank canvas after eframe
+reported the missing capability. The host page now catches that startup error
+and presents a styled compatibility explanation. The canvas path remains marked
+unverified until it is exercised on a WebGL-enabled browser.

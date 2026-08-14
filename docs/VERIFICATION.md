@@ -13,12 +13,17 @@ cargo clippy --all-targets -- -D warnings
 cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings
 cargo build --target wasm32-unknown-unknown --release --no-default-features
 wasm-pack build --target web --out-dir web/pkg --no-default-features
+cargo build --release
 ```
 
 The native tests cover stable theme metadata, basic color contrast invariants,
 and cross-platform shell-title extraction. The WASM package contains generated
 JavaScript/TypeScript bindings and a 3.4 MB uncompressed module before HTTP
 compression.
+
+The stripped native release executable is 13,361,544 bytes. On this
+software-rendered VM, a clean launch reached a discoverable X11 window in 572
+ms. This is a coarse end-to-end observation rather than a controlled benchmark.
 
 ## Manual desktop smoke test
 
@@ -39,6 +44,9 @@ real X11 window:
    pane. Closing the native window through Alt+F4 stopped both the application
    and the remaining Bash child.
 
+The final lifecycle check repeated step 7 against the optimized release binary:
+the window, application PID, and Bash child PID all disappeared cleanly.
+
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal.
 
@@ -48,4 +56,3 @@ The generated package loaded through an HTTP server and reached eframe startup.
 The VM browser reported that WebGL was unavailable. The page then showed its
 tested compatibility message instead of a blank canvas. Interactive canvas
 testing remains explicitly unverified until run in a WebGL-enabled browser.
-
