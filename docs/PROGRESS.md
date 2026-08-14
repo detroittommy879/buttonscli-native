@@ -120,3 +120,19 @@ font faces, selects them per Alacritty cell flag, and promotes normal ANSI color
 to the theme's exact bright values when requested. Settings shows both the
 requested bold weight and the actual nearest bundled face when a family lacks
 that weight.
+
+## 2026-08-14 — Editable command presets
+
+The hard-coded native buttons were replaced with one persisted preset library
+shared by the top bar, resizable command dock, and a dedicated Commands settings
+page. Presets can be added, edited, deleted, or restored to the same
+platform-aware starter set as the legacy app. Each button also preserves the
+important `sendEnter` distinction: repetitive commands can run immediately,
+while templates such as SSH addresses can be typed into the focused terminal
+for review without being submitted.
+
+The migration path gives existing native preferences the starter collection,
+and focused tests cover migration, validation, CRUD state, and exact terminal
+payloads. A living `PARITY_BACKLOG.md` now tracks the rest of the reconstruction
+with source references and acceptance criteria rather than relying on a short
+limitations summary.

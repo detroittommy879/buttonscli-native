@@ -14,8 +14,8 @@ Current desktop features include:
 - real local shell sessions with production VT parsing and scrollback;
 - native GPU-rendered tabs and single, side-by-side, or stacked pane layouts;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
-- a resizable command dock, quick command presets, and all 555 legacy theme
-  selections with exact terminal ANSI palettes;
+- a resizable command dock, editable persisted command presets with type/run
+  behavior, and all 555 legacy theme selections with exact terminal ANSI palettes;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
   including separate terminal regular/bold faces;

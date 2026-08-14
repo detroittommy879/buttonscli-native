@@ -24,7 +24,7 @@ constraints.
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
 | Tabs and sessions | Partial | Rename, reorder, reopen, and configurable shell profiles |
 | Pane layouts | Partial | Arbitrary layouts with up to 10 visible panes |
-| Command presets | Partial | User-managed saved buttons with type/run behavior |
+| Command presets | Done | Extend the same model to the separate SSH collection |
 | Themes and fonts | Partial | Import/edit/share plus full effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
 | Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
@@ -39,7 +39,7 @@ constraints.
 | Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, undo-close, and preserve the correct pane-to-tab mapping. |
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Add/remove/focus panes in arbitrary arrangements up to 10 visible sessions; closing and tab changes never corrupt layout state. |
 | Shell profiles | Missing | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
-| Command presets | Partial | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
+| Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Missing | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
 | Dock behavior | Partial | `src/components/PresetBar.tsx` | Top and left docks resize, collapse, auto-hide, and support compact wrapping without covering terminal content. |
 | Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Port every supported command, expose editable bindings, detect conflicts, and verify macOS/Windows modifier behavior. |
@@ -98,14 +98,13 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Finish command preset CRUD and persistence.
-2. Add tab rename/reorder/reopen and strengthen session-state tests.
-3. Generalize pane layout state beyond the current two-pane modes.
-4. Add shell profile discovery and launch selection.
-5. Finish non-AI visual editing/effects foundations.
-6. Build secure provider/key configuration, then AI Help.
-7. Version and secure the loopback automation API before adding CLI/MCP clients.
-8. Close platform, accessibility, localization, and release gaps continuously.
+1. Add tab rename/reorder/reopen and strengthen session-state tests.
+2. Generalize pane layout state beyond the current two-pane modes.
+3. Add shell profile discovery and launch selection.
+4. Finish non-AI visual editing/effects foundations.
+5. Build secure provider/key configuration, then AI Help.
+6. Version and secure the loopback automation API before adding CLI/MCP clients.
+7. Close platform, accessibility, localization, and release gaps continuously.
 
 ## Definition of done for a backlog row
 

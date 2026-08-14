@@ -22,7 +22,9 @@ verbatim, all 26 scalable font files have catalog entries, legacy font aliases
 sanitize safely, and cross-platform shell-title extraction remains stable. The
 test suite also covers one-ID preference migration, proves that unchecked
 theme-apply sections remain unchanged, and preserves terminal bold-weight plus
-bright-ANSI settings. The WASM package contains generated
+bright-ANSI settings. Preset tests cover old-preference migration, validated
+add/edit/delete state, and the exact difference between immediate execution and
+type-only templates. The WASM package contains generated
 JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 

@@ -28,7 +28,7 @@ not a backlog disguised as release notes.
   bundled family.
 - Shell sessions use `$SHELL -l` on Unix and `%COMSPEC%` on Windows. A graphical
   shell/profile chooser is still future work.
-- Tab rename/undo, preset CRUD, profile switching, SSH presets, detached
+- Tab rename/undo, profile switching, SSH presets, detached
   settings, AI Help, the loopback automation API, localization, accounts, and
   updater/release infrastructure are not part of this lean core yet.
 - Images, color emoji rendering, sixel graphics, ligatures across cells, and
