@@ -13,6 +13,7 @@ Current desktop features include:
 
 - real local shell sessions with production VT parsing and scrollback;
 - native GPU-rendered tabs and single, side-by-side, or stacked pane layouts;
+- tab rename, reorder, and recent-close recovery with pane-safe index updates;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - a resizable command dock, editable persisted command presets with type/run
   behavior, and all 555 legacy theme selections with exact terminal ANSI palettes;
@@ -34,7 +35,8 @@ the usual X11 or Wayland development packages. See `docs/BUILDING.md` for the
 full platform notes.
 
 Useful shortcuts are Ctrl+Shift+T (new tab), Ctrl+Shift+W (close tab),
-Ctrl+Shift+C/V (copy/paste), Ctrl+Shift+, (Settings), and Ctrl+Shift+Q (quit).
+Ctrl+Shift+U (reopen tab), Ctrl+Shift+C/V (copy/paste), Ctrl+Shift+, (Settings),
+and Ctrl+Shift+Q (quit).
 
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.

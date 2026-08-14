@@ -22,7 +22,7 @@ constraints.
 | Area | Status | Next acceptance milestone |
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
-| Tabs and sessions | Partial | Rename, reorder, reopen, and configurable shell profiles |
+| Tabs and sessions | Done | Keep lifecycle and pane-index regressions covered |
 | Pane layouts | Partial | Arbitrary layouts with up to 10 visible panes |
 | Command presets | Done | Extend the same model to the separate SSH collection |
 | Themes and fonts | Partial | Import/edit/share plus full effect rendering and online fonts |
@@ -36,7 +36,7 @@ constraints.
 | --- | --- | --- | --- |
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
-| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, undo-close, and preserve the correct pane-to-tab mapping. |
+| Session tabs | Done | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, reopen a recent close, and preserve the correct pane-to-tab mapping. |
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Add/remove/focus panes in arbitrary arrangements up to 10 visible sessions; closing and tab changes never corrupt layout state. |
 | Shell profiles | Missing | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
@@ -98,13 +98,12 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Add tab rename/reorder/reopen and strengthen session-state tests.
-2. Generalize pane layout state beyond the current two-pane modes.
-3. Add shell profile discovery and launch selection.
-4. Finish non-AI visual editing/effects foundations.
-5. Build secure provider/key configuration, then AI Help.
-6. Version and secure the loopback automation API before adding CLI/MCP clients.
-7. Close platform, accessibility, localization, and release gaps continuously.
+1. Generalize pane layout state beyond the current two-pane modes.
+2. Add shell profile discovery and launch selection.
+3. Finish non-AI visual editing/effects foundations.
+4. Build secure provider/key configuration, then AI Help.
+5. Version and secure the loopback automation API before adding CLI/MCP clients.
+6. Close platform, accessibility, localization, and release gaps continuously.
 
 ## Definition of done for a backlog row
 

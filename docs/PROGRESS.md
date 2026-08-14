@@ -136,3 +136,16 @@ and focused tests cover migration, validation, CRUD state, and exact terminal
 payloads. A living `PARITY_BACKLOG.md` now tracks the rest of the reconstruction
 with source references and acceptance criteria rather than relying on a short
 limitations summary.
+
+## 2026-08-14 — Complete tab lifecycle
+
+Native tabs now expose per-tab actions for rename, move left/right, and close;
+double-click also opens rename. Manual titles are protected from later shell
+title events. Closing a tab terminates its PTY and keeps bounded recovery
+metadata, so reopening creates a clean shell and restores the user-assigned
+name without implying that a terminated process resumed.
+
+Moving a tab remaps focused, primary-pane, and secondary-pane indices as one
+operation. Forward and backward remapping have focused tests, and an X11 pass
+created two Bash sessions, renamed and reordered one, closed and reopened it,
+then confirmed normal child cleanup on window close.
