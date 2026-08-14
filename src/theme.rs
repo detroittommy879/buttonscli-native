@@ -459,6 +459,7 @@ fn to_hex(color: Color32) -> String {
     format!("#{:02x}{:02x}{:02x}", color.r(), color.g(), color.b())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn dim_hex(value: &str) -> String {
     parse_color(value)
         .map(|color| to_hex(mix(color, Color32::BLACK, 0.38)))
