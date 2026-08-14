@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Try ButtonsCLI</title>
+    <style>
+      html, body { margin: 0; width: 100%; height: 100%; background: #090c16; }
+      body { overflow: hidden; }
+      canvas { width: 100%; height: 100%; display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="buttonscli_canvas"></canvas>
+    <script type="module">
+      import init, { WebHandle } from "./pkg/buttonscli.js";
+      await init();
+      const app = new WebHandle();
+      await app.start(document.getElementById("buttonscli_canvas"));
+      window.buttonscli = app;
+    </script>
+  </body>
+</html>

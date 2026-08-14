@@ -1,11 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod app;
-mod theme;
-
-#[cfg(not(target_arch = "wasm32"))]
-mod terminal;
-
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     tracing_subscriber::fmt()
@@ -27,7 +21,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "ButtonsCLI",
         options,
-        Box::new(|cc| Ok(Box::new(app::ButtonsApp::new(cc)))),
+        Box::new(|cc| Ok(Box::new(buttonscli::app::ButtonsApp::new(cc)))),
     )
 }
 
