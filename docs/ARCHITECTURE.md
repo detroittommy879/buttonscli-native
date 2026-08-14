@@ -64,6 +64,12 @@ overlays; animation schedules repaint only for themes that request it. More
 specialized post-processing fields remain in the source assets for the renderer
 work described in `LIMITATIONS.md`.
 
+Theme application persists five independent source IDs: app chrome, terminal
+palette, fonts, gradient, and special effects. This keeps an app-only apply from
+silently replacing terminal colors (or vice versa). Calm apply uses the chosen
+gradient colors but disables gradient motion, static, and scanlines. Preferences
+from the earlier single-theme schema migrate that one ID into all five sources.
+
 All 26 legacy font binaries are embedded and registered once at startup. Named
 egui families point to real face files, the closest packaged weight is selected,
 and symbol plus broad Unicode faces form the fallback chain. Seven persisted
