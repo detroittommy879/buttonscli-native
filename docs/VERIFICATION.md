@@ -69,6 +69,12 @@ again stopped both the application and its login-shell child cleanly. Preset
 editor mutations and type-only payload behavior are covered by the automated
 tests above.
 
+The tab-lifecycle pass used an isolated preference directory, created a second
+real Bash session, renamed it `Work shell`, moved it left, closed it, and used
+the visible recent-close control to reopen it as a fresh PTY with its custom
+title restored. Unit tests cover forward and backward index remapping for every
+affected slot. Closing the window stopped the app and both shell children.
+
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
 `native-font-settings.png`.

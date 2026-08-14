@@ -6,6 +6,7 @@ use egui_term::{BackendCommand, BackendSettings, PtyEvent, TerminalBackend};
 pub struct TerminalTab {
     pub id: u64,
     pub title: String,
+    pub custom_title: Option<String>,
     pub backend: TerminalBackend,
     pub exited: bool,
 }
@@ -28,6 +29,7 @@ impl TerminalTab {
         Ok(Self {
             id,
             title,
+            custom_title: None,
             backend,
             exited: false,
         })
@@ -40,6 +42,11 @@ impl TerminalTab {
 
     pub fn run(&mut self, command: &str) {
         self.write(format!("{command}\r"));
+    }
+
+    pub fn rename(&mut self, title: String) {
+        self.title.clone_from(&title);
+        self.custom_title = Some(title);
     }
 
     pub fn request_exit(&mut self) {
