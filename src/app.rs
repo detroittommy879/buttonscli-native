@@ -1,5 +1,7 @@
 use crate::fonts::{self, FontZone, Typography};
 #[cfg(not(target_arch = "wasm32"))]
+use crate::theme::GradientGeometry;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
@@ -8,7 +10,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::terminal::{DetectedShell, ShellLaunch, TerminalTab};
 #[cfg(not(target_arch = "wasm32"))]
-use egui_term::{FontSettings, PtyEvent, TerminalFont, TerminalView};
+use egui_term::{BackgroundGradient, FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 
@@ -447,6 +449,7 @@ impl ButtonsApp {
         let effects = &self.themes.get(&self.preferences.effects_theme_id).effects;
         theme.effects = TerminalEffects {
             gradient: gradient.gradient,
+            gradient_geometry: gradient.gradient_geometry,
             gradient_animation: gradient.gradient_animation && !self.preferences.calm_mode,
             static_opacity: if self.preferences.calm_mode {
                 0.0
@@ -2335,19 +2338,37 @@ fn terminal_surface(
         bold_font_type: Some(terminal_bold_font_id),
     });
     let time = ui.input(|input| input.time) as f32;
-    let gradient = theme.effects.gradient.map(|colors| {
-        if theme.effects.gradient_animation {
-            let amount = (time * 0.35).sin() * 0.5 + 0.5;
-            [
-                mix_effect_color(colors[0], colors[1], amount),
-                mix_effect_color(colors[1], colors[3], amount),
-                mix_effect_color(colors[2], colors[0], amount),
-                mix_effect_color(colors[3], colors[2], amount),
-            ]
-        } else {
-            colors
-        }
-    });
+    let gradient = theme
+        .effects
+        .gradient
+        .map(|colors| {
+            if theme.effects.gradient_animation {
+                let amount = (time * 0.35).sin() * 0.5 + 0.5;
+                [
+                    mix_effect_color(colors[0], colors[1], amount),
+                    mix_effect_color(colors[1], colors[3], amount),
+                    mix_effect_color(colors[2], colors[0], amount),
+                    mix_effect_color(colors[3], colors[2], amount),
+                ]
+            } else {
+                colors
+            }
+        })
+        .map(|colors| match theme.effects.gradient_geometry {
+            GradientGeometry::Linear { angle_degrees } => BackgroundGradient::Linear {
+                colors,
+                angle_degrees,
+            },
+            GradientGeometry::Radial { center } => BackgroundGradient::Radial { colors, center },
+            GradientGeometry::Conic {
+                center,
+                angle_degrees,
+            } => BackgroundGradient::Conic {
+                colors,
+                center,
+                angle_degrees,
+            },
+        });
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(focused)
         .set_font(terminal_font)

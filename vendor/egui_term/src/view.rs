@@ -45,9 +45,26 @@ pub struct TerminalView<'a> {
     backend: &'a mut TerminalBackend,
     font: TerminalFont,
     theme: TerminalTheme,
-    background_gradient: Option<[Color32; 4]>,
+    background_gradient: Option<BackgroundGradient>,
     draw_bold_bright: bool,
     bindings_layout: BindingsLayout,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BackgroundGradient {
+    Linear {
+        colors: [Color32; 4],
+        angle_degrees: f32,
+    },
+    Radial {
+        colors: [Color32; 4],
+        center: [f32; 2],
+    },
+    Conic {
+        colors: [Color32; 4],
+        center: [f32; 2],
+        angle_degrees: f32,
+    },
 }
 
 impl Widget for TerminalView<'_> {
@@ -98,14 +115,14 @@ impl<'a> TerminalView<'a> {
         self
     }
 
-    /// Replace the global terminal background fill with a four-corner color
-    /// mesh. Cells that explicitly set a background color still paint over it.
+    /// Replace the global terminal background fill with a gradient mesh. Cells
+    /// that explicitly set a background color still paint over it.
     #[inline]
     pub fn set_background_gradient(
         mut self,
-        colors: Option<[Color32; 4]>,
+        gradient: Option<BackgroundGradient>,
     ) -> Self {
-        self.background_gradient = colors;
+        self.background_gradient = gradient;
         self
     }
 
@@ -252,31 +269,18 @@ impl<'a> TerminalView<'a> {
         let global_bg =
             self.theme.get_color(Color::Named(NamedColor::Background));
 
-        let background =
-            if let Some([top_left, top_right, bottom_left, bottom_right]) =
-                self.background_gradient
-            {
-                let mut mesh = Mesh::default();
-                mesh.colored_vertex(layout_min, top_left);
-                mesh.colored_vertex(
-                    Pos2::new(layout_max.x, layout_min.y),
-                    top_right,
-                );
-                mesh.colored_vertex(
-                    Pos2::new(layout_min.x, layout_max.y),
-                    bottom_left,
-                );
-                mesh.colored_vertex(layout_max, bottom_right);
-                mesh.add_triangle(0, 1, 2);
-                mesh.add_triangle(2, 1, 3);
-                Shape::mesh(mesh)
-            } else {
-                Shape::Rect(RectShape::filled(
-                    Rect::from_min_max(layout_min, layout_max),
-                    CornerRadius::ZERO,
-                    global_bg,
-                ))
-            };
+        let background = if let Some(gradient) = self.background_gradient {
+            Shape::mesh(background_gradient_mesh(
+                Rect::from_min_max(layout_min, layout_max),
+                gradient,
+            ))
+        } else {
+            Shape::Rect(RectShape::filled(
+                Rect::from_min_max(layout_min, layout_max),
+                CornerRadius::ZERO,
+                global_bg,
+            ))
+        };
         let mut shapes = vec![background];
 
         for indexed in content.grid.display_iter() {
@@ -393,6 +397,162 @@ impl<'a> TerminalView<'a> {
 
         painter.extend(shapes);
     }
+}
+
+fn background_gradient_mesh(rect: Rect, gradient: BackgroundGradient) -> Mesh {
+    match gradient {
+        BackgroundGradient::Linear {
+            colors,
+            angle_degrees,
+        } => linear_gradient_mesh(rect, colors, angle_degrees),
+        BackgroundGradient::Radial { colors, center } => {
+            radial_gradient_mesh(rect, colors, center)
+        },
+        BackgroundGradient::Conic {
+            colors,
+            center,
+            angle_degrees,
+        } => conic_gradient_mesh(rect, colors, center, angle_degrees),
+    }
+}
+
+fn linear_gradient_mesh(
+    rect: Rect,
+    colors: [Color32; 4],
+    angle_degrees: f32,
+) -> Mesh {
+    let angle = angle_degrees.to_radians();
+    let direction = Vec2::new(angle.cos(), angle.sin());
+    let extent = direction.x.abs() + direction.y.abs();
+    let color_at = |x: f32, y: f32| {
+        let projection = (x - 0.5) * direction.x + (y - 0.5) * direction.y;
+        gradient_color(colors, 0.5 + projection / extent.max(0.001))
+    };
+    let mut mesh = Mesh::default();
+    mesh.colored_vertex(rect.left_top(), color_at(0.0, 0.0));
+    mesh.colored_vertex(rect.right_top(), color_at(1.0, 0.0));
+    mesh.colored_vertex(rect.left_bottom(), color_at(0.0, 1.0));
+    mesh.colored_vertex(rect.right_bottom(), color_at(1.0, 1.0));
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(2, 1, 3);
+    mesh
+}
+
+fn radial_gradient_mesh(
+    rect: Rect,
+    colors: [Color32; 4],
+    center: [f32; 2],
+) -> Mesh {
+    const SEGMENTS: usize = 48;
+    const RINGS: usize = 4;
+    let center = Pos2::new(
+        rect.left() + rect.width() * center[0].clamp(0.0, 1.0),
+        rect.top() + rect.height() * center[1].clamp(0.0, 1.0),
+    );
+    let radius = [
+        rect.left_top(),
+        rect.right_top(),
+        rect.left_bottom(),
+        rect.right_bottom(),
+    ]
+    .into_iter()
+    .map(|corner| center.distance(corner))
+    .fold(0.0_f32, f32::max);
+    let mut mesh = Mesh::default();
+    for ring in 0..RINGS {
+        let progress = ring as f32 / (RINGS - 1) as f32;
+        for segment in 0..SEGMENTS {
+            let angle =
+                std::f32::consts::TAU * segment as f32 / SEGMENTS as f32;
+            mesh.colored_vertex(
+                center + Vec2::angled(angle) * radius * progress,
+                gradient_color(colors, progress),
+            );
+        }
+    }
+    for ring in 0..RINGS - 1 {
+        for segment in 0..SEGMENTS {
+            let next = (segment + 1) % SEGMENTS;
+            let inner = (ring * SEGMENTS + segment) as u32;
+            let inner_next = (ring * SEGMENTS + next) as u32;
+            let outer = ((ring + 1) * SEGMENTS + segment) as u32;
+            let outer_next = ((ring + 1) * SEGMENTS + next) as u32;
+            mesh.add_triangle(inner, outer, inner_next);
+            mesh.add_triangle(inner_next, outer, outer_next);
+        }
+    }
+    mesh
+}
+
+fn conic_gradient_mesh(
+    rect: Rect,
+    colors: [Color32; 4],
+    center: [f32; 2],
+    angle_degrees: f32,
+) -> Mesh {
+    const SEGMENTS: usize = 64;
+    let center = Pos2::new(
+        rect.left() + rect.width() * center[0].clamp(0.0, 1.0),
+        rect.top() + rect.height() * center[1].clamp(0.0, 1.0),
+    );
+    let radius = [
+        rect.left_top(),
+        rect.right_top(),
+        rect.left_bottom(),
+        rect.right_bottom(),
+    ]
+    .into_iter()
+    .map(|corner| center.distance(corner))
+    .fold(0.0_f32, f32::max);
+    let offset = angle_degrees / 360.0;
+    let mut mesh = Mesh::default();
+    for segment in 0..SEGMENTS {
+        let start = segment as f32 / SEGMENTS as f32;
+        let end = (segment + 1) as f32 / SEGMENTS as f32;
+        let start_angle = std::f32::consts::TAU * start;
+        let end_angle = std::f32::consts::TAU * end;
+        let start_color = conic_color(colors, start + offset);
+        let end_color = conic_color(colors, end + offset);
+        let base = mesh.vertices.len() as u32;
+        mesh.colored_vertex(center, start_color);
+        mesh.colored_vertex(
+            center + Vec2::angled(start_angle) * radius,
+            start_color,
+        );
+        mesh.colored_vertex(
+            center + Vec2::angled(end_angle) * radius,
+            end_color,
+        );
+        mesh.add_triangle(base, base + 1, base + 2);
+    }
+    mesh
+}
+
+fn gradient_color(colors: [Color32; 4], progress: f32) -> Color32 {
+    let scaled = progress.clamp(0.0, 1.0) * 3.0;
+    let index = (scaled.floor() as usize).min(2);
+    mix_color(colors[index], colors[index + 1], scaled - index as f32)
+}
+
+fn conic_color(colors: [Color32; 4], progress: f32) -> Color32 {
+    let scaled = progress.rem_euclid(1.0) * 4.0;
+    let index = (scaled.floor() as usize).min(3);
+    mix_color(
+        colors[index],
+        colors[(index + 1) % 4],
+        scaled - index as f32,
+    )
+}
+
+fn mix_color(first: Color32, second: Color32, amount: f32) -> Color32 {
+    let channel =
+        |a: u8, b: u8| (a as f32 * (1.0 - amount) + b as f32 * amount) as u8;
+    Color32::from_rgba_premultiplied(
+        channel(first.r(), second.r()),
+        channel(first.g(), second.g()),
+        channel(first.b(), second.b()),
+        channel(first.a(), second.a()),
+    )
 }
 
 fn process_keyboard_event(

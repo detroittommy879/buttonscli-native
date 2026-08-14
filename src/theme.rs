@@ -137,11 +137,34 @@ pub struct TerminalColors {
 #[derive(Clone, Debug, Default)]
 pub struct TerminalEffects {
     pub gradient: Option<[Color32; 4]>,
+    pub gradient_geometry: GradientGeometry,
     pub gradient_animation: bool,
     pub static_opacity: f32,
     pub static_density: f32,
     pub scanlines_strength: f32,
     pub scanlines_period: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GradientGeometry {
+    Linear {
+        angle_degrees: f32,
+    },
+    Radial {
+        center: [f32; 2],
+    },
+    Conic {
+        center: [f32; 2],
+        angle_degrees: f32,
+    },
+}
+
+impl Default for GradientGeometry {
+    fn default() -> Self {
+        Self::Linear {
+            angle_degrees: 135.0,
+        }
+    }
 }
 
 impl TerminalColors {
@@ -409,6 +432,7 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
 
     TerminalEffects {
         gradient,
+        gradient_geometry: parse_gradient_geometry(terminal),
         gradient_animation: terminal
             .get("gradientAnimation")
             .and_then(Value::as_bool)
@@ -426,6 +450,51 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
         },
         scanlines_period: number("scanlinesPeriod", 4.0).clamp(2.0, 16.0),
     }
+}
+
+fn parse_gradient_geometry(terminal: &Value) -> GradientGeometry {
+    let kind = string_at(terminal, "gradientType")
+        .or_else(|| string_at(terminal, "gradientDirection"))
+        .unwrap_or("linear")
+        .to_ascii_lowercase();
+    let angle_degrees = number_at(terminal, "gradientAngle")
+        .map(|value| value as f32)
+        .unwrap_or(135.0)
+        .rem_euclid(360.0);
+    let center = parse_gradient_center(
+        string_at(terminal, "gradientRadialPosition")
+            .or_else(|| string_at(terminal, "gradientPosition"))
+            .unwrap_or("center"),
+    );
+    if kind.contains("radial") {
+        GradientGeometry::Radial { center }
+    } else if kind.contains("conic") {
+        GradientGeometry::Conic {
+            center,
+            angle_degrees,
+        }
+    } else {
+        GradientGeometry::Linear { angle_degrees }
+    }
+}
+
+fn parse_gradient_center(value: &str) -> [f32; 2] {
+    let value = value.to_ascii_lowercase();
+    let x = if value.contains("left") {
+        0.0
+    } else if value.contains("right") {
+        1.0
+    } else {
+        0.5
+    };
+    let y = if value.contains("top") {
+        0.0
+    } else if value.contains("bottom") {
+        1.0
+    } else {
+        0.5
+    };
+    [x, y]
 }
 
 fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography> {
@@ -629,5 +698,21 @@ mod tests {
         let typography = theme.typography.as_ref().unwrap();
         assert_eq!(typography.terminal_bold_weight, 700);
         assert!(typography.draw_bold_bright);
+    }
+
+    #[test]
+    fn legacy_gradient_geometry_is_preserved() {
+        let catalog = ThemeCatalog::load();
+        assert_eq!(
+            catalog.get("neon_monster_mash").effects.gradient_geometry,
+            GradientGeometry::Radial { center: [0.5, 0.5] }
+        );
+        assert_eq!(
+            catalog.get("prismatic-stage").effects.gradient_geometry,
+            GradientGeometry::Conic {
+                center: [0.5, 0.5],
+                angle_degrees: 90.0,
+            }
+        );
     }
 }
