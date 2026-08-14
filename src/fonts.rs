@@ -136,7 +136,7 @@ pub static FONT_FACES: &[FontFace] = &[
     face!("roboto-300", "Roboto Bundled", "Roboto-Light.ttf", 300, Ui),
     face!(
         "roboto-300-italic",
-        "Roboto Bundled Italic",
+        "Roboto Bundled",
         "Roboto-LightItalic.ttf",
         300,
         Ui
@@ -407,7 +407,8 @@ mod tests {
     #[test]
     fn catalog_has_every_packaged_scalable_face() {
         assert_eq!(FONT_FACES.len(), 26);
-        assert!(family_names(true).len() >= 10);
+        assert_eq!(family_names(false).len(), 19);
+        assert_eq!(family_names(true).len(), 12);
         assert!(family_names(false).contains(&"Roboto Bundled"));
     }
 
