@@ -174,6 +174,16 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
+    recently_closed: Vec<ClosedTab>,
+    #[cfg(not(target_arch = "wasm32"))]
+    show_tab_rename: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    renaming_tab: Option<usize>,
+    #[cfg(not(target_arch = "wasm32"))]
+    tab_title_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    tab_rename_error: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
     primary: usize,
     #[cfg(not(target_arch = "wasm32"))]
     secondary: Option<usize>,
@@ -207,6 +217,23 @@ enum PresetAction {
     Run(usize),
     Edit(usize),
     Delete(usize),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ClosedTab {
+    title: String,
+    had_custom_title: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TabAction {
+    Activate(usize),
+    Rename(usize),
+    MoveLeft(usize),
+    MoveRight(usize),
+    Close(usize),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -256,6 +283,16 @@ impl ButtonsApp {
             notice: None,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            recently_closed: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            show_tab_rename: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            renaming_tab: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            tab_title_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            tab_rename_error: None,
             #[cfg(not(target_arch = "wasm32"))]
             primary: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -379,11 +416,18 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn close_tab(&mut self, index: usize) {
-        if let Some(tab) = self.tabs.get_mut(index) {
-            tab.request_exit();
+        if index >= self.tabs.len() {
+            return;
         }
-        if index < self.tabs.len() {
-            self.tabs.remove(index);
+        let mut tab = self.tabs.remove(index);
+        let closed = ClosedTab {
+            title: tab.title.clone(),
+            had_custom_title: tab.custom_title.is_some(),
+        };
+        tab.request_exit();
+        self.recently_closed.push(closed);
+        if self.recently_closed.len() > 10 {
+            self.recently_closed.remove(0);
         }
         if self.tabs.is_empty() {
             self.primary = 0;
@@ -423,11 +467,91 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn reopen_closed_tab(&mut self, context: egui::Context) {
+        let Some(closed) = self.recently_closed.pop() else {
+            return;
+        };
+        let previous_len = self.tabs.len();
+        self.open_tab(context);
+        if self.tabs.len() == previous_len {
+            self.recently_closed.push(closed);
+            return;
+        }
+        if closed.had_custom_title {
+            if let Some(tab) = self.tabs.last_mut() {
+                tab.rename(closed.title);
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn move_tab(&mut self, from: usize, to: usize) {
+        if from >= self.tabs.len() || to >= self.tabs.len() || from == to {
+            return;
+        }
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        self.primary = remap_index_after_move(self.primary, from, to);
+        self.secondary = self
+            .secondary
+            .map(|slot| remap_index_after_move(slot, from, to));
+        self.focused = remap_index_after_move(self.focused, from, to);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_tab_rename(&mut self, index: usize) {
+        let Some(tab) = self.tabs.get(index) else {
+            return;
+        };
+        self.renaming_tab = Some(index);
+        self.tab_title_draft.clone_from(&tab.title);
+        self.tab_rename_error = None;
+        self.show_tab_rename = true;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_tab_rename(&mut self) -> bool {
+        let title = self.tab_title_draft.trim();
+        if title.is_empty() {
+            self.tab_rename_error = Some("A tab title is required.".into());
+            return false;
+        }
+        let Some(index) = self.renaming_tab else {
+            return false;
+        };
+        let Some(tab) = self.tabs.get_mut(index) else {
+            self.tab_rename_error = Some("That terminal is no longer open.".into());
+            return false;
+        };
+        tab.rename(title.to_owned());
+        self.tab_rename_error = None;
+        true
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn perform_tab_action(&mut self, action: TabAction) {
+        match action {
+            TabAction::Activate(index) => self.activate_tab(index),
+            TabAction::Rename(index) => self.open_tab_rename(index),
+            TabAction::MoveLeft(index) if index > 0 => self.move_tab(index, index - 1),
+            TabAction::MoveRight(index) if index + 1 < self.tabs.len() => {
+                self.move_tab(index, index + 1);
+            }
+            TabAction::Close(index) => self.close_tab(index),
+            TabAction::MoveLeft(_) | TabAction::MoveRight(_) => {}
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn process_terminal_events(&mut self) {
         while let Ok((id, event)) = self.events_rx.try_recv() {
             if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
                 match event {
-                    PtyEvent::Title(title) if !title.trim().is_empty() => tab.title = title,
+                    PtyEvent::Title(title)
+                        if tab.custom_title.is_none() && !title.trim().is_empty() =>
+                    {
+                        tab.title = title;
+                    }
                     PtyEvent::Exit | PtyEvent::ChildExit(_) => tab.exited = true,
                     _ => {}
                 }
@@ -566,7 +690,10 @@ impl ButtonsApp {
         let terminal_bold_font = fonts::font_id(&bold_zone);
         let draw_bold_bright = self.preferences.typography.draw_bold_bright;
         let theme = self.terminal_presentation();
-        let modal_open = self.show_settings || self.show_about;
+        let modal_open = self.show_settings
+            || self.show_about
+            || self.show_preset_editor
+            || self.show_tab_rename;
         let mut clicked = None;
 
         match (self.pane_layout, self.secondary) {
@@ -763,6 +890,18 @@ impl ButtonsApp {
                             self.open_tab(ctx.clone());
                             ui.close_menu();
                         }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui
+                            .add_enabled(
+                                !self.recently_closed.is_empty(),
+                                egui::Button::new("Reopen closed terminal  Ctrl+Shift+U"),
+                            )
+                            .clicked()
+                        {
+                            self.reopen_closed_tab(ctx.clone());
+                            ui.close_menu();
+                        }
+                        ui.separator();
                         if ui.button("Quit  Ctrl+Shift+Q").clicked() {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
@@ -807,61 +946,74 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.tabs);
-                let mut close = None;
-                let mut activate = None;
-                ui.horizontal(|ui| {
-                    for (index, tab) in self.tabs.iter().enumerate() {
-                        let active = index == self.focused;
-                        let visible = index == self.primary || Some(index) == self.secondary;
-                        let label = if tab.exited {
-                            format!("{}  · exited", tab.title)
-                        } else if visible && !active {
-                            format!("{}  · visible", tab.title)
-                        } else {
-                            tab.title.clone()
-                        };
-                        let button = egui::Button::new(RichText::new(label).color(if active {
-                            colors.text
-                        } else {
-                            colors.muted
-                        }))
-                        .fill(if active {
-                            colors.tabs_active
-                        } else {
-                            colors.tabs_idle
-                        })
-                        .stroke(Stroke::new(
-                            1.0_f32,
-                            if active {
-                                colors.tabs_border
+                let mut action = None;
+                let mut add = false;
+                let mut reopen = false;
+                egui::ScrollArea::horizontal().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        for (index, tab) in self.tabs.iter().enumerate() {
+                            let active = index == self.focused;
+                            let visible = index == self.primary || Some(index) == self.secondary;
+                            let label = if tab.exited {
+                                format!("{}  · exited", tab.title)
+                            } else if visible && !active {
+                                format!("{}  · visible", tab.title)
                             } else {
-                                colors.border
-                            },
-                        ));
-                        if ui.add_sized([150.0, 28.0], button).clicked() {
-                            activate = Some(index);
+                                tab.title.clone()
+                            };
+                            let button = egui::Button::new(RichText::new(label).color(if active {
+                                colors.text
+                            } else {
+                                colors.muted
+                            }))
+                            .fill(if active {
+                                colors.tabs_active
+                            } else {
+                                colors.tabs_idle
+                            })
+                            .stroke(Stroke::new(
+                                1.0_f32,
+                                if active {
+                                    colors.tabs_border
+                                } else {
+                                    colors.border
+                                },
+                            ));
+                            let response = ui
+                                .add_sized([150.0, 28.0], button)
+                                .on_hover_text("Double-click to rename");
+                            if response.double_clicked() {
+                                action = Some(TabAction::Rename(index));
+                            } else if response.clicked() {
+                                action = Some(TabAction::Activate(index));
+                            }
+                            tab_action_menu(ui, index, self.tabs.len(), &mut action);
                         }
                         if ui
-                            .small_button("×")
-                            .on_hover_text("Close terminal")
+                            .button(RichText::new("+").color(colors.accent))
+                            .on_hover_text("New terminal")
                             .clicked()
                         {
-                            close = Some(index);
+                            add = true;
                         }
-                    }
-                    if ui
-                        .button(RichText::new("+").color(colors.accent))
-                        .on_hover_text("New terminal")
-                        .clicked()
-                    {
-                        self.open_tab(ctx.clone());
-                    }
+                        if !self.recently_closed.is_empty()
+                            && ui
+                                .button("↶")
+                                .on_hover_text("Reopen the most recently closed terminal")
+                                .clicked()
+                        {
+                            reopen = true;
+                        }
+                    });
                 });
-                if let Some(index) = activate {
-                    self.activate_tab(index);
+                if let Some(action) = action {
+                    self.perform_tab_action(action);
                 }
-                if let Some(index) = close {
-                    self.close_tab(index);
+                if add {
+                    self.open_tab(ctx.clone());
+                }
+                if reopen {
+                    self.reopen_closed_tab(ctx.clone());
                 }
             });
     }
@@ -1572,6 +1724,50 @@ impl ButtonsApp {
         self.show_preset_editor = open;
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn tab_rename_window(&mut self, ctx: &egui::Context) {
+        if !self.show_tab_rename {
+            return;
+        }
+        let mut open = self.show_tab_rename;
+        let mut save = false;
+        let mut cancel = false;
+        egui::Window::new("Rename terminal")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(420.0)
+            .show(ctx, |ui| {
+                apply_zone_style(ui, &self.preferences.typography.settings);
+                ui.label("Tab title");
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut self.tab_title_draft)
+                        .desired_width(f32::INFINITY),
+                );
+                let submitted =
+                    response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                if let Some(error) = &self.tab_rename_error {
+                    ui.colored_label(ui.visuals().error_fg_color, error);
+                }
+                ui.add_space(8.0);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                    if ui.button("Rename").clicked() || submitted {
+                        save = true;
+                    }
+                });
+            });
+        if save && self.save_tab_rename() {
+            open = false;
+        }
+        if cancel {
+            open = false;
+        }
+        self.show_tab_rename = open;
+    }
+
     fn about_window(&mut self, ctx: &egui::Context) {
         egui::Window::new("About ButtonsCLI")
             .open(&mut self.show_about)
@@ -1586,11 +1782,12 @@ impl ButtonsApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (new_tab, close_tab, copy, paste, settings, quit) = ctx.input(|input| {
+        let (new_tab, close_tab, reopen_tab, copy, paste, settings, quit) = ctx.input(|input| {
             let command = input.modifiers.command && input.modifiers.shift;
             (
                 command && input.key_pressed(egui::Key::T),
                 command && input.key_pressed(egui::Key::W),
+                command && input.key_pressed(egui::Key::U),
                 command && input.key_pressed(egui::Key::C),
                 command && input.key_pressed(egui::Key::V),
                 command && input.key_pressed(egui::Key::Comma),
@@ -1605,6 +1802,9 @@ impl ButtonsApp {
             if close_tab && !self.tabs.is_empty() {
                 self.close_tab(self.focused);
             }
+            if reopen_tab {
+                self.reopen_closed_tab(ctx.clone());
+            }
             if copy {
                 if let Some(tab) = self.tabs.get(self.focused) {
                     let selected = tab.backend.selectable_content();
@@ -1617,7 +1817,7 @@ impl ButtonsApp {
                 ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
             }
         }
-        let _ = (new_tab, close_tab, copy, paste);
+        let _ = (new_tab, close_tab, reopen_tab, copy, paste);
         if settings {
             self.show_settings = true;
         }
@@ -1853,6 +2053,53 @@ fn two_tabs_mut(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn remap_index_after_move(slot: usize, from: usize, to: usize) -> usize {
+    if slot == from {
+        to
+    } else if from < to && slot > from && slot <= to {
+        slot - 1
+    } else if to < from && slot >= to && slot < from {
+        slot + 1
+    } else {
+        slot
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn tab_action_menu(
+    ui: &mut egui::Ui,
+    index: usize,
+    tab_count: usize,
+    action: &mut Option<TabAction>,
+) {
+    ui.menu_button("⋮", |ui| {
+        if ui.button("Rename").clicked() {
+            *action = Some(TabAction::Rename(index));
+            ui.close_menu();
+        }
+        if ui
+            .add_enabled(index > 0, egui::Button::new("Move left"))
+            .clicked()
+        {
+            *action = Some(TabAction::MoveLeft(index));
+            ui.close_menu();
+        }
+        if ui
+            .add_enabled(index + 1 < tab_count, egui::Button::new("Move right"))
+            .clicked()
+        {
+            *action = Some(TabAction::MoveRight(index));
+            ui.close_menu();
+        }
+        ui.separator();
+        if ui.button("Close terminal").clicked() {
+            *action = Some(TabAction::Close(index));
+            ui.close_menu();
+        }
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn preset_hover_text(preset: &CommandPreset) -> String {
     if preset.send_enter {
         format!("{}\nExecutes immediately", preset.command)
@@ -1914,6 +2161,8 @@ impl eframe::App for ButtonsApp {
 
         self.settings_window(ctx);
         self.preset_editor_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.tab_rename_window(ctx);
         self.about_window(ctx);
     }
 
@@ -2030,5 +2279,23 @@ mod tests {
         assert!(!app.save_preset_draft());
         assert_eq!(app.preferences.presets, original);
         assert!(app.preset_editor_error.is_some());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn moving_tabs_forward_remaps_every_affected_slot() {
+        let remapped: Vec<usize> = (0..5)
+            .map(|slot| remap_index_after_move(slot, 1, 4))
+            .collect();
+        assert_eq!(remapped, vec![0, 4, 1, 2, 3]);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn moving_tabs_backward_remaps_every_affected_slot() {
+        let remapped: Vec<usize> = (0..5)
+            .map(|slot| remap_index_after_move(slot, 4, 1))
+            .collect();
+        assert_eq!(remapped, vec![0, 2, 3, 4, 1]);
     }
 }
