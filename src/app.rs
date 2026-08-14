@@ -184,9 +184,7 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tab_rename_error: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
-    primary: usize,
-    #[cfg(not(target_arch = "wasm32"))]
-    secondary: Option<usize>,
+    visible_panes: Vec<usize>,
     #[cfg(not(target_arch = "wasm32"))]
     focused: usize,
     #[cfg(not(target_arch = "wasm32"))]
@@ -241,8 +239,9 @@ enum TabAction {
 enum PaneLayout {
     #[default]
     Single,
-    SideBySide,
-    Stacked,
+    Columns,
+    Rows,
+    Grid,
 }
 
 impl ButtonsApp {
@@ -294,9 +293,7 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             tab_rename_error: None,
             #[cfg(not(target_arch = "wasm32"))]
-            primary: 0,
-            #[cfg(not(target_arch = "wasm32"))]
-            secondary: None,
+            visible_panes: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             focused: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -402,10 +399,10 @@ impl ButtonsApp {
                 self.tabs.push(tab);
                 let index = self.tabs.len() - 1;
                 if self.tabs.len() == 1 || self.pane_layout == PaneLayout::Single {
-                    self.primary = index;
-                    self.secondary = None;
-                } else {
-                    self.secondary = Some(index);
+                    self.visible_panes.clear();
+                    self.visible_panes.push(index);
+                } else if self.visible_panes.len() < 10 {
+                    self.visible_panes.push(index);
                 }
                 self.focused = index;
                 self.notice = None;
@@ -430,38 +427,15 @@ impl ButtonsApp {
             self.recently_closed.remove(0);
         }
         if self.tabs.is_empty() {
-            self.primary = 0;
-            self.secondary = None;
+            self.visible_panes.clear();
             self.focused = 0;
             self.pane_layout = PaneLayout::Single;
             return;
         }
 
-        let adjust = |slot: usize| {
-            if slot == index {
-                None
-            } else if slot > index {
-                Some(slot - 1)
-            } else {
-                Some(slot)
-            }
-        };
-        let old_secondary = self.secondary;
-        self.primary = adjust(self.primary)
-            .or_else(|| old_secondary.and_then(adjust))
-            .unwrap_or(0)
-            .min(self.tabs.len() - 1);
-        self.secondary = old_secondary
-            .and_then(adjust)
-            .filter(|slot| *slot != self.primary && *slot < self.tabs.len());
-        self.focused = adjust(self.focused)
-            .unwrap_or(self.primary)
-            .min(self.tabs.len() - 1);
-
-        if self.pane_layout != PaneLayout::Single && self.secondary.is_none() {
-            self.secondary = (0..self.tabs.len()).find(|slot| *slot != self.primary);
-        }
-        if self.secondary.is_none() {
+        (self.visible_panes, self.focused) =
+            pane_state_after_close(&self.visible_panes, self.focused, index, self.tabs.len());
+        if self.visible_panes.len() <= 1 {
             self.pane_layout = PaneLayout::Single;
         }
     }
@@ -491,10 +465,9 @@ impl ButtonsApp {
         }
         let tab = self.tabs.remove(from);
         self.tabs.insert(to, tab);
-        self.primary = remap_index_after_move(self.primary, from, to);
-        self.secondary = self
-            .secondary
-            .map(|slot| remap_index_after_move(slot, from, to));
+        for slot in &mut self.visible_panes {
+            *slot = remap_index_after_move(*slot, from, to);
+        }
         self.focused = remap_index_after_move(self.focused, from, to);
     }
 
@@ -642,30 +615,63 @@ impl ButtonsApp {
     fn set_pane_layout(&mut self, layout: PaneLayout, context: &egui::Context) {
         self.pane_layout = layout;
         if layout == PaneLayout::Single {
-            self.primary = self.focused.min(self.tabs.len().saturating_sub(1));
-            self.secondary = None;
+            self.visible_panes = if self.tabs.is_empty() {
+                Vec::new()
+            } else {
+                vec![self.focused.min(self.tabs.len() - 1)]
+            };
             return;
         }
+        self.set_visible_pane_count(self.visible_panes.len().max(2), context);
+    }
 
-        self.primary = self.focused.min(self.tabs.len().saturating_sub(1));
-        self.secondary = (0..self.tabs.len()).find(|slot| *slot != self.primary);
-        if self.secondary.is_none() {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_visible_pane_count(&mut self, count: usize, context: &egui::Context) {
+        let count = count.clamp(1, 10);
+        if count == 1 {
+            self.set_pane_layout(PaneLayout::Single, context);
+            return;
+        }
+        if self.pane_layout == PaneLayout::Single {
+            self.pane_layout = PaneLayout::Grid;
+        }
+        while self.tabs.len() < count {
+            let previous_len = self.tabs.len();
             self.open_tab(context.clone());
+            if self.tabs.len() == previous_len {
+                break;
+            }
         }
-        if let Some(secondary) = self.secondary {
-            self.focused = secondary;
+        let count = count.min(self.tabs.len());
+        let focused = self.focused.min(self.tabs.len().saturating_sub(1));
+        let mut visible = Vec::with_capacity(count);
+        visible.push(focused);
+        for index in self.visible_panes.iter().copied().chain(0..self.tabs.len()) {
+            if visible.len() >= count {
+                break;
+            }
+            if !visible.contains(&index) {
+                visible.push(index);
+            }
         }
+        self.visible_panes = visible;
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn activate_tab(&mut self, index: usize) {
+        if index >= self.tabs.len() {
+            return;
+        }
         if self.pane_layout == PaneLayout::Single {
-            self.primary = index;
-        } else if Some(index) != self.secondary && index != self.primary {
-            if self.focused == self.primary {
-                self.primary = index;
-            } else {
-                self.secondary = Some(index);
+            self.visible_panes = vec![index];
+        } else if !self.visible_panes.contains(&index) {
+            let position = self
+                .visible_panes
+                .iter()
+                .position(|slot| *slot == self.focused)
+                .unwrap_or(0);
+            if let Some(slot) = self.visible_panes.get_mut(position) {
+                *slot = index;
             }
         }
         self.focused = index;
@@ -682,7 +688,6 @@ impl ButtonsApp {
             return;
         }
 
-        let primary = self.primary.min(self.tabs.len() - 1);
         let focused = self.focused;
         let terminal_font = fonts::font_id(&self.preferences.typography.terminal);
         let mut bold_zone = self.preferences.typography.terminal.clone();
@@ -695,90 +700,41 @@ impl ButtonsApp {
             || self.show_preset_editor
             || self.show_tab_rename;
         let mut clicked = None;
-
-        match (self.pane_layout, self.secondary) {
-            (PaneLayout::Single, _) | (_, None) => {
-                let response = terminal_surface(
-                    ui,
-                    &mut self.tabs[primary],
-                    focused == primary && !modal_open,
-                    terminal_font.clone(),
-                    terminal_bold_font.clone(),
-                    draw_bold_bright,
-                    &theme,
-                );
-                if response.clicked() {
-                    clicked = Some(primary);
+        let mut visible = self.visible_panes.clone();
+        visible.retain(|index| *index < self.tabs.len());
+        if visible.is_empty() {
+            visible.push(focused.min(self.tabs.len() - 1));
+        }
+        let (rows, columns) = pane_grid_dimensions(self.pane_layout, visible.len());
+        let spacing = ui.spacing().item_spacing;
+        let cell_width =
+            ((ui.available_width() - spacing.x * (columns - 1) as f32) / columns as f32).max(100.0);
+        let cell_height =
+            ((ui.available_height() - spacing.y * (rows - 1) as f32) / rows as f32).max(80.0);
+        let tabs = &mut self.tabs;
+        for row in visible.chunks(columns) {
+            ui.horizontal(|ui| {
+                for index in row {
+                    ui.allocate_ui(Vec2::new(cell_width, cell_height), |pane| {
+                        let Some(tab) = tabs.get_mut(*index) else {
+                            return;
+                        };
+                        if terminal_surface(
+                            pane,
+                            tab,
+                            focused == *index && !modal_open,
+                            terminal_font.clone(),
+                            terminal_bold_font.clone(),
+                            draw_bold_bright,
+                            &theme,
+                        )
+                        .clicked()
+                        {
+                            clicked = Some(*index);
+                        }
+                    });
                 }
-            }
-            (PaneLayout::SideBySide, Some(secondary)) => {
-                let secondary = secondary.min(self.tabs.len() - 1);
-                let (first, second) = two_tabs_mut(&mut self.tabs, primary, secondary);
-                ui.columns(2, |columns| {
-                    if terminal_surface(
-                        &mut columns[0],
-                        first,
-                        focused == primary && !modal_open,
-                        terminal_font.clone(),
-                        terminal_bold_font.clone(),
-                        draw_bold_bright,
-                        &theme,
-                    )
-                    .clicked()
-                    {
-                        clicked = Some(primary);
-                    }
-                    if terminal_surface(
-                        &mut columns[1],
-                        second,
-                        focused == secondary && !modal_open,
-                        terminal_font.clone(),
-                        terminal_bold_font.clone(),
-                        draw_bold_bright,
-                        &theme,
-                    )
-                    .clicked()
-                    {
-                        clicked = Some(secondary);
-                    }
-                });
-            }
-            (PaneLayout::Stacked, Some(secondary)) => {
-                let secondary = secondary.min(self.tabs.len() - 1);
-                let (first, second) = two_tabs_mut(&mut self.tabs, primary, secondary);
-                let pane_height = ((ui.available_height() - 8.0) / 2.0).max(80.0);
-                ui.allocate_ui(Vec2::new(ui.available_width(), pane_height), |pane| {
-                    if terminal_surface(
-                        pane,
-                        first,
-                        focused == primary && !modal_open,
-                        terminal_font.clone(),
-                        terminal_bold_font.clone(),
-                        draw_bold_bright,
-                        &theme,
-                    )
-                    .clicked()
-                    {
-                        clicked = Some(primary);
-                    }
-                });
-                ui.separator();
-                ui.allocate_ui(Vec2::new(ui.available_width(), pane_height), |pane| {
-                    if terminal_surface(
-                        pane,
-                        second,
-                        focused == secondary && !modal_open,
-                        terminal_font.clone(),
-                        terminal_bold_font.clone(),
-                        draw_bold_bright,
-                        &theme,
-                    )
-                    .clicked()
-                    {
-                        clicked = Some(secondary);
-                    }
-                });
-            }
+            });
         }
 
         if let Some(index) = clicked {
@@ -953,7 +909,7 @@ impl ButtonsApp {
                     ui.horizontal(|ui| {
                         for (index, tab) in self.tabs.iter().enumerate() {
                             let active = index == self.focused;
-                            let visible = index == self.primary || Some(index) == self.secondary;
+                            let visible = self.visible_panes.contains(&index);
                             let label = if tab.exited {
                                 format!("{}  · exited", tab.title)
                             } else if visible && !active {
@@ -1193,6 +1149,7 @@ impl ButtonsApp {
                     {
                         ui.separator();
                         ui.label(RichText::new("Panes").small().color(colors.muted));
+                        let pane_count = self.visible_panes.len().max(1);
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Single, "1")
                             .on_hover_text("Single pane")
@@ -1201,18 +1158,44 @@ impl ButtonsApp {
                             self.set_pane_layout(PaneLayout::Single, ctx);
                         }
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::SideBySide, "SIDE")
-                            .on_hover_text("Side-by-side panes")
+                            .selectable_label(self.pane_layout == PaneLayout::Columns, "COL")
+                            .on_hover_text("Arrange visible terminals in columns")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::SideBySide, ctx);
+                            self.set_pane_layout(PaneLayout::Columns, ctx);
                         }
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::Stacked, "STACK")
-                            .on_hover_text("Stacked panes")
+                            .selectable_label(self.pane_layout == PaneLayout::Rows, "ROW")
+                            .on_hover_text("Arrange visible terminals in rows")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::Stacked, ctx);
+                            self.set_pane_layout(PaneLayout::Rows, ctx);
+                        }
+                        if ui
+                            .selectable_label(self.pane_layout == PaneLayout::Grid, "GRID")
+                            .on_hover_text("Tile visible terminals in a balanced grid")
+                            .clicked()
+                        {
+                            self.set_pane_layout(PaneLayout::Grid, ctx);
+                        }
+                        if ui
+                            .add_enabled(pane_count > 1, egui::Button::new("−"))
+                            .on_hover_text("Show one fewer terminal")
+                            .clicked()
+                        {
+                            self.set_visible_pane_count(pane_count - 1, ctx);
+                        }
+                        ui.label(
+                            RichText::new(pane_count.to_string())
+                                .small()
+                                .color(colors.status_text),
+                        );
+                        if ui
+                            .add_enabled(pane_count < 10, egui::Button::new("+"))
+                            .on_hover_text("Show one more terminal")
+                            .clicked()
+                        {
+                            self.set_visible_pane_count(pane_count + 1, ctx);
                         }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -2037,18 +2020,17 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn two_tabs_mut(
-    tabs: &mut [TerminalTab],
-    first: usize,
-    second: usize,
-) -> (&mut TerminalTab, &mut TerminalTab) {
-    assert_ne!(first, second, "split panes must reference different tabs");
-    if first < second {
-        let (left, right) = tabs.split_at_mut(second);
-        (&mut left[first], &mut right[0])
-    } else {
-        let (left, right) = tabs.split_at_mut(first);
-        (&mut right[0], &mut left[second])
+fn pane_grid_dimensions(layout: PaneLayout, pane_count: usize) -> (usize, usize) {
+    let pane_count = pane_count.max(1);
+    match layout {
+        PaneLayout::Single => (1, 1),
+        PaneLayout::Columns => (1, pane_count),
+        PaneLayout::Rows => (pane_count, 1),
+        PaneLayout::Grid => {
+            let columns = (pane_count as f32).sqrt().ceil() as usize;
+            let rows = pane_count.div_ceil(columns);
+            (rows, columns)
+        }
     }
 }
 
@@ -2063,6 +2045,42 @@ fn remap_index_after_move(slot: usize, from: usize, to: usize) -> usize {
     } else {
         slot
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_state_after_close(
+    visible: &[usize],
+    focused: usize,
+    closed: usize,
+    remaining_tabs: usize,
+) -> (Vec<usize>, usize) {
+    if remaining_tabs == 0 {
+        return (Vec::new(), 0);
+    }
+    let adjust = |slot: usize| {
+        if slot == closed {
+            None
+        } else if slot > closed {
+            Some(slot - 1)
+        } else {
+            Some(slot)
+        }
+    };
+    let target_count = visible.len().min(remaining_tabs).clamp(1, 10);
+    let mut next_visible: Vec<usize> = visible.iter().filter_map(|slot| adjust(*slot)).collect();
+    let next_focused = adjust(focused)
+        .or_else(|| next_visible.first().copied())
+        .unwrap_or(0)
+        .min(remaining_tabs - 1);
+    for index in 0..remaining_tabs {
+        if next_visible.len() >= target_count {
+            break;
+        }
+        if !next_visible.contains(&index) {
+            next_visible.push(index);
+        }
+    }
+    (next_visible, next_focused)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2297,5 +2315,32 @@ mod tests {
             .map(|slot| remap_index_after_move(slot, 4, 1))
             .collect();
         assert_eq!(remapped, vec![0, 2, 3, 4, 1]);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn balanced_grid_dimensions_cover_up_to_ten_panes() {
+        assert_eq!(pane_grid_dimensions(PaneLayout::Grid, 1), (1, 1));
+        assert_eq!(pane_grid_dimensions(PaneLayout::Grid, 2), (1, 2));
+        assert_eq!(pane_grid_dimensions(PaneLayout::Grid, 5), (2, 3));
+        assert_eq!(pane_grid_dimensions(PaneLayout::Grid, 10), (3, 4));
+        assert_eq!(pane_grid_dimensions(PaneLayout::Rows, 4), (4, 1));
+        assert_eq!(pane_grid_dimensions(PaneLayout::Columns, 4), (1, 4));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn closing_a_visible_pane_fills_the_vacated_slot() {
+        let (visible, focused) = pane_state_after_close(&[0, 1, 2], 1, 1, 3);
+        assert_eq!(visible, vec![0, 1, 2]);
+        assert_eq!(focused, 0);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn closing_a_hidden_tab_preserves_visible_panes_and_focus() {
+        let (visible, focused) = pane_state_after_close(&[0, 1, 2], 1, 3, 3);
+        assert_eq!(visible, vec![0, 1, 2]);
+        assert_eq!(focused, 1);
     }
 }
