@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "april-neon-abyss",
+    "name": "April Neon Abyss",
+    "description": "Deep space black with vibrant neon pink and electric blue accents.",
+    "createdAt": "2026-04-11T06:11:00.000Z",
+    "updatedAt": "2026-04-11T06:11:00.000Z"
+  },
+  "theme": {
+    "mode": "system",
+    "app": {
+      "shell": {
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "textMain": "#e0e0f0",
+        "textDim": "#8b8b9f",
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "shadowColor": "rgba(0, 0, 0, 0.6)"
+      },
+      "tabs": {
+        "background": "#07070b",
+        "idleBackground": "#0c0c12",
+        "activeBackground": "#050508",
+        "hoverBackground": "#12121a",
+        "activeBorder": "#05d9e8",
+        "textActive": "#ffffff",
+        "textIdle": "#7e7e8f",
+        "height": 35,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 6
+      },
+      "presetDock": {
+        "background": "#09090e",
+        "headerBackground": "#0e0e15",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "widthAccent": "#01ffe5",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#0b0b11",
+        "headerBackground": "#101018",
+        "buttonBackground": "#161621",
+        "buttonHover": "#202030",
+        "widthAccent": "#d1f7ff",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#0d0d14",
+        "headerBackground": "#13131c",
+        "buttonBackground": "#191925",
+        "buttonHover": "#242436",
+        "widthAccent": "#ff2a6d",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "text": "#c4c4d4",
+        "accent": "#05d9e8",
+        "border": "#1a1a28",
+        "height": 25
+      },
+      "controls": {
+        "buttonRadius": 5,
+        "buttonPaddingX": 15,
+        "buttonPaddingY": 8,
+        "inputRadius": 5,
+        "inputBorder": "#211a36",
+        "inputBackground": "#0d0d14",
+        "focusRing": "rgba(5, 217, 232, 0.2)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "compact",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', monospace",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "googleFont": "",
+      "background": "#040406",
+      "foreground": "#d0d0e0",
+      "cursor": "#01ffe5",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#281b3d",
+      "useGradient": false,
+      "gradientAnimation": false,
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#1a1a24",
+        "red": "#ff2a6d",
+        "green": "#01ffe5",
+        "yellow": "#ffea00",
+        "blue": "#05d9e8",
+        "magenta": "#d1f7ff",
+        "cyan": "#01ffe5",
+        "white": "#e0e0f0",
+        "brightBlack": "#4a4a5c",
+        "brightRed": "#ff5c8d",
+        "brightGreen": "#5cffef",
+        "brightYellow": "#fff04d",
+        "brightBlue": "#4dedf8",
+        "brightMagenta": "#e8fbff",
+        "brightCyan": "#5cffef",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Noto Sans', 'Segoe UI', Tahoma, sans-serif",
+        "googleFont": "Noto Sans",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Space Grotesk', 'Segoe UI', Tahoma, sans-serif",
+        "googleFont": "Space Grotesk",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'JetBrains Mono Bundled', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Azeret Mono', 'Consolas', monospace",
+        "googleFont": "Azeret Mono",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'JetBrains Mono Bundled', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      }
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "hsyncEnabled": false,
+    "tvNoiseEnabled": false,
+    "simpleNoiseEnabled": false,
+    "rowBandingEnabled": false
+  }
+}

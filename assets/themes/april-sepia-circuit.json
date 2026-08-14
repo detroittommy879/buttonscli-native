@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "april-sepia-circuit",
+    "name": "April Sepia Circuit",
+    "description": "Vintage paper-brown terminal with olive and CRT-teal accents.",
+    "createdAt": "2026-04-11T06:04:00.000Z",
+    "updatedAt": "2026-04-11T06:04:00.000Z"
+  },
+  "theme": {
+    "mode": "system",
+    "app": {
+      "shell": {
+        "background": "#15110d",
+        "backgroundSecondary": "#1e1813",
+        "border": "#5b4b34",
+        "textMain": "#f1e7d4",
+        "textDim": "#baa98a",
+        "accent": "#caa35f",
+        "accentHover": "#ddb97a",
+        "shadowColor": "rgba(18, 12, 7, 0.44)"
+      },
+      "tabs": {
+        "background": "#18130f",
+        "idleBackground": "#221b15",
+        "activeBackground": "#16120e",
+        "hoverBackground": "#2a2118",
+        "activeBorder": "#8fae74",
+        "textActive": "#fcf3e1",
+        "textIdle": "#a99c85",
+        "height": 35,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 5
+      },
+      "presetDock": {
+        "background": "#1b1511",
+        "headerBackground": "#251d16",
+        "buttonBackground": "#30241b",
+        "buttonHover": "#3b2d21",
+        "widthAccent": "#74b3a2",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#1d1712",
+        "headerBackground": "#271f18",
+        "buttonBackground": "#33261d",
+        "buttonHover": "#402f23",
+        "widthAccent": "#b88b64",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#191716",
+        "headerBackground": "#24211f",
+        "buttonBackground": "#2f2b28",
+        "buttonHover": "#3b3531",
+        "widthAccent": "#8ca8bf",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#2b241a",
+        "text": "#f8f0de",
+        "accent": "#b7cf84",
+        "border": "#4c3d2c",
+        "height": 25
+      },
+      "controls": {
+        "buttonRadius": 4,
+        "buttonPaddingX": 15,
+        "buttonPaddingY": 8,
+        "inputRadius": 4,
+        "inputBorder": "#65513a",
+        "inputBackground": "#211913",
+        "focusRing": "rgba(202, 163, 95, 0.19)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "default",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'i A Writer Mono S Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "googleFont": "",
+      "background": "#14100c",
+      "foreground": "#e6dbc7",
+      "cursor": "#d8c48f",
+      "cursorAccent": "#221a13",
+      "selectionBackground": "#4a3a23",
+      "useGradient": true,
+      "gradientAnimation": false,
+      "gradientType": "linear",
+      "gradientColors": [
+        "#1a1410",
+        "#2a2118",
+        "#3a3120",
+        "#173531"
+      ],
+      "gradientStart": "#100c09",
+      "gradientEnd": "#211912",
+      "gradientColorC": "#352a1d",
+      "gradientColorD": "#21443e",
+      "gradientAngle": 149,
+      "gradientSpeed": 10,
+      "gradientRadialShape": "circle",
+      "gradientRadialPosition": "center",
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#221b16",
+        "red": "#c77764",
+        "green": "#8aa76b",
+        "yellow": "#c8ae67",
+        "blue": "#6f8faf",
+        "magenta": "#a07b93",
+        "cyan": "#71aaa6",
+        "white": "#d8cec0",
+        "brightBlack": "#63554a",
+        "brightRed": "#e0907a",
+        "brightGreen": "#a2c283",
+        "brightYellow": "#e0c77f",
+        "brightBlue": "#88a8c7",
+        "brightMagenta": "#ba95ad",
+        "brightCyan": "#89c8c1",
+        "brightWhite": "#fff8eb"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Noto Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "Noto Sans",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Special Elite', 'Courier New', monospace",
+        "googleFont": "Special Elite",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'Quicksand', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "Quicksand",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "'cnr Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Azeret Mono', 'Consolas', monospace",
+        "googleFont": "Azeret Mono",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'i A Writer Mono S Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      }
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "staticIntensity": 10,
+    "staticDensity": 14,
+    "staticAmplitude": 13,
+    "staticOpacity": 7,
+    "staticBrightness": 35,
+    "scanlinesEnabled": true,
+    "scanlinesStrength": 12,
+    "scanlinesPeriod": 4,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 2,
+    "hsyncWavePeriod": 140,
+    "hsyncSpeed": 5,
+    "hsyncUseGpu": true,
+    "hsyncDebugPanel": true,
+    "tvNoiseEnabled": false,
+    "tvNoiseAmount": 30,
+    "simpleNoiseEnabled": true,
+    "simpleNoiseAmount": 11,
+    "simpleNoiseResolution": 54,
+    "simpleNoiseFps": 90,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseMaxBrightness": 32,
+    "rowBandingEnabled": false,
+    "rowBandingColor": "#4a5a3a",
+    "rowBandingOpacity": 4
+  }
+}

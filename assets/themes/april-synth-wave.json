@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "april-synth-wave",
+    "name": "April Synth Wave",
+    "description": "Retrowave-inspired theme with sunset oranges, purples, and grid lines.",
+    "createdAt": "2026-04-11T06:13:00.000Z",
+    "updatedAt": "2026-04-11T06:13:00.000Z"
+  },
+  "theme": {
+    "mode": "system",
+    "app": {
+      "shell": {
+        "background": "#181028",
+        "backgroundSecondary": "#221838",
+        "border": "#4b225c",
+        "textMain": "#e8d8f0",
+        "textDim": "#a38fae",
+        "accent": "#ff6a00",
+        "accentHover": "#ff8c3a",
+        "shadowColor": "rgba(0, 0, 0, 0.4)"
+      },
+      "tabs": {
+        "background": "#1c122e",
+        "idleBackground": "#261a3e",
+        "activeBackground": "#181028",
+        "hoverBackground": "#30224d",
+        "activeBorder": "#ff007f",
+        "textActive": "#fef8ff",
+        "textIdle": "#927e9d",
+        "height": 35,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 4
+      },
+      "presetDock": {
+        "background": "#1e1431",
+        "headerBackground": "#281c42",
+        "buttonBackground": "#342555",
+        "buttonHover": "#402e68",
+        "widthAccent": "#00f0ff",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#211636",
+        "headerBackground": "#2b1e47",
+        "buttonBackground": "#38285c",
+        "buttonHover": "#453270",
+        "widthAccent": "#ff6a00",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#231839",
+        "headerBackground": "#2e1f4b",
+        "buttonBackground": "#3b2a60",
+        "buttonHover": "#483575",
+        "widthAccent": "#ff007f",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#221838",
+        "text": "#d8c4e0",
+        "accent": "#00f0ff",
+        "border": "#3a204e",
+        "height": 25
+      },
+      "controls": {
+        "buttonRadius": 4,
+        "buttonPaddingX": 15,
+        "buttonPaddingY": 8,
+        "inputRadius": 4,
+        "inputBorder": "#4b225c",
+        "inputBackground": "#281c42",
+        "focusRing": "rgba(255, 106, 0, 0.2)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "compact",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'Courier New', monospace",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "googleFont": "",
+      "background": "#140e21",
+      "foreground": "#d4c2df",
+      "cursor": "#ff6a00",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#542252",
+      "useGradient": false,
+      "gradientAnimation": false,
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#281c42",
+        "red": "#ff007f",
+        "green": "#00f0ff",
+        "yellow": "#ffb800",
+        "blue": "#6a00ff",
+        "magenta": "#ff00e5",
+        "cyan": "#00ffff",
+        "white": "#e8d8f0",
+        "brightBlack": "#5f457a",
+        "brightRed": "#ff4d9e",
+        "brightGreen": "#4dffff",
+        "brightYellow": "#ffd64d",
+        "brightBlue": "#8f4dff",
+        "brightMagenta": "#ff4df0",
+        "brightCyan": "#4dffff",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "monospace",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 16,
+        "fontWeight": 400
+      }
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "hsyncEnabled": false,
+    "tvNoiseEnabled": false,
+    "simpleNoiseEnabled": false,
+    "rowBandingEnabled": false
+  }
+}

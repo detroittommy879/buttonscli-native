@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "ch3-static",
+    "name": "Channel 3 Static",
+    "description": "Mimics the very slight gray-blue noise and scanline flicker of a blank CRT tuned to Channel 3 before the computer fully boots.",
+    "createdAt": "2026-04-17T23:42:48.025Z",
+    "updatedAt": "2026-04-17T23:42:48.026Z"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#12111a",
+        "backgroundSecondary": "#271c34",
+        "border": "#2d3038",
+        "textMain": "#cccccc",
+        "textDim": "#858585",
+        "accent": "#c26df3",
+        "accentHover": "#cd87f5",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "foreground": "#A8B0C0"
+      },
+      "tabs": {
+        "background": "#252526",
+        "idleBackground": "#2d2d30",
+        "activeBackground": "#1e1e1e",
+        "hoverBackground": "#2a2d2e",
+        "activeBorder": "#007acc",
+        "textActive": "#cccccc",
+        "textIdle": "#858585",
+        "height": 36,
+        "paddingX": 10,
+        "gap": 4,
+        "radius": 4
+      },
+      "presetDock": {
+        "background": "#252526",
+        "headerBackground": "#2d2d30",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "widthAccent": "#007acc",
+        "padding": 10,
+        "itemGap": 8
+      },
+      "settings": {
+        "background": "#252526",
+        "headerBackground": "#2d2d30",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "widthAccent": "#007acc",
+        "padding": 16,
+        "itemGap": 12
+      },
+      "assistant": {
+        "background": "#1e1e1e",
+        "headerBackground": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "widthAccent": "#007acc",
+        "padding": 12,
+        "itemGap": 8
+      },
+      "statusBar": {
+        "background": "#007acc",
+        "text": "#ffffff",
+        "accent": "#0098ff",
+        "border": "#3c3c3c",
+        "height": 24
+      },
+      "controls": {
+        "buttonRadius": 4,
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "inputRadius": 4,
+        "inputBorder": "#3c3c3c",
+        "inputBackground": "#3c3c3c",
+        "focusRing": "rgba(0, 122, 204, 0.4)"
+      },
+      "layout": {
+        "shellPadding": 0,
+        "panelDensity": "default",
+        "gapScale": 1
+      }
+    },
+    "terminal": {
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "googleFont": "",
+      "background": "#121219",
+      "foreground": "#DEE4EA",
+      "cursor": "#FFFFFF",
+      "cursorAccent": "#000000",
+      "selectionBackground": "#2c313c",
+      "useGradient": true,
+      "gradientAnimation": false,
+      "gradientType": "repeating-linear",
+      "gradientColors": [
+        "#121219",
+        "#2e213c",
+        "#191527"
+      ],
+      "gradientStart": "#121219",
+      "gradientEnd": "#191527",
+      "gradientColorC": "#2e213c",
+      "gradientColorD": "#191527",
+      "gradientAngle": 0,
+      "gradientSpeed": 4,
+      "gradientRadialShape": "circle",
+      "gradientRadialPosition": "center",
+      "cursorBlink": true,
+      "ansiColors": {
+        "black": "#000000",
+        "red": "#cd3131",
+        "green": "#0dbc79",
+        "yellow": "#e5e510",
+        "blue": "#2472c8",
+        "magenta": "#bc3fbc",
+        "cyan": "#11a8cd",
+        "white": "#e5e5e5",
+        "brightBlack": "#666666",
+        "brightRed": "#f14c4c",
+        "brightGreen": "#23d18b",
+        "brightYellow": "#f5f543",
+        "brightBlue": "#3b8eea",
+        "brightMagenta": "#d670d6",
+        "brightCyan": "#29b8db",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "assistant": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "googleFont": "",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+        "googleFont": "",
+        "fontSize": 14,
+        "fontWeight": 300
+      },
+      "fontFamily": "\"VT323\", monospace",
+      "fontSize": 16
+    }
+  },
+  "effects": {
+    "staticEnabled": false,
+    "staticIntensity": 11,
+    "staticDensity": 14,
+    "staticAmplitude": 14,
+    "staticOpacity": 8,
+    "staticBrightness": 38,
+    "scanlinesEnabled": false,
+    "scanlinesStrength": 28,
+    "scanlinesPeriod": 4,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 5,
+    "hsyncWavePeriod": 72,
+    "hsyncSpeed": 6,
+    "hsyncUseGpu": true,
+    "hsyncDebugPanel": true,
+    "tvNoiseEnabled": false,
+    "tvNoiseAmount": 36,
+    "simpleNoiseEnabled": true,
+    "simpleNoiseAmount": 10,
+    "simpleNoiseResolution": 57,
+    "simpleNoiseFps": 120,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleAmount": 50,
+    "simpleNoiseIdleDelaySeconds": 60,
+    "simpleNoiseIdleRampSeconds": 6,
+    "rowBandingEnabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingOpacity": 6
+  }
+}
