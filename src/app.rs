@@ -118,6 +118,7 @@ struct Preferences {
     show_presets: bool,
     presets: Vec<CommandPreset>,
     ssh_presets: Vec<CommandPreset>,
+    pane_split_ratios: std::collections::BTreeMap<String, f32>,
     default_shell_id: String,
     default_working_directory: String,
     custom_shell_profiles: Vec<ShellProfile>,
@@ -138,6 +139,7 @@ impl Default for Preferences {
             show_presets: true,
             presets: default_presets(),
             ssh_presets: Vec::new(),
+            pane_split_ratios: std::collections::BTreeMap::new(),
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
@@ -290,6 +292,26 @@ enum PaneLayout {
     Columns,
     Rows,
     Grid,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SplitAxis {
+    Horizontal,
+    Vertical,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq)]
+enum PaneTree {
+    Leaf(usize),
+    Split {
+        axis: SplitAxis,
+        key: String,
+        default_ratio: f32,
+        first: Box<PaneTree>,
+        second: Box<PaneTree>,
+    },
 }
 
 impl ButtonsApp {
@@ -900,37 +922,21 @@ impl ButtonsApp {
         if visible.is_empty() {
             visible.push(focused.min(self.tabs.len() - 1));
         }
-        let (rows, columns) = pane_grid_dimensions(self.pane_layout, visible.len());
-        let spacing = ui.spacing().item_spacing;
-        let cell_width =
-            ((ui.available_width() - spacing.x * (columns - 1) as f32) / columns as f32).max(100.0);
-        let cell_height =
-            ((ui.available_height() - spacing.y * (rows - 1) as f32) / rows as f32).max(80.0);
-        let tabs = &mut self.tabs;
-        for row in visible.chunks(columns) {
-            ui.horizontal(|ui| {
-                for index in row {
-                    ui.allocate_ui(Vec2::new(cell_width, cell_height), |pane| {
-                        let Some(tab) = tabs.get_mut(*index) else {
-                            return;
-                        };
-                        if terminal_surface(
-                            pane,
-                            tab,
-                            focused == *index && !modal_open,
-                            terminal_font.clone(),
-                            terminal_bold_font.clone(),
-                            draw_bold_bright,
-                            &theme,
-                        )
-                        .clicked()
-                        {
-                            clicked = Some(*index);
-                        }
-                    });
-                }
-            });
-        }
+        let tree = pane_tree(self.pane_layout, &visible);
+        let rect = ui.available_rect_before_wrap();
+        ui.allocate_rect(rect, egui::Sense::hover());
+        let mut render_state = PaneRenderState {
+            ratios: &mut self.preferences.pane_split_ratios,
+            tabs: &mut self.tabs,
+            focused,
+            modal_open,
+            terminal_font: &terminal_font,
+            terminal_bold_font: &terminal_bold_font,
+            draw_bold_bright,
+            theme: &theme,
+            clicked: &mut clicked,
+        };
+        render_pane_tree(ui, &tree, rect, &mut render_state);
 
         if let Some(index) = clicked {
             self.focused = index;
@@ -1397,6 +1403,16 @@ impl ButtonsApp {
                             .clicked()
                         {
                             self.set_pane_layout(PaneLayout::Grid, ctx);
+                        }
+                        if ui
+                            .add_enabled(
+                                pane_count > 1 && !self.preferences.pane_split_ratios.is_empty(),
+                                egui::Button::new("↺"),
+                            )
+                            .on_hover_text("Reset draggable pane dividers")
+                            .clicked()
+                        {
+                            self.preferences.pane_split_ratios.clear();
                         }
                         if ui
                             .add_enabled(pane_count > 1, egui::Button::new("−"))
@@ -2408,6 +2424,187 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn pane_tree(layout: PaneLayout, visible: &[usize]) -> PaneTree {
+    let visible = if visible.is_empty() {
+        &[0][..]
+    } else {
+        visible
+    };
+    match layout {
+        PaneLayout::Single => PaneTree::Leaf(visible[0]),
+        PaneLayout::Columns => build_pane_sequence(
+            visible.iter().copied().map(PaneTree::Leaf).collect(),
+            SplitAxis::Horizontal,
+            format!("columns:{}", visible.len()),
+        ),
+        PaneLayout::Rows => build_pane_sequence(
+            visible.iter().copied().map(PaneTree::Leaf).collect(),
+            SplitAxis::Vertical,
+            format!("rows:{}", visible.len()),
+        ),
+        PaneLayout::Grid => {
+            let (_, columns) = pane_grid_dimensions(layout, visible.len());
+            let rows = visible
+                .chunks(columns)
+                .enumerate()
+                .map(|(row, indices)| {
+                    build_pane_sequence(
+                        indices.iter().copied().map(PaneTree::Leaf).collect(),
+                        SplitAxis::Horizontal,
+                        format!("grid:{}/row:{row}", visible.len()),
+                    )
+                })
+                .collect();
+            build_pane_sequence(
+                rows,
+                SplitAxis::Vertical,
+                format!("grid:{}/rows", visible.len()),
+            )
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn build_pane_sequence(mut panes: Vec<PaneTree>, axis: SplitAxis, key: String) -> PaneTree {
+    if panes.len() == 1 {
+        return panes.pop().expect("one pane remains");
+    }
+    let count = panes.len();
+    let first = panes.remove(0);
+    PaneTree::Split {
+        axis,
+        key: key.clone(),
+        default_ratio: 1.0 / count as f32,
+        first: Box::new(first),
+        second: Box::new(build_pane_sequence(panes, axis, format!("{key}/rest"))),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct PaneRenderState<'a> {
+    ratios: &'a mut std::collections::BTreeMap<String, f32>,
+    tabs: &'a mut [TerminalTab],
+    focused: usize,
+    modal_open: bool,
+    terminal_font: &'a FontId,
+    terminal_bold_font: &'a FontId,
+    draw_bold_bright: bool,
+    theme: &'a ThemeDefinition,
+    clicked: &'a mut Option<usize>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn render_pane_tree(
+    ui: &mut egui::Ui,
+    tree: &PaneTree,
+    rect: egui::Rect,
+    state: &mut PaneRenderState<'_>,
+) {
+    match tree {
+        PaneTree::Leaf(index) => {
+            let Some(tab) = state.tabs.get_mut(*index) else {
+                return;
+            };
+            let mut pane = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(rect)
+                    .layout(Layout::top_down(Align::Min)),
+            );
+            pane.set_clip_rect(rect);
+            if terminal_surface(
+                &mut pane,
+                tab,
+                state.focused == *index && !state.modal_open,
+                state.terminal_font.clone(),
+                state.terminal_bold_font.clone(),
+                state.draw_bold_bright,
+                state.theme,
+            )
+            .clicked()
+            {
+                *state.clicked = Some(*index);
+            }
+        }
+        PaneTree::Split {
+            axis,
+            key,
+            default_ratio,
+            first,
+            second,
+        } => {
+            // Keep a generous dead zone between terminal widgets so beginning a
+            // divider drag cannot also start a terminal text selection.
+            let gap = 10.0_f32;
+            let length = match axis {
+                SplitAxis::Horizontal => rect.width(),
+                SplitAxis::Vertical => rect.height(),
+            };
+            let usable = (length - gap).max(1.0);
+            let minimum = if usable >= 180.0 { 80.0 / usable } else { 0.1 };
+            let ratio = state
+                .ratios
+                .get(key)
+                .copied()
+                .unwrap_or(*default_ratio)
+                .clamp(minimum, 1.0 - minimum);
+            let first_extent = usable * ratio;
+            let (first_rect, divider, second_rect) = match axis {
+                SplitAxis::Horizontal => {
+                    let split_x = rect.left() + first_extent;
+                    (
+                        egui::Rect::from_min_max(rect.min, egui::pos2(split_x, rect.bottom())),
+                        egui::Rect::from_min_max(
+                            egui::pos2(split_x, rect.top()),
+                            egui::pos2(split_x + gap, rect.bottom()),
+                        ),
+                        egui::Rect::from_min_max(egui::pos2(split_x + gap, rect.top()), rect.max),
+                    )
+                }
+                SplitAxis::Vertical => {
+                    let split_y = rect.top() + first_extent;
+                    (
+                        egui::Rect::from_min_max(rect.min, egui::pos2(rect.right(), split_y)),
+                        egui::Rect::from_min_max(
+                            egui::pos2(rect.left(), split_y),
+                            egui::pos2(rect.right(), split_y + gap),
+                        ),
+                        egui::Rect::from_min_max(egui::pos2(rect.left(), split_y + gap), rect.max),
+                    )
+                }
+            };
+            render_pane_tree(ui, first, first_rect, state);
+            render_pane_tree(ui, second, second_rect, state);
+
+            let cursor = match axis {
+                SplitAxis::Horizontal => egui::CursorIcon::ResizeHorizontal,
+                SplitAxis::Vertical => egui::CursorIcon::ResizeVertical,
+            };
+            let response = ui
+                .interact(
+                    divider,
+                    ui.id().with(("pane-divider", key)),
+                    egui::Sense::drag(),
+                )
+                .on_hover_cursor(cursor);
+            if response.hovered() || response.dragged() {
+                ui.painter()
+                    .rect_filled(divider.shrink(2.0), 1.0, state.theme.colors.accent);
+            }
+            if response.dragged() {
+                let delta = ui.input(|input| input.pointer.delta());
+                let change = match axis {
+                    SplitAxis::Horizontal => delta.x / usable,
+                    SplitAxis::Vertical => delta.y / usable,
+                };
+                state
+                    .ratios
+                    .insert(key.clone(), (ratio + change).clamp(minimum, 1.0 - minimum));
+            }
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn pane_grid_dimensions(layout: PaneLayout, pane_count: usize) -> (usize, usize) {
     let pane_count = pane_count.max(1);
     match layout {
@@ -2673,6 +2870,7 @@ mod tests {
         assert_eq!(preferences.default_shell_id, "system");
         assert!(preferences.custom_shell_profiles.is_empty());
         assert!(preferences.ssh_presets.is_empty());
+        assert!(preferences.pane_split_ratios.is_empty());
         assert!(preferences
             .presets
             .iter()
@@ -2776,6 +2974,42 @@ mod tests {
         assert_eq!(pane_grid_dimensions(PaneLayout::Grid, 10), (3, 4));
         assert_eq!(pane_grid_dimensions(PaneLayout::Rows, 4), (4, 1));
         assert_eq!(pane_grid_dimensions(PaneLayout::Columns, 4), (1, 4));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pane_tree_preserves_every_visible_terminal() {
+        fn stats(tree: &PaneTree) -> (usize, usize) {
+            match tree {
+                PaneTree::Leaf(_) => (1, 0),
+                PaneTree::Split { first, second, .. } => {
+                    let (first_leaves, first_depth) = stats(first);
+                    let (second_leaves, second_depth) = stats(second);
+                    (
+                        first_leaves + second_leaves,
+                        1 + first_depth.max(second_depth),
+                    )
+                }
+            }
+        }
+
+        for layout in [PaneLayout::Columns, PaneLayout::Rows, PaneLayout::Grid] {
+            let visible: Vec<usize> = (0..10).collect();
+            let (leaves, depth) = stats(&pane_tree(layout, &visible));
+            assert_eq!(leaves, visible.len());
+            assert!(depth >= 3);
+        }
+    }
+
+    #[test]
+    fn pane_divider_ratios_round_trip_in_preferences() {
+        let mut preferences = Preferences::default();
+        preferences
+            .pane_split_ratios
+            .insert("grid:4/rows".into(), 0.63);
+        let encoded = serde_json::to_string(&preferences).unwrap();
+        let decoded: Preferences = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.pane_split_ratios["grid:4/rows"], 0.63);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
