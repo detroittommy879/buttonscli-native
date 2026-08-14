@@ -17,7 +17,8 @@ Current desktop features include:
 - a resizable command dock, quick command presets, and all 555 legacy theme
   selections with exact terminal ANSI palettes;
 - 26 bundled font faces grouped into 19 selectable families, with independent
-  typography for shell UI, tabs, dock, settings, assistant, status, and terminal;
+  typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
+  including separate terminal regular/bold faces;
 - theme-driven terminal gradients, animated color drift, static, and scanline
   overlays rendered natively;
 - persistent appearance preferences and clean child-process shutdown.

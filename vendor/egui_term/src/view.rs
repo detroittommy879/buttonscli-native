@@ -46,6 +46,7 @@ pub struct TerminalView<'a> {
     font: TerminalFont,
     theme: TerminalTheme,
     background_gradient: Option<[Color32; 4]>,
+    draw_bold_bright: bool,
     bindings_layout: BindingsLayout,
 }
 
@@ -86,6 +87,7 @@ impl<'a> TerminalView<'a> {
             font: TerminalFont::default(),
             theme: TerminalTheme::default(),
             background_gradient: None,
+            draw_bold_bright: false,
             bindings_layout: BindingsLayout::new(),
         }
     }
@@ -104,6 +106,12 @@ impl<'a> TerminalView<'a> {
         colors: Option<[Color32; 4]>,
     ) -> Self {
         self.background_gradient = colors;
+        self
+    }
+
+    #[inline]
+    pub fn set_draw_bold_bright(mut self, enabled: bool) -> Self {
+        self.draw_bold_bright = enabled;
         self
     }
 
@@ -283,6 +291,8 @@ impl<'a> TerminalView<'a> {
                 content.terminal_mode.contains(TermMode::APP_CURSOR);
             let is_wide_char = flags.contains(cell::Flags::WIDE_CHAR);
             let is_inverse = flags.contains(cell::Flags::INVERSE);
+            let is_bold =
+                flags.intersects(cell::Flags::BOLD | cell::Flags::DIM_BOLD);
             let is_dim =
                 flags.intersects(cell::Flags::DIM | cell::Flags::DIM_BOLD);
             let is_selected = content
@@ -307,6 +317,9 @@ impl<'a> TerminalView<'a> {
                 cell_width
             };
 
+            if is_bold && self.draw_bold_bright {
+                fg = self.theme.get_bold_color(indexed.fg);
+            }
             if is_dim {
                 fg = fg.linear_multiply(0.7);
             }
@@ -368,7 +381,11 @@ impl<'a> TerminalView<'a> {
                     },
                     Align2::CENTER_TOP,
                     indexed.c,
-                    self.font.font_type(),
+                    if is_bold {
+                        self.font.bold_font_type()
+                    } else {
+                        self.font.font_type()
+                    },
                     fg,
                 ));
             }

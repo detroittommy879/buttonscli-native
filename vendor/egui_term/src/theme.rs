@@ -203,6 +203,43 @@ impl TerminalTheme {
             },
         }
     }
+
+    pub fn get_bold_color(&self, color: ansi::Color) -> Color32 {
+        let bright = match color {
+            ansi::Color::Indexed(index @ 0..=7) => {
+                ansi::Color::Indexed(index + 8)
+            },
+            ansi::Color::Named(NamedColor::Foreground) => {
+                ansi::Color::Named(NamedColor::BrightForeground)
+            },
+            ansi::Color::Named(NamedColor::Black) => {
+                ansi::Color::Named(NamedColor::BrightBlack)
+            },
+            ansi::Color::Named(NamedColor::Red) => {
+                ansi::Color::Named(NamedColor::BrightRed)
+            },
+            ansi::Color::Named(NamedColor::Green) => {
+                ansi::Color::Named(NamedColor::BrightGreen)
+            },
+            ansi::Color::Named(NamedColor::Yellow) => {
+                ansi::Color::Named(NamedColor::BrightYellow)
+            },
+            ansi::Color::Named(NamedColor::Blue) => {
+                ansi::Color::Named(NamedColor::BrightBlue)
+            },
+            ansi::Color::Named(NamedColor::Magenta) => {
+                ansi::Color::Named(NamedColor::BrightMagenta)
+            },
+            ansi::Color::Named(NamedColor::Cyan) => {
+                ansi::Color::Named(NamedColor::BrightCyan)
+            },
+            ansi::Color::Named(NamedColor::White) => {
+                ansi::Color::Named(NamedColor::BrightWhite)
+            },
+            other => other,
+        };
+        self.get_color(bright)
+    }
 }
 
 fn hex_to_color(hex: &str) -> anyhow::Result<Color32> {

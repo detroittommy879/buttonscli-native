@@ -111,3 +111,12 @@ source theme, so mixing a favorite terminal palette with another theme's chrome
 is real state rather than a temporary preview. Calm apply preserves the selected
 colors while suppressing motion, static, and scanlines. Migration and partial
 apply behavior have focused unit coverage.
+
+## 2026-08-14 — Real terminal bold typography
+
+Terminal themes no longer discard `fontWeightBold` or
+`drawBoldTextInBrightColors`. The renderer receives distinct regular and bold
+font faces, selects them per Alacritty cell flag, and promotes normal ANSI colors
+to the theme's exact bright values when requested. Settings shows both the
+requested bold weight and the actual nearest bundled face when a family lacks
+that weight.
