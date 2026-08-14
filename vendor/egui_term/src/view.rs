@@ -7,7 +7,9 @@ use egui::Modifiers;
 use egui::MouseWheelUnit;
 use egui::Shape;
 use egui::Widget;
-use egui::{Align2, Painter, Pos2, Rect, Response, Stroke, Vec2};
+use egui::{
+    Align2, Color32, Mesh, Painter, Pos2, Rect, Response, Stroke, Vec2,
+};
 use egui::{CornerRadius, Key};
 use egui::{Id, PointerButton};
 
@@ -43,6 +45,7 @@ pub struct TerminalView<'a> {
     backend: &'a mut TerminalBackend,
     font: TerminalFont,
     theme: TerminalTheme,
+    background_gradient: Option<[Color32; 4]>,
     bindings_layout: BindingsLayout,
 }
 
@@ -82,6 +85,7 @@ impl<'a> TerminalView<'a> {
             backend,
             font: TerminalFont::default(),
             theme: TerminalTheme::default(),
+            background_gradient: None,
             bindings_layout: BindingsLayout::new(),
         }
     }
@@ -89,6 +93,17 @@ impl<'a> TerminalView<'a> {
     #[inline]
     pub fn set_theme(mut self, theme: TerminalTheme) -> Self {
         self.theme = theme;
+        self
+    }
+
+    /// Replace the global terminal background fill with a four-corner color
+    /// mesh. Cells that explicitly set a background color still paint over it.
+    #[inline]
+    pub fn set_background_gradient(
+        mut self,
+        colors: Option<[Color32; 4]>,
+    ) -> Self {
+        self.background_gradient = colors;
         self
     }
 
@@ -229,11 +244,32 @@ impl<'a> TerminalView<'a> {
         let global_bg =
             self.theme.get_color(Color::Named(NamedColor::Background));
 
-        let mut shapes = vec![Shape::Rect(RectShape::filled(
-            Rect::from_min_max(layout_min, layout_max),
-            CornerRadius::ZERO,
-            global_bg,
-        ))];
+        let background =
+            if let Some([top_left, top_right, bottom_left, bottom_right]) =
+                self.background_gradient
+            {
+                let mut mesh = Mesh::default();
+                mesh.colored_vertex(layout_min, top_left);
+                mesh.colored_vertex(
+                    Pos2::new(layout_max.x, layout_min.y),
+                    top_right,
+                );
+                mesh.colored_vertex(
+                    Pos2::new(layout_min.x, layout_max.y),
+                    bottom_left,
+                );
+                mesh.colored_vertex(layout_max, bottom_right);
+                mesh.add_triangle(0, 1, 2);
+                mesh.add_triangle(2, 1, 3);
+                Shape::mesh(mesh)
+            } else {
+                Shape::Rect(RectShape::filled(
+                    Rect::from_min_max(layout_min, layout_max),
+                    CornerRadius::ZERO,
+                    global_bg,
+                ))
+            };
+        let mut shapes = vec![background];
 
         for indexed in content.grid.display_iter() {
             let flags = indexed.cell.flags;

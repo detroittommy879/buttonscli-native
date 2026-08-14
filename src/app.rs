@@ -1214,11 +1214,92 @@ fn terminal_surface(
     let terminal_font = TerminalFont::new(FontSettings {
         font_type: terminal_font_id,
     });
+    let time = ui.input(|input| input.time) as f32;
+    let gradient = theme.effects.gradient.map(|colors| {
+        if theme.effects.gradient_animation {
+            let amount = (time * 0.35).sin() * 0.5 + 0.5;
+            [
+                mix_effect_color(colors[0], colors[1], amount),
+                mix_effect_color(colors[1], colors[3], amount),
+                mix_effect_color(colors[2], colors[0], amount),
+                mix_effect_color(colors[3], colors[2], amount),
+            ]
+        } else {
+            colors
+        }
+    });
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(focused)
         .set_font(terminal_font)
-        .set_theme(theme.terminal());
-    ui.add(terminal)
+        .set_theme(theme.terminal())
+        .set_background_gradient(gradient);
+    let response = ui.add(terminal);
+    paint_terminal_effects(ui, response.rect, theme, tab.id, time);
+    response
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn paint_terminal_effects(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    theme: &ThemeDefinition,
+    terminal_id: u64,
+    time: f32,
+) {
+    let effects = &theme.effects;
+    if effects.scanlines_strength > 0.0 {
+        let alpha = (effects.scanlines_strength * 255.0) as u8;
+        let mut y = rect.top();
+        while y < rect.bottom() {
+            ui.painter().line_segment(
+                [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+                Stroke::new(1.0_f32, Color32::from_black_alpha(alpha)),
+            );
+            y += effects.scanlines_period;
+        }
+    }
+    if effects.static_opacity > 0.0 {
+        let frame = (time * 12.0) as u64;
+        let mut state = terminal_id
+            .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+            .wrapping_add(frame);
+        let count = ((rect.area() / 1800.0) * effects.static_density).clamp(24.0, 500.0) as usize;
+        let alpha = (effects.static_opacity * 255.0) as u8;
+        for _ in 0..count {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let x = rect.left() + ((state >> 16) as u32 as f32 / u32::MAX as f32) * rect.width();
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            let y = rect.top() + ((state >> 16) as u32 as f32 / u32::MAX as f32) * rect.height();
+            let color = if state & 1 == 0 {
+                Color32::from_white_alpha(alpha)
+            } else {
+                Color32::from_black_alpha(alpha)
+            };
+            ui.painter().rect_filled(
+                egui::Rect::from_min_size(egui::pos2(x, y), Vec2::splat(1.25)),
+                0.0,
+                color,
+            );
+        }
+    }
+    if theme.effects.gradient_animation || effects.static_opacity > 0.0 {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(80));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
+    let channel = |x: u8, y: u8| (x as f32 * (1.0 - amount) + y as f32 * amount) as u8;
+    Color32::from_rgb(
+        channel(a.r(), b.r()),
+        channel(a.g(), b.g()),
+        channel(a.b(), b.b()),
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]

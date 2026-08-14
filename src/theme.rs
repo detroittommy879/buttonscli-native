@@ -15,6 +15,7 @@ pub struct ThemeDefinition {
     pub source: ThemeSource,
     pub colors: AppColors,
     pub terminal_colors: TerminalColors,
+    pub effects: TerminalEffects,
     pub typography: Option<Typography>,
 }
 
@@ -133,6 +134,16 @@ pub struct TerminalColors {
     pub bright_white: String,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct TerminalEffects {
+    pub gradient: Option<[Color32; 4]>,
+    pub gradient_animation: bool,
+    pub static_opacity: f32,
+    pub static_density: f32,
+    pub scanlines_strength: f32,
+    pub scanlines_period: f32,
+}
+
 impl TerminalColors {
     #[cfg(not(target_arch = "wasm32"))]
     fn palette(&self) -> ColorPalette {
@@ -226,6 +237,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
             description: "Native ButtonsCLI foundation theme".into(),
             source: ThemeSource::Native,
             terminal_colors: terminal_from_app(&colors),
+            effects: TerminalEffects::default(),
             colors,
             typography: None,
         }
@@ -250,6 +262,11 @@ fn parse_legacy_value(
     let settings = &theme["app"]["settings"];
     let status = &theme["app"]["statusBar"];
     let terminal = &theme["terminal"];
+    let effects_value = if document["effects"].is_object() {
+        &document["effects"]
+    } else {
+        &theme["effects"]
+    };
     let ansi = &terminal["ansiColors"];
 
     let terminal_background = color_string(terminal, &["background"], "#090c16");
@@ -328,8 +345,87 @@ fn parse_legacy_value(
         source,
         colors,
         terminal_colors,
+        effects: parse_effects(terminal, effects_value),
         typography: parse_typography(&theme["typography"], terminal),
     })
+}
+
+fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
+    let disabled = effects
+        .get("masterDisabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let gradient_enabled = terminal
+        .get("useGradient")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let gradient = gradient_enabled.then(|| {
+        let mut colors: Vec<Color32> = terminal
+            .get("gradientColors")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .filter_map(parse_color)
+            .take(4)
+            .collect();
+        for key in [
+            "gradientStart",
+            "gradientEnd",
+            "gradientColorC",
+            "gradientColorD",
+        ] {
+            if colors.len() >= 4 {
+                break;
+            }
+            if let Some(color) = string_at(terminal, key).and_then(parse_color) {
+                colors.push(color);
+            }
+        }
+        let background = string_at(terminal, "background")
+            .and_then(parse_color)
+            .unwrap_or(Color32::BLACK);
+        while colors.len() < 4 {
+            colors.push(background);
+        }
+        [colors[0], colors[1], colors[2], colors[3]]
+    });
+
+    let enabled =
+        |key: &str| !disabled && effects.get(key).and_then(Value::as_bool).unwrap_or(false);
+    let number = |key: &str, fallback: f32| {
+        number_at(effects, key)
+            .map(|value| value as f32)
+            .unwrap_or(fallback)
+    };
+    let unit = |key: &str, fallback: f32| {
+        let value = number(key, fallback);
+        if value > 1.0 {
+            value / 100.0
+        } else {
+            value
+        }
+    };
+
+    TerminalEffects {
+        gradient,
+        gradient_animation: terminal
+            .get("gradientAnimation")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        static_opacity: if enabled("staticEnabled") {
+            unit("staticOpacity", unit("staticIntensity", 0.08)).clamp(0.0, 0.35)
+        } else {
+            0.0
+        },
+        static_density: unit("staticDensity", 0.2).clamp(0.02, 1.0),
+        scanlines_strength: if enabled("scanlinesEnabled") {
+            unit("scanlinesStrength", 0.08).clamp(0.0, 0.35)
+        } else {
+            0.0
+        },
+        scanlines_period: number("scanlinesPeriod", 4.0).clamp(2.0, 16.0),
+    }
 }
 
 fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography> {
@@ -344,7 +440,11 @@ fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography>
         settings: parse_zone(&value["settings"], defaults.settings, false),
         assistant: parse_zone(&value["assistant"], defaults.assistant, false),
         status_bar: parse_zone(&value["statusBar"], defaults.status_bar, false),
-        terminal: parse_zone(terminal_theme, defaults.terminal, true),
+        terminal: parse_zone(
+            terminal_theme,
+            parse_zone(&value["terminal"], defaults.terminal, true),
+            true,
+        ),
     })
 }
 
@@ -352,13 +452,13 @@ fn parse_zone(value: &Value, mut fallback: FontZone, monospace_only: bool) -> Fo
     if let Some(family) = string_at(value, "fontFamily") {
         fallback.family = fonts::resolve_bundled_family(&normalize_family(family), monospace_only);
     }
-    if let Some(size) = value.get("fontSize").and_then(Value::as_f64) {
+    if let Some(size) = number_at(value, "fontSize") {
         fallback.size = size as f32;
     }
-    if let Some(weight) = value.get("fontWeight").and_then(Value::as_u64) {
+    if let Some(weight) = number_at(value, "fontWeight") {
         fallback.weight = weight as u16;
     }
-    if let Some(spacing) = value.get("letterSpacing").and_then(Value::as_f64) {
+    if let Some(spacing) = number_at(value, "letterSpacing") {
         fallback.letter_spacing = spacing as f32;
     }
     fallback
@@ -384,6 +484,19 @@ fn string_at<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
         .get(key)
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
+}
+
+fn number_at(value: &Value, key: &str) -> Option<f64> {
+    let value = value.get(key)?;
+    value.as_f64().or_else(|| {
+        value.as_str().and_then(|text| {
+            text.trim()
+                .trim_end_matches("px")
+                .trim()
+                .parse::<f64>()
+                .ok()
+        })
+    })
 }
 
 fn color(value: &Value, keys: &[&str], fallback: &str) -> Color32 {
@@ -486,11 +599,26 @@ mod tests {
     }
 
     #[test]
+    fn legacy_percent_effects_and_string_typography_are_normalized() {
+        let catalog = ThemeCatalog::load();
+        let theme = catalog.get("1990crt");
+        assert_eq!(theme.effects.static_opacity, 0.14);
+        assert_eq!(theme.effects.static_density, 0.30);
+        assert_eq!(theme.effects.scanlines_strength, 0.15);
+        assert_eq!(theme.typography.as_ref().unwrap().terminal.weight, 400);
+        assert_eq!(
+            theme.typography.as_ref().unwrap().terminal.letter_spacing,
+            0.2
+        );
+    }
+
+    #[test]
     fn basic2_preserves_exact_terminal_palette() {
         let catalog = ThemeCatalog::load();
         let theme = catalog.get("basic2");
         assert_eq!(theme.terminal_colors.background, "#100f15");
         assert_eq!(theme.terminal_colors.red, "#cd3131");
         assert_eq!(theme.terminal_colors.bright_cyan, "#29b8db");
+        assert!(theme.effects.gradient.is_some());
     }
 }
