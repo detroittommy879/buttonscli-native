@@ -194,3 +194,18 @@ that editing or deleting an SSH entry cannot modify command presets. The X11
 pass created a type-only entry, inserted it at a live Bash cursor without
 submitting, restarted the app, confirmed persistence, and verified clean parent
 and child shutdown.
+
+## 2026-08-14 — Nested, persistent pane dividers
+
+Pane rendering now builds a recursive tree for column, row, and balanced-grid
+topologies instead of calculating one fixed rectangle size for every terminal.
+Each branch owns a draggable divider and a topology-specific persisted ratio;
+resetting from the status bar returns every branch to its balanced default. The
+divider gap is kept outside terminal widgets so resizing does not begin a text
+selection.
+
+Structural tests prove every visible terminal appears exactly once in trees up
+to ten leaves, while preference round-trip coverage protects saved ratios. In
+the X11 smoke pass, moving only the top row divider of a four-PTY grid left the
+bottom row unchanged. The asymmetric layout returned after a normal restart,
+and both shutdown passes removed all four Bash children.

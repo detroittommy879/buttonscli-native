@@ -23,11 +23,13 @@ sanitize safely, and cross-platform shell-title extraction remains stable. The
 shell-profile suite covers quoted command-line parsing, malformed input,
 discovery de-duplication, old-preference migration, custom launch resolution,
 missing executables/directories, and fallback after removing the selected
-default. The test suite also covers one-ID preference migration, proves that unchecked
-theme-apply sections remain unchanged, and preserves terminal bold-weight plus
-bright-ANSI settings. Preset tests cover old-preference migration, validated
-add/edit/delete state, collection isolation, and the exact difference between
-immediate execution and type-only templates. The WASM package contains generated
+default. The test suite also covers one-ID preference migration, proves that
+unchecked theme-apply sections remain unchanged, and preserves terminal
+bold-weight plus bright-ANSI settings. Preset tests cover old-preference
+migration, validated add/edit/delete state, collection isolation, and the exact difference between
+immediate execution and type-only templates. Pane tests cover recursive leaf
+preservation through ten terminals and persisted divider-ratio round trips. The
+WASM package contains generated
 JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 
@@ -101,6 +103,13 @@ focused Bash prompt with Enter disabled. The command appeared at the cursor and
 did not execute. After a normal close and relaunch against the same isolated
 preference directory, the SSH entry and its type-only behavior were still
 present. The app and Bash child both exited cleanly after each close.
+
+The resizable-pane pass created a four-shell grid and confirmed four direct Bash
+children. Dragging the top row's vertical divider changed only that nested
+branch; the bottom row remained balanced and every PTY resized in place. After
+closing normally, relaunching with the same isolated preferences, and returning
+to four panes, the asymmetric top-row ratio was restored. Both close cycles
+removed the app and all four child shells.
 
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and

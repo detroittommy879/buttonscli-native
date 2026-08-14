@@ -23,7 +23,7 @@ constraints.
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
 | Tabs and sessions | Done | Keep lifecycle and pane-index regressions covered |
-| Pane layouts | Partial | Add nested/resizable splits beyond the 10-pane tiler |
+| Pane layouts | Done | Keep split-tree, ratio persistence, and lifecycle regressions covered |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Import/edit/share plus full effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
@@ -37,7 +37,7 @@ constraints.
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
 | Session tabs | Done | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, reopen a recent close, and preserve the correct pane-to-tab mapping. |
-| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Columns, rows, and balanced grids add/remove/focus up to 10 visible sessions without corrupting tab mappings; nested and individually resizable splits remain. |
+| Pane layouts | Done | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Columns, rows, and balanced grids add/remove/focus up to 10 visible sessions without corrupting tab mappings; recursive split branches resize independently and persist their ratios. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
@@ -98,11 +98,10 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Add nested/resizable split-tree editing to the new 10-pane state model.
-2. Finish non-AI visual editing/effects foundations.
-3. Build secure provider/key configuration, then AI Help.
-4. Version and secure the loopback automation API before adding CLI/MCP clients.
-5. Close platform, accessibility, localization, and release gaps continuously.
+1. Finish non-AI visual editing/effects foundations.
+2. Build secure provider/key configuration, then AI Help.
+3. Version and secure the loopback automation API before adding CLI/MCP clients.
+4. Close platform, accessibility, localization, and release gaps continuously.
 
 ## Definition of done for a backlog row
 
