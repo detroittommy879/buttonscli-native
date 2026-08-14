@@ -23,12 +23,12 @@ sanitize safely, and cross-platform shell-title extraction remains stable. The
 test suite also covers one-ID preference migration, proves that unchecked
 theme-apply sections remain unchanged, and preserves terminal bold-weight plus
 bright-ANSI settings. The WASM package contains generated
-JavaScript/TypeScript bindings and a 33,475,638
+JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 
-The stripped native release executable is 43,519,064 bytes with the complete
-offline font and theme payload. On this software-rendered VM, a warm launch
-reached a discoverable X11 window in 241 ms. This is a coarse end-to-end
+The stripped native release executable is 43,553,440 bytes with the complete
+offline font and theme payload. On this software-rendered VM, a post-link launch
+reached a discoverable X11 window in 554 ms. This is a coarse end-to-end
 observation rather than a controlled benchmark.
 
 ## Manual desktop smoke test
