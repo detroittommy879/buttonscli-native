@@ -26,8 +26,8 @@ missing executables/directories, and fallback after removing the selected
 default. The test suite also covers one-ID preference migration, proves that unchecked
 theme-apply sections remain unchanged, and preserves terminal bold-weight plus
 bright-ANSI settings. Preset tests cover old-preference migration, validated
-add/edit/delete state, and the exact difference between immediate execution and
-type-only templates. The WASM package contains generated
+add/edit/delete state, collection isolation, and the exact difference between
+immediate execution and type-only templates. The WASM package contains generated
 JavaScript/TypeScript bindings and a 33,498,448
 byte uncompressed module before HTTP compression.
 
@@ -94,6 +94,13 @@ supported window size without hiding the command fields or actions. Closing the
 window normally removed the app and both shell children. Custom resolution,
 working-directory validation, and persistence are additionally covered by the
 automated tests above.
+
+The SSH-preset pass started with the legacy-compatible empty SSH collection,
+created a `Staging host` entry from the left dock, and clicked it into the
+focused Bash prompt with Enter disabled. The command appeared at the cursor and
+did not execute. After a normal close and relaunch against the same isolated
+preference directory, the SSH entry and its type-only behavior were still
+present. The app and Bash child both exited cleanly after each close.
 
 Screenshots from this run are recorded in `docs/images/` and the reconstruction
 journal. The parity pass includes `native-theme-library.png` and
