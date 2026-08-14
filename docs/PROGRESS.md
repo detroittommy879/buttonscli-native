@@ -43,3 +43,18 @@ chrome instead renders an interactive, deterministic command sandbox. This is a
 deliberate product boundary: the website can offer a convincing trial without
 claiming or attempting access to a visitor's machine. A release-mode WASM build
 now succeeds; the raw module is 4.4 MiB before `wasm-opt`/gzip or Brotli.
+
+## 2026-08-14 — Pane layouts and lifecycle proof
+
+The workspace now supports the three most useful reference layouts: one pane,
+two side-by-side panes, and two stacked panes. Switching into a split creates a
+second real shell when necessary. Each pane remains independently interactive,
+resizes its own PTY grid, and visibly marks its backing tab. Clicking a hidden
+tab swaps it into the focused pane. Closing either side normalizes indices and
+collapses back to one pane when only one session remains.
+
+The manual smoke test exercised both split directions with distinct commands in
+each shell, then closed one tab and confirmed its bash child disappeared while
+the surviving shell stayed usable. Finally the window was closed through the
+desktop window manager (not by killing the test harness): the application and
+remaining child shell both exited within the polling window.

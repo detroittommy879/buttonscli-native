@@ -41,6 +41,9 @@ visitor's local PTY.
 - Closing the application drops all session owners and exits the GUI event loop.
 - App-level shortcuts are handled before terminal input only when they include
   the platform command modifier.
+- Pane layouts reference session indices through one normalizing owner. A tab
+  close remaps the primary, secondary, and focused indices together so the UI
+  never retains a dangling terminal reference.
 
 ## Dependency policy
 
@@ -48,4 +51,3 @@ Direct dependencies must be permissively licensed. Dependencies are pinned to
 compatible minor releases in `Cargo.toml` and committed in `Cargo.lock`. Before
 a public release, run a transitive license audit and review bundled fonts or
 icons separately.
-
