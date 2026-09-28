@@ -950,7 +950,6 @@ impl ButtonsApp {
     fn tab_bar(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
         egui::TopBottomPanel::top("tabs")
-            .exact_height(40.0)
             .frame(
                 egui::Frame::new()
                     .fill(colors.tabs_background)
@@ -961,66 +960,64 @@ impl ButtonsApp {
                 let mut action = None;
                 let mut add = None;
                 let mut reopen = false;
-                egui::ScrollArea::horizontal().show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        for (index, tab) in self.tabs.iter().enumerate() {
-                            let active = index == self.focused;
-                            let visible = self.visible_panes.contains(&index);
-                            let label = if tab.exited {
-                                format!("{}  · exited", tab.title)
-                            } else if visible && !active {
-                                format!("{}  · visible", tab.title)
-                            } else {
-                                tab.title.clone()
-                            };
-                            let button = egui::Button::new(RichText::new(label).color(if active {
-                                colors.text
-                            } else {
-                                colors.muted
-                            }))
-                            .fill(if active {
-                                colors.tabs_active
-                            } else {
-                                colors.tabs_idle
-                            })
-                            .stroke(Stroke::new(
-                                1.0_f32,
-                                if active {
-                                    colors.tabs_border
-                                } else {
-                                    colors.border
-                                },
-                            ));
-                            let response = ui
-                                .add_sized([150.0, 28.0], button)
-                                .on_hover_text("Double-click to rename");
-                            if response.double_clicked() {
-                                action = Some(TabAction::Rename(index));
-                            } else if response.clicked() {
-                                action = Some(TabAction::Activate(index));
-                            }
-                            tab_action_menu(ui, index, self.tabs.len(), &mut action);
-                        }
-                        let options = self.shell_menu_options();
-                        ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
-                            for (id, label, detail) in options {
-                                if ui.button(label).on_hover_text(detail).clicked() {
-                                    add = Some(id);
-                                    ui.close_menu();
-                                }
-                            }
+                ui.horizontal_wrapped(|ui| {
+                    for (index, tab) in self.tabs.iter().enumerate() {
+                        let active = index == self.focused;
+                        let visible = self.visible_panes.contains(&index);
+                        let label = if tab.exited {
+                            format!("{}  · exited", tab.title)
+                        } else if visible && !active {
+                            format!("{}  · visible", tab.title)
+                        } else {
+                            tab.title.clone()
+                        };
+                        let button = egui::Button::new(RichText::new(label).color(if active {
+                            colors.text
+                        } else {
+                            colors.muted
+                        }))
+                        .fill(if active {
+                            colors.tabs_active
+                        } else {
+                            colors.tabs_idle
                         })
-                        .response
-                        .on_hover_text("New terminal with a shell profile");
-                        if !self.recently_closed.is_empty()
-                            && ui
-                                .button("↶")
-                                .on_hover_text("Reopen the most recently closed terminal")
-                                .clicked()
-                        {
-                            reopen = true;
+                        .stroke(Stroke::new(
+                            1.0_f32,
+                            if active {
+                                colors.tabs_border
+                            } else {
+                                colors.border
+                            },
+                        ));
+                        let response = ui
+                            .add_sized([150.0, 28.0], button)
+                            .on_hover_text("Double-click to rename");
+                        if response.double_clicked() {
+                            action = Some(TabAction::Rename(index));
+                        } else if response.clicked() {
+                            action = Some(TabAction::Activate(index));
                         }
-                    });
+                        tab_action_menu(ui, index, self.tabs.len(), &mut action);
+                    }
+                    let options = self.shell_menu_options();
+                    ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
+                        for (id, label, detail) in options {
+                            if ui.button(label).on_hover_text(detail).clicked() {
+                                add = Some(id);
+                                ui.close_menu();
+                            }
+                        }
+                    })
+                    .response
+                    .on_hover_text("New terminal with a shell profile");
+                    if !self.recently_closed.is_empty()
+                        && ui
+                            .button("↶")
+                            .on_hover_text("Reopen the most recently closed terminal")
+                            .clicked()
+                    {
+                        reopen = true;
+                    }
                 });
                 if let Some(action) = action {
                     self.perform_tab_action(action);

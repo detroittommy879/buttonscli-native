@@ -12,7 +12,7 @@ sandboxed interactive demo and never exposes a visitor's local shell.
 Current desktop features include:
 
 - real local shell sessions with production VT parsing and scrollback;
-- native GPU-rendered tabs and draggable recursive column, row, or balanced-grid
+- native GPU-rendered tabs that wrap into more rows, and draggable recursive column, row, or balanced-grid
   layouts for up to ten simultaneous terminal panes;
 - new tabs named `term1`, `term2`, and so on, with rename, reorder, and
   recent-close recovery with pane-safe index updates;

@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L04 wrapped native tab strip
+
+Replaced the fixed 40-point, sideways-scrolling tab row with egui 0.31's `horizontal_wrapped` layout in a content-sized top panel. Existing tab activation, rename, menus, add/reopen and reorder actions remain on the same controls. README records the visible behavior; access tier: free (`tabWrapping`). Windows full release tests (44 library, 2 fixture) and Clippy with the known unrelated lint exempted passed. Narrow-window/Fedora X11 and Wayland interaction, long-name clipping and DPI behavior still need GUI review; source/API checks are not those manual checks.
+
 ## 2026-09-28 — S01 separate data roots and read-only legacy resolver
 
 Added native `~/.buttonscli-native` and legacy `~/.buttonscli` root types with injectable home paths. The resolver reads active-profile metadata, prefers that profile's config, uses the old root config only if the profile file is absent, rejects malformed/oversized metadata and out-of-root canonical paths, and writes nothing. Tests use disposable roots with spaces/Unicode; they cover fallback, invalid names, source preservation and containment. Windows full release suite passed (44 library and 2 fixture tests); Clippy passed with only the pre-existing test-module lint exempted. WASM target is not installed here; the module is native-gated. S02/S03 still need projection and persistence, and every later import read must revalidate source paths and content before commit. Access tier: free.

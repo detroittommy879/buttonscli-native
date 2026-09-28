@@ -2,6 +2,7 @@
 pub enum FeatureKey {
     PaneLayout,
     TabNaming,
+    TabWrapping,
     ThemeSelection,
     TerminalScrollbar,
     PaneDivider,
@@ -20,9 +21,10 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::PaneLayout,
         Self::TabNaming,
+        Self::TabWrapping,
         Self::ThemeSelection,
         Self::TerminalScrollbar,
         Self::PaneDivider,
@@ -44,6 +46,7 @@ impl FeatureKey {
         match self {
             Self::PaneLayout => "paneLayout",
             Self::TabNaming => "tabNaming",
+            Self::TabWrapping => "tabWrapping",
             Self::ThemeSelection => "themeSelection",
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
@@ -67,9 +70,11 @@ impl FeatureKey {
         use FeatureTier as T;
         use Rollout as R;
         let (tier, enabled, rollout, owner) = match self {
-            K::PaneLayout | K::TabNaming | K::TerminalScrollbar | K::PaneDivider => {
-                (T::Free, true, R::Active, "layout")
-            }
+            K::PaneLayout
+            | K::TabNaming
+            | K::TabWrapping
+            | K::TerminalScrollbar
+            | K::PaneDivider => (T::Free, true, R::Active, "layout"),
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
             K::SettingsAppearance => (T::Free, true, R::Active, "settings"),
             K::GuidedOnboarding => (T::Free, false, R::Planned, "activation"),
