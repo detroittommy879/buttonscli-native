@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — S03 native settings store
+
+Added versioned `native.json` in `~/.buttonscli-native/profiles/<profile>/`, native active-profile metadata, same-directory temp replacement, file locking and revision checks. Desktop startup prefers native data and reads prior eframe preferences only when no native document exists; the old eframe data is retained. A malformed native file or stale second instance blocks overwrite and surfaces an error. Guard checks prevent the native root or redirected child paths from writing into the original settings folder. Tests cover Windows replacement/restart, stale instances, corrupt document and unusable destination. The first lock implementation used Rust 1.89's API and failed the crate's Rust 1.85 MSRV lint; replaced it with `fs2` 0.4.3. No original app settings were read or written. Import remains S05, and Fedora/Windows GUI restart validation is pending. Access tier: free.
+
 ## 2026-09-28 — S02 pure legacy config projection
 
 Added JSON document parsing and a UI-free projection for command/SSH presets, shell profiles/default selection, bundled font-compatible typography, locale, provider endpoint/model metadata and retained visual/settings objects. Explicit empty preset lists stay empty; absent `sendEnter` follows the original trailing-newline rule, while explicit false and command whitespace survive. The serialized compatible copy removes known credential fields recursively and omits unknown top-level blocks pending an import choice. The first focused test had an invalid expectation that the fixture contained an unknown top-level key; corrected it and added a separate unknown-key case. No real settings were read or written. Import preview, persistence and revalidation remain S03–S05. Access tier: free.

@@ -47,6 +47,12 @@ not reuse its number; restarting begins at `term1` because sessions are not
 restored. A custom tab name survives reorder and recent-close recovery. Shell
 names and terminal-reported titles do not replace the tab name automatically.
 
+Desktop preferences now save under `~/.buttonscli-native/`. If no native settings
+document exists, the app reads its earlier eframe preferences once and writes a
+native copy on the next save. The original Tauri app's `~/.buttonscli/` folder is
+not changed. Importing that original app's settings is still planned; it does
+not happen automatically.
+
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.
 

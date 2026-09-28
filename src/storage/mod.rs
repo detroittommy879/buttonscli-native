@@ -4,3 +4,4 @@ pub(crate) mod document;
 pub mod paths;
 #[allow(dead_code)]
 pub(crate) mod projection;
+pub(crate) mod store;

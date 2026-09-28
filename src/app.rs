@@ -3,6 +3,10 @@ use crate::fonts::{self, FontZone};
 use crate::settings::ThemeApplyScopes;
 use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
 #[cfg(not(target_arch = "wasm32"))]
+use crate::storage::paths::production_roots;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::storage::store::NativeStore;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::theme::GradientGeometry;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::theme::TerminalEffects;
@@ -35,6 +39,12 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_store: Option<NativeStore>,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_revision: Option<u64>,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_save_blocked: bool,
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -154,13 +164,38 @@ impl ButtonsApp {
             .storage
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (native_store, native_revision, storage_error) = match production_roots() {
+            Ok((root, legacy)) => match NativeStore::open(root, legacy.0) {
+                Ok(store) => match store.load() {
+                    Ok(Some(loaded)) => {
+                        preferences = loaded.preferences;
+                        (Some(store), Some(loaded.revision), None)
+                    }
+                    Ok(None) => (Some(store), None, None),
+                    Err(error) => (Some(store), None, Some(error.to_string())),
+                },
+                Err(error) => (None, None, Some(error.to_string())),
+            },
+            Err(error) => (None, None, Some(error.to_string())),
+        };
         preferences.normalize_theme_sources();
         #[allow(unused_mut)]
         let mut app = Self::empty(preferences);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            app.native_store = native_store;
+            app.native_revision = native_revision;
+            app.native_save_blocked = storage_error.is_some();
+        }
         fonts::install(&cc.egui_ctx);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(error) = storage_error {
+            app.notice = Some(format!("Native settings could not load: {error}"));
+        }
         app
     }
 
@@ -186,6 +221,12 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_store: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_revision: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_save_blocked: false,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -2618,8 +2659,24 @@ fn preset_action_menu(
 }
 
 impl eframe::App for ButtonsApp {
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, &self.preferences);
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {
+        #[cfg(target_arch = "wasm32")]
+        eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
+        #[cfg(not(target_arch = "wasm32"))]
+        if !self.native_save_blocked {
+            if let Some(store) = &self.native_store {
+                match store.save(self.native_revision, &self.preferences) {
+                    Ok(revision) => self.native_revision = Some(revision),
+                    Err(error) => {
+                        tracing::error!("Native settings save failed: {error}");
+                        self.notice = Some(format!("Native settings could not save: {error}"));
+                        if matches!(error, crate::storage::store::StoreError::StaleRevision) {
+                            self.native_save_blocked = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
