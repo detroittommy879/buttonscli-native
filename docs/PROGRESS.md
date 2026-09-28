@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L09 saved chrome corner radius, source pass
+
+Added one 0–16 point radius preference for tab/control widgets, cards, menus and Settings, with a Theme Settings slider and native settings round-trip. Old settings get the restrained 6-point default, and oversized saved values clamp on load. Terminal cell clipping stays unchanged. Windows library tests passed; Fedora/Windows GUI DPI, focus and hit-target review plus a WASM build are still pending. Access tier: free (`settingsAppearance`).
+
 ## 2026-09-28 — L07 visible saved pane dividers, source pass
 
 Kept the 10-point drag gap and now paint a centered divider line at idle and during hover. Added theme defaults from optional personal theme `theme.app.shell.paneDivider` data plus native preference overrides for color and 1–6-point painted width. Settings exposes theme inheritance and custom controls; old settings inherit automatically. Tests cover serialization, theme parsing and override clamping. Native theme editor/export is not implemented, and Fedora/Windows contrast and drag interaction remain unverified, so L07 is partial. Access tier: free (`paneDivider`).

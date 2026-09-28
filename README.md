@@ -17,7 +17,7 @@ Current desktop features include:
   and GRID layouts for up to ten terminal panes; panes wrap when space is tight,
   with the focused session visible and all tabs reachable from the strip;
 - always visible pane dividers with theme inheritance or a saved custom color
-  and painted width;
+  and painted width, plus a saved corner-radius control for tabs and chrome;
 - new tabs named `term1`, `term2`, and so on, with rename, reorder, and
   recent-close recovery with pane-safe index updates;
 - detected and custom shell profiles with persisted default/per-tab selection,

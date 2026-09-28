@@ -2,7 +2,7 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
-Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, and L07 has visible saved dividers. L01/L03/L05/L07 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, L07 has visible saved dividers, and L09 has a saved chrome radius. L01/L03/L05/L07/L09 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
 
 ## Read in this order
 
@@ -60,7 +60,7 @@ The supplied screenshot is visual context for the current native UI, not an inst
 | Plain AI Help | Missing; O AssistantPanel/DetachedAssistantWindow/useAIAssistantChat | P1 import endpoints/keys, explain terminal, suggest reviewed commands in a separate window |
 | Terminal scrollbar/search/zoom | Real-grid per-pane scrollbar implemented; GUI acceptance pending | P1 verify scroll/drag/alternate-screen on Fedora; P2 search, clear, select all and zoom |
 | Paste/input shortcuts | Basic clipboard present; O keyboardShortcuts/clipboardService | P1 input contract; P2 editable keys, slow paste, bracketed mode |
-| Dividers/rounding | Draggable gaps appear only on hover; tabs are rectangular | P1 visible, theme-saveable colored dividers; optional tab/panel corner radius |
+| Dividers/rounding | Visible dividers and adjustable chrome radius now exist; GUI acceptance remains | P1 verify drag/contrast/scale and complete theme editor/export |
 | Dock/status/settings behavior | Partial; O PresetBar/StatusBar/SettingsDialog | P1 detached Settings for live theme preview; P2 compact/auto-hide/resizing and Revert & Close |
 | Fonts/appearance | Bundled fonts/scopes present; O fontLoader/themeDesignerService | P2 system/custom fonts and editing; P3 opt-in downloads |
 | Effects | Static/scanlines and gradient subset present; O plugins/effects, config types | P3 native effect modules, master/calm controls, performance caps |

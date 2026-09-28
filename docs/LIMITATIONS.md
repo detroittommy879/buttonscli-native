@@ -24,6 +24,9 @@ not a backlog disguised as release notes.
   Settings can save a custom color and width. Personal theme documents may set
   `theme.app.shell.paneDivider`. There is no personal-theme editor/export flow
   for this field yet, and contrast/drag behavior needs GUI review.
+- Theme Settings saves a 0–16 point corner radius for tabs, controls, menus,
+  cards and Settings. It does not round terminal cells. Visuals at different DPI
+  scales and keyboard focus outlines still need desktop review.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
   screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior

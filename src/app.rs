@@ -368,7 +368,18 @@ impl ButtonsApp {
         let mut style = (*ctx.style()).clone();
         style.spacing.item_spacing = Vec2::new(7.0, 6.0);
         style.spacing.button_padding = Vec2::new(10.0, 5.0);
-        style.visuals.window_corner_radius = 6.0.into();
+        let chrome_radius = egui::CornerRadius::same(self.preferences.chrome_corner_radius.min(16));
+        style.visuals.window_corner_radius = chrome_radius;
+        style.visuals.menu_corner_radius = chrome_radius;
+        for widget in [
+            &mut style.visuals.widgets.noninteractive,
+            &mut style.visuals.widgets.inactive,
+            &mut style.visuals.widgets.hovered,
+            &mut style.visuals.widgets.active,
+            &mut style.visuals.widgets.open,
+        ] {
+            widget.corner_radius = chrome_radius;
+        }
         let shell = &self.preferences.typography.shell;
         for (text_style, scale) in [
             (TextStyle::Heading, 1.45),
@@ -1516,6 +1527,18 @@ impl ButtonsApp {
         });
         #[cfg(not(target_arch = "wasm32"))]
         self.divider_settings(ui);
+        ui.separator();
+        ui.label(crate::i18n::text(
+            "en",
+            crate::i18n::MessageKey::ChromeCornerRadius,
+            &[],
+        ));
+        ui.add(egui::Slider::new(&mut self.preferences.chrome_corner_radius, 0..=16).text("pt"))
+            .on_hover_text(crate::i18n::text(
+                "en",
+                crate::i18n::MessageKey::ChromeCornerRadiusHelp,
+                &[],
+            ));
         ui.add_space(6.0);
         ui.add(
             egui::TextEdit::singleline(&mut self.theme_search)
@@ -1565,7 +1588,7 @@ impl ButtonsApp {
                                         theme.colors.border
                                     },
                                 ))
-                                .corner_radius(6.0)
+                                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                                 .inner_margin(10.0);
                             ui.allocate_ui_with_layout(
                                 Vec2::new(card_width, 142.0),
@@ -1780,7 +1803,7 @@ impl ButtonsApp {
             egui::Frame::new()
                 .fill(ui.visuals().faint_bg_color)
                 .stroke(ui.visuals().widgets.inactive.bg_stroke)
-                .corner_radius(5.0)
+                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
                     ui.label(RichText::new("Terminal bold rendering").strong());
@@ -2105,7 +2128,7 @@ impl ButtonsApp {
             egui::Frame::new()
                 .fill(colors.raised)
                 .stroke(Stroke::new(1.0_f32, colors.border))
-                .corner_radius(5.0)
+                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
                     egui::Grid::new(("custom-shell-profile", &profile.id))
@@ -2212,7 +2235,7 @@ impl ButtonsApp {
             egui::Frame::new()
                 .fill(colors.raised)
                 .stroke(Stroke::new(1.0_f32, colors.warning))
-                .corner_radius(5.0)
+                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(8.0)
                 .show(ui, |ui| {
                     ui.label("Replace every saved preset with the platform starter set?");
@@ -2238,7 +2261,7 @@ impl ButtonsApp {
                     egui::Frame::new()
                         .fill(colors.raised)
                         .stroke(Stroke::new(1.0_f32, colors.border))
-                        .corner_radius(5.0)
+                        .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                         .inner_margin(10.0)
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
@@ -2474,7 +2497,7 @@ fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospa
     egui::Frame::new()
         .fill(ui.visuals().faint_bg_color)
         .stroke(ui.visuals().widgets.inactive.bg_stroke)
-        .corner_radius(5.0)
+        .corner_radius(ui.visuals().widgets.inactive.corner_radius)
         .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_min_width((ui.available_width() - 24.0).max(420.0));

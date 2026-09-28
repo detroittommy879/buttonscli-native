@@ -20,10 +20,12 @@ pub enum MessageKey {
     AiHelpReview,
     AiHelpRun,
     Cancel,
+    ChromeCornerRadius,
+    ChromeCornerRadiusHelp,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 15] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -37,6 +39,8 @@ impl MessageKey {
         Self::AiHelpReview,
         Self::AiHelpRun,
         Self::Cancel,
+        Self::ChromeCornerRadius,
+        Self::ChromeCornerRadiusHelp,
     ];
 }
 
@@ -71,6 +75,10 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::AiHelpReview => "Review command before sending",
         MessageKey::AiHelpRun => "Run reviewed command",
         MessageKey::Cancel => "Cancel",
+        MessageKey::ChromeCornerRadius => "Chrome corner radius",
+        MessageKey::ChromeCornerRadiusHelp => {
+            "Rounds tabs, controls, cards, menus, and Settings without changing terminal cells."
+        }
     }
 }
 

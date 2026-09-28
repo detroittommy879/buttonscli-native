@@ -109,6 +109,7 @@ pub(crate) struct Preferences {
     pub(crate) ssh_presets: Vec<CommandPreset>,
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
     pub(crate) pane_divider: PaneDividerAppearance,
+    pub(crate) chrome_corner_radius: u8,
     pub(crate) default_shell_id: String,
     pub(crate) default_working_directory: String,
     pub(crate) custom_shell_profiles: Vec<ShellProfile>,
@@ -131,6 +132,7 @@ impl Default for Preferences {
             ssh_presets: Vec::new(),
             pane_split_ratios: std::collections::BTreeMap::new(),
             pane_divider: PaneDividerAppearance::default(),
+            chrome_corner_radius: 6,
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
@@ -149,6 +151,7 @@ pub(crate) struct PaneDividerAppearance {
 
 impl Preferences {
     pub(crate) fn normalize_theme_sources(&mut self) {
+        self.chrome_corner_radius = self.chrome_corner_radius.min(16);
         for source in [
             &mut self.app_theme_id,
             &mut self.terminal_theme_id,
@@ -217,5 +220,20 @@ mod tests {
         let restored: Preferences =
             serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
         assert_eq!(restored.pane_divider, saved.pane_divider);
+    }
+
+    #[test]
+    fn chrome_corner_radius_defaults_and_persists() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.chrome_corner_radius, 6);
+        let mut saved = old;
+        saved.chrome_corner_radius = 12;
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert_eq!(restored.chrome_corner_radius, 12);
+        let mut oversized: Preferences =
+            serde_json::from_str(r#"{"chrome_corner_radius":255}"#).unwrap();
+        oversized.normalize_theme_sources();
+        assert_eq!(oversized.chrome_corner_radius, 16);
     }
 }
