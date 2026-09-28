@@ -13,6 +13,8 @@ use crate::storage::store::NativeStore;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::theme::GradientGeometry;
 #[cfg(not(target_arch = "wasm32"))]
+use crate::theme::PaneDividerTheme;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
@@ -864,6 +866,8 @@ impl ButtonsApp {
         let terminal_bold_font = fonts::font_id(&bold_zone);
         let draw_bold_bright = self.preferences.typography.draw_bold_bright;
         let theme = self.terminal_presentation();
+        let divider_style =
+            resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
         let modal_open = self.show_settings
             || self.show_about
             || self.show_preset_editor
@@ -912,6 +916,7 @@ impl ButtonsApp {
             terminal_bold_font: &terminal_bold_font,
             draw_bold_bright,
             theme: &theme,
+            divider_style,
             clicked: &mut clicked,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
@@ -1509,6 +1514,8 @@ impl ButtonsApp {
             ui.checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
             ui.checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        self.divider_settings(ui);
         ui.add_space(6.0);
         ui.add(
             egui::TextEdit::singleline(&mut self.theme_search)
@@ -1660,6 +1667,53 @@ impl ButtonsApp {
         }
         if self.preferences.theme_apply.gradient || self.preferences.theme_apply.effects {
             self.preferences.calm_mode = calm;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn divider_settings(&mut self, ui: &mut egui::Ui) {
+        let inherited = self.active_app_theme().pane_divider;
+        ui.separator();
+        ui.label(RichText::new("Pane dividers").strong());
+        let mut custom = self.preferences.pane_divider.color_override.is_some()
+            || self.preferences.pane_divider.thickness_override.is_some();
+        if ui
+            .checkbox(&mut custom, "Custom color and thickness")
+            .changed()
+        {
+            if custom {
+                self.preferences.pane_divider.color_override =
+                    Some(crate::theme::to_hex(inherited.color));
+                self.preferences.pane_divider.thickness_override = Some(inherited.thickness);
+            } else {
+                self.preferences.pane_divider = Default::default();
+            }
+        }
+        if custom {
+            let mut color = self
+                .preferences
+                .pane_divider
+                .color_override
+                .as_deref()
+                .and_then(crate::theme::parse_color)
+                .unwrap_or(inherited.color);
+            if ui.color_edit_button_srgba(&mut color).changed() {
+                self.preferences.pane_divider.color_override = Some(crate::theme::to_hex(color));
+            }
+            let mut thickness = self
+                .preferences
+                .pane_divider
+                .thickness_override
+                .unwrap_or(inherited.thickness)
+                .clamp(1.0, 6.0);
+            if ui
+                .add(egui::Slider::new(&mut thickness, 1.0..=6.0).text("Painted width"))
+                .changed()
+            {
+                self.preferences.pane_divider.thickness_override = Some(thickness);
+            }
+        } else {
+            ui.label("Using the active app theme's divider style.");
         }
     }
 
@@ -2696,6 +2750,25 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn resolve_pane_divider(
+    appearance: &crate::settings::PaneDividerAppearance,
+    theme: &ThemeDefinition,
+) -> PaneDividerTheme {
+    PaneDividerTheme {
+        color: appearance
+            .color_override
+            .as_deref()
+            .and_then(crate::theme::parse_color)
+            .unwrap_or(theme.pane_divider.color),
+        thickness: appearance
+            .thickness_override
+            .filter(|value| value.is_finite())
+            .unwrap_or(theme.pane_divider.thickness)
+            .clamp(1.0, 6.0),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn pane_tree(layout: PaneLayout, visible: &[usize], rows: usize, columns: usize) -> PaneTree {
     let visible = if visible.is_empty() {
         &[0][..]
@@ -2804,6 +2877,7 @@ struct PaneRenderState<'a> {
     terminal_bold_font: &'a FontId,
     draw_bold_bright: bool,
     theme: &'a ThemeDefinition,
+    divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
 }
 
@@ -2898,10 +2972,22 @@ fn render_pane_tree(
                     egui::Sense::drag(),
                 )
                 .on_hover_cursor(cursor);
-            if response.hovered() || response.dragged() {
-                ui.painter()
-                    .rect_filled(divider.shrink(2.0), 1.0, state.theme.colors.accent);
-            }
+            let painted = match axis {
+                SplitAxis::Horizontal => egui::Rect::from_center_size(
+                    divider.center(),
+                    egui::vec2(state.divider_style.thickness, divider.height()),
+                ),
+                SplitAxis::Vertical => egui::Rect::from_center_size(
+                    divider.center(),
+                    egui::vec2(divider.width(), state.divider_style.thickness),
+                ),
+            };
+            let color = if response.hovered() || response.dragged() {
+                mix_effect_color(state.divider_style.color, Color32::WHITE, 0.25)
+            } else {
+                state.divider_style.color
+            };
+            ui.painter().rect_filled(painted, 1.0, color);
             if response.dragged() {
                 let delta = ui.input(|input| input.pointer.delta());
                 let change = match axis {
@@ -3404,6 +3490,25 @@ mod tests {
         let encoded = serde_json::to_string(&preferences).unwrap();
         let decoded: Preferences = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded.pane_split_ratios["grid:4/rows"], 0.63);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn divider_style_inherits_theme_then_clamps_saved_override() {
+        let catalog = ThemeCatalog::load();
+        let theme = catalog.get("aurora");
+        let mut preference = crate::settings::PaneDividerAppearance::default();
+        assert_eq!(resolve_pane_divider(&preference, theme), theme.pane_divider);
+        preference.color_override = Some("#ff0000".into());
+        preference.thickness_override = Some(100.0);
+        let resolved = resolve_pane_divider(&preference, theme);
+        assert_eq!(resolved.color, Color32::RED);
+        assert_eq!(resolved.thickness, 6.0);
+        preference.color_override = Some("invalid".into());
+        assert_eq!(
+            resolve_pane_divider(&preference, theme).color,
+            theme.pane_divider.color
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]

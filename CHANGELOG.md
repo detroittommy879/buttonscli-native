@@ -6,3 +6,4 @@
 - Added a first-run import offer and selection of another original profile in Settings. API keys and runtime/auth files remain excluded; native credential transfer and AI Help are pending.
 - COL, ROW and GRID panes now wrap within minimum viewport bounds. Overflow sessions stay open and reachable through tabs, and resizing back restores the larger layout.
 - Added a per-pane scrollbar driven by real terminal scrollback; it hides in alternate-screen and mouse-reporting modes.
+- Pane dividers remain visible when idle and can inherit the active app theme or use a saved custom color and painted width.

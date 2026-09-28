@@ -2,7 +2,7 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
-Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer and L05 has a real-grid scrollbar path. L01/L03/L05 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, and L07 has visible saved dividers. L01/L03/L05/L07 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
 
 ## Read in this order
 

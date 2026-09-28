@@ -16,6 +16,7 @@ pub struct ThemeDefinition {
     pub description: String,
     pub source: ThemeSource,
     pub colors: AppColors,
+    pub pane_divider: PaneDividerTheme,
     pub terminal_colors: TerminalColors,
     pub effects: TerminalEffects,
     pub typography: Option<Typography>,
@@ -27,6 +28,12 @@ pub enum ThemeSource {
     LegacyBundle,
     LegacyBuiltIn,
     Personal,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PaneDividerTheme {
+    pub color: Color32,
+    pub thickness: f32,
 }
 
 impl ThemeDefinition {
@@ -363,6 +370,10 @@ fn native_themes() -> Vec<ThemeDefinition> {
             terminal_colors: terminal_from_app(&colors),
             effects: TerminalEffects::default(),
             colors,
+            pane_divider: PaneDividerTheme {
+                color: accent,
+                thickness: 2.0,
+            },
             typography: None,
         }
     })
@@ -456,6 +467,18 @@ fn parse_legacy_value(
         bright_white: ansi_color(ansi, "brightWhite", "15", "#f8f8f8"),
     };
 
+    let divider_document = &shell["paneDivider"];
+    let divider = PaneDividerTheme {
+        color: divider_document["color"]
+            .as_str()
+            .and_then(parse_color)
+            .unwrap_or(colors.accent),
+        thickness: divider_document["thickness"]
+            .as_f64()
+            .filter(|value| value.is_finite())
+            .map(|value| value.clamp(1.0, 6.0) as f32)
+            .unwrap_or(2.0),
+    };
     Ok(ThemeDefinition {
         id: string_at(&document["metadata"], "id")
             .unwrap_or(file_id)
@@ -468,6 +491,7 @@ fn parse_legacy_value(
             .to_owned(),
         source,
         colors,
+        pane_divider: divider,
         terminal_colors,
         effects: parse_effects(terminal, effects_value),
         typography: parse_typography(&theme["typography"], terminal),
@@ -691,7 +715,7 @@ fn ansi_color(ansi: &Value, named: &str, indexed: &str, fallback: &str) -> Strin
     color_string(ansi, &[named, indexed], fallback)
 }
 
-fn parse_color(value: &str) -> Option<Color32> {
+pub(crate) fn parse_color(value: &str) -> Option<Color32> {
     let hex = value.strip_prefix('#')?;
     match hex.len() {
         3 => Some(Color32::from_rgb(
@@ -744,7 +768,7 @@ fn mix(a: Color32, b: Color32, amount: f32) -> Color32 {
     )
 }
 
-fn to_hex(color: Color32) -> String {
+pub(crate) fn to_hex(color: Color32) -> String {
     format!("#{:02x}{:02x}{:02x}", color.r(), color.g(), color.b())
 }
 
@@ -764,6 +788,17 @@ mod tests {
         let catalog = ThemeCatalog::load();
         assert_eq!(catalog.bundle_count(), BUNDLED_THEME_JSON.len());
         assert_eq!(BUNDLED_THEME_JSON.len(), 127);
+    }
+
+    #[test]
+    fn personal_theme_document_can_define_pane_divider_style() {
+        let document = serde_json::json!({"metadata":{"id":"divider","name":"Divider"},"theme":{"app":{"shell":{"paneDivider":{"color":"#123456","thickness":4.5}}}}});
+        let theme = parse_legacy_value("divider", &document, ThemeSource::Personal).unwrap();
+        assert_eq!(
+            theme.pane_divider.color,
+            Color32::from_rgb(0x12, 0x34, 0x56)
+        );
+        assert_eq!(theme.pane_divider.thickness, 4.5);
     }
 
     #[test]

@@ -16,6 +16,8 @@ Current desktop features include:
 - native GPU-rendered tabs that wrap into more rows, and draggable COL, ROW,
   and GRID layouts for up to ten terminal panes; panes wrap when space is tight,
   with the focused session visible and all tabs reachable from the strip;
+- always visible pane dividers with theme inheritance or a saved custom color
+  and painted width;
 - new tabs named `term1`, `term2`, and so on, with rename, reorder, and
   recent-close recovery with pane-safe index updates;
 - detected and custom shell profiles with persisted default/per-tab selection,

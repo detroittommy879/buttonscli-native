@@ -108,6 +108,7 @@ pub(crate) struct Preferences {
     pub(crate) presets: Vec<CommandPreset>,
     pub(crate) ssh_presets: Vec<CommandPreset>,
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
+    pub(crate) pane_divider: PaneDividerAppearance,
     pub(crate) default_shell_id: String,
     pub(crate) default_working_directory: String,
     pub(crate) custom_shell_profiles: Vec<ShellProfile>,
@@ -129,11 +130,21 @@ impl Default for Preferences {
             presets: default_presets(),
             ssh_presets: Vec::new(),
             pane_split_ratios: std::collections::BTreeMap::new(),
+            pane_divider: PaneDividerAppearance::default(),
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct PaneDividerAppearance {
+    /// Hex RGB; `None` inherits the active app theme.
+    pub(crate) color_override: Option<String>,
+    /// Logical points; `None` inherits the active app theme.
+    pub(crate) thickness_override: Option<f32>,
 }
 
 impl Preferences {
@@ -194,5 +205,17 @@ mod tests {
             serde_json::from_str(r#"{"presets":[],"ssh_presets":[]}"#).unwrap();
         assert!(preferences.presets.is_empty());
         assert!(preferences.ssh_presets.is_empty());
+    }
+
+    #[test]
+    fn divider_overrides_round_trip_and_old_settings_inherit_theme() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.pane_divider, PaneDividerAppearance::default());
+        let mut saved = old;
+        saved.pane_divider.color_override = Some("#123456".into());
+        saved.pane_divider.thickness_override = Some(4.0);
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert_eq!(restored.pane_divider, saved.pane_divider);
     }
 }

@@ -58,7 +58,7 @@ constraints.
 | Terminal effects | Partial | `src/types/config.ts`, `src/components/HsyncDebugPanel.tsx` | Preserve current static/scanlines and add hsync warp, TV/simple/idle noise, row banding, glow, wallpaper, master switch, and focused-pane behavior. |
 | Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
 | Random/per-terminal/theme-all | Missing | native theme catalog and terminal palette | Random current/all, per-terminal assignment, global default, imported themes and live PTY preservation. |
-| Colored dividers/rounded chrome | Missing | native pane renderer and theme settings | Visible, draggable, theme-saveable separators and adjustable tab/panel radius. |
+| Colored dividers/rounded chrome | Partial | native pane renderer and theme settings | Visible dividers inherit the app theme or saved native overrides; verify GUI dragging/contrast, then add theme editor/export and adjustable tab/panel radius. |
 | Theme designer | Missing | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts` | Generate preview candidates, self-correct invalid output, selectively apply, keep/save, and expose provenance. |
 | Shader Lab | Missing | `src/components/ShaderLabCard.tsx`, `src/services/shaderDesignerService.ts` | Edit/preview/save native GPU effects with a safe fallback and clear performance limits. |
 | Window appearance | Missing | feature `windowTransparency` | Persist opacity/transparency where supported and degrade clearly on unsupported compositors. |

@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L07 visible saved pane dividers, source pass
+
+Kept the 10-point drag gap and now paint a centered divider line at idle and during hover. Added theme defaults from optional personal theme `theme.app.shell.paneDivider` data plus native preference overrides for color and 1–6-point painted width. Settings exposes theme inheritance and custom controls; old settings inherit automatically. Tests cover serialization, theme parsing and override clamping. Native theme editor/export is not implemented, and Fedora/Windows contrast and drag interaction remain unverified, so L07 is partial. Access tier: free (`paneDivider`).
+
 ## 2026-09-28 — L05 real-grid scrollbar source implementation
 
 Exposed retained history, viewport lines, display offset and alternate-screen/mouse-reporting mode from the vendored Alacritty adapter without a new PTY reader or outer ScrollArea. The native pane reserves a narrow track; wheel and thumb drag both use the backend's `Scroll` command. Geometry tests cover fresh output, resize/truncation, top/bottom dragging and hidden modes; a vendored-grid test exercises actual scroll-up, top and history truncation. Windows `cargo test` passed 68 library and 2 fixture tests; vendored `egui_term` passed 7 tests; strict Clippy passed with the known unrelated test-module lint exempted. Fedora/Windows GUI selection, PTY-size and alternate-screen checks remain open before L05 acceptance. Access tier: free (`terminalScrollbar`).
