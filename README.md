@@ -44,6 +44,11 @@ and Ctrl+Shift+Q (quit).
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.
 
+The [feature migration plan](docs/migration/README.md) compares the original
+Tauri app with this native implementation and defines prioritized, testable
+tasks for optional settings import, agent control, AI Help, and remaining parity.
+It describes planned work, not currently shipped capabilities.
+
 The theme and font catalogs are embedded into the executable. They do not make
 network requests and remain available offline.
 

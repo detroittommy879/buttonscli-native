@@ -1,5 +1,22 @@
 # Reconstruction journal
 
+## 2026-09-27 — Source-audited migration specification
+
+Compared the native models/backend/theme loader with the current local Tauri
+config, CLI, assistant, feature-access, docs and test contracts. Added
+`docs/migration/` with priorities, compatibility rules, 51 bounded tasks,
+acceptance tests, platform/performance gates and a Luna handoff prompt. Updated
+the backlog execution order and README links. User clarified that native should
+use a separate settings folder: planned `~/.buttonscli-native/` with optional
+previewed import from `~/.buttonscli/`, not live shared writes.
+
+Fresh Windows `cargo test --release`: 29 passed, zero failed. No runtime code,
+personal settings, original repo files, services or live terminals changed.
+Document links/task references were checked. An initial combined documentation
+patch failed on the journal heading; reapplied with the actual heading. GUI,
+performance and cross-platform acceptance remain future work; test success
+does not certify those behaviors.
+
 ## 2026-08-14 — Investigation and foundation
 
 The legacy application was inspected as a product rather than treated as a

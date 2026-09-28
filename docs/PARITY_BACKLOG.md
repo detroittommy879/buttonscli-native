@@ -98,10 +98,15 @@ preferences JSON.
 
 ## Near-term execution order
 
-1. Finish non-AI visual editing/effects foundations.
-2. Build secure provider/key configuration, then AI Help.
-3. Version and secure the loopback automation API before adding CLI/MCP clients.
-4. Close platform, accessibility, localization, and release gaps continuously.
+The source-audited [migration plan](migration/README.md) supersedes the earlier
+visual-first ordering and breaks the work into bounded implementation tasks.
+
+1. Establish `~/.buttonscli-native/` with optional import from the original
+   `~/.buttonscli/`; leave the original settings untouched.
+2. Build stable session/output/input services and compatible `buttonsclictl`.
+3. Build secure provider configuration and a separate native AI Help window.
+4. Close everyday workflow gaps, then advanced assistant/effect capabilities.
+5. Verify platforms, accessibility, performance, and native releases throughout.
 
 ## Definition of done for a backlog row
 
