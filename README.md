@@ -12,8 +12,9 @@ sandboxed interactive demo and never exposes a visitor's local shell.
 Current desktop features include:
 
 - real local shell sessions with production VT parsing and scrollback;
-- native GPU-rendered tabs that wrap into more rows, and draggable recursive column, row, or balanced-grid
-  layouts for up to ten simultaneous terminal panes;
+- native GPU-rendered tabs that wrap into more rows, and draggable COL, ROW,
+  and GRID layouts for up to ten terminal panes; panes wrap when space is tight,
+  with the focused session visible and all tabs reachable from the strip;
 - new tabs named `term1`, `term2`, and so on, with rename, reorder, and
   recent-close recovery with pane-safe index updates;
 - detected and custom shell profiles with persisted default/per-tab selection,
@@ -51,13 +52,19 @@ names and terminal-reported titles do not replace the tab name automatically.
 Desktop preferences now save under `~/.buttonscli-native/`. If no native settings
 document exists, the app reads its earlier eframe preferences once and writes a
 native copy on the next save. The original Tauri app's `~/.buttonscli/` folder is
-not changed. Importing that original app's settings is still planned; it does
-not happen automatically.
+not changed. On desktop, open **Settings → Import from original ButtonsCLI** to
+preview the active original profile or select another listed profile. Confirming
+creates a separate native profile with settings, command and SSH presets, and
+valid personal themes. Repeating the same snapshot preserves native edits;
+changed source data creates another profile. Import never runs saved commands.
+API keys, runtime/auth files and session history are excluded. Provider names,
+endpoints and models are retained as inert compatibility data; native AI Help
+and credential transfer are not implemented yet.
 
 Personal themes are read when the desktop app starts. A broken theme file is
-skipped without removing other themes. These files are not copied from the
-original app yet, and unsupported effect fields are retained for later export
-but are not rendered.
+skipped without removing other themes. Imported files are copied only after
+confirmation; unsupported effect fields are retained for later export but are
+not rendered.
 
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.

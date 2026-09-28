@@ -233,7 +233,13 @@ fn safe_assistant(value: &Value) -> Value {
     let mut safe = Map::new();
     for key in ["activeProviderId", "provider", "endpoint", "model"] {
         if let Some(Value::String(value)) = value.get(key) {
-            safe.insert(key.into(), Value::String(value.clone()));
+            if key == "endpoint" {
+                if let Some(endpoint) = safe_endpoint(value) {
+                    safe.insert(key.into(), Value::String(endpoint));
+                }
+            } else {
+                safe.insert(key.into(), Value::String(value.clone()));
+            }
         }
     }
     if let Some(providers) = value.get("namedProviders").and_then(Value::as_array) {
@@ -260,6 +266,9 @@ fn copy_string_fields(value: &Value, keys: &[&str]) -> Option<Value> {
     let fields = keys
         .iter()
         .filter_map(|key| match source.get(*key) {
+            Some(Value::String(value)) if *key == "endpoint" => {
+                safe_endpoint(value).map(|endpoint| ((*key).to_owned(), Value::String(endpoint)))
+            }
             Some(Value::String(value)) => Some(((*key).to_owned(), Value::String(value.clone()))),
             _ => None,
         })
@@ -267,16 +276,40 @@ fn copy_string_fields(value: &Value, keys: &[&str]) -> Option<Value> {
     Some(Value::Object(fields))
 }
 
-fn scrub_secrets(value: &Value) -> Value {
+fn safe_endpoint(raw: &str) -> Option<String> {
+    let mut endpoint = url::Url::parse(raw).ok()?;
+    if !matches!(endpoint.scheme(), "http" | "https") {
+        return None;
+    }
+    endpoint.set_username("").ok()?;
+    endpoint.set_password(None).ok()?;
+    endpoint.set_query(None);
+    endpoint.set_fragment(None);
+    Some(endpoint.to_string())
+}
+
+pub(crate) fn scrub_secrets(value: &Value) -> Value {
     match value {
         Value::Object(fields) => Value::Object(
             fields
                 .iter()
                 .filter_map(|(key, value)| {
-                    let lower = key.to_ascii_lowercase();
-                    if ["apikey", "token", "secret", "password", "credential"]
-                        .iter()
-                        .any(|term| lower.contains(term))
+                    let normalized: String = key
+                        .chars()
+                        .filter(|ch| ch.is_ascii_alphanumeric())
+                        .map(|ch| ch.to_ascii_lowercase())
+                        .collect();
+                    if [
+                        "apikey",
+                        "token",
+                        "secret",
+                        "password",
+                        "credential",
+                        "authorization",
+                        "privatekey",
+                    ]
+                    .iter()
+                    .any(|term| normalized.contains(term))
                     {
                         None
                     } else {
@@ -336,7 +369,7 @@ mod tests {
 
     #[test]
     fn scrubber_removes_nested_secrets_from_retained_visual_data() {
-        let document = LegacyDocument::parse(br#"{"theme":{"future":{"apiKey":"canary","safe":"yes"}},"features":{"nested":{"sessionToken":"canary"}}}"#).unwrap();
+        let document = LegacyDocument::parse(br#"{"theme":{"future":{"apiKey":"canary","api_key":"canary","Authorization":"canary","safe":"yes"}},"features":{"nested":{"sessionToken":"canary"}}}"#).unwrap();
         let safe = serde_json::to_string(&project(&document).safe_config).unwrap();
         assert!(!safe.contains("canary"));
         assert!(safe.contains("yes"));
@@ -352,5 +385,13 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("futureExtension")));
+    }
+
+    #[test]
+    fn provider_endpoint_userinfo_and_query_are_not_persisted() {
+        let document = LegacyDocument::parse(br#"{"assistant":{"endpoint":"https://user:FAKE-KEY@example.test/v1?api_key=FAKE-KEY#secret","namedProviders":[{"name":"Remote","endpoint":"https://u:FAKE-KEY@example.test/v1?token=FAKE-KEY","model":"m"}]}}"#).unwrap();
+        let safe = serde_json::to_string(&project(&document).safe_config).unwrap();
+        assert!(!safe.contains("FAKE-KEY"));
+        assert!(safe.contains("https://example.test/v1"));
     }
 }

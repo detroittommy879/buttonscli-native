@@ -15,9 +15,11 @@ not a backlog disguised as release notes.
 
 ## Product surface
 
-- Pane layouts arrange up to ten live shells as columns, rows, or a balanced
-  recursive split tree. Every branch has a draggable divider, stores its ratio,
-  and can be returned to balanced defaults from the status bar.
+- Pane layouts arrange up to ten live shells as responsive columns, rows, or a
+  balanced recursive split tree. Narrow windows show fewer panes at once while
+  retaining the other sessions in the tab strip. Every branch has a draggable
+  divider, stores its ratio, and can be returned to balanced defaults from the
+  status bar. Fedora GUI resizing and PTY behavior still need direct review.
 - All 555 legacy theme selections are present. Linear, radial, and conic
   multi-stop terminal gradients preserve their angle/position; animated drift,
   static, and scanlines also render natively. Repeating gradients, hsync warp,
@@ -35,6 +37,10 @@ not a backlog disguised as release notes.
 - Profile switching, detached settings, AI Help, the loopback automation API,
   localization, accounts, and updater/release infrastructure are not part of
   this lean core yet.
+- Desktop Settings can preview and import an original-app profile as a new native
+  snapshot. There is no general profile switcher or native credential transfer
+  yet. Imported provider metadata does not activate AI Help. Repeat imports
+  skip identical snapshots and do not overwrite native edits.
 - Images, color emoji rendering, sixel graphics, ligatures across cells, and
   advanced IME behavior need focused renderer tests.
 

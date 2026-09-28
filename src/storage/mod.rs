@@ -1,7 +1,6 @@
-// These pure import stages are exercised now and wired to the UI in S05.
-#[allow(dead_code)]
+// Legacy parsing and projection feed the read-only import preview.
 pub(crate) mod document;
+pub(crate) mod import;
 pub mod paths;
-#[allow(dead_code)]
 pub(crate) mod projection;
 pub(crate) mod store;

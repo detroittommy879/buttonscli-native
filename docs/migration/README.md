@@ -2,7 +2,7 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
-Implementation update, 2026-09-28: F01–F04 and S01–S04 are committed. L02 and L04 are implemented on Windows; L01 has a source decision but awaits Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs and native-profile theme loading now exist. The previewed original-app import (S05), responsive pane geometry (L03), CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 now has a pure responsive reducer and render wiring. L01/L03 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
 
 ## Read in this order
 
@@ -29,8 +29,8 @@ Keep egui/eframe, Alacritty, offline assets, and event-driven rendering. Port be
 ## What the audit establishes
 
 - N `src/app.rs` provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. Preferences now save in versioned native storage, with one-time fallback reading of earlier eframe data.
-- N `pane_tree` still forces every COL pane into one horizontal strip and every ROW pane into one vertical strip; GRID chooses `ceil(sqrt(count))` columns. Tabs now wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive reproduction.
-- N `src/theme.rs::ThemeCatalog::load` reads embedded assets (555 legacy choices plus four native themes). Native-profile personal theme files are now loaded separately; import from the original profile is pending.
+- N now plans COL/ROW/GRID from available viewport size and minimum cell bounds, hides overflow without closing its PTYs, and includes the focused session in the rendered slice. Tabs wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive Fedora reproduction and resize evidence.
+- N `src/theme.rs::ThemeCatalog::load` reads embedded assets (555 legacy choices plus four native themes). Native-profile personal theme files load separately; Settings can now import valid original-profile files after preview.
 - O `src-tauri/src/main.rs` resolves `~/.buttonscli/active-profile.json`, `profiles/<name>/config.json`, profile `themes/` and `shaders/`; root `config.json` is a migration fallback.
 - O `src-tauri/src/control_api.rs` exposes an authenticated `/v1` API; O `scripts/buttonsclictl.mjs` already supports an explicit discovery-file environment override. This makes reuse of the existing CLI practical before writing a Rust CLI.
 - N has no equivalent control server or assistant implementation. Its numeric tab IDs can support stable external IDs; vector positions must not become those IDs.
@@ -47,11 +47,11 @@ The supplied screenshot is visual context for the current native UI, not an inst
 
 | Capability | Native baseline / original source | Destination and priority |
 |---|---|---|
-| Legacy active profile/config import | Read-only resolver and sanitized projection exist; preview/commit UI missing | P0 finish S05/S06 optional import into separate native root |
+| Legacy active profile/config import | Preview and staged new-profile commit exist for active or selected original profile; synthetic tests pass | P0 GUI acceptance on Windows/Fedora; credential transfer remains A01 |
 | Existing command/SSH presets | Native editor present, isolated storage; O `PresetBar.tsx` | P0 compatible import/native save, order and type-only semantics |
-| Personal themes | Native-profile JSON loader exists; original-profile import missing | P0 finish import; P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
+| Personal themes | Native-profile JSON loader and explicit original-profile import exist | P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
 | Shell profiles | Present but simpler discovery; O shellProfiles, backend discovery | P1 preserve settings; P2 Windows Terminal/WSL/wrappers and platform checks |
-| COL/ROW/GRID | Half-working per user; source uses fixed sequences | P0 reproduce and fix focus, resize, new-tab placement and width-aware second row |
+| COL/ROW/GRID | Responsive reducer and wrapped render tree are wired; GUI acceptance remains | P0 verify focus, PTY resize, new-tab placement and no blank panes on Fedora |
 | Tab strip/names | `termN` and multi-row strip implemented; Fedora interaction pending | P0 GUI acceptance for narrow/many-tab layouts |
 | Docking library | N uses a custom pane tree | P0 evaluate compatible `egui_dock` 0.16 as a bounded prototype |
 | Tabs/panes | Present, ten visible panes; O tabStore/sessionStore | P0 stable IDs/action dispatcher; preserve hidden tab targeting and lifecycle |

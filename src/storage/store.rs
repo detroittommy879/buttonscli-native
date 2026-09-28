@@ -23,6 +23,8 @@ pub enum StoreError {
     OutsideNativeRoot,
     Busy,
     StaleRevision,
+    ImportCollision,
+    SourceChanged,
     Io(io::Error),
 }
 
@@ -42,6 +44,10 @@ impl std::fmt::Display for StoreError {
             }
             Self::Busy => write!(f, "another native instance is saving settings"),
             Self::StaleRevision => write!(f, "native settings changed in another instance"),
+            Self::ImportCollision => {
+                write!(f, "import destination already exists; refresh the preview")
+            }
+            Self::SourceChanged => write!(f, "original settings changed; refresh the preview"),
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
     }
@@ -180,6 +186,123 @@ impl NativeStore {
         atomic_replace(&path, &encoded)?;
         Ok(revision)
     }
+
+    /// Publish a fully staged, new profile. Nothing in the original root is writable here.
+    pub(crate) fn import_profile(
+        &self,
+        profile: &str,
+        preferences: &Preferences,
+        compatible_config: &[u8],
+        themes: &[(String, Vec<u8>)],
+        manifest: &[u8],
+        verify_source: impl FnOnce() -> bool,
+    ) -> Result<Self, StoreError> {
+        sanitize_profile_name(profile).map_err(|_| StoreError::InvalidProfile)?;
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        fs::create_dir_all(&self.root.0)?;
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        let lock_path = self.root.0.join(".native.lock");
+        ensure_native_path(&self.root.0, &lock_path)?;
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(lock_path)?;
+        lock.try_lock_exclusive().map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                StoreError::Busy
+            } else {
+                StoreError::Io(error)
+            }
+        })?;
+        let profiles = self.root.0.join("profiles");
+        ensure_native_path(&self.root.0, &profiles)?;
+        fs::create_dir_all(&profiles)?;
+        let destination = profiles.join(profile);
+        ensure_native_path(&self.root.0, &destination)?;
+        if destination.exists() {
+            return Err(StoreError::ImportCollision);
+        }
+        let document = NativeDocument {
+            schema_version: SCHEMA_VERSION,
+            revision: 1,
+            preferences: preferences.clone(),
+        };
+        let native_bytes =
+            serde_json::to_vec_pretty(&document).map_err(|_| StoreError::InvalidDocument)?;
+        if native_bytes.len() as u64 > MAX_NATIVE_BYTES
+            || compatible_config.len() as u64 > MAX_NATIVE_BYTES
+        {
+            return Err(StoreError::TooLarge);
+        }
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| StoreError::InvalidDocument)?
+            .as_nanos();
+        let staging = profiles.join(format!(".import-{}-{nonce}", std::process::id()));
+        ensure_native_path(&self.root.0, &staging)?;
+        fs::create_dir(&staging)?;
+        let result = (|| -> Result<(), StoreError> {
+            write_new(&staging.join("native.json"), &native_bytes)?;
+            write_new(&staging.join("legacy-compatible.json"), compatible_config)?;
+            write_new(&staging.join("import-manifest.json"), manifest)?;
+            if !themes.is_empty() {
+                fs::create_dir(staging.join("themes"))?;
+                for (name, bytes) in themes {
+                    let filename = Path::new(name);
+                    if filename.components().count() != 1
+                        || !filename
+                            .extension()
+                            .and_then(|s| s.to_str())
+                            .is_some_and(|s| s.eq_ignore_ascii_case("json"))
+                    {
+                        return Err(StoreError::InvalidDocument);
+                    }
+                    write_new(&staging.join("themes").join(filename), bytes)?;
+                }
+            }
+            if !verify_source() {
+                return Err(StoreError::SourceChanged);
+            }
+            ensure_native_path(&self.root.0, &destination)?;
+            if destination.exists() {
+                return Err(StoreError::ImportCollision);
+            }
+            fs::rename(&staging, &destination)?;
+            let metadata_path = self.root.0.join("active-profile.json");
+            ensure_native_path(&self.root.0, &metadata_path)?;
+            if let Err(error) = atomic_replace(
+                &metadata_path,
+                serde_json::json!({"name":profile}).to_string().as_bytes(),
+            ) {
+                fs::remove_dir_all(&destination)?;
+                return Err(error);
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            // This directory was created by this transaction and has never held user data.
+            let _ = fs::remove_dir_all(&staging);
+        }
+        result?;
+        Ok(Self {
+            root: self.root.clone(),
+            legacy_root: self.legacy_root.clone(),
+            profile: profile.to_owned(),
+        })
+    }
+
+    pub(crate) fn native_root(&self) -> &Path {
+        &self.root.0
+    }
+}
+
+fn write_new(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
+    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
 }
 
 fn parse_document(bytes: &[u8]) -> Result<NativeDocument, StoreError> {

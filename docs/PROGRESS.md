@@ -1,5 +1,13 @@
 # Reconstruction journal
 
+## 2026-09-28 — L03 responsive pane layout source implementation
+
+Added a pure, stable-session-ID layout reducer for COL, ROW and GRID. It plans from the available workspace size using 320 × 160 logical-point review bounds plus a font-size estimate for 40 columns and 8 rows, keeps the focused session in view, and hides overflow without closing PTYs; the tab strip and status count expose the effective view. The render tree wraps COL across/down and ROW down/across, with shape-specific divider keys so ratios return after resizing back. Wide/narrow/focus, large-font and new-tab-at-capacity tests were added. Windows release suite passed 64 library and 2 fixture tests; the final source additions passed 65 debug library tests and strict Clippy with the known unrelated lint exempted. A live Fedora X11/Wayland GUI and `stty size` pass are still needed before L03 acceptance. Access tier: free (`paneLayout`).
+
+## 2026-09-28 — S05/S06 previewed snapshot import
+
+Added a Settings preview for the original app's active or a selected additional profile, with destination, counts, warnings, provider metadata, detected-key count and explicit exclusions. Import runs on a worker, rereads source before and during a locked staged commit, publishes a new native profile, and rolls it back if the final metadata update fails. A sanitized content fingerprint makes identical repeats idempotent without overwriting native edits; changed content gets a new profile. Source byte hashes remain transient, so manifests identify only sanitized content. Known API-key fields, endpoint URL user info/query data, runtime/auth files and session history are excluded. The original folder is never written. Strict Clippy first rejected oversized import event variants; boxing the preview/preferences fixed it. Windows release tests passed 64 library tests and 2 fixture tests, and later focused changes passed 65 debug library tests and strict Clippy with only the pre-existing test-module lint exempted. UI interaction, Fedora behavior, credential transfer and general profile switching remain open. Access tier: free (`originalSettingsImport`).
+
 ## 2026-09-28 — Migration documentation sync
 
 Updated the planning baseline and parity backlog to distinguish implemented native storage, theme loading and wrapped tabs from pending original-app import, pane reflow and Fedora GUI acceptance. This corrects stale source-audit statements without changing runtime behavior.

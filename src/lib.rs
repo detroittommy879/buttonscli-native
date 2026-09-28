@@ -2,6 +2,8 @@ pub mod app;
 pub mod features;
 pub mod fonts;
 pub mod i18n;
+#[cfg(not(target_arch = "wasm32"))]
+mod layout;
 mod settings;
 pub mod theme;
 

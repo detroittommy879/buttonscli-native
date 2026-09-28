@@ -1,7 +1,11 @@
 use crate::fonts::{self, FontZone};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::layout::{self, Bounds, LayoutMode};
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
 use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::storage::import::{self, ImportCommit, ImportPreview};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage::paths::production_roots;
 #[cfg(not(target_arch = "wasm32"))]
@@ -46,6 +50,24 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     native_save_blocked: bool,
     #[cfg(not(target_arch = "wasm32"))]
+    import_preview: Option<ImportPreview>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_offer: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_source_choice: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_available_profiles: Vec<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_tx: Sender<ImportEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_rx: Receiver<ImportEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
     detected_shells: Vec<DetectedShell>,
@@ -61,6 +83,10 @@ pub struct ButtonsApp {
     tab_rename_error: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     visible_panes: Vec<usize>,
+    #[cfg(not(target_arch = "wasm32"))]
+    rendered_panes: Vec<usize>,
+    #[cfg(not(target_arch = "wasm32"))]
+    layout_window_start: usize,
     #[cfg(not(target_arch = "wasm32"))]
     focused: usize,
     #[cfg(not(target_arch = "wasm32"))]
@@ -86,6 +112,14 @@ enum SettingsTab {
     Fonts,
     Commands,
     Workspace,
+    #[cfg(not(target_arch = "wasm32"))]
+    Import,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum ImportEvent {
+    Preview(u64, Vec<String>, Result<Box<ImportPreview>, String>),
+    Commit(u64, Result<ImportCommit, String>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -187,6 +221,8 @@ impl ButtonsApp {
             app.native_store = native_store;
             app.native_revision = native_revision;
             app.native_save_blocked = storage_error.is_some();
+            app.import_offer = app.native_revision.is_none()
+                && production_roots().is_ok_and(|(_, legacy)| legacy.0.exists());
             if let Some(store) = &app.native_store {
                 for warning in app
                     .themes
@@ -210,6 +246,8 @@ impl ButtonsApp {
     fn empty(preferences: Preferences) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         let (events_tx, events_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (import_tx, import_rx) = mpsc::channel();
         Self {
             preferences,
             themes: ThemeCatalog::load(),
@@ -236,6 +274,24 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             native_save_blocked: false,
             #[cfg(not(target_arch = "wasm32"))]
+            import_preview: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_generation: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_message: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_offer: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_source_choice: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_available_profiles: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            import_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_rx,
+            #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             detected_shells: crate::terminal::detected_shells(),
@@ -251,6 +307,10 @@ impl ButtonsApp {
             tab_rename_error: None,
             #[cfg(not(target_arch = "wasm32"))]
             visible_panes: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            rendered_panes: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            layout_window_start: 0,
             #[cfg(not(target_arch = "wasm32"))]
             focused: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -374,12 +434,12 @@ impl ButtonsApp {
                 self.next_title_number = next_title_number;
                 self.tabs.push(tab);
                 let index = self.tabs.len() - 1;
-                if self.tabs.len() == 1 || self.pane_layout == PaneLayout::Single {
-                    self.visible_panes.clear();
-                    self.visible_panes.push(index);
-                } else if self.visible_panes.len() < 10 {
-                    self.visible_panes.push(index);
-                }
+                self.visible_panes = pane_state_after_new_tab(
+                    &self.visible_panes,
+                    self.focused,
+                    index,
+                    self.pane_layout,
+                );
                 self.focused = index;
                 self.notice = None;
             }
@@ -809,8 +869,34 @@ impl ButtonsApp {
         if visible.is_empty() {
             visible.push(focused.min(self.tabs.len() - 1));
         }
-        let tree = pane_tree(self.pane_layout, &visible);
         let rect = ui.available_rect_before_wrap();
+        let ordered_ids: Vec<u64> = visible.iter().map(|index| self.tabs[*index].id).collect();
+        let focused_id = self.tabs[focused.min(self.tabs.len() - 1)].id;
+        let mode = match self.pane_layout {
+            PaneLayout::Single => LayoutMode::Single,
+            PaneLayout::Columns => LayoutMode::Columns,
+            PaneLayout::Rows => LayoutMode::Rows,
+            PaneLayout::Grid => LayoutMode::Grid,
+        };
+        let plan = layout::plan(
+            mode,
+            &ordered_ids,
+            focused_id,
+            self.layout_window_start,
+            Bounds {
+                width: rect.width(),
+                height: rect.height(),
+            },
+            layout::minimum_for_font(terminal_font.size),
+        );
+        self.layout_window_start = plan.window_start;
+        visible = plan
+            .ids
+            .iter()
+            .filter_map(|id| self.tabs.iter().position(|tab| tab.id == *id))
+            .collect();
+        self.rendered_panes = visible.clone();
+        let tree = pane_tree(self.pane_layout, &visible, plan.rows, plan.columns);
         ui.allocate_rect(rect, egui::Sense::hover());
         let mut render_state = PaneRenderState {
             ratios: &mut self.preferences.pane_split_ratios,
@@ -1012,7 +1098,11 @@ impl ButtonsApp {
                 ui.horizontal_wrapped(|ui| {
                     for (index, tab) in self.tabs.iter().enumerate() {
                         let active = index == self.focused;
-                        let visible = self.visible_panes.contains(&index);
+                        let visible = if self.rendered_panes.is_empty() {
+                            self.visible_panes.contains(&index)
+                        } else {
+                            self.rendered_panes.contains(&index)
+                        };
                         let label = if tab.exited {
                             format!("{}  · exited", tab.title)
                         } else if visible && !active {
@@ -1306,10 +1396,10 @@ impl ButtonsApp {
                             self.set_visible_pane_count(pane_count - 1, ctx);
                         }
                         ui.label(
-                            RichText::new(pane_count.to_string())
+                            RichText::new(if !self.rendered_panes.is_empty() && self.rendered_panes.len() < pane_count { format!("{}/{pane_count}", self.rendered_panes.len()) } else { pane_count.to_string() })
                                 .small()
                                 .color(colors.status_text),
-                        );
+                        ).on_hover_text("Visible / requested panes. Use the tab strip to reach panes hidden by window size.");
                         if ui
                             .add_enabled(pane_count < 10, egui::Button::new("+"))
                             .on_hover_text("Show one more terminal")
@@ -1366,6 +1456,12 @@ impl ButtonsApp {
                         SettingsTab::Workspace,
                         "Workspace",
                     );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Import,
+                        crate::i18n::text("en", crate::i18n::MessageKey::ImportFromOriginal, &[]),
+                    );
                 });
                 ui.separator();
                 match self.settings_tab {
@@ -1373,6 +1469,8 @@ impl ButtonsApp {
                     SettingsTab::Fonts => self.font_settings(ui),
                     SettingsTab::Commands => self.command_settings(ui),
                     SettingsTab::Workspace => self.workspace_settings(ui),
+                    #[cfg(not(target_arch = "wasm32"))]
+                    SettingsTab::Import => self.import_settings(ui, ctx),
                 }
             });
         self.show_settings = open;
@@ -1653,6 +1751,201 @@ impl ButtonsApp {
                     });
                 });
         });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn import_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        use crate::i18n::{text, MessageKey};
+        ui.heading(text("en", MessageKey::ImportFromOriginal, &[]));
+        ui.label("Select an original profile and inspect a snapshot before importing. The original files are never changed.");
+        ui.add_space(8.0);
+        let previous_choice = self.import_source_choice.clone();
+        egui::ComboBox::from_id_salt("import-source-profile")
+            .selected_text(
+                self.import_source_choice
+                    .as_deref()
+                    .unwrap_or("Active profile"),
+            )
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.import_source_choice, None, "Active profile");
+                for name in &self.import_available_profiles {
+                    ui.selectable_value(&mut self.import_source_choice, Some(name.clone()), name);
+                }
+            });
+        if self.import_source_choice != previous_choice {
+            self.import_preview = None;
+        }
+        if !self.import_busy
+            && ui
+                .button(text("en", MessageKey::ImportPreview, &[]))
+                .clicked()
+        {
+            self.import_generation = self.import_generation.wrapping_add(1);
+            let generation = self.import_generation;
+            self.import_preview = None;
+            self.import_message = None;
+            self.import_busy = true;
+            let tx = self.import_tx.clone();
+            let ctx = ctx.clone();
+            let choice = self.import_source_choice.clone();
+            std::thread::spawn(move || {
+                let response = (|| {
+                    let (native, original) =
+                        production_roots().map_err(|error| error.to_string())?;
+                    let store = NativeStore::open(native, original.0.clone())
+                        .map_err(|error| error.to_string())?;
+                    let profiles = original
+                        .list_profile_names()
+                        .map_err(|error| error.to_string())?;
+                    let preview = import::preview(&original, &store, choice.as_deref())
+                        .map(Box::new)
+                        .map_err(|error| error.to_string());
+                    Ok::<_, String>((profiles, preview))
+                })();
+                let (profiles, result) = match response {
+                    Ok(response) => response,
+                    Err(error) => (Vec::new(), Err(error)),
+                };
+                let _ = tx.send(ImportEvent::Preview(generation, profiles, result));
+                ctx.request_repaint();
+            });
+        }
+        if self.import_busy {
+            ui.spinner();
+            ui.label("Reading or saving the import snapshot…");
+        }
+        if let Some(message) = &self.import_message {
+            ui.label(message);
+        }
+        let Some(preview) = &self.import_preview else {
+            return;
+        };
+        ui.separator();
+        ui.label(format!(
+            "Source: {}{}",
+            preview.source_profile,
+            if preview.source_fallback {
+                " (root config fallback)"
+            } else {
+                ""
+            }
+        ));
+        ui.label(format!("Destination: {}", preview.destination_profile));
+        if let Some(locale) = &preview.selected_locale {
+            ui.label(format!("Original language: {locale}"));
+        }
+        ui.label(format!(
+            "{} command presets · {} SSH presets · {} personal themes",
+            preview.command_presets, preview.ssh_presets, preview.themes
+        ));
+        ui.label("Settings, shell profiles, fonts, theme choices and supported visual data are included. Commands are saved as presets; import does not run them.");
+        if !preview.provider_metadata.is_empty() {
+            ui.label("Provider names, endpoints and models:");
+            for provider in &preview.provider_metadata {
+                ui.label(provider);
+            }
+        }
+        ui.label(text("en", MessageKey::ImportExcludedKeys, &[]));
+        ui.label(format!(
+            "{} original provider key(s) detected. Credential transfer is unavailable.",
+            preview.credential_count
+        ));
+        ui.label("API-key transfer is unavailable until native credential storage is implemented. Runtime/auth files, session history and unknown top-level fields are excluded.");
+        for warning in &preview.warnings {
+            ui.colored_label(self.colors().warning, warning);
+        }
+        if preview.already_imported {
+            ui.label("This source snapshot was already imported. Native edits are preserved.");
+        }
+        let already_imported = preview.already_imported;
+        let destination_profile = preview.destination_profile.clone();
+        ui.horizontal(|ui| {
+            if ui.button(text("en", MessageKey::Cancel, &[])).clicked() {
+                self.import_generation = self.import_generation.wrapping_add(1);
+                self.import_preview = None;
+            }
+            if !already_imported
+                && !self.import_busy
+                && ui
+                    .button(text(
+                        "en",
+                        MessageKey::ImportConfirm,
+                        &[("profile", &destination_profile)],
+                    ))
+                    .clicked()
+            {
+                let preview = self.import_preview.take().expect("preview shown");
+                self.import_busy = true;
+                let generation = self.import_generation;
+                let tx = self.import_tx.clone();
+                let ctx = ctx.clone();
+                std::thread::spawn(move || {
+                    let result = (|| {
+                        let (native, original) =
+                            production_roots().map_err(|error| error.to_string())?;
+                        let store = NativeStore::open(native, original.0.clone())
+                            .map_err(|error| error.to_string())?;
+                        import::commit(&original, &store, preview)
+                            .map_err(|error| error.to_string())
+                    })();
+                    let _ = tx.send(ImportEvent::Commit(generation, result));
+                    ctx.request_repaint();
+                });
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_import_events(&mut self, ctx: &egui::Context) {
+        while let Ok(event) = self.import_rx.try_recv() {
+            match event {
+                ImportEvent::Preview(generation, profiles, result)
+                    if generation == self.import_generation =>
+                {
+                    self.import_busy = false;
+                    self.import_available_profiles = profiles;
+                    match result {
+                        Ok(preview) => {
+                            self.import_preview = Some(*preview);
+                        }
+                        Err(error) => {
+                            self.import_message = Some(format!("Import preview failed: {error}"))
+                        }
+                    }
+                }
+                ImportEvent::Commit(generation, result) if generation == self.import_generation => {
+                    self.import_busy = false;
+                    match result {
+                        Ok(ImportCommit::AlreadyImported) => {
+                            self.import_message = Some(
+                                "This source snapshot was already imported; nothing changed."
+                                    .into(),
+                            )
+                        }
+                        Ok(ImportCommit::Imported { store, preferences }) => {
+                            let mut preferences = *preferences;
+                            preferences.normalize_theme_sources();
+                            self.themes = ThemeCatalog::load();
+                            for warning in self
+                                .themes
+                                .load_personal(store.profile_name(), &store.profile_dir())
+                            {
+                                log::warn!("personal theme: {warning}");
+                            }
+                            self.preferences = preferences;
+                            self.native_store = Some(store);
+                            self.native_revision = Some(1);
+                            self.native_save_blocked = false;
+                            self.import_offer = false;
+                            self.apply_style(ctx);
+                            self.import_message = Some("Import complete. New terminals and settings now use the imported profile.".into());
+                        }
+                        Err(error) => self.import_message = Some(format!("Import failed: {error}")),
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
@@ -2326,7 +2619,7 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn pane_tree(layout: PaneLayout, visible: &[usize]) -> PaneTree {
+fn pane_tree(layout: PaneLayout, visible: &[usize], rows: usize, columns: usize) -> PaneTree {
     let visible = if visible.is_empty() {
         &[0][..]
     } else {
@@ -2334,18 +2627,64 @@ fn pane_tree(layout: PaneLayout, visible: &[usize]) -> PaneTree {
     };
     match layout {
         PaneLayout::Single => PaneTree::Leaf(visible[0]),
-        PaneLayout::Columns => build_pane_sequence(
-            visible.iter().copied().map(PaneTree::Leaf).collect(),
-            SplitAxis::Horizontal,
-            format!("columns:{}", visible.len()),
-        ),
-        PaneLayout::Rows => build_pane_sequence(
-            visible.iter().copied().map(PaneTree::Leaf).collect(),
-            SplitAxis::Vertical,
-            format!("rows:{}", visible.len()),
-        ),
+        PaneLayout::Columns => {
+            if rows == 1 {
+                build_pane_sequence(
+                    visible.iter().copied().map(PaneTree::Leaf).collect(),
+                    SplitAxis::Horizontal,
+                    format!("columns:{}", visible.len()),
+                )
+            } else {
+                let row_trees = visible
+                    .chunks(columns)
+                    .enumerate()
+                    .map(|(row, indices)| {
+                        build_pane_sequence(
+                            indices.iter().copied().map(PaneTree::Leaf).collect(),
+                            SplitAxis::Horizontal,
+                            format!("columns:{}/cols:{columns}/row:{row}", visible.len()),
+                        )
+                    })
+                    .collect();
+                build_pane_sequence(
+                    row_trees,
+                    SplitAxis::Vertical,
+                    format!("columns:{}/cols:{columns}/rows", visible.len()),
+                )
+            }
+        }
+        PaneLayout::Rows => {
+            if columns == 1 {
+                build_pane_sequence(
+                    visible.iter().copied().map(PaneTree::Leaf).collect(),
+                    SplitAxis::Vertical,
+                    format!("rows:{}", visible.len()),
+                )
+            } else {
+                let column_trees = visible
+                    .chunks(rows)
+                    .enumerate()
+                    .map(|(column, indices)| {
+                        build_pane_sequence(
+                            indices.iter().copied().map(PaneTree::Leaf).collect(),
+                            SplitAxis::Vertical,
+                            format!("rows:{}/rows:{rows}/column:{column}", visible.len()),
+                        )
+                    })
+                    .collect();
+                build_pane_sequence(
+                    column_trees,
+                    SplitAxis::Horizontal,
+                    format!("rows:{}/rows:{rows}/columns", visible.len()),
+                )
+            }
+        }
         PaneLayout::Grid => {
-            let (_, columns) = pane_grid_dimensions(layout, visible.len());
+            let prefix = if pane_grid_dimensions(layout, visible.len()) == (rows, columns) {
+                format!("grid:{}", visible.len())
+            } else {
+                format!("grid:{}/shape:{rows}x{columns}", visible.len())
+            };
             let rows = visible
                 .chunks(columns)
                 .enumerate()
@@ -2353,15 +2692,11 @@ fn pane_tree(layout: PaneLayout, visible: &[usize]) -> PaneTree {
                     build_pane_sequence(
                         indices.iter().copied().map(PaneTree::Leaf).collect(),
                         SplitAxis::Horizontal,
-                        format!("grid:{}/row:{row}", visible.len()),
+                        format!("{prefix}/row:{row}"),
                     )
                 })
                 .collect();
-            build_pane_sequence(
-                rows,
-                SplitAxis::Vertical,
-                format!("grid:{}/rows", visible.len()),
-            )
+            build_pane_sequence(rows, SplitAxis::Vertical, format!("{prefix}/rows"))
         }
     }
 }
@@ -2564,6 +2899,26 @@ fn remap_index_after_move(slot: usize, from: usize, to: usize) -> usize {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn pane_state_after_new_tab(
+    visible: &[usize],
+    focused: usize,
+    new_index: usize,
+    layout: PaneLayout,
+) -> Vec<usize> {
+    if new_index == 0 || layout == PaneLayout::Single {
+        return vec![new_index];
+    }
+    let mut next = visible.to_vec();
+    if next.len() < 10 {
+        next.push(new_index);
+    } else {
+        let slot = next.iter().position(|index| *index == focused).unwrap_or(0);
+        next[slot] = new_index;
+    }
+    next
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn pane_state_after_close(
     visible: &[usize],
     focused: usize,
@@ -2689,6 +3044,8 @@ impl eframe::App for ButtonsApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(not(target_arch = "wasm32"))]
+        self.process_import_events(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
         self.shortcuts(ctx);
         self.top_menu(ctx);
@@ -2707,6 +3064,27 @@ impl eframe::App for ButtonsApp {
                 if let Some(notice) = &self.notice {
                     ui.colored_label(colors.warning, notice);
                     ui.add_space(8.0);
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                if self.import_offer {
+                    ui.horizontal(|ui| {
+                        ui.label("Original ButtonsCLI settings are available to preview.");
+                        if ui
+                            .button(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::ImportFromOriginal,
+                                &[],
+                            ))
+                            .clicked()
+                        {
+                            self.show_settings = true;
+                            self.settings_tab = SettingsTab::Import;
+                        }
+                        if ui.small_button("Dismiss").clicked() {
+                            self.import_offer = false;
+                        }
+                    });
+                    ui.add_space(6.0);
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 self.terminal_workspace(ui, ctx);
@@ -2913,10 +3291,33 @@ mod tests {
 
         for layout in [PaneLayout::Columns, PaneLayout::Rows, PaneLayout::Grid] {
             let visible: Vec<usize> = (0..10).collect();
-            let (leaves, depth) = stats(&pane_tree(layout, &visible));
+            let (rows, columns) = pane_grid_dimensions(layout, visible.len());
+            let (leaves, depth) = stats(&pane_tree(layout, &visible, rows, columns));
             assert_eq!(leaves, visible.len());
             assert!(depth >= 3);
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn responsive_column_and_row_trees_wrap_on_opposite_axes() {
+        let visible: Vec<usize> = (0..6).collect();
+        let columns = pane_tree(PaneLayout::Columns, &visible, 3, 2);
+        let rows = pane_tree(PaneLayout::Rows, &visible, 3, 2);
+        assert!(matches!(
+            columns,
+            PaneTree::Split {
+                axis: SplitAxis::Vertical,
+                ..
+            }
+        ));
+        assert!(matches!(
+            rows,
+            PaneTree::Split {
+                axis: SplitAxis::Horizontal,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -2944,6 +3345,16 @@ mod tests {
         let (visible, focused) = pane_state_after_close(&[0, 1, 2], 1, 3, 3);
         assert_eq!(visible, vec![0, 1, 2]);
         assert_eq!(focused, 1);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn new_tab_replaces_focused_requested_slot_when_ten_are_already_requested() {
+        let visible: Vec<usize> = (0..10).collect();
+        let next = pane_state_after_new_tab(&visible, 5, 10, PaneLayout::Grid);
+        assert_eq!(next.len(), 10);
+        assert_eq!(next[5], 10);
+        assert!(!next.contains(&5));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

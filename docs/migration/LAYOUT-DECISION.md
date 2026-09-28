@@ -2,7 +2,7 @@
 
 This is the source-based part of L01. Fedora X11/Wayland interaction and screenshots remain to be recorded before calling L01 accepted. Checked native source at `a5192cb` on Windows, 2026-09-28. No PTY or GUI observation is claimed here.
 
-Since this source pass, L02 assigned `termN` titles and L04 replaced the fixed tab strip with wrapping. The pane-tree geometry described below is still current; the old tab-strip description is historical baseline evidence.
+Since this source pass, L02 assigned `termN` titles, L04 wrapped the tab strip, and L03 added `src/layout.rs`. The geometry table below is historical baseline evidence. The new reducer uses stable session IDs, a 320 × 160 logical-point review target, a font-size estimate for 40 columns and 8 rows, and the available viewport size; COL fills across then down, ROW fills down then across, and GRID chooses a balanced feasible shape. Overflow sessions remain open and reachable through the tab strip. Resizing back restores the full requested set and any saved ratios for its prior shape. Fedora X11/Wayland GUI and PTY resize acceptance remain open.
 
 ## Current behavior to reproduce
 

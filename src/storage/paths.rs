@@ -106,13 +106,64 @@ impl LegacyImportRoot {
         } else {
             "default".to_owned()
         };
+        self.resolve_at(&root, name, true)
+    }
+
+    pub fn resolve_named(&self, name: &str) -> Result<LegacyProfilePaths, PathError> {
+        let root = self.0.canonicalize().map_err(|error| {
+            if error.kind() == io::ErrorKind::NotFound {
+                PathError::MissingSource
+            } else {
+                PathError::Io(error)
+            }
+        })?;
+        let name = sanitize_profile_name(name)?;
+        self.resolve_at(&root, name, false)
+    }
+
+    pub fn list_profile_names(&self) -> Result<Vec<String>, PathError> {
+        let root = self.0.canonicalize().map_err(|error| {
+            if error.kind() == io::ErrorKind::NotFound {
+                PathError::MissingSource
+            } else {
+                PathError::Io(error)
+            }
+        })?;
+        let profiles = root.join("profiles");
+        if !profiles.exists() {
+            return Ok(Vec::new());
+        }
+        ensure_inside(&root, &profiles)?;
+        let mut names = Vec::new();
+        for entry in fs::read_dir(&profiles)? {
+            let entry = entry?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if sanitize_profile_name(&name).is_ok_and(|sanitized| sanitized == name) {
+                ensure_inside(&root, &entry.path())?;
+                if entry.path().join("config.json").is_file() {
+                    names.push(name);
+                }
+            }
+        }
+        names.sort();
+        Ok(names)
+    }
+
+    fn resolve_at(
+        &self,
+        root: &Path,
+        name: String,
+        allow_root_fallback: bool,
+    ) -> Result<LegacyProfilePaths, PathError> {
         let profile_dir = root.join("profiles").join(&name);
         let profile_config = profile_dir.join("config.json");
         let root_config = root.join("config.json");
         let (config, used_root_fallback) =
-            if read_checked(&root, &profile_config, MAX_CONFIG_BYTES)?.is_some() {
+            if read_checked(root, &profile_config, MAX_CONFIG_BYTES)?.is_some() {
                 (profile_config, false)
-            } else if read_checked(&root, &root_config, MAX_CONFIG_BYTES)?.is_some() {
+            } else if allow_root_fallback
+                && read_checked(root, &root_config, MAX_CONFIG_BYTES)?.is_some()
+            {
                 (root_config, true)
             } else {
                 return Err(PathError::MissingConfig);
@@ -120,7 +171,7 @@ impl LegacyImportRoot {
         let themes = profile_dir.join("themes");
         // Existing theme directories are validated before later enumeration.
         if fs::symlink_metadata(&themes).is_ok() {
-            ensure_inside(&root, &themes)?;
+            ensure_inside(root, &themes)?;
         }
         Ok(LegacyProfilePaths {
             name,
@@ -276,6 +327,21 @@ mod tests {
             LegacyImportRoot(temp.0.clone()).resolve_active(),
             Err(PathError::TooLarge)
         ));
+    }
+
+    #[test]
+    fn named_profile_remains_selectable_when_active_metadata_is_broken() {
+        let temp = TestRoot::new();
+        fs::create_dir_all(temp.0.join("profiles/Other")).unwrap();
+        fs::write(temp.0.join("profiles/Other/config.json"), "{}").unwrap();
+        fs::write(temp.0.join("active-profile.json"), "{broken").unwrap();
+        let source = LegacyImportRoot(temp.0.clone());
+        assert!(matches!(
+            source.resolve_active(),
+            Err(PathError::InvalidMetadata)
+        ));
+        assert_eq!(source.list_profile_names().unwrap(), vec!["Other"]);
+        assert_eq!(source.resolve_named("Other").unwrap().name, "Other");
     }
 
     #[test]

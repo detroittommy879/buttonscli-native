@@ -23,9 +23,9 @@ constraints.
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
 | Tabs and sessions | Partial | `termN` naming and multi-row tab strip are implemented; finish pane reflow and Fedora interaction checks |
-| Pane layouts | Partial | Reproduce/fix COL/ROW/GRID and width-aware wrapping on Fedora |
+| Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
-| Themes and fonts | Partial | Import/edit/share plus remaining effect rendering and online fonts |
+| Themes and fonts | Partial | Personal-theme snapshot import exists; finish edit/share, effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
 | Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
@@ -37,7 +37,7 @@ constraints.
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
 | Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults and multi-row tab strip are implemented; verify wrapped interactions and pane mapping on Fedora. |
-| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | COL/ROW/GRID add/remove/focus up to 10 visible sessions; wrap on constrained room, avoid unusable PTY sizes and preserve independent split ratios. |
+| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Pure geometry reducer and wrapped tree are implemented; verify add/remove/focus, PTY resize, ratio restoration and no blank panes on Fedora. |
 | Visible scrollbars | Missing | native `vendor/egui_term` | Each terminal displays real scrollback position and can drag to scroll without breaking selection or PTY size. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |

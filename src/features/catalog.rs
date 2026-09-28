@@ -7,6 +7,7 @@ pub enum FeatureKey {
     TerminalScrollbar,
     PaneDivider,
     SettingsAppearance,
+    OriginalSettingsImport,
     GuidedOnboarding,
     EffectsMasterSwitch,
     CalmThemeApply,
@@ -21,7 +22,7 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -29,6 +30,7 @@ impl FeatureKey {
         Self::TerminalScrollbar,
         Self::PaneDivider,
         Self::SettingsAppearance,
+        Self::OriginalSettingsImport,
         Self::GuidedOnboarding,
         Self::EffectsMasterSwitch,
         Self::CalmThemeApply,
@@ -51,6 +53,7 @@ impl FeatureKey {
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
             Self::SettingsAppearance => "settingsAppearance",
+            Self::OriginalSettingsImport => "originalSettingsImport",
             Self::GuidedOnboarding => "guidedOnboarding",
             Self::EffectsMasterSwitch => "effectsMasterSwitch",
             Self::CalmThemeApply => "calmThemeApply",
@@ -76,7 +79,9 @@ impl FeatureKey {
             | K::TerminalScrollbar
             | K::PaneDivider => (T::Free, true, R::Active, "layout"),
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
-            K::SettingsAppearance => (T::Free, true, R::Active, "settings"),
+            K::SettingsAppearance | K::OriginalSettingsImport => {
+                (T::Free, true, R::Active, "settings")
+            }
             K::GuidedOnboarding => (T::Free, false, R::Planned, "activation"),
             K::EffectsMasterSwitch => (T::Free, true, R::Active, "effects"),
             K::WindowTransparency => (T::Free, false, R::Planned, "appearance"),
