@@ -1,11 +1,13 @@
-use crate::fonts::{self, FontZone, Typography};
+use crate::fonts::{self, FontZone};
+#[cfg(test)]
+use crate::settings::ThemeApplyScopes;
+use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::theme::GradientGeometry;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
-use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::terminal::{DetectedShell, ShellLaunch, TerminalTab};
@@ -13,178 +15,6 @@ use crate::terminal::{DetectedShell, ShellLaunch, TerminalTab};
 use egui_term::{BackgroundGradient, FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-struct CommandPreset {
-    label: String,
-    command: String,
-    send_enter: bool,
-}
-
-impl Default for CommandPreset {
-    fn default() -> Self {
-        Self {
-            label: "New preset".into(),
-            command: String::new(),
-            send_enter: true,
-        }
-    }
-}
-
-impl CommandPreset {
-    fn new(label: &str, command: &str, send_enter: bool) -> Self {
-        Self {
-            label: label.into(),
-            command: command.into(),
-            send_enter,
-        }
-    }
-
-    fn normalized(mut self) -> Option<Self> {
-        self.label = self.label.trim().to_owned();
-        self.command = self
-            .command
-            .trim_end_matches(&['\r', '\n'][..])
-            .trim()
-            .to_owned();
-        (!self.label.is_empty() && !self.command.is_empty()).then_some(self)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn terminal_payload(&self) -> String {
-        if self.send_enter {
-            format!("{}\r", self.command)
-        } else {
-            self.command.clone()
-        }
-    }
-}
-
-fn default_presets() -> Vec<CommandPreset> {
-    #[cfg(windows)]
-    let (list_files, current_folder, disk_space) = (
-        "Get-ChildItem",
-        "Get-Location",
-        "Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize Name, Used, Free",
-    );
-    #[cfg(not(windows))]
-    let (list_files, current_folder, disk_space) = ("ls -la", "pwd", "df -h");
-
-    vec![
-        CommandPreset::new(
-            "Preset Intro",
-            "echo \"ButtonsCLI preset buttons can run repeated commands or paste templates for you to edit.\"",
-            true,
-        ),
-        CommandPreset::new("List Files", list_files, true),
-        CommandPreset::new("Current Folder", current_folder, true),
-        CommandPreset::new("Disk Space", disk_space, true),
-        CommandPreset::new("Git Status", "git status", true),
-        CommandPreset::new("SSH Template", "ssh user@your-vps-or-vm", false),
-    ]
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-struct ShellProfile {
-    id: String,
-    label: String,
-    command: String,
-    working_directory: String,
-}
-
-impl Default for ShellProfile {
-    fn default() -> Self {
-        Self {
-            id: "custom-1".into(),
-            label: "Custom shell".into(),
-            command: String::new(),
-            working_directory: String::new(),
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(default)]
-struct Preferences {
-    theme_id: String,
-    app_theme_id: String,
-    terminal_theme_id: String,
-    gradient_theme_id: String,
-    effects_theme_id: String,
-    theme_apply: ThemeApplyScopes,
-    calm_mode: bool,
-    typography: Typography,
-    show_sidebar: bool,
-    show_presets: bool,
-    presets: Vec<CommandPreset>,
-    ssh_presets: Vec<CommandPreset>,
-    pane_split_ratios: std::collections::BTreeMap<String, f32>,
-    default_shell_id: String,
-    default_working_directory: String,
-    custom_shell_profiles: Vec<ShellProfile>,
-}
-
-impl Default for Preferences {
-    fn default() -> Self {
-        Self {
-            theme_id: "basic2".into(),
-            app_theme_id: String::new(),
-            terminal_theme_id: String::new(),
-            gradient_theme_id: String::new(),
-            effects_theme_id: String::new(),
-            theme_apply: ThemeApplyScopes::default(),
-            calm_mode: false,
-            typography: Typography::default(),
-            show_sidebar: true,
-            show_presets: true,
-            presets: default_presets(),
-            ssh_presets: Vec::new(),
-            pane_split_ratios: std::collections::BTreeMap::new(),
-            default_shell_id: "system".into(),
-            default_working_directory: String::new(),
-            custom_shell_profiles: Vec::new(),
-        }
-    }
-}
-
-impl Preferences {
-    fn normalize_theme_sources(&mut self) {
-        for source in [
-            &mut self.app_theme_id,
-            &mut self.terminal_theme_id,
-            &mut self.gradient_theme_id,
-            &mut self.effects_theme_id,
-        ] {
-            if source.is_empty() {
-                source.clone_from(&self.theme_id);
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-struct ThemeApplyScopes {
-    app: bool,
-    terminal: bool,
-    fonts: bool,
-    gradient: bool,
-    effects: bool,
-}
-
-impl Default for ThemeApplyScopes {
-    fn default() -> Self {
-        Self {
-            app: true,
-            terminal: true,
-            fonts: true,
-            gradient: true,
-            effects: true,
-        }
-    }
-}
 
 pub struct ButtonsApp {
     preferences: Preferences,

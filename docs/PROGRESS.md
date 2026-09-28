@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — F02 native settings model extraction
+
+Moved preferences, shell profiles, command/SSH presets and theme-scope serialization into `src/settings.rs` without changing the app's eframe storage path or editor behavior. Added tests for explicit empty preset lists and command whitespace: JSON decoding keeps whitespace, while the existing editor normalization still trims it. Focused Windows release tests passed (2 new; prior full extraction build passed 29 existing plus 2 fixture tests), and `cargo fmt --all -- --check` passed. Native root/import persistence is still S01–S05. Access tier: free.
+
 ## 2026-09-28 — F01 synthetic migration fixtures
 
 Added invented legacy profile, root fallback, theme collision, malformed metadata, preset, and fake provider-key fixtures with a source matrix. Verified the original preset newline rule in `PresetBar.tsx`; no real settings were read. Windows Rust 1.96: baseline `cargo test --release` passed 29 tests, and `cargo test --release --test legacy_fixtures` passed 2. This freezes examples only; import behavior remains unimplemented. Access tier: free infrastructure.
