@@ -1,0 +1,23 @@
+{
+  "localization": {"mode":"manual","manualLocale":"en","firstRunLanguageConfirmed":true},
+  "presets": [
+    {"label":"Type only","command":"  echo café  ","sendEnter":false},
+    {"label":"Legacy newline","command":"printf 'ok'\n"}
+  ],
+  "sshPresets": [],
+  "window": {"defaultShell":"/bin/bash","customShellProfiles":[]},
+  "theme": {
+    "mode":"dark",
+    "app":{"shell":{"background":"#111827","accent":"#22d3ee"}},
+    "terminal":{"background":"#10131b","foreground":"#e5e7eb"},
+    "typography":{"unknownFutureZone":{"family":"Fixture Mono"}}
+  },
+  "effects":{"futureVisualField":{"intensity":0.42}},
+  "assistant": {
+    "namedProviders":[{"id":"fixture-local","name":"Local fixture","endpoint":"http://127.0.0.1:18080/v1","apiKey":"FAKE-KEY-NAMED-NOT-REAL","model":"fixture-model"}],
+    "activeProviderId":"fixture-local",
+    "provider":"custom","endpoint":"http://127.0.0.1:18081/v1","apiKey":"FAKE-KEY-DEPRECATED-NOT-REAL","model":"old-fixture-model",
+    "savedProfiles":[{"id":"old","label":"Old fixture","provider":"custom","endpoint":"http://127.0.0.1:18082/v1","apiKey":"FAKE-KEY-SAVED-NOT-REAL","model":"old-saved-model"}]
+  },
+  "plugins":{"futurePluginSetting":{"enabled":true}}
+}

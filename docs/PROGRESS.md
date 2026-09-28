@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — F01 synthetic migration fixtures
+
+Added invented legacy profile, root fallback, theme collision, malformed metadata, preset, and fake provider-key fixtures with a source matrix. Verified the original preset newline rule in `PresetBar.tsx`; no real settings were read. Windows Rust 1.96: baseline `cargo test --release` passed 29 tests, and `cargo test --release --test legacy_fixtures` passed 2. This freezes examples only; import behavior remains unimplemented. Access tier: free infrastructure.
+
 ## 2026-09-27 — Plan refined for native daily use and Fedora
 
 Updated `docs/migration/` after the user narrowed AI Help to explanations and
