@@ -31,6 +31,8 @@ Current desktop features include:
   including separate terminal regular/bold faces;
 - theme-driven linear, radial, and conic terminal gradients, animated color
   drift, static, and scanline overlays rendered natively;
+- per-terminal theme choices plus **Theme all**, **Random current**, and
+  **Random all** in Theme Settings; the tab hover shows its current theme;
 - persistent appearance preferences and clean child-process shutdown.
 
 ## Development
@@ -68,6 +70,13 @@ Personal themes are read when the desktop app starts. A broken theme file is
 skipped without removing other themes. Imported files are copied only after
 confirmation; unsupported effect fields are retained for later export but are
 not rendered.
+
+In Theme Settings, **This terminal** pins a theme to the focused session;
+**Use global** returns it to the saved default. **Theme all** changes that
+default and replaces every open session's override, including hidden tabs.
+Random controls avoid repeating a terminal's current theme when another is
+available. Per-terminal choices survive tab reorder and recent-close recovery,
+but reset after app restart because terminal sessions are not restored.
 
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.

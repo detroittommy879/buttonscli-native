@@ -255,6 +255,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_term",
+ "fastrand",
  "fs2",
  "home",
  "log",

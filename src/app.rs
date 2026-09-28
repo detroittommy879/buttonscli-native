@@ -77,6 +77,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
+    theme_overrides: std::collections::BTreeMap<u64, String>,
+    #[cfg(not(target_arch = "wasm32"))]
     detected_shells: Vec<DetectedShell>,
     #[cfg(not(target_arch = "wasm32"))]
     recently_closed: Vec<ClosedTab>,
@@ -157,6 +159,7 @@ struct ClosedTab {
     title: String,
     had_custom_title: bool,
     profile_id: String,
+    theme_override: Option<String>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -301,6 +304,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            theme_overrides: std::collections::BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             detected_shells: crate::terminal::detected_shells(),
             #[cfg(not(target_arch = "wasm32"))]
             recently_closed: Vec::new(),
@@ -426,6 +431,86 @@ impl ButtonsApp {
             scanlines_period: effects.scanlines_period,
         };
         theme
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn terminal_presentation_for(&self, session_id: u64) -> ThemeDefinition {
+        if let Some(id) = self.theme_overrides.get(&session_id) {
+            if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
+                let mut theme = theme.clone();
+                if self.preferences.calm_mode {
+                    theme.effects.gradient_animation = false;
+                    theme.effects.static_opacity = 0.0;
+                    theme.effects.scanlines_strength = 0.0;
+                }
+                return theme;
+            }
+        }
+        self.terminal_presentation()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn theme_for_tab(&self, index: usize) -> &str {
+        self.tabs
+            .get(index)
+            .and_then(|tab| self.theme_overrides.get(&tab.id))
+            .map(String::as_str)
+            .unwrap_or(&self.preferences.terminal_theme_id)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_theme_for_tab(&mut self, index: usize, theme_id: &str) {
+        let Some(tab) = self.tabs.get(index) else {
+            return;
+        };
+        if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
+            return;
+        }
+        self.theme_overrides.insert(tab.id, theme_id.to_owned());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn set_theme_all(&mut self, theme_id: &str) {
+        if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
+            return;
+        }
+        self.preferences.theme_id = theme_id.to_owned();
+        self.preferences.terminal_theme_id = theme_id.to_owned();
+        self.preferences.gradient_theme_id = theme_id.to_owned();
+        self.preferences.effects_theme_id = theme_id.to_owned();
+        self.theme_overrides.clear();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn random_theme_id(&self, current: &str) -> Option<String> {
+        let candidates: Vec<_> = self
+            .themes
+            .all()
+            .iter()
+            .filter(|theme| theme.id != current)
+            .collect();
+        (!candidates.is_empty()).then(|| candidates[fastrand::usize(..candidates.len())].id.clone())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn random_theme_current(&mut self) {
+        let Some(theme_id) = self.random_theme_id(self.theme_for_tab(self.focused)) else {
+            return;
+        };
+        self.set_theme_for_tab(self.focused, &theme_id);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn random_theme_all(&mut self) {
+        let replacements: Vec<_> = (0..self.tabs.len())
+            .filter_map(|index| {
+                self.random_theme_id(self.theme_for_tab(index))
+                    .map(|id| (index, id))
+            })
+            .collect();
+        for (index, theme_id) in replacements {
+            self.set_theme_for_tab(index, &theme_id);
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -584,6 +669,7 @@ impl ButtonsApp {
             title: tab.title.clone(),
             had_custom_title: tab.custom_title.is_some(),
             profile_id: tab.profile_id.clone(),
+            theme_override: self.theme_overrides.remove(&tab.id),
         };
         tab.request_exit();
         self.recently_closed.push(closed);
@@ -618,6 +704,11 @@ impl ButtonsApp {
         if closed.had_custom_title {
             if let Some(tab) = self.tabs.last_mut() {
                 tab.rename(closed.title);
+            }
+        }
+        if let (Some(theme_id), Some(tab)) = (closed.theme_override, self.tabs.last()) {
+            if self.themes.all().iter().any(|theme| theme.id == theme_id) {
+                self.theme_overrides.insert(tab.id, theme_id);
             }
         }
     }
@@ -916,6 +1007,12 @@ impl ButtonsApp {
             .filter_map(|id| self.tabs.iter().position(|tab| tab.id == *id))
             .collect();
         self.rendered_panes = visible.clone();
+        let override_themes: std::collections::BTreeMap<_, _> = visible
+            .iter()
+            .filter_map(|index| self.tabs.get(*index))
+            .filter(|tab| self.theme_overrides.contains_key(&tab.id))
+            .map(|tab| (tab.id, self.terminal_presentation_for(tab.id)))
+            .collect();
         let tree = pane_tree(self.pane_layout, &visible, plan.rows, plan.columns);
         ui.allocate_rect(rect, egui::Sense::hover());
         let mut render_state = PaneRenderState {
@@ -927,6 +1024,7 @@ impl ButtonsApp {
             terminal_bold_font: &terminal_bold_font,
             draw_bold_bright,
             theme: &theme,
+            override_themes: &override_themes,
             divider_style,
             clicked: &mut clicked,
         };
@@ -1149,9 +1247,13 @@ impl ButtonsApp {
                                 colors.border
                             },
                         ));
-                        let response = ui
-                            .add_sized([150.0, 28.0], button)
-                            .on_hover_text("Double-click to rename");
+                        let response =
+                            ui.add_sized([150.0, 28.0], button)
+                                .on_hover_text(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TabThemeTooltip,
+                                    &[("name", &self.themes.get(self.theme_for_tab(index)).name)],
+                                ));
                         if response.double_clicked() {
                             action = Some(TabAction::Rename(index));
                         } else if response.clicked() {
@@ -1526,6 +1628,52 @@ impl ButtonsApp {
             ui.checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
         });
         #[cfg(not(target_arch = "wasm32"))]
+        {
+            use crate::i18n::{text, MessageKey};
+            let current_id = self.theme_for_tab(self.focused).to_owned();
+            ui.label(format!(
+                "{}: {}",
+                text("en", MessageKey::CurrentTerminalTheme, &[]),
+                self.themes.get(&current_id).name
+            ));
+            let mut random_current = false;
+            let mut random_all = false;
+            let mut use_global = false;
+            ui.horizontal(|ui| {
+                random_current = ui
+                    .add_enabled(
+                        !self.tabs.is_empty(),
+                        egui::Button::new(text("en", MessageKey::RandomCurrent, &[])),
+                    )
+                    .clicked();
+                random_all = ui
+                    .add_enabled(
+                        !self.tabs.is_empty(),
+                        egui::Button::new(text("en", MessageKey::RandomAll, &[])),
+                    )
+                    .clicked();
+                use_global = ui
+                    .add_enabled(
+                        self.tabs
+                            .get(self.focused)
+                            .is_some_and(|tab| self.theme_overrides.contains_key(&tab.id)),
+                        egui::Button::new(text("en", MessageKey::UseGlobalTheme, &[])),
+                    )
+                    .clicked();
+            });
+            if random_current {
+                self.random_theme_current();
+            }
+            if random_all {
+                self.random_theme_all();
+            }
+            if use_global {
+                if let Some(tab) = self.tabs.get(self.focused) {
+                    self.theme_overrides.remove(&tab.id);
+                }
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         self.divider_settings(ui);
         ui.separator();
         ui.label(crate::i18n::text(
@@ -1567,6 +1715,10 @@ impl ButtonsApp {
         );
 
         let mut apply = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut per_tab_theme = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut all_theme = None;
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -1591,11 +1743,11 @@ impl ButtonsApp {
                                 .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                                 .inner_margin(10.0);
                             ui.allocate_ui_with_layout(
-                                Vec2::new(card_width, 142.0),
+                                Vec2::new(card_width, 174.0),
                                 Layout::top_down(Align::Min),
                                 |ui| {
                                     frame.show(ui, |ui| {
-                                        ui.set_min_size(Vec2::new(card_width - 20.0, 122.0));
+                                        ui.set_min_size(Vec2::new(card_width - 20.0, 154.0));
                                         ui.set_max_width(card_width - 20.0);
                                         ui.label(
                                             RichText::new(&theme.name)
@@ -1652,6 +1804,29 @@ impl ButtonsApp {
                                                 apply = Some((index, true));
                                             }
                                         });
+                                        #[cfg(not(target_arch = "wasm32"))]
+                                        ui.horizontal(|ui| {
+                                            use crate::i18n::{text, MessageKey};
+                                            if ui
+                                                .add_enabled(
+                                                    !self.tabs.is_empty(),
+                                                    egui::Button::new(text("en", MessageKey::ThisTerminal, &[])),
+                                                )
+                                                .clicked()
+                                            {
+                                                per_tab_theme = Some(theme.id.clone());
+                                            }
+                                            if ui
+                                                .add_enabled(
+                                                    !self.tabs.is_empty(),
+                                                    egui::Button::new(text("en", MessageKey::ThemeAll, &[])),
+                                                )
+                                                .on_hover_text(text("en", MessageKey::ThemeAllHelp, &[]))
+                                                .clicked()
+                                            {
+                                                all_theme = Some(theme.id.clone());
+                                            }
+                                        });
                                     });
                                 },
                             );
@@ -1664,6 +1839,14 @@ impl ButtonsApp {
 
         if let Some((index, calm)) = apply {
             self.apply_theme(index, calm);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(id) = per_tab_theme {
+            self.set_theme_for_tab(self.focused, &id);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(id) = all_theme {
+            self.set_theme_all(&id);
         }
     }
 
@@ -2015,6 +2198,7 @@ impl ButtonsApp {
                                 log::warn!("personal theme: {warning}");
                             }
                             self.preferences = preferences;
+                            self.theme_overrides.clear();
                             self.native_store = Some(store);
                             self.native_revision = Some(1);
                             self.native_save_blocked = false;
@@ -2900,6 +3084,7 @@ struct PaneRenderState<'a> {
     terminal_bold_font: &'a FontId,
     draw_bold_bright: bool,
     theme: &'a ThemeDefinition,
+    override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
 }
@@ -2929,7 +3114,7 @@ fn render_pane_tree(
                 state.terminal_font.clone(),
                 state.terminal_bold_font.clone(),
                 state.draw_bold_bright,
-                state.theme,
+                state.override_themes.get(&tab.id).unwrap_or(state.theme),
             ) {
                 *state.clicked = Some(*index);
             }
@@ -3341,6 +3526,39 @@ mod tests {
         assert_eq!(app.preferences.app_theme_id, "aurora");
         assert_eq!(app.preferences.terminal_theme_id, "basic2");
         assert_eq!(app.preferences.gradient_theme_id, "basic2");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn terminal_theme_override_is_id_scoped_and_theme_all_resets_default() {
+        let mut preferences = Preferences::default();
+        preferences.normalize_theme_sources();
+        let mut app = ButtonsApp::empty(preferences);
+        app.theme_overrides.insert(42, "aurora".into());
+        assert_eq!(app.terminal_presentation_for(42).id, "aurora");
+        assert_eq!(
+            app.terminal_presentation_for(42).terminal_colors.red,
+            app.themes.get("aurora").terminal_colors.red
+        );
+        assert_eq!(app.terminal_presentation_for(7).id, "basic2");
+        app.set_theme_all("aurora");
+        assert!(app.theme_overrides.is_empty());
+        assert_eq!(app.preferences.app_theme_id, "basic2");
+        assert_eq!(app.preferences.terminal_theme_id, "aurora");
+        assert_eq!(app.preferences.gradient_theme_id, "aurora");
+        assert_eq!(app.preferences.effects_theme_id, "aurora");
+        assert_eq!(app.terminal_presentation_for(7).id, "aurora");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn random_theme_never_repeats_current_when_alternatives_exist() {
+        let app = ButtonsApp::empty(Preferences::default());
+        for _ in 0..32 {
+            let candidate = app.random_theme_id("basic2").unwrap();
+            assert_ne!(candidate, "basic2");
+            assert!(app.themes.all().iter().any(|theme| theme.id == candidate));
+        }
     }
 
     #[test]

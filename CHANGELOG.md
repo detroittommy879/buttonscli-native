@@ -8,3 +8,4 @@
 - Added a per-pane scrollbar driven by real terminal scrollback; it hides in alternate-screen and mouse-reporting modes.
 - Pane dividers remain visible when idle and can inherit the active app theme or use a saved custom color and painted width.
 - Added a saved 0–16 point corner radius for tabs and app chrome in Theme Settings.
+- Theme Settings can assign a theme to one terminal, apply a theme to all open terminals and new tabs, or randomize the current or all terminals. Theme changes update live terminals without recreating their PTYs.

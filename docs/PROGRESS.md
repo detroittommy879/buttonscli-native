@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L08 per-terminal and random themes, source pass
+
+Added stable-session-ID terminal theme overrides and Theme Settings actions for This terminal, Theme all, Random current/all and Use global. Theme all updates the persisted default and clears overrides even for hidden tabs; new tabs inherit it. Random selection excludes each terminal's current theme when alternatives exist. Terminal palettes and supported gradient/effect settings change through the existing live TerminalView path; app chrome remains global. Recent-close recovery carries an override to the new session, while restart clears overrides because sessions are not restored. Tests cover ID-scoped presentation, theme-all reset and non-repeating random choices. Windows source tests and Clippy pass; Fedora live PTY, 1/4/10-pane, personal-theme and contrast checks remain. Access tier: free (`themeSelection`).
+
 ## 2026-09-28 — L09 saved chrome corner radius, source pass
 
 Added one 0–16 point radius preference for tab/control widgets, cards, menus and Settings, with a Theme Settings slider and native settings round-trip. Old settings get the restrained 6-point default, and oversized saved values clamp on load. Terminal cell clipping stays unchanged. Windows library tests passed; Fedora/Windows GUI DPI, focus and hit-target review plus a WASM build are still pending. Access tier: free (`settingsAppearance`).

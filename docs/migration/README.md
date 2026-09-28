@@ -2,7 +2,7 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
-Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, L07 has visible saved dividers, and L09 has a saved chrome radius. L01/L03/L05/L07/L09 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, L07 has visible saved dividers, L08 has per-terminal/random/theme-all controls, and L09 has a saved chrome radius. L01/L03/L05/L07/L08/L09 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
 
 ## Read in this order
 
@@ -49,7 +49,7 @@ The supplied screenshot is visual context for the current native UI, not an inst
 |---|---|---|
 | Legacy active profile/config import | Preview and staged new-profile commit exist for active or selected original profile; synthetic tests pass | P0 GUI acceptance on Windows/Fedora; credential transfer remains A01 |
 | Existing command/SSH presets | Native editor present, isolated storage; O `PresetBar.tsx` | P0 compatible import/native save, order and type-only semantics |
-| Personal themes | Native-profile JSON loader and explicit original-profile import exist | P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
+| Personal themes | Native-profile JSON loader and explicit original-profile import exist | P1 verify per-terminal/random/theme-all controls on Fedora; P2 CRUD and editor |
 | Shell profiles | Present but simpler discovery; O shellProfiles, backend discovery | P1 preserve settings; P2 Windows Terminal/WSL/wrappers and platform checks |
 | COL/ROW/GRID | Responsive reducer and wrapped render tree are wired; GUI acceptance remains | P0 verify focus, PTY resize, new-tab placement and no blank panes on Fedora |
 | Tab strip/names | `termN` and multi-row strip implemented; Fedora interaction pending | P0 GUI acceptance for narrow/many-tab layouts |

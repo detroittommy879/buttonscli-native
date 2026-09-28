@@ -27,6 +27,10 @@ not a backlog disguised as release notes.
 - Theme Settings saves a 0–16 point corner radius for tabs, controls, menus,
   cards and Settings. It does not round terminal cells. Visuals at different DPI
   scales and keyboard focus outlines still need desktop review.
+- Theme Settings assigns full terminal palettes and supported effects to one
+  terminal or all open terminals, including hidden tabs. App chrome stays
+  global. Per-terminal choices are session-only and reset on restart; the
+  global default persists. Fedora GUI/PTY theme-switch behavior is unverified.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
   screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior

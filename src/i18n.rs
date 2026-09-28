@@ -22,10 +22,18 @@ pub enum MessageKey {
     Cancel,
     ChromeCornerRadius,
     ChromeCornerRadiusHelp,
+    CurrentTerminalTheme,
+    RandomCurrent,
+    RandomAll,
+    ThisTerminal,
+    ThemeAll,
+    ThemeAllHelp,
+    UseGlobalTheme,
+    TabThemeTooltip,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 23] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -41,6 +49,14 @@ impl MessageKey {
         Self::Cancel,
         Self::ChromeCornerRadius,
         Self::ChromeCornerRadiusHelp,
+        Self::CurrentTerminalTheme,
+        Self::RandomCurrent,
+        Self::RandomAll,
+        Self::ThisTerminal,
+        Self::ThemeAll,
+        Self::ThemeAllHelp,
+        Self::UseGlobalTheme,
+        Self::TabThemeTooltip,
     ];
 }
 
@@ -79,6 +95,14 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::ChromeCornerRadiusHelp => {
             "Rounds tabs, controls, cards, menus, and Settings without changing terminal cells."
         }
+        MessageKey::CurrentTerminalTheme => "Current terminal theme",
+        MessageKey::RandomCurrent => "Random current",
+        MessageKey::RandomAll => "Random all",
+        MessageKey::ThisTerminal => "This terminal",
+        MessageKey::ThemeAll => "Theme all",
+        MessageKey::ThemeAllHelp => "Set this terminal theme as the default for new tabs and replace overrides in every open tab.",
+        MessageKey::UseGlobalTheme => "Use global",
+        MessageKey::TabThemeTooltip => "Double-click to rename · Theme: {name}",
     }
 }
 
