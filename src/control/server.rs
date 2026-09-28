@@ -229,6 +229,7 @@ struct RunResponse {
 pub(crate) struct ControlServer {
     info_path: PathBuf,
     helper_path: PathBuf,
+    mcp_helper_path: PathBuf,
     instance_id: String,
     shutdown: Option<oneshot::Sender<()>>,
     _thread: Option<JoinHandle<()>>,
@@ -242,6 +243,7 @@ impl ControlServer {
         repaint: egui::Context,
     ) -> Result<Self, String> {
         let helper_path = install_cli_helper(native_root)?;
+        let mcp_helper_path = install_mcp_helper(native_root)?;
         let control_dir = native_root.join(CONTROL_DIR);
         fs::create_dir_all(&control_dir).map_err(|error| error.to_string())?;
         set_private_directory_permissions(&control_dir)?;
@@ -364,6 +366,7 @@ impl ControlServer {
         Ok(Self {
             info_path,
             helper_path,
+            mcp_helper_path,
             instance_id,
             shutdown: Some(shutdown),
             _thread: Some(thread),
@@ -373,17 +376,56 @@ impl ControlServer {
     pub(crate) fn agent_instructions(&self) -> String {
         let info_path = self.info_path.to_string_lossy();
         let helper_path = self.helper_path.to_string_lossy();
+        let mcp_helper_path = self.mcp_helper_path.to_string_lossy();
+        let control_dir = self
+            .info_path
+            .parent()
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let mcp_config = json!({
+            "mcpServers": {
+                "buttonscli-native": {
+                    "command": "node",
+                    "args": [mcp_helper_path.as_ref()],
+                    "env": {
+                        "BUTTONSCLI_CONTROL_INFO_PATH": control_dir,
+                    }
+                }
+            }
+        });
+        let mcp_config =
+            serde_json::to_string_pretty(&mcp_config).unwrap_or_else(|_| "{}".to_owned());
         format!(
-            "Use the native ButtonsCLI instance selected by this exact connection file. The file contains a temporary local token; read it through the helper and never copy or print its contents.\n\nPowerShell:\n$env:BUTTONSCLI_CONTROL_INFO_PATH = {}\nnode {} status --json\nnode {} tabs --json\n\nFor other commands, use the same environment variable and helper path. This native instance supports status, tabs, read, send, key, run, create, rename, layout, and presets. Input modes are raw, bracketed, and paced slow-typed. Grid columns respect the current window's minimum pane sizes and may be reduced when space is limited.\n",
+            "Use the native ButtonsCLI instance selected by this exact connection file. The file contains a temporary local token; read it through the helper and never copy or print its contents.\n\nPowerShell:\n$env:BUTTONSCLI_CONTROL_INFO_PATH = {}\nnode {} status --json\nnode {} tabs --json\n\nFor other commands, use the same environment variable and helper path. This native instance supports status, tabs, read, send, key, run, create, rename, layout, and presets. Input modes are raw, bracketed, and paced slow-typed. Grid columns respect the current window's minimum pane sizes and may be reduced when space is limited.\n\nOptional MCP setup (stdio): add this example entry to an MCP client that accepts the mcpServers JSON format. Clients can use different config formats. The entry probes this native control directory and connects only when exactly one instance is live. If multiple instances are running, set BUTTONSCLI_CONTROL_INFO_PATH to the exact descriptor file. The client process receives local control access while connected.\n{}\n",
             powershell_literal(&info_path),
             powershell_literal(&helper_path),
             powershell_literal(&helper_path),
+            mcp_config,
         )
     }
 }
 
 fn install_cli_helper(native_root: &Path) -> Result<PathBuf, String> {
-    let helper_source = include_bytes!("../../scripts/buttonsclictl.mjs");
+    install_embedded_helper(
+        native_root,
+        "buttonsclictl",
+        include_bytes!("../../scripts/buttonsclictl.mjs"),
+    )
+}
+
+fn install_mcp_helper(native_root: &Path) -> Result<PathBuf, String> {
+    install_embedded_helper(
+        native_root,
+        "buttonscli-mcp",
+        include_bytes!("../../scripts/buttonscli-mcp.mjs"),
+    )
+}
+
+fn install_embedded_helper(
+    native_root: &Path,
+    file_stem: &str,
+    helper_source: &[u8],
+) -> Result<PathBuf, String> {
     let digest = Sha256::digest(helper_source);
     let mut name = String::with_capacity(64);
     for byte in digest {
@@ -393,11 +435,14 @@ fn install_cli_helper(native_root: &Path) -> Result<PathBuf, String> {
     let helper_dir = native_root.join(HELPER_DIR);
     fs::create_dir_all(&helper_dir).map_err(|error| error.to_string())?;
     set_private_directory_permissions(&helper_dir)?;
-    let helper_path = helper_dir.join(format!("buttonsclictl-{name}.mjs"));
+    let helper_path = helper_dir.join(format!("{file_stem}-{name}.mjs"));
     if helper_path.is_file() {
         let current = fs::read(&helper_path).map_err(|error| error.to_string())?;
         if current != helper_source {
-            return Err("installed native CLI helper does not match its version hash".into());
+            return Err(format!(
+                "installed native helper does not match its version hash: {}",
+                helper_path.display()
+            ));
         }
         return Ok(helper_path);
     }

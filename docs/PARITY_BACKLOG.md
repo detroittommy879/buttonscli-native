@@ -27,7 +27,7 @@ constraints.
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Personal-theme snapshot import exists; finish edit/share, effect rendering and online fonts |
 | AI Help | Partial | Provider settings, secure key storage, connection test, model discovery, separate-window conversation, bounded context and reviewed actions exist in source; finish GUI/provider acceptance |
-| Local automation | Partial | Authenticated loopback API, per-instance handoff, and Node helper exist in source; finish route/runtime contract acceptance |
+| Local automation | Partial | Authenticated loopback API, CLI and stdio MCP helpers exist; finish full route and real-client acceptance |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
 
 ## P0 — terminal workspace
@@ -78,7 +78,7 @@ preferences JSON.
 | Suggested actions | Partial | `src/services/assistantActions.ts` | Commands and allowlisted control keys are parsed and require explicit target-bound review; finish runtime regression and GUI checks. |
 | AI theme/shader generation | Deferred | theme and shader designer services | Start after provider storage and the non-AI theme/shader editors are stable. |
 | Loopback control API | Partial | legacy Tauri control server, `src/services/controlSync.ts` | Native loopback/auth/instance discovery and tab/pane/preset/input routes exist in source; finish hostile-request and PTY runtime checks. |
-| CLI and MCP helper | Partial | `src/services/controlCliInstructions.ts` | Pinned native Node helper discovers the exact native instance without copying tokens into handoff text; verify CLI contract. MCP remains optional and open. |
+| CLI and MCP helper | Partial | `src/services/controlCliInstructions.ts` | Pinned native CLI and stdio MCP helpers use native descriptors without copying tokens into handoff text; a fake-API MCP protocol smoke passes. Verify the full route matrix and a real MCP client. |
 | Quick secret vault | Missing | `src/components/SecretVaultPanel.tsx`, `src/services/secretVaultService.ts` | Encrypt at rest with explicit unlock, never render secrets into logs, and paste only into the selected terminal after direct user intent. |
 
 ## P2 — settings, product, and distribution

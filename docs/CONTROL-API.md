@@ -13,14 +13,16 @@ build can exercise it when launched with
 ## Copy the exact instance handoff
 
 With the feature enabled, click **Agent Inst.** in the status bar. The app
-copies instructions containing the exact connection-file path and the native
-CLI helper path. The connection file contains the temporary token; the copied
-instructions do not contain the token.
+copies instructions containing the exact connection-file path, the native CLI
+helper path, and an example MCP server entry. The connection file
+contains the temporary token; the copied instructions do not contain the
+token.
 
 Native files live under `~/.buttonscli-native/`:
 
 - `control/<instance-id>.json` is the current connection descriptor.
 - `helpers/buttonsclictl-<source-hash>.mjs` is the matching Node helper.
+- `helpers/buttonscli-mcp-<source-hash>.mjs` is the optional stdio MCP server.
 
 The helper is a native adaptation of the read-only reference copy at original
 revision `032c9f21a17f17e48974f57259b1ad4a6506b858` (source SHA-256
@@ -34,10 +36,27 @@ file. Normal shutdown removes only the descriptor owned by that instance and
 rotates the token on the next run. A crash may leave a stale file; the helper
 checks live status and ignores it.
 
-Node is needed only for the optional CLI helper, not for the desktop app.
+Node is needed only when using an optional helper, not for the desktop app.
 The helper supports the original commands: `status`, `tabs`, `create-tab`,
 `rename-tab`, `open-layout`, `read`, `wait-for-text`, `wait-for-quiet`, `send`,
 `run`, `key`, `presets`, and `preset-run`.
+
+## Optional MCP server
+
+The copied `mcpServers` JSON example starts a local Node stdio server and
+points it at the native `control/` directory. Adapt its placement to your MCP
+client's configuration format. For each tool call, it checks descriptors and
+connects only if exactly one native instance is live. If multiple instances
+are live, set `BUTTONSCLI_CONTROL_INFO_PATH` to the exact descriptor file in
+the MCP entry. The server uses the descriptor token only in its authenticated
+loopback request; it never prints or copies the token. Add it only to an MCP
+client you trust, because its tools can read terminal output and send input.
+
+The helper is adapted from the original read-only template
+`src-tauri/src/control_mcp_helper_template.mjs` (SHA-256
+`763661545A727180853E743C4682872D98F59298BAB764761000A5656B1C5F83`). The
+native app embeds and installs its version-hashed copy; Node is not required
+for normal desktop use.
 
 ## API routes
 
@@ -65,9 +84,8 @@ Payloads are limited to 64 KiB. Input delivery can be `raw`, `bracketed`, or
 `slow-typed`. Bracketed mode wraps only the pasted text and sends Enter after
 the closing marker. Slow-typed input requires valid UTF-8, sends whole Unicode
 characters (up to 512 per request), accepts a delay from 1 to 250 ms, and is
-capped at 30 seconds. A
-cancelled or closed request stops further paced delivery; bytes already sent
-cannot be recalled.
+capped at 30 seconds. Cancellation or a closed tab stops further paced
+delivery; bytes already sent cannot be recalled.
 
 The output observer is attached to the existing PTY reader. The service keeps a
 Unicode-safe tail of at most 200,000 characters per open terminal. It preserves
@@ -83,6 +101,6 @@ dispatcher used by the app.
 Terminal command text is sent as input to the selected PTY; it is not evaluated
 by the control server itself.
 
-The native control and CLI paths have passed Windows source checks and a Node
-syntax check. No live API/PTY interaction, GUI handoff, provider request, or
-cross-platform runtime acceptance is claimed yet.
+The native control API and helpers have passed Windows source/build checks and
+Node syntax checks. No live API/PTY interaction, MCP-client launch, GUI
+handoff, provider request, or cross-platform runtime acceptance is claimed yet.

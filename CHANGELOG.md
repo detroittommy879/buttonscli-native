@@ -11,6 +11,7 @@
 - Kept provider requests behind the Pro `aiHelp` feature gate. This build has no entitlement service yet; debug builds have an explicit environment-only development override.
 - Added the Pro `automationRemoteControl` local API on an ephemeral `127.0.0.1` port. It provides status, tab list/create/rename, bounded output reads, send/run/key actions, layouts, and active-profile presets through the app-thread session dispatcher.
 - Added an `Agent Inst.` status-bar handoff, a native per-instance discovery descriptor, and an optional version-pinned Node CLI installed under `~/.buttonscli-native/helpers/`. Handoff text selects one exact native descriptor and never includes its token; the helper does not fall back to the original app.
+- Added an optional stdio MCP server for the same Pro-gated local control API. The copied setup points to the native control directory, selects only one live instance, and keeps its descriptor token out of MCP configuration and logs.
 - Added a single-reader raw PTY output observer with a 200,000-character per-session tail and activity metadata. Native CLI input supports raw, bracketed, and paced UTF-8 delivery; quiet waits report observation state, not a shell exit code.
 - Kept remote control unavailable by default in release builds until entitlement integration exists. Debug builds can opt in with `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`.
 - COL, ROW and GRID panes now wrap within minimum viewport bounds. Overflow sessions stay open and reachable through tabs, and resizing back restores the larger layout.

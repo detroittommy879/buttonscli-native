@@ -1,10 +1,30 @@
 # Reconstruction journal
 
+## 2026-09-28 — C05 optional MCP adapter source and protocol smoke
+
+Adapted the read-only original stdio helper template into a native MCP server
+that reads only `~/.buttonscli-native/control/`, validates descriptors, and
+connects only when one live instance is found. The app embeds and installs a
+content-hashed copy; **Agent Inst.** now includes a ready-to-paste MCP config
+that points at the stable control directory, never at a rotating token. Added
+bounded JSONL request lines, graceful draining for in-flight tool calls,
+actionable disconnect errors, bracketed delivery metadata, and a fake-API
+initialize/list/status smoke script. The helper remains optional and the API's
+Pro gate applies to every route. Access tier: Pro
+(`automationRemoteControl`).
+
+`cargo fmt --all`, Windows `cargo check --bin buttonscli` and
+`cargo build --bin buttonscli`, both Node syntax checks, and
+`node scripts/test-mcp-smoke.mjs` passed. The smoke used a temporary fake
+loopback API and confirmed authenticated discovery and status, exposed tools,
+MCP initialization, and no token in stdout. A real MCP client, full route
+matrix, desktop handoff click, and cross-platform behavior remain unverified.
+
 ## 2026-09-28 — R02–R04 and C01–C04 native control source pass
 
 Vendored Alacritty's optional observer seam at its existing single PTY reader and added a 200,000-character raw output tail with input/output timestamps and sequence metadata. Added bounded raw, bracketed and paced UTF-8 delivery; paced requests stop on cancellation/closed targets, cap at 512 Unicode characters per request, and cap at 30 seconds. Implemented authenticated loopback `/v1` status, tabs, read/send/key/run, create/rename, layout, and preset routes through the stable-ID app-thread dispatcher. Added a per-instance descriptor, version-hashed native Node helper with no fallback to the original app, and an **Agent Inst.** clipboard handoff containing an exact descriptor path but no token. Updated API, migration, decision and changelog docs. Remote control tier: Pro (`automationRemoteControl`); debug-only override is `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`, release remains unavailable pending entitlements.
 
-`cargo fmt --all`, Windows `cargo check --bin buttonscli`, `node --check scripts/buttonsclictl.mjs`, and the helper's `--help` path passed. No tests, live GUI/API/PTY interaction, provider request, or output benchmark was run. Therefore the route behavior, handoff clipboard, paced input cancellation, output transcript fixtures and throughput remain runtime-unverified; fixed-size responsive grid behavior honors requested columns only within minimum-pane bounds. The optional MCP adapter, full locale translation, and platform acceptance remain open.
+`cargo fmt --all`, Windows `cargo check --bin buttonscli`, `node --check scripts/buttonsclictl.mjs`, and the helper's `--help` path passed. No tests, live GUI/API/PTY interaction, provider request, or output benchmark was run. Therefore the route behavior, handoff clipboard, paced input cancellation, output transcript fixtures and throughput remain runtime-unverified; fixed-size responsive grid behavior honors requested columns only within minimum-pane bounds. At this entry, the optional MCP adapter had not yet been implemented; see the later C05 entry. Full locale translation and platform acceptance remain open.
 
 ## 2026-09-28 — A03/A04/A05/A06 AI Help source implementation, Windows build pass
 

@@ -30,10 +30,10 @@ Current desktop features include:
   with streamed answers, previewed optional terminal context, and explicitly
   reviewed suggestions; the Pro gate is still closed in release builds until
   native entitlement integration exists;
-- an authenticated, loopback-only agent control API with an exact-instance
-  **Agent Inst.** handoff and optional Node CLI; it supports tab creation,
-  rename, layouts, presets, bounded output reads, and raw, bracketed, or paced
-  input, but is still Pro-gated and not enabled in release builds;
+- an authenticated, loopback-only agent control API with an **Agent Inst.**
+  handoff, optional Node CLI, and optional stdio MCP server; it supports tab
+  creation, rename, layouts, presets, bounded output reads, and raw, bracketed,
+  or paced input, but is still Pro-gated and not enabled in release builds;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
   including separate terminal regular/bold faces;
