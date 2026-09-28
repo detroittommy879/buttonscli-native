@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — F04 native message lookup
+
+Added a typed lookup for import, control and plain AI Help strings with named interpolation, the original app's 21 supported locale codes, and English fallback for partial locale entries. Spanish, French, Japanese and German have a few native entries; the remaining migration strings currently fall back to English. The full existing UI translation and locale selector remain U05. Three focused release tests and Clippy with the known unrelated test-module lint exempted passed. Access tier: free infrastructure.
+
 ## 2026-09-28 — F03 feature access foundation
 
 Added a native catalog and pure access resolver with stable keys, tiers, rollout state, owner, runtime flag metadata, injected entitlement source, expiring cached grants, development override and kill-switch precedence. Layout/theme/scrollbar/divider/settings appearance are free; AI Help and remote control remain pro and unreleased; internal features stay hidden. Three focused Windows release tests passed. Strict Clippy found the pre-existing `items_after_test_module` lint in `src/terminal.rs`; Clippy passed with only that lint exempted. This is a foundation only: UI and future action dispatchers must both call the resolver when their features are wired. No paid entitlement is inferred from local settings. Access tier: free infrastructure.

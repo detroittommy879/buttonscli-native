@@ -1,6 +1,7 @@
 pub mod app;
 pub mod features;
 pub mod fonts;
+pub mod i18n;
 mod settings;
 pub mod theme;
 
