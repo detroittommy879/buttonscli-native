@@ -15,13 +15,16 @@ use alacritty_terminal::term::search::{Match, RegexIter, RegexSearch};
 use alacritty_terminal::term::{
     self, cell::Cell, test::TermSize, viewport_to_point, Term, TermMode,
 };
+use alacritty_terminal::vte::ansi::Color;
 use alacritty_terminal::{tty, Grid};
 use egui::Modifiers;
 use settings::BackendSettings;
 use std::borrow::Cow;
 use std::cmp::min;
+use std::collections::HashSet;
 use std::io::Result;
 use std::ops::{Index, RangeInclusive};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc};
 
@@ -174,6 +177,10 @@ pub struct TerminalBackend {
     notifier: Notifier,
     last_content: RenderableContent,
     input_observer: Option<ByteObserver>,
+    search_dirty: Arc<AtomicBool>,
+    search_query: Option<String>,
+    search_matches: Vec<Match>,
+    current_search_match: Option<usize>,
 }
 
 impl TerminalBackend {
@@ -210,6 +217,17 @@ impl TerminalBackend {
         let config = term::Config::default();
         let terminal_size = TerminalSize::default();
         let pty = tty::new(&pty_config, terminal_size.into(), id)?;
+        let search_dirty = Arc::new(AtomicBool::new(true));
+        let output_observer = {
+            let search_dirty = Arc::clone(&search_dirty);
+            let output_observer = output_observer.clone();
+            Some(Arc::new(move |bytes: &[u8]| {
+                search_dirty.store(true, Ordering::Relaxed);
+                if let Some(observer) = &output_observer {
+                    observer(bytes);
+                }
+            }) as ByteObserver)
+        };
         let (event_sender, event_receiver) = mpsc::channel();
         let event_proxy = EventProxy(event_sender);
         let mut term = Term::new(config, &terminal_size, event_proxy.clone());
@@ -220,6 +238,8 @@ impl TerminalBackend {
             terminal_size,
             cursor: term.grid_mut().cursor_cell().clone(),
             hovered_hyperlink: None,
+            search_highlights: HashSet::new(),
+            current_search_highlights: HashSet::new(),
         };
         let term = Arc::new(FairMutex::new(term));
         let pty_event_loop = EventLoop::new_with_output_observer(
@@ -256,6 +276,10 @@ impl TerminalBackend {
             notifier,
             last_content: initial_content,
             input_observer,
+            search_dirty,
+            search_query: None,
+            search_matches: Vec::new(),
+            current_search_match: None,
         })
     }
 
@@ -319,9 +343,121 @@ impl TerminalBackend {
         result
     }
 
+    /// Search this terminal's retained grid, including wrapped lines and scrollback.
+    /// Results are cached until new PTY output arrives or another search is requested.
+    pub fn search_next(
+        &mut self,
+        query: &str,
+    ) -> std::result::Result<Option<(usize, usize)>, String> {
+        self.search(query, true)
+    }
+
+    /// Move to the previous match in this terminal's retained grid.
+    pub fn search_previous(
+        &mut self,
+        query: &str,
+    ) -> std::result::Result<Option<(usize, usize)>, String> {
+        self.search(query, false)
+    }
+
+    fn search(
+        &mut self,
+        query: &str,
+        forward: bool,
+    ) -> std::result::Result<Option<(usize, usize)>, String> {
+        let query = query.trim();
+        if query.is_empty() {
+            self.clear_search();
+            return Ok(None);
+        }
+
+        let query_changed = self.search_query.as_deref() != Some(query);
+        let output_changed = self.search_dirty.swap(false, Ordering::Relaxed);
+        if query_changed || output_changed {
+            let term = self.term.clone();
+            let terminal = term.lock();
+            let matches = match collect_search_matches(&terminal, query) {
+                Ok(matches) => matches,
+                Err(error) => {
+                    self.search_matches.clear();
+                    self.current_search_match = None;
+                    self.search_query = Some(query.to_owned());
+                    self.last_content.search_highlights.clear();
+                    self.last_content.current_search_highlights.clear();
+                    return Err(error);
+                },
+            };
+            self.search_matches = matches;
+            self.current_search_match = None;
+            self.search_query = Some(query.to_owned());
+        }
+
+        if self.search_matches.is_empty() {
+            self.current_search_match = None;
+            return Ok(None);
+        }
+
+        let count = self.search_matches.len();
+        let index =
+            next_search_index(self.current_search_match, count, forward);
+        let term = self.term.clone();
+        let mut terminal = term.lock();
+        scroll_to_search_match(&mut terminal, &self.search_matches[index]);
+        self.current_search_match = Some(index);
+        Ok(Some((index + 1, count)))
+    }
+
+    pub fn clear_search(&mut self) {
+        self.search_query = None;
+        self.search_matches.clear();
+        self.current_search_match = None;
+        self.search_dirty.store(false, Ordering::Relaxed);
+        self.last_content.search_highlights.clear();
+        self.last_content.current_search_highlights.clear();
+    }
+
+    pub fn search_status(&self) -> (usize, Option<usize>) {
+        (
+            self.search_matches.len(),
+            self.current_search_match.map(|index| index + 1),
+        )
+    }
+
+    /// Select every retained line in this terminal, including scrollback.
+    pub fn select_all(&mut self) {
+        let term = self.term.clone();
+        let mut terminal = term.lock();
+        select_all_in_term(&mut terminal);
+    }
+
+    /// Clear the visible screen without sending input to or restarting the shell.
+    /// The cleared viewport is retained in scrollback, matching normal `clear` behavior.
+    pub fn clear_screen(&mut self) {
+        let term = self.term.clone();
+        let mut terminal = term.lock();
+        clear_visible_screen(&mut terminal);
+        drop(terminal);
+        self.clear_search();
+    }
+
     pub fn sync(&mut self) -> &RenderableContent {
         let term = self.term.clone();
         let mut terminal = term.lock();
+        if self.search_dirty.swap(false, Ordering::Relaxed) {
+            if let Some(query) = self.search_query.as_deref() {
+                let selected_match = self
+                    .current_search_match
+                    .and_then(|index| self.search_matches.get(index))
+                    .cloned();
+                self.search_matches = collect_search_matches(&terminal, query)
+                    .unwrap_or_default();
+                self.current_search_match = selected_match.and_then(|old| {
+                    self.search_matches
+                        .iter()
+                        .position(|current| current == &old)
+                });
+            }
+        }
         let selectable_range = match &terminal.selection {
             Some(s) => s.to_range(&terminal),
             None => None,
@@ -333,6 +469,14 @@ impl TerminalBackend {
         self.last_content.cursor = cursor.clone();
         self.last_content.terminal_mode = *terminal.mode();
         self.last_content.terminal_size = self.size;
+        let (search_highlights, current_search_highlights) =
+            visible_search_highlights(
+                &terminal,
+                &self.search_matches,
+                self.current_search_match,
+            );
+        self.last_content.search_highlights = search_highlights;
+        self.last_content.current_search_highlights = current_search_highlights;
         self.last_content()
     }
 
@@ -644,6 +788,120 @@ fn visible_regex_match_iter<'a>(
         .take_while(move |rm| rm.start().line <= viewport_end)
 }
 
+fn collect_search_matches<T>(
+    term: &Term<T>,
+    query: &str,
+) -> std::result::Result<Vec<Match>, String> {
+    if query.is_empty() || term.grid().columns() == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut regex =
+        RegexSearch::new(query).map_err(|error| error.to_string())?;
+    let grid = term.grid();
+    let start = Point::new(grid.topmost_line(), Column(0));
+    let end = Point::new(grid.bottommost_line(), grid.last_column());
+    Ok(
+        RegexIter::new(start, end, Direction::Right, term, &mut regex)
+            .collect(),
+    )
+}
+
+fn next_search_index(
+    current: Option<usize>,
+    count: usize,
+    forward: bool,
+) -> usize {
+    debug_assert!(count > 0);
+    match (current, forward) {
+        (None, true) => 0,
+        (None, false) => count - 1,
+        (Some(index), true) => (index + 1) % count,
+        (Some(0), false) => count - 1,
+        (Some(index), false) => (index - 1) % count,
+    }
+}
+
+fn scroll_to_search_match<T: EventListener>(
+    term: &mut Term<T>,
+    matched: &Match,
+) {
+    let grid = term.grid();
+    let half_viewport = (grid.screen_lines() / 2) as i32;
+    let top_line = matched.start().line.0 - half_viewport;
+    let target_offset = (-top_line).clamp(0, grid.history_size() as i32);
+    let delta = target_offset - grid.display_offset() as i32;
+    if delta != 0 {
+        term.scroll_display(Scroll::Delta(delta));
+    }
+}
+
+fn select_all_in_term<T>(term: &mut Term<T>) {
+    let grid = term.grid();
+    let start = Point::new(grid.topmost_line(), Column(0));
+    let end = Point::new(grid.bottommost_line(), grid.last_column());
+    let mut selection =
+        Selection::new(AlacrittySelectionType::Lines, start, Side::Left);
+    selection.update(end, Side::Right);
+    term.selection = Some(selection);
+}
+
+fn clear_visible_screen<T: EventListener>(term: &mut Term<T>) {
+    term.scroll_display(Scroll::Bottom);
+    term.grid_mut().clear_viewport::<Color>();
+    term.selection = None;
+}
+
+fn visible_search_highlights<T>(
+    term: &Term<T>,
+    matches: &[Match],
+    current: Option<usize>,
+) -> (HashSet<(i32, usize)>, HashSet<(i32, usize)>) {
+    let grid = term.grid();
+    let viewport_start = -(grid.display_offset() as i32);
+    let viewport_end = viewport_start + grid.screen_lines() as i32 - 1;
+    let mut highlights = HashSet::new();
+    let mut current_highlights = HashSet::new();
+
+    let first_visible = matches
+        .partition_point(|matched| matched.end().line.0 < viewport_start);
+    for (index, matched) in matches.iter().enumerate().skip(first_visible) {
+        if matched.start().line.0 > viewport_end {
+            break;
+        }
+        let target = if current == Some(index) {
+            &mut current_highlights
+        } else {
+            &mut highlights
+        };
+        let first = matched.start();
+        let last = matched.end();
+        let first_line = first.line.0.max(viewport_start);
+        let last_line = last.line.0.min(viewport_end);
+        if first_line > last_line {
+            continue;
+        }
+
+        for line in first_line..=last_line {
+            let start_column = if line == first.line.0 {
+                first.column.0
+            } else {
+                0
+            };
+            let end_column = if line == last.line.0 {
+                last.column.0
+            } else {
+                grid.last_column().0
+            };
+            for column in start_column..=end_column {
+                target.insert((line, column));
+            }
+        }
+    }
+
+    (highlights, current_highlights)
+}
+
 pub struct RenderableContent {
     pub grid: Grid<Cell>,
     pub hovered_hyperlink: Option<RangeInclusive<Point>>,
@@ -651,6 +909,8 @@ pub struct RenderableContent {
     pub cursor: Cell,
     pub terminal_mode: TermMode,
     pub terminal_size: TerminalSize,
+    pub search_highlights: HashSet<(i32, usize)>,
+    pub current_search_highlights: HashSet<(i32, usize)>,
 }
 
 impl Default for RenderableContent {
@@ -662,6 +922,8 @@ impl Default for RenderableContent {
             cursor: Cell::default(),
             terminal_mode: TermMode::empty(),
             terminal_size: TerminalSize::default(),
+            search_highlights: HashSet::new(),
+            current_search_highlights: HashSet::new(),
         }
     }
 }
@@ -684,7 +946,8 @@ impl EventListener for EventProxy {
 #[cfg(test)]
 mod scrollback_tests {
     use super::*;
-    use alacritty_terminal::vte::ansi::Color;
+    use alacritty_terminal::event::VoidListener;
+    use alacritty_terminal::term::test::mock_term;
 
     #[test]
     fn snapshot_tracks_retained_grid_offset_and_mode() {
@@ -709,5 +972,88 @@ mod scrollback_tests {
         assert!(!ScrollbackState::from_content(&content).available());
         content.grid.clear_history();
         assert_eq!(ScrollbackState::from_content(&content).history_lines, 0);
+    }
+
+    #[test]
+    fn search_matches_wrapped_wide_unicode_and_retained_scrollback() {
+        let wrapped = mock_term("ab🦇\nX\r\nend");
+        let matches = collect_search_matches(&wrapped, "🦇X").unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].start(), &Point::new(Line(0), Column(2)));
+        assert_eq!(matches[0].end(), &Point::new(Line(1), Column(0)));
+
+        let size = TermSize::new(8, 2);
+        let mut history = Term::new(
+            term::Config {
+                scrolling_history: 4,
+                ..term::Config::default()
+            },
+            &size,
+            VoidListener,
+        );
+        history
+            .grid_mut()
+            .scroll_up::<Color>(&(Line(0)..Line(2)), 1);
+        for (column, character) in "older".chars().enumerate() {
+            history.grid_mut()[Line(-1)][Column(column)].c = character;
+        }
+        let matches = collect_search_matches(&history, "older").unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].start().line, Line(-1));
+    }
+
+    #[test]
+    fn search_navigation_wraps_at_both_ends() {
+        assert_eq!(next_search_index(None, 3, true), 0);
+        assert_eq!(next_search_index(None, 3, false), 2);
+        assert_eq!(next_search_index(Some(2), 3, true), 0);
+        assert_eq!(next_search_index(Some(0), 3, false), 2);
+        assert_eq!(next_search_index(Some(1), 3, false), 0);
+    }
+
+    #[test]
+    fn select_all_covers_retained_buffer_and_clear_keeps_terminal_state() {
+        let size = TermSize::new(8, 2);
+        let mut terminal = Term::new(
+            term::Config {
+                scrolling_history: 4,
+                ..term::Config::default()
+            },
+            &size,
+            VoidListener,
+        );
+        terminal
+            .grid_mut()
+            .scroll_up::<Color>(&(Line(0)..Line(2)), 1);
+        for (column, character) in "older".chars().enumerate() {
+            terminal.grid_mut()[Line(-1)][Column(column)].c = character;
+        }
+        for (line, text) in [(0, "first"), (1, "second")] {
+            for (column, character) in text.chars().enumerate() {
+                terminal.grid_mut()[Line(line)][Column(column)].c = character;
+            }
+        }
+
+        select_all_in_term(&mut terminal);
+        let selected = terminal.selection_to_string().unwrap();
+        assert!(selected.contains("older"));
+        assert!(selected.contains("first"));
+        assert!(selected.contains("second"));
+
+        clear_visible_screen(&mut terminal);
+        assert!(terminal.selection.is_none());
+        assert!(terminal.grid().history_size() > 0);
+        assert!(terminal.grid().display_iter().all(|cell| cell.c == ' '));
+        assert_eq!(
+            collect_search_matches(&terminal, "first").unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn search_rejects_invalid_regex_and_empty_query() {
+        let terminal = mock_term("content");
+        assert!(collect_search_matches(&terminal, "[").is_err());
+        assert!(collect_search_matches(&terminal, "").unwrap().is_empty());
     }
 }

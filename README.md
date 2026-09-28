@@ -23,6 +23,8 @@ Current desktop features include:
 - detected and custom shell profiles with persisted default/per-tab selection,
   arguments, and working directories;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
+- focused-terminal regex search across wrapped text and scrollback, plus
+  select-all and clear-screen actions that leave the shell running;
 - separate command and SSH docks, editable persisted presets with type/run
   behavior, all 555 bundled legacy theme selections, and personal version 1
   theme JSON files from the active native profile's `themes/` folder;
@@ -58,6 +60,9 @@ Default shortcuts are `Primary+Shift+T` (new tab), `Primary+Shift+W` (close),
 `Primary+Shift+,` (Settings), and `Primary+Shift+Q` (quit). Primary means Ctrl
 on Windows/Linux and Command on macOS. Edit or clear these under
 **Settings → Shortcuts**; see [Keyboard shortcuts](docs/SHORTCUTS.md).
+
+See [Terminal search and buffer actions](docs/TERMINAL-SEARCH.md) for search,
+select-all, and clear-screen behavior.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

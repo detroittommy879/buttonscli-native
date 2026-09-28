@@ -302,6 +302,11 @@ impl<'a> TerminalView<'a> {
             let is_selected = content
                 .selectable_range
                 .is_some_and(|r| r.contains(indexed.point));
+            let search_cell = (indexed.point.line.0, indexed.point.column.0);
+            let is_current_search_match =
+                content.current_search_highlights.contains(&search_cell);
+            let is_search_match =
+                content.search_highlights.contains(&search_cell);
             let is_hovered_hyperling =
                 content.hovered_hyperlink.as_ref().is_some_and(|r| {
                     r.contains(&indexed.point)
@@ -330,6 +335,13 @@ impl<'a> TerminalView<'a> {
 
             if is_inverse || is_selected {
                 std::mem::swap(&mut fg, &mut bg);
+            }
+            if !is_selected && is_current_search_match {
+                bg = Color32::from_rgb(191, 119, 18);
+                fg = Color32::WHITE;
+            } else if !is_selected && is_search_match {
+                bg = Color32::from_rgb(105, 80, 31);
+                fg = Color32::WHITE;
             }
 
             if global_bg != bg {

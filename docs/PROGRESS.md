@@ -1,5 +1,23 @@
 # Reconstruction journal
 
+## 2026-09-28 — U02 terminal search and buffer actions
+
+Added focused-terminal regex search against Alacritty's live grid, with wrapped
+and wide-Unicode matches, scrollback navigation, wraparound next/previous, and
+visible match highlights. Added Terminal-menu actions for Find, Select all,
+and Clear screen. Clear screen clears the active viewport in place, keeps the
+shell running, and leaves cleared lines in scrollback. Search targets the
+focused session even when its pane is not rendered. Added the free
+`terminalSearch` feature-catalog entry and native UI strings. See
+[`TERMINAL-SEARCH.md`](TERMINAL-SEARCH.md). Access tier: free.
+
+`cargo check --bin buttonscli` and five focused `egui_term` backend tests passed
+on Windows, including wrapped wide-Unicode search, a synthetic scrollback
+match, navigation wraparound, select-all, and clear-screen state. The desktop
+GUI, real PTY clear behavior, and Fedora interaction have not been manually
+verified. The separate vendored-crate test run created an untracked lockfile;
+it is cleanup-only and will not be retained.
+
 ## 2026-09-28 — U01 editable native shortcuts
 
 Added a persisted shortcut map and Settings recorder for new tab, close,

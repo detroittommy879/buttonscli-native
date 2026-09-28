@@ -37,6 +37,11 @@ not a backlog disguised as release notes.
   Alacritty grid's real history and display offset. The track hides in alternate
   screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior
   still need GUI review on Fedora and Windows.
+- Terminal search, next/previous navigation, match highlights, select-all, and
+  clear-screen actions are implemented against the live Alacritty grid. Focused
+  tests cover wrapped wide Unicode, scrollback, and keeping the terminal state
+  in place during clear. The Windows GUI controls and Fedora interactions still
+  need manual review.
 - All 555 legacy theme selections are present. Linear, radial, and conic
   multi-stop terminal gradients preserve their angle/position; animated drift,
   static, and scanlines also render natively. Repeating gradients, hsync warp,

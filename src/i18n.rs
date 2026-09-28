@@ -118,10 +118,20 @@ pub enum MessageKey {
     ShortcutPaste,
     ShortcutOpenSettings,
     ShortcutQuit,
+    TerminalFind,
+    TerminalSearchHint,
+    TerminalSearchNext,
+    TerminalSearchPrevious,
+    TerminalSearchClear,
+    TerminalSelectAll,
+    TerminalClearScreen,
+    TerminalSearchStatus,
+    TerminalSearchNoMatches,
+    TerminalSearchInvalidPattern,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 111] = [
+    pub const ALL: [Self; 121] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -233,6 +243,16 @@ impl MessageKey {
         Self::ShortcutPaste,
         Self::ShortcutOpenSettings,
         Self::ShortcutQuit,
+        Self::TerminalFind,
+        Self::TerminalSearchHint,
+        Self::TerminalSearchNext,
+        Self::TerminalSearchPrevious,
+        Self::TerminalSearchClear,
+        Self::TerminalSelectAll,
+        Self::TerminalClearScreen,
+        Self::TerminalSearchStatus,
+        Self::TerminalSearchNoMatches,
+        Self::TerminalSearchInvalidPattern,
     ];
 }
 
@@ -367,6 +387,16 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::ShortcutPaste => "Paste",
         MessageKey::ShortcutOpenSettings => "Open Settings",
         MessageKey::ShortcutQuit => "Quit",
+        MessageKey::TerminalFind => "Find in terminal…",
+        MessageKey::TerminalSearchHint => "Search text or regex",
+        MessageKey::TerminalSearchNext => "Next",
+        MessageKey::TerminalSearchPrevious => "Previous",
+        MessageKey::TerminalSearchClear => "Clear search",
+        MessageKey::TerminalSelectAll => "Select all",
+        MessageKey::TerminalClearScreen => "Clear screen",
+        MessageKey::TerminalSearchStatus => "{current} of {count}",
+        MessageKey::TerminalSearchNoMatches => "No matches",
+        MessageKey::TerminalSearchInvalidPattern => "Invalid search pattern",
     }
 }
 

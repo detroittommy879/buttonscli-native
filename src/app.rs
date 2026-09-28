@@ -102,6 +102,17 @@ pub(crate) fn remote_control_available() -> bool {
     access::resolve(FeatureKey::AutomationRemoteControl, &runtime, &None, now).available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn terminal_search_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::TerminalSearch,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
     themes: ThemeCatalog,
@@ -110,6 +121,12 @@ pub struct ButtonsApp {
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    show_terminal_search: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    terminal_search_query: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    terminal_search_status: Option<String>,
     show_about: bool,
     show_preset_editor: bool,
     preset_editor_collection: PresetCollection,
@@ -488,6 +505,12 @@ impl ButtonsApp {
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            show_terminal_search: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            terminal_search_query: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            terminal_search_status: None,
             show_about: false,
             show_preset_editor: false,
             preset_editor_collection: PresetCollection::Commands,
@@ -1628,6 +1651,159 @@ impl ButtonsApp {
         });
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn search_active_terminal(&mut self, forward: bool) {
+        if !terminal_search_available() {
+            return;
+        }
+        let query = self.terminal_search_query.clone();
+        let Some(tab) = self.tabs.get_mut(self.focused) else {
+            self.terminal_search_status = Some(crate::i18n::text(
+                "en",
+                crate::i18n::MessageKey::TerminalSearchNoMatches,
+                &[],
+            ));
+            return;
+        };
+        let result = if forward {
+            tab.backend.search_next(&query)
+        } else {
+            tab.backend.search_previous(&query)
+        };
+        self.terminal_search_status = Some(match result {
+            Ok(Some((current, count))) => crate::i18n::text(
+                "en",
+                crate::i18n::MessageKey::TerminalSearchStatus,
+                &[
+                    ("current", &current.to_string()),
+                    ("count", &count.to_string()),
+                ],
+            ),
+            Ok(None) => {
+                crate::i18n::text("en", crate::i18n::MessageKey::TerminalSearchNoMatches, &[])
+            }
+            Err(_) => crate::i18n::text(
+                "en",
+                crate::i18n::MessageKey::TerminalSearchInvalidPattern,
+                &[],
+            ),
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn clear_terminal_search(&mut self) {
+        if !terminal_search_available() {
+            return;
+        }
+        for tab in &mut self.tabs {
+            tab.backend.clear_search();
+        }
+        self.terminal_search_query.clear();
+        self.terminal_search_status = None;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn select_all_active_terminal(&mut self) {
+        if terminal_search_available() {
+            if let Some(tab) = self.tabs.get_mut(self.focused) {
+                tab.backend.select_all();
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn clear_active_terminal_screen(&mut self) {
+        if terminal_search_available() {
+            if let Some(tab) = self.tabs.get_mut(self.focused) {
+                tab.backend.clear_screen();
+            }
+        }
+        self.terminal_search_status = None;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn terminal_search_bar(&mut self, ctx: &egui::Context) {
+        if !self.show_terminal_search {
+            return;
+        }
+        let colors = self.colors();
+        let mut action = None;
+        let mut clear_search = false;
+        let mut close = false;
+        egui::TopBottomPanel::top("terminal-search")
+            .exact_height(40.0)
+            .frame(
+                egui::Frame::new()
+                    .fill(colors.panel)
+                    .inner_margin(egui::Margin::symmetric(9, 4)),
+            )
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut self.terminal_search_query)
+                            .hint_text(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::TerminalSearchHint,
+                                &[],
+                            ))
+                            .desired_width(260.0),
+                    );
+                    if response.changed() {
+                        self.terminal_search_status = None;
+                    }
+                    if response.has_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter))
+                    {
+                        action = Some(true);
+                    }
+                    if ui
+                        .button(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::TerminalSearchPrevious,
+                            &[],
+                        ))
+                        .clicked()
+                    {
+                        action = Some(false);
+                    }
+                    if ui
+                        .button(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::TerminalSearchNext,
+                            &[],
+                        ))
+                        .clicked()
+                    {
+                        action = Some(true);
+                    }
+                    if ui
+                        .button(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::TerminalSearchClear,
+                            &[],
+                        ))
+                        .clicked()
+                    {
+                        clear_search = true;
+                    }
+                    if let Some(status) = &self.terminal_search_status {
+                        ui.label(RichText::new(status).small().color(colors.muted));
+                    }
+                    if ui.small_button("×").clicked() {
+                        close = true;
+                    }
+                });
+            });
+
+        if close {
+            self.show_terminal_search = false;
+        }
+        if clear_search {
+            self.clear_terminal_search();
+        } else if let Some(forward) = action {
+            self.search_active_terminal(forward);
+        }
+    }
+
     fn top_menu(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
         egui::TopBottomPanel::top("menu")
@@ -1702,8 +1878,48 @@ impl ButtonsApp {
                     });
                     ui.menu_button("Terminal", |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
-                        if ui.button("Clear").clicked() {
-                            self.run_command("clear");
+                        if ui
+                            .add_enabled(
+                                terminal_search_available() && !self.tabs.is_empty(),
+                                egui::Button::new(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalFind,
+                                    &[],
+                                )),
+                            )
+                            .clicked()
+                        {
+                            self.show_terminal_search = true;
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui
+                            .add_enabled(
+                                terminal_search_available() && !self.tabs.is_empty(),
+                                egui::Button::new(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalSelectAll,
+                                    &[],
+                                )),
+                            )
+                            .clicked()
+                        {
+                            self.select_all_active_terminal();
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui
+                            .add_enabled(
+                                terminal_search_available() && !self.tabs.is_empty(),
+                                egui::Button::new(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalClearScreen,
+                                    &[],
+                                )),
+                            )
+                            .clicked()
+                        {
+                            self.clear_active_terminal_screen();
                             ui.close_menu();
                         }
                         if ui.button("Settings").clicked() {
@@ -5206,6 +5422,8 @@ impl eframe::App for ButtonsApp {
         self.top_menu(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_bar(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.terminal_search_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.preset_bar(ctx);
         self.status_bar(ctx);
