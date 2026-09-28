@@ -8,6 +8,9 @@ pub mod theme;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod terminal;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod storage;
+
 #[cfg(target_arch = "wasm32")]
 mod web {
     use wasm_bindgen::prelude::*;

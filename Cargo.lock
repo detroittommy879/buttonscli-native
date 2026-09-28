@@ -246,6 +246,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_term",
+ "home",
  "log",
  "serde",
  "serde_json",
