@@ -1,4 +1,5 @@
 pub mod app;
+mod assistant;
 pub mod features;
 pub mod fonts;
 pub mod i18n;

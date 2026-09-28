@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — A01 provider metadata and credentials, Windows source pass
+
+Added named provider metadata in native preferences, an AI providers Settings tab, editable HTTP(S) endpoints and model IDs, OS credential storage through `keyring` 3.6.3, and explicit session-only keys. Credential calls run on workers; UI shows only generic errors and never persists key values. Legacy import now offers a separate unchecked key-transfer choice. Only keys corresponding to imported providers transfer; old files are read only, and older native imports recover provider metadata from their sanitized compatibility file. Added fake-store tests for success/failure, key redaction, source preservation and recovery. Windows library tests and strict Clippy pass. A live credential-store/GUI pass and AI request pipeline remain. Access tier: `aiHelp` is pro; provider configuration itself does not execute AI or imply entitlement.
+
 ## 2026-09-28 — R01 stable session action dispatcher
 
 Added `session/actions.rs` with original-style active/ID/tab-ID/title resolution, ambiguity errors, a 64-request bounded reply queue, deadlines and explicit access/readiness/closed/unsupported errors. Submission pins the active terminal ID; execution rechecks that ID on the app thread, including hidden sessions. Native create/reopen/focus/rename/move/close/layout/count UI mutations now pass through this action path. Rename dialogs pin IDs rather than vector positions. Tests cover queued focus changes, reorder/close, duplicate titles, hidden IDs, saturation, deadlines and failed shell launch; existing pane remap tests continue to pass. This is free core infrastructure. The future control server must request repaint after background enqueue and apply its own feature-access decision before submission. `Send` remains deliberately unsupported until R04.

@@ -26,18 +26,28 @@ egui = "0.31.1"
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+url = "2.5"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 anyhow = "1.0"
 fastrand = "2.5"
+zeroize = "1.8"
 fs2 = "0.4.3"
 sha2 = "0.10"
-url = "2.5"
 home = "0.5.12"
 eframe = { version = "0.31.1", default-features = false, features = ["wgpu", "wayland", "x11"] }
 egui_term = { path = "vendor/egui_term" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["sync-secret-service", "crypto-rust", "vendored"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["apple-native"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 eframe = { version = "0.31.1", default-features = false, features = ["glow"] }

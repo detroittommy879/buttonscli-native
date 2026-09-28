@@ -1,3 +1,9 @@
+#[cfg(not(target_arch = "wasm32"))]
+use crate::assistant::credentials::{
+    self, CredentialStore, SessionCredentialStore, SystemCredentialStore,
+};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::assistant::provider::{validate_endpoint, ProviderProfile};
 use crate::fonts::{self, FontZone};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layout::{self, Bounds, LayoutMode};
@@ -35,7 +41,11 @@ use egui_term::{
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use zeroize::{Zeroize, Zeroizing};
 
 pub struct ButtonsApp {
     preferences: Preferences,
@@ -80,6 +90,22 @@ pub struct ButtonsApp {
     import_tx: Sender<ImportEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     import_rx: Receiver<ImportEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    import_keys: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_session_only: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_session: Arc<SessionCredentialStore>,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_tx: Sender<CredentialEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    credential_rx: Receiver<CredentialEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -132,13 +158,34 @@ enum SettingsTab {
     Commands,
     Workspace,
     #[cfg(not(target_arch = "wasm32"))]
+    Providers,
+    #[cfg(not(target_arch = "wasm32"))]
     Import,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 enum ImportEvent {
     Preview(u64, Vec<String>, Result<Box<ImportPreview>, String>),
-    Commit(u64, Result<ImportCommit, String>),
+    Commit(
+        u64,
+        Result<ImportCommit, String>,
+        Option<Result<import::CredentialTransferResult, String>>,
+    ),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum CredentialEvent {
+    Saved {
+        provider_id: String,
+        reference: String,
+        session_only: bool,
+        result: Result<(), credentials::CredentialError>,
+    },
+    Deleted {
+        provider_id: String,
+        session_only: bool,
+        result: Result<(), credentials::CredentialError>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -270,6 +317,8 @@ impl ButtonsApp {
         let (session_dispatcher, session_inbox) = actions::bounded(64);
         #[cfg(not(target_arch = "wasm32"))]
         let (import_tx, import_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (credential_tx, credential_rx) = mpsc::channel();
         Self {
             preferences,
             themes: ThemeCatalog::load(),
@@ -313,6 +362,22 @@ impl ButtonsApp {
             import_tx,
             #[cfg(not(target_arch = "wasm32"))]
             import_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            import_keys: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_session_only: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_message: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_session: Arc::new(SessionCredentialStore::default()),
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            credential_rx,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1747,6 +1812,12 @@ impl ButtonsApp {
                     #[cfg(not(target_arch = "wasm32"))]
                     ui.selectable_value(
                         &mut self.settings_tab,
+                        SettingsTab::Providers,
+                        crate::i18n::text("en", crate::i18n::MessageKey::Providers, &[]),
+                    );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    ui.selectable_value(
+                        &mut self.settings_tab,
                         SettingsTab::Import,
                         crate::i18n::text("en", crate::i18n::MessageKey::ImportFromOriginal, &[]),
                     );
@@ -1758,6 +1829,8 @@ impl ButtonsApp {
                     SettingsTab::Commands => self.command_settings(ui),
                     SettingsTab::Workspace => self.workspace_settings(ui),
                     #[cfg(not(target_arch = "wasm32"))]
+                    SettingsTab::Providers => self.provider_settings(ui, ctx),
+                    #[cfg(not(target_arch = "wasm32"))]
                     SettingsTab::Import => self.import_settings(ui, ctx),
                 }
             });
@@ -1766,6 +1839,251 @@ impl ButtonsApp {
             || old_typography != self.preferences.typography
         {
             self.apply_style(ctx);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn provider_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        use crate::i18n::{text, MessageKey as M};
+        let warning_color = self.colors().warning;
+        ui.heading(text("en", M::Providers, &[]));
+        ui.label(text("en", M::ProviderHelp, &[]));
+        let settings = &mut self.preferences.provider_settings;
+        let prior = settings.active_provider_id.clone();
+        egui::ComboBox::from_label(text("en", M::ActiveProvider, &[]))
+            .selected_text(
+                settings
+                    .active()
+                    .map(|provider| provider.name.as_str())
+                    .unwrap_or("—"),
+            )
+            .show_ui(ui, |ui| {
+                for provider in &settings.providers {
+                    ui.selectable_value(
+                        &mut settings.active_provider_id,
+                        provider.id.clone(),
+                        &provider.name,
+                    );
+                }
+            });
+        if prior != settings.active_provider_id {
+            self.credential_draft.zeroize();
+            self.credential_message = None;
+        }
+        if ui.button(text("en", M::AddProvider, &[])).clicked() {
+            let unique = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default();
+            let provider = ProviderProfile {
+                id: format!("provider-{unique}"),
+                name: format!("Provider {}", settings.providers.len() + 1),
+                ..ProviderProfile::default()
+            };
+            settings.active_provider_id = provider.id.clone();
+            settings.providers.push(provider);
+            self.credential_draft.zeroize();
+            self.credential_message = None;
+        }
+        let Some(index) = settings
+            .providers
+            .iter()
+            .position(|provider| provider.id == settings.active_provider_id)
+        else {
+            return;
+        };
+        let provider = &mut settings.providers[index];
+        ui.horizontal(|ui| {
+            ui.label(text("en", M::ProviderName, &[]));
+            ui.text_edit_singleline(&mut provider.name);
+        });
+        ui.horizontal(|ui| {
+            ui.label(text("en", M::ProviderEndpoint, &[]));
+            ui.text_edit_singleline(&mut provider.endpoint);
+        });
+        ui.horizontal(|ui| {
+            ui.label(text("en", M::ProviderModel, &[]));
+            ui.text_edit_singleline(&mut provider.model);
+        });
+        if validate_endpoint(&provider.endpoint).is_err() {
+            ui.colored_label(warning_color, text("en", M::ProviderEndpointInvalid, &[]));
+        }
+        let profile_name = self
+            .native_store
+            .as_ref()
+            .map_or("default", NativeStore::profile_name);
+        let reference = credentials::reference(profile_name, &provider.id);
+        let has_session_key = self.credential_session.get(&reference).is_ok();
+        let has_saved_key = provider.credential_ref.as_deref() == Some(reference.as_str());
+        let key_status = text(
+            "en",
+            if has_session_key {
+                M::ProviderSessionStatus
+            } else if has_saved_key {
+                M::ProviderOsStatus
+            } else {
+                M::ProviderNoneStatus
+            },
+            &[],
+        );
+        ui.label(text("en", M::ProviderKeyStatus, &[("status", &key_status)]));
+        ui.horizontal(|ui| {
+            ui.label(text("en", M::ApiKey, &[]));
+            ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
+        });
+        ui.checkbox(
+            &mut self.credential_session_only,
+            text("en", M::SessionOnlyKey, &[]),
+        );
+        let provider_id = provider.id.clone();
+        let save = ui
+            .add_enabled(
+                !self.credential_busy && !self.credential_draft.trim().is_empty(),
+                egui::Button::new(text("en", M::SaveKey, &[])),
+            )
+            .clicked();
+        let delete = ui
+            .add_enabled(
+                !self.credential_busy && (has_session_key || has_saved_key),
+                egui::Button::new(text("en", M::RemoveKey, &[])),
+            )
+            .clicked();
+        let remove = ui
+            .add_enabled(
+                !self.credential_busy && !has_session_key && !has_saved_key,
+                egui::Button::new(text("en", M::RemoveProvider, &[])),
+            )
+            .clicked();
+        if let Some(message) = &self.credential_message {
+            ui.label(message);
+        }
+        if save {
+            let value = Zeroizing::new(std::mem::take(&mut self.credential_draft));
+            let session_only = self.credential_session_only;
+            let session = Arc::clone(&self.credential_session);
+            let tx = self.credential_tx.clone();
+            let ctx = ctx.clone();
+            self.credential_busy = true;
+            std::thread::spawn(move || {
+                let result = if session_only {
+                    session.put(&reference, &value)
+                } else {
+                    SystemCredentialStore.put(&reference, &value)
+                };
+                let _ = tx.send(CredentialEvent::Saved {
+                    provider_id,
+                    reference,
+                    session_only,
+                    result,
+                });
+                ctx.request_repaint();
+            });
+        } else if delete {
+            let session = Arc::clone(&self.credential_session);
+            let tx = self.credential_tx.clone();
+            let ctx = ctx.clone();
+            self.credential_busy = true;
+            std::thread::spawn(move || {
+                let result = if has_session_key {
+                    session.delete(&reference)
+                } else {
+                    SystemCredentialStore.delete(&reference)
+                };
+                let _ = tx.send(CredentialEvent::Deleted {
+                    provider_id,
+                    session_only: has_session_key,
+                    result,
+                });
+                ctx.request_repaint();
+            });
+        } else if remove {
+            settings.providers.remove(index);
+            settings.active_provider_id = settings
+                .providers
+                .first()
+                .map(|provider| provider.id.clone())
+                .unwrap_or_default();
+            self.credential_draft.zeroize();
+            self.credential_message = None;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_credential_events(&mut self) {
+        while let Ok(event) = self.credential_rx.try_recv() {
+            self.credential_busy = false;
+            match event {
+                CredentialEvent::Saved {
+                    provider_id,
+                    reference,
+                    session_only,
+                    result,
+                } => match result {
+                    Ok(()) => {
+                        if let Some(provider) = self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter_mut()
+                            .find(|p| p.id == provider_id)
+                        {
+                            if !session_only {
+                                provider.credential_ref = Some(reference.clone());
+                            }
+                        }
+                        if !session_only {
+                            let _ = self.credential_session.delete(&reference);
+                        }
+                        self.credential_message = Some(crate::i18n::text(
+                            "en",
+                            if session_only {
+                                crate::i18n::MessageKey::KeySavedSession
+                            } else {
+                                crate::i18n::MessageKey::KeySavedOs
+                            },
+                            &[],
+                        ));
+                    }
+                    Err(error) => {
+                        self.credential_message = Some(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::KeySaveFailed,
+                            &[("reason", &error.to_string())],
+                        ));
+                    }
+                },
+                CredentialEvent::Deleted {
+                    provider_id,
+                    session_only,
+                    result,
+                } => match result {
+                    Ok(()) => {
+                        if let Some(provider) = self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter_mut()
+                            .find(|p| p.id == provider_id)
+                        {
+                            if !session_only {
+                                provider.credential_ref = None;
+                            }
+                        }
+                        self.credential_message = Some(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::KeyRemoved,
+                            &[],
+                        ));
+                    }
+                    Err(error) => {
+                        self.credential_message = Some(crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::KeyRemoveFailed,
+                            &[("reason", &error.to_string())],
+                        ));
+                    }
+                },
+            }
         }
     }
 
@@ -2204,6 +2522,7 @@ impl ButtonsApp {
             });
         if self.import_source_choice != previous_choice {
             self.import_preview = None;
+            self.import_keys = false;
         }
         if !self.import_busy
             && ui
@@ -2213,6 +2532,7 @@ impl ButtonsApp {
             self.import_generation = self.import_generation.wrapping_add(1);
             let generation = self.import_generation;
             self.import_preview = None;
+            self.import_keys = false;
             self.import_message = None;
             self.import_busy = true;
             let tx = self.import_tx.clone();
@@ -2276,11 +2596,21 @@ impl ButtonsApp {
             }
         }
         ui.label(text("en", MessageKey::ImportExcludedKeys, &[]));
-        ui.label(format!(
-            "{} original provider key(s) detected. Credential transfer is unavailable.",
-            preview.credential_count
+        ui.label(text(
+            "en",
+            MessageKey::ImportKeyCount,
+            &[("count", &preview.credential_count.to_string())],
         ));
-        ui.label("API-key transfer is unavailable until native credential storage is implemented. Runtime/auth files, session history and unknown top-level fields are excluded.");
+        ui.add_enabled_ui(
+            preview.credential_count > 0 && !preview.already_imported,
+            |ui| {
+                ui.checkbox(
+                    &mut self.import_keys,
+                    text("en", MessageKey::ImportKeysChoice, &[]),
+                );
+            },
+        );
+        ui.label(text("en", MessageKey::ImportOtherExclusions, &[]));
         for warning in &preview.warnings {
             ui.colored_label(self.colors().warning, warning);
         }
@@ -2305,20 +2635,44 @@ impl ButtonsApp {
                     .clicked()
             {
                 let preview = self.import_preview.take().expect("preview shown");
+                let key_plan = self.import_keys.then(|| preview.credential_transfer_plan());
+                self.import_keys = false;
                 self.import_busy = true;
                 let generation = self.import_generation;
                 let tx = self.import_tx.clone();
                 let ctx = ctx.clone();
                 std::thread::spawn(move || {
-                    let result = (|| {
+                    let (result, transfer) = (|| {
                         let (native, original) =
                             production_roots().map_err(|error| error.to_string())?;
                         let store = NativeStore::open(native, original.0.clone())
                             .map_err(|error| error.to_string())?;
-                        import::commit(&original, &store, preview)
-                            .map_err(|error| error.to_string())
-                    })();
-                    let _ = tx.send(ImportEvent::Commit(generation, result));
+                        let mut result = import::commit(&original, &store, preview)
+                            .map_err(|error| error.to_string())?;
+                        let transfer =
+                            if let (Some(plan), ImportCommit::Imported { store, preferences }) =
+                                (key_plan, &mut result)
+                            {
+                                Some(
+                                    import::transfer_credentials(
+                                        &original,
+                                        &plan,
+                                        store,
+                                        preferences,
+                                        &SystemCredentialStore,
+                                    )
+                                    .map_err(|error| error.to_string()),
+                                )
+                            } else {
+                                None
+                            };
+                        Ok::<_, String>((result, transfer))
+                    })()
+                    .map_or_else(
+                        |error| (Err(error), None),
+                        |(result, transfer)| (Ok(result), transfer),
+                    );
+                    let _ = tx.send(ImportEvent::Commit(generation, result, transfer));
                     ctx.request_repaint();
                 });
             }
@@ -2343,7 +2697,9 @@ impl ButtonsApp {
                         }
                     }
                 }
-                ImportEvent::Commit(generation, result) if generation == self.import_generation => {
+                ImportEvent::Commit(generation, result, transfer)
+                    if generation == self.import_generation =>
+                {
                     self.import_busy = false;
                     match result {
                         Ok(ImportCommit::AlreadyImported) => {
@@ -2365,11 +2721,20 @@ impl ButtonsApp {
                             self.preferences = preferences;
                             self.theme_overrides.clear();
                             self.native_store = Some(store);
-                            self.native_revision = Some(1);
+                            self.native_revision = Some(
+                                transfer
+                                    .as_ref()
+                                    .and_then(|result| result.as_ref().ok())
+                                    .map_or(1, |result| result.revision),
+                            );
                             self.native_save_blocked = false;
                             self.import_offer = false;
                             self.apply_style(ctx);
-                            self.import_message = Some("Import complete. New terminals and settings now use the imported profile.".into());
+                            self.import_message = Some(match transfer {
+                                Some(Ok(result)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysResult, &[("saved", &result.imported.to_string()), ("failed", &result.failed.to_string())]),
+                                Some(Err(error)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysFailed, &[("reason", &error)]),
+                                None => "Import complete. New terminals and settings now use the imported profile.".into(),
+                            });
                         }
                         Err(error) => self.import_message = Some(format!("Import failed: {error}")),
                     }
@@ -3585,6 +3950,8 @@ impl eframe::App for ButtonsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(not(target_arch = "wasm32"))]
         self.process_import_events(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_credential_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
         #[cfg(not(target_arch = "wasm32"))]

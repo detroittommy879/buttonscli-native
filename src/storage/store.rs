@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 
+use crate::assistant::provider::ProviderSettings;
 use crate::settings::Preferences;
 
 use super::paths::{sanitize_profile_name, NativeDataRoot};
@@ -120,7 +121,25 @@ impl NativeStore {
             return Ok(None);
         }
         ensure_native_path(&self.root.0, &path)?;
-        let document = parse_document(&read_limited(&path, MAX_NATIVE_BYTES)?)?;
+        let bytes = read_limited(&path, MAX_NATIVE_BYTES)?;
+        let has_provider_settings = serde_json::from_slice::<serde_json::Value>(&bytes)
+            .ok()
+            .and_then(|value| value.get("preferences")?.get("provider_settings").cloned())
+            .is_some();
+        let mut document = parse_document(&bytes)?;
+        if !has_provider_settings {
+            let compatibility = self.profile_dir().join("legacy-compatible.json");
+            if compatibility.is_file() {
+                ensure_native_path(&self.root.0, &compatibility)?;
+                let safe: serde_json::Value =
+                    serde_json::from_slice(&read_limited(&compatibility, MAX_NATIVE_BYTES)?)
+                        .map_err(|_| StoreError::InvalidDocument)?;
+                if let Some(assistant) = safe.get("assistant") {
+                    document.preferences.provider_settings =
+                        ProviderSettings::from_legacy(assistant).0;
+                }
+            }
+        }
         Ok(Some(LoadedNative {
             preferences: document.preferences,
             revision: document.revision,
@@ -164,10 +183,14 @@ impl NativeStore {
             .unwrap_or(0)
             .checked_add(1)
             .ok_or(StoreError::StaleRevision)?;
+        let mut safe_preferences = preferences.clone();
+        safe_preferences
+            .provider_settings
+            .normalize(&mut Vec::new());
         let document = NativeDocument {
             schema_version: SCHEMA_VERSION,
             revision,
-            preferences: preferences.clone(),
+            preferences: safe_preferences,
         };
         let encoded =
             serde_json::to_vec_pretty(&document).map_err(|_| StoreError::InvalidDocument)?;

@@ -7,6 +7,8 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use crate::assistant::credentials::{self, CredentialStore};
+use crate::assistant::provider::sanitize_endpoint;
 use crate::settings::Preferences;
 
 use super::document::LegacyDocument;
@@ -99,6 +101,101 @@ pub(crate) struct ImportPreview {
     pub selected_locale: Option<String>,
     pub credential_count: usize,
     prepared: Prepared,
+}
+
+pub(crate) struct CredentialTransferPlan {
+    selection: Option<String>,
+    source_fingerprint: String,
+}
+
+impl ImportPreview {
+    pub(crate) fn credential_transfer_plan(&self) -> CredentialTransferPlan {
+        CredentialTransferPlan {
+            selection: self.prepared.selection.clone(),
+            source_fingerprint: self.prepared.source_fingerprint.clone(),
+        }
+    }
+}
+
+pub(crate) struct CredentialTransferResult {
+    pub(crate) revision: u64,
+    pub(crate) imported: usize,
+    pub(crate) failed: usize,
+}
+
+/// Called only after an explicit key-transfer choice and a successful profile import.
+/// The source is reopened read-only and checked against the preview before any key is saved.
+pub(crate) fn transfer_credentials(
+    source: &LegacyImportRoot,
+    plan: &CredentialTransferPlan,
+    store: &NativeStore,
+    preferences: &mut Preferences,
+    credentials: &dyn CredentialStore,
+) -> Result<CredentialTransferResult, ImportError> {
+    let current = scan(source, plan.selection.as_deref())?;
+    if current.source_fingerprint != plan.source_fingerprint {
+        return Err(ImportError::Store(StoreError::SourceChanged));
+    }
+    let paths = match plan.selection.as_deref() {
+        Some(name) => source.resolve_named(name)?,
+        None => source.resolve_active()?,
+    };
+    let raw = read_source(&source.0.canonicalize()?, &paths.config, MAX_CONFIG)?;
+    let document = LegacyDocument::parse(&raw).map_err(|_| ImportError::InvalidConfig)?;
+    let assistant = document.get("assistant").unwrap_or(&Value::Null);
+    let entries = assistant
+        .get("namedProviders")
+        .and_then(Value::as_array)
+        .or_else(|| assistant.get("savedProfiles").and_then(Value::as_array));
+    let mut candidates = Vec::new();
+    if let Some(entries) = entries {
+        for entry in entries {
+            if entry["endpoint"]
+                .as_str()
+                .and_then(sanitize_endpoint)
+                .is_none()
+            {
+                continue;
+            }
+            candidates.push(entry["apiKey"].as_str().filter(|key| !key.is_empty()));
+        }
+    } else if assistant["endpoint"]
+        .as_str()
+        .and_then(sanitize_endpoint)
+        .is_some()
+    {
+        candidates.push(assistant["apiKey"].as_str().filter(|key| !key.is_empty()));
+    }
+    let mut imported = 0;
+    let mut failed = 0;
+    for (provider, key) in preferences
+        .provider_settings
+        .providers
+        .iter_mut()
+        .zip(candidates)
+    {
+        let Some(key) = key else {
+            continue;
+        };
+        let reference = credentials::reference(store.profile_name(), &provider.id);
+        match credentials.put(&reference, key) {
+            Ok(()) => {
+                provider.credential_ref = Some(reference);
+                imported += 1;
+            }
+            Err(_) => failed += 1,
+        }
+    }
+    let revision = if imported > 0 {
+        store.save(Some(1), preferences)?
+    } else {
+        1
+    };
+    Ok(CredentialTransferResult {
+        revision,
+        imported,
+        failed,
+    })
 }
 
 pub(crate) enum ImportCommit {
@@ -403,7 +500,9 @@ fn destination(store: &NativeStore, prepared: &Prepared) -> Result<(String, bool
 mod tests {
     use super::super::paths::NativeDataRoot;
     use super::*;
+    use crate::assistant::credentials::{CredentialError, SessionCredentialStore};
     use std::time::{SystemTime, UNIX_EPOCH};
+    use zeroize::Zeroizing;
 
     fn fixture() -> (PathBuf, LegacyImportRoot, NativeStore) {
         let nonce = SystemTime::now()
@@ -478,6 +577,109 @@ mod tests {
         let mut digest = Sha256::new();
         visit(root, root, &mut digest);
         format!("{:x}", digest.finalize())
+    }
+
+    struct UnavailableCredentials;
+
+    impl CredentialStore for UnavailableCredentials {
+        fn put(&self, _: &str, _: &str) -> Result<(), CredentialError> {
+            Err(CredentialError::Unavailable)
+        }
+        fn get(&self, _: &str) -> Result<Zeroizing<String>, CredentialError> {
+            Err(CredentialError::Unavailable)
+        }
+        fn delete(&self, _: &str) -> Result<(), CredentialError> {
+            Err(CredentialError::Unavailable)
+        }
+    }
+
+    #[test]
+    fn selected_key_transfer_uses_credential_store_without_serializing_values() {
+        let (base, source, store) = fixture();
+        let original_digest = source_tree_digest(&source.0);
+        let preview = preview(&source, &store, None).unwrap();
+        let plan = preview.credential_transfer_plan();
+        let ImportCommit::Imported {
+            store,
+            mut preferences,
+        } = commit(&source, &store, preview).unwrap()
+        else {
+            panic!("fresh import skipped");
+        };
+        let credentials = SessionCredentialStore::default();
+        let result =
+            transfer_credentials(&source, &plan, &store, &mut preferences, &credentials).unwrap();
+        assert_eq!((result.imported, result.failed, result.revision), (1, 0, 2));
+        let provider = &preferences.provider_settings.providers[0];
+        assert_eq!(
+            credentials
+                .get(provider.credential_ref.as_deref().unwrap())
+                .unwrap()
+                .as_str(),
+            "FAKE-KEY-NAMED-NOT-REAL"
+        );
+        for name in [
+            "native.json",
+            "legacy-compatible.json",
+            "import-manifest.json",
+        ] {
+            let content = fs::read_to_string(store.profile_dir().join(name)).unwrap();
+            assert!(!content.contains("FAKE-KEY"));
+        }
+        assert_eq!(source_tree_digest(&source.0), original_digest);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn failed_key_transfer_does_not_claim_saved_credentials() {
+        let (base, source, store) = fixture();
+        let preview = preview(&source, &store, None).unwrap();
+        let plan = preview.credential_transfer_plan();
+        let ImportCommit::Imported {
+            store,
+            mut preferences,
+        } = commit(&source, &store, preview).unwrap()
+        else {
+            panic!("fresh import skipped");
+        };
+        let result = transfer_credentials(
+            &source,
+            &plan,
+            &store,
+            &mut preferences,
+            &UnavailableCredentials,
+        )
+        .unwrap();
+        assert_eq!((result.imported, result.failed, result.revision), (0, 1, 1));
+        assert!(preferences.provider_settings.providers[0]
+            .credential_ref
+            .is_none());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn prior_import_loads_provider_metadata_from_safe_compatibility_file() {
+        let (base, source, store) = fixture();
+        let preview = preview(&source, &store, None).unwrap();
+        let ImportCommit::Imported { store, .. } = commit(&source, &store, preview).unwrap() else {
+            panic!("fresh import skipped");
+        };
+        let path = store.profile_dir().join("native.json");
+        let mut native: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        native["preferences"]
+            .as_object_mut()
+            .unwrap()
+            .remove("provider_settings");
+        fs::write(&path, serde_json::to_vec(&native).unwrap()).unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        assert_eq!(
+            loaded.preferences.provider_settings.providers[0].id,
+            "fixture-local"
+        );
+        assert!(loaded.preferences.provider_settings.providers[0]
+            .credential_ref
+            .is_none());
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

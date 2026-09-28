@@ -1,3 +1,4 @@
+use crate::assistant::provider::ProviderSettings;
 use crate::fonts::Typography;
 use serde::{Deserialize, Serialize};
 
@@ -109,6 +110,7 @@ pub(crate) struct Preferences {
     pub(crate) ssh_presets: Vec<CommandPreset>,
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
     pub(crate) pane_divider: PaneDividerAppearance,
+    pub(crate) provider_settings: ProviderSettings,
     pub(crate) chrome_corner_radius: u8,
     pub(crate) default_shell_id: String,
     pub(crate) default_working_directory: String,
@@ -132,6 +134,7 @@ impl Default for Preferences {
             ssh_presets: Vec::new(),
             pane_split_ratios: std::collections::BTreeMap::new(),
             pane_divider: PaneDividerAppearance::default(),
+            provider_settings: ProviderSettings::default(),
             chrome_corner_radius: 6,
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
@@ -152,6 +155,7 @@ pub(crate) struct PaneDividerAppearance {
 impl Preferences {
     pub(crate) fn normalize_theme_sources(&mut self) {
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
+        self.provider_settings.normalize(&mut Vec::new());
         for source in [
             &mut self.app_theme_id,
             &mut self.terminal_theme_id,

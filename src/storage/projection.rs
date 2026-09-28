@@ -1,5 +1,6 @@
 use serde_json::{Map, Value};
 
+use crate::assistant::provider::ProviderSettings;
 use crate::fonts::{self, FontZone};
 use crate::i18n;
 use crate::settings::{CommandPreset, Preferences, ShellProfile};
@@ -109,7 +110,11 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
     }
     if let Some(assistant) = document.get("assistant") {
         if assistant.is_object() {
-            safe.insert("assistant".into(), safe_assistant(assistant));
+            let sanitized = safe_assistant(assistant);
+            let (providers, provider_warnings) = ProviderSettings::from_legacy(&sanitized);
+            preferences.provider_settings = providers;
+            warnings.extend(provider_warnings);
+            safe.insert("assistant".into(), sanitized);
         } else {
             warnings.push("assistant is not an object".into());
         }
@@ -231,7 +236,13 @@ fn project_font_zone(value: &Value, zone: &mut FontZone, mono: bool, warnings: &
 
 fn safe_assistant(value: &Value) -> Value {
     let mut safe = Map::new();
-    for key in ["activeProviderId", "provider", "endpoint", "model"] {
+    for key in [
+        "activeProviderId",
+        "activeProfileId",
+        "provider",
+        "endpoint",
+        "model",
+    ] {
         if let Some(Value::String(value)) = value.get(key) {
             if key == "endpoint" {
                 if let Some(endpoint) = safe_endpoint(value) {
@@ -277,15 +288,7 @@ fn copy_string_fields(value: &Value, keys: &[&str]) -> Option<Value> {
 }
 
 fn safe_endpoint(raw: &str) -> Option<String> {
-    let mut endpoint = url::Url::parse(raw).ok()?;
-    if !matches!(endpoint.scheme(), "http" | "https") {
-        return None;
-    }
-    endpoint.set_username("").ok()?;
-    endpoint.set_password(None).ok()?;
-    endpoint.set_query(None);
-    endpoint.set_fragment(None);
-    Some(endpoint.to_string())
+    crate::assistant::provider::sanitize_endpoint(raw)
 }
 
 pub(crate) fn scrub_secrets(value: &Value) -> Value {

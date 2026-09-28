@@ -53,8 +53,9 @@ not a backlog disguised as release notes.
   localization, accounts, and updater/release infrastructure are not part of
   this lean core yet.
 - Desktop Settings can preview and import an original-app profile as a new native
-  snapshot. There is no general profile switcher or native credential transfer
-  yet. Imported provider metadata does not activate AI Help. Repeat imports
+  snapshot. There is no general profile switcher. Selected keys for imported
+  providers can transfer to the OS credential store; other legacy keys are not
+  migrated. Imported provider metadata does not activate AI Help. Repeat imports
   skip identical snapshots and do not overwrite native edits.
 - Images, color emoji rendering, sixel graphics, ligatures across cells, and
   advanced IME behavior need focused renderer tests.
