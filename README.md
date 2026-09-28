@@ -20,7 +20,8 @@ Current desktop features include:
   arguments, and working directories;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - separate command and SSH docks, editable persisted presets with type/run
-  behavior, and all 555 legacy theme selections with exact terminal ANSI palettes;
+  behavior, all 555 bundled legacy theme selections, and personal version 1
+  theme JSON files from the active native profile's `themes/` folder;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
   including separate terminal regular/bold faces;
@@ -52,6 +53,11 @@ document exists, the app reads its earlier eframe preferences once and writes a
 native copy on the next save. The original Tauri app's `~/.buttonscli/` folder is
 not changed. Importing that original app's settings is still planned; it does
 not happen automatically.
+
+Personal themes are read when the desktop app starts. A broken theme file is
+skipped without removing other themes. These files are not copied from the
+original app yet, and unsupported effect fields are retained for later export
+but are not rendered.
 
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.

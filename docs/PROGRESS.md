@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — S04 native personal theme loading
+
+The active native profile now loads version 1 personal theme JSON documents beside the 559 embedded choices. Internal IDs include profile and filename, so duplicate legacy metadata IDs cannot replace embedded themes or each other. Raw documents retain unsupported effect fields; bad/oversized/escaped files produce isolated warnings. The first focused test incorrectly classified embedded `basic2` as a native theme; source shows it is a legacy bundle, and the assertion was corrected. Temporary-profile tests cover collisions, a bad file, preserved data, profile isolation and the full embedded catalog. Original profile themes are not imported yet. GUI theme switching without PTY respawn remains a manual check. Access tier: free (`themeSelection`).
+
 ## 2026-09-28 — S03 native settings store
 
 Added versioned `native.json` in `~/.buttonscli-native/profiles/<profile>/`, native active-profile metadata, same-directory temp replacement, file locking and revision checks. Desktop startup prefers native data and reads prior eframe preferences only when no native document exists; the old eframe data is retained. A malformed native file or stale second instance blocks overwrite and surfaces an error. Guard checks prevent the native root or redirected child paths from writing into the original settings folder. Tests cover Windows replacement/restart, stale instances, corrupt document and unusable destination. The first lock implementation used Rust 1.89's API and failed the crate's Rust 1.85 MSRV lint; replaced it with `fs2` 0.4.3. No original app settings were read or written. Import remains S05, and Fedora/Windows GUI restart validation is pending. Access tier: free.

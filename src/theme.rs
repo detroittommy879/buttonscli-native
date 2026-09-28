@@ -3,6 +3,8 @@ use egui::Color32;
 #[cfg(not(target_arch = "wasm32"))]
 use egui_term::{ColorPalette, TerminalTheme};
 use serde_json::Value;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
 
 include!(concat!(env!("OUT_DIR"), "/bundled_themes.rs"));
 const LEGACY_CODE_THEMES_JSON: &str = include_str!("../assets/generated/legacy-code-themes.json");
@@ -24,6 +26,7 @@ pub enum ThemeSource {
     Native,
     LegacyBundle,
     LegacyBuiltIn,
+    Personal,
 }
 
 impl ThemeDefinition {
@@ -36,6 +39,8 @@ impl ThemeDefinition {
 #[derive(Clone, Debug)]
 pub struct ThemeCatalog {
     themes: Vec<ThemeDefinition>,
+    #[cfg(not(target_arch = "wasm32"))]
+    personal_documents: std::collections::BTreeMap<String, Value>,
 }
 
 impl ThemeCatalog {
@@ -60,7 +65,11 @@ impl ThemeCatalog {
             Ok(_) => log::warn!("legacy code theme catalog is not an array"),
             Err(error) => log::warn!("could not load legacy code theme catalog: {error}"),
         }
-        Self { themes }
+        Self {
+            themes,
+            #[cfg(not(target_arch = "wasm32"))]
+            personal_documents: std::collections::BTreeMap::new(),
+        }
     }
 
     pub fn all(&self) -> &[ThemeDefinition] {
@@ -77,7 +86,12 @@ impl ThemeCatalog {
     pub fn legacy_count(&self) -> usize {
         self.themes
             .iter()
-            .filter(|theme| theme.source != ThemeSource::Native)
+            .filter(|theme| {
+                matches!(
+                    theme.source,
+                    ThemeSource::LegacyBundle | ThemeSource::LegacyBuiltIn
+                )
+            })
             .count()
     }
 
@@ -86,6 +100,93 @@ impl ThemeCatalog {
             .iter()
             .filter(|theme| theme.source == ThemeSource::LegacyBundle)
             .count()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn load_personal(&mut self, profile: &str, profile_dir: &Path) -> Vec<String> {
+        self.themes
+            .retain(|theme| theme.source != ThemeSource::Personal);
+        self.personal_documents.clear();
+        let themes_dir = profile_dir.join("themes");
+        if !themes_dir.exists() {
+            return Vec::new();
+        }
+        let mut warnings = Vec::new();
+        let canonical_profile = match profile_dir.canonicalize() {
+            Ok(path) => path,
+            Err(error) => return vec![format!("could not resolve profile directory: {error}")],
+        };
+        let canonical_themes = match themes_dir.canonicalize() {
+            Ok(path) if path.starts_with(&canonical_profile) => path,
+            Ok(_) => return vec!["personal themes directory escapes the native profile".into()],
+            Err(error) => return vec![format!("could not resolve themes directory: {error}")],
+        };
+        let entries = match std::fs::read_dir(&themes_dir) {
+            Ok(entries) => entries,
+            Err(error) => return vec![format!("could not list personal themes: {error}")],
+        };
+        let mut paths: Vec<_> = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+            })
+            .collect();
+        paths.sort();
+        for path in paths {
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("theme.json");
+            let stem = path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("theme");
+            let identity = format!("personal:{profile}:{stem}");
+            let result = (|| -> Result<(ThemeDefinition, Value), String> {
+                let resolved = path.canonicalize().map_err(|error| error.to_string())?;
+                if !resolved.starts_with(&canonical_themes) {
+                    return Err("file escapes the themes directory".into());
+                }
+                let metadata = std::fs::metadata(&path).map_err(|error| error.to_string())?;
+                if metadata.len() > 2 * 1024 * 1024 {
+                    return Err("file exceeds 2 MiB".into());
+                }
+                let bytes = std::fs::read(&path).map_err(|error| error.to_string())?;
+                if bytes.len() > 2 * 1024 * 1024 {
+                    return Err("file exceeds 2 MiB".into());
+                }
+                let document: Value =
+                    serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+                if document["version"] != 1
+                    || !document["metadata"]["id"].is_string()
+                    || !document["metadata"]["name"].is_string()
+                    || !document["theme"].is_object()
+                    || !document["effects"].is_object()
+                {
+                    return Err("not a version 1 saved theme document".into());
+                }
+                let mut theme = parse_legacy_value(stem, &document, ThemeSource::Personal)
+                    .map_err(|error| error.to_string())?;
+                theme.id = identity.clone();
+                Ok((theme, document))
+            })();
+            match result {
+                Ok((theme, document)) => {
+                    self.personal_documents.insert(identity, document);
+                    self.themes.push(theme);
+                }
+                Err(error) => warnings.push(format!("{file_name}: {error}")),
+            }
+        }
+        warnings
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn personal_document(&self, id: &str) -> Option<&Value> {
+        self.personal_documents.get(id)
     }
 }
 
@@ -714,5 +815,70 @@ mod tests {
                 angle_degrees: 90.0,
             }
         );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn personal_themes_keep_colliding_ids_and_isolate_broken_files() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let profile = std::env::temp_dir().join(format!(
+            "buttonscli-theme-test-{}-{nonce}",
+            std::process::id()
+        ));
+        let themes = profile.join("themes");
+        fs::create_dir_all(&themes).unwrap();
+        let first =
+            include_str!("../tests/fixtures/legacy/profiles/Work_Space/themes/duplicate-a.json")
+                .replace("same-id", "basic2");
+        let second =
+            include_str!("../tests/fixtures/legacy/profiles/Work_Space/themes/duplicate-b.json");
+        fs::write(themes.join("first.json"), first).unwrap();
+        fs::write(themes.join("second.json"), second).unwrap();
+        fs::write(themes.join("broken.json"), "{bad").unwrap();
+        let mut catalog = ThemeCatalog::load();
+        let warnings = catalog.load_personal("Work_Space", &profile);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("broken.json"));
+        assert_eq!(catalog.legacy_count(), 555);
+        assert_eq!(catalog.all().len(), 561);
+        assert_eq!(catalog.get("basic2").source, ThemeSource::LegacyBundle);
+        assert_eq!(
+            catalog.get("personal:Work_Space:first").source,
+            ThemeSource::Personal
+        );
+        assert_ne!(
+            catalog
+                .get("personal:Work_Space:first")
+                .terminal_colors
+                .background,
+            catalog
+                .get("personal:Work_Space:second")
+                .terminal_colors
+                .background
+        );
+        assert_eq!(
+            catalog
+                .personal_document("personal:Work_Space:first")
+                .unwrap()["metadata"]["id"],
+            "basic2"
+        );
+        assert!(catalog
+            .personal_document("personal:Work_Space:first")
+            .unwrap()["effects"]["futureEffect"]
+            .as_bool()
+            .unwrap());
+        let other_profile = profile.join("other");
+        fs::create_dir(&other_profile).unwrap();
+        assert!(catalog.load_personal("Other", &other_profile).is_empty());
+        assert_eq!(catalog.all().len(), 559);
+        assert!(catalog
+            .personal_document("personal:Work_Space:first")
+            .is_none());
+        fs::remove_dir_all(profile).unwrap();
     }
 }

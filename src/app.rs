@@ -187,6 +187,14 @@ impl ButtonsApp {
             app.native_store = native_store;
             app.native_revision = native_revision;
             app.native_save_blocked = storage_error.is_some();
+            if let Some(store) = &app.native_store {
+                for warning in app
+                    .themes
+                    .load_personal(store.profile_name(), &store.profile_dir())
+                {
+                    log::warn!("personal theme: {warning}");
+                }
+            }
         }
         fonts::install(&cc.egui_ctx);
         app.apply_style(&cc.egui_ctx);

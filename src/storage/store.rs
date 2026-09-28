@@ -96,8 +96,12 @@ impl NativeStore {
         })
     }
 
-    fn profile_dir(&self) -> PathBuf {
+    pub(crate) fn profile_dir(&self) -> PathBuf {
         self.root.0.join("profiles").join(&self.profile)
+    }
+
+    pub(crate) fn profile_name(&self) -> &str {
+        &self.profile
     }
     fn native_path(&self) -> PathBuf {
         self.profile_dir().join("native.json")
