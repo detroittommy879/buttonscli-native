@@ -16,6 +16,7 @@ use crate::session::actions::{
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
 use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
+use crate::shortcuts::{ShortcutAction, ShortcutAssignError, ShortcutChord};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage::import::{self, ImportCommit, ImportPreview};
 #[cfg(not(target_arch = "wasm32"))]
@@ -106,6 +107,8 @@ pub struct ButtonsApp {
     themes: ThemeCatalog,
     theme_search: String,
     settings_tab: SettingsTab,
+    shortcut_capture: Option<ShortcutAction>,
+    shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
     show_about: bool,
     show_preset_editor: bool,
@@ -233,10 +236,24 @@ enum SettingsTab {
     Fonts,
     Commands,
     Workspace,
+    Shortcuts,
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
     Import,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ShortcutFeedback {
+    Saved,
+    Cleared,
+    Reset,
+    Cancelled,
+    Conflict(ShortcutAction),
+    UnknownConflict,
+    UnsafeInterrupt,
+    ModifierRequired,
+    Invalid,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -468,6 +485,8 @@ impl ButtonsApp {
             themes: ThemeCatalog::load(),
             theme_search: String::new(),
             settings_tab: SettingsTab::Themes,
+            shortcut_capture: None,
+            shortcut_feedback: None,
             show_settings: false,
             show_about: false,
             show_preset_editor: false,
@@ -2124,6 +2143,11 @@ impl ButtonsApp {
                         SettingsTab::Workspace,
                         "Workspace",
                     );
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Shortcuts,
+                        crate::i18n::text("en", crate::i18n::MessageKey::Shortcuts, &[]),
+                    );
                     #[cfg(not(target_arch = "wasm32"))]
                     ui.selectable_value(
                         &mut self.settings_tab,
@@ -2143,6 +2167,7 @@ impl ButtonsApp {
                     SettingsTab::Fonts => self.font_settings(ui),
                     SettingsTab::Commands => self.command_settings(ui),
                     SettingsTab::Workspace => self.workspace_settings(ui),
+                    SettingsTab::Shortcuts => self.shortcut_settings(ui),
                     #[cfg(not(target_arch = "wasm32"))]
                     SettingsTab::Providers => self.provider_settings(ui, ctx),
                     #[cfg(not(target_arch = "wasm32"))]
@@ -3802,6 +3827,73 @@ impl ButtonsApp {
         }
     }
 
+    fn shortcut_settings(&mut self, ui: &mut egui::Ui) {
+        use crate::i18n::{text, MessageKey as M};
+
+        ui.heading(text("en", M::Shortcuts, &[]));
+        ui.label(text("en", M::ShortcutHelp, &[]));
+        ui.add_space(8.0);
+        egui::Grid::new("native-shortcut-settings")
+            .striped(true)
+            .num_columns(4)
+            .show(ui, |ui| {
+                for action in ShortcutAction::ALL {
+                    let current = self
+                        .preferences
+                        .shortcuts
+                        .binding(action)
+                        .map(ShortcutChord::label)
+                        .unwrap_or_else(|| "—".into());
+                    ui.label(text("en", action.message_key(), &[]));
+                    ui.monospace(current);
+                    if ui.button(text("en", M::ShortcutRecord, &[])).clicked() {
+                        self.shortcut_capture = Some(action);
+                        self.shortcut_feedback = None;
+                    }
+                    if ui.button(text("en", M::ShortcutClear, &[])).clicked() {
+                        self.preferences.shortcuts.clear(action);
+                        self.shortcut_feedback = Some(ShortcutFeedback::Cleared);
+                        if self.shortcut_capture == Some(action) {
+                            self.shortcut_capture = None;
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+
+        if ui
+            .button(text("en", M::ShortcutResetDefaults, &[]))
+            .clicked()
+        {
+            self.preferences.shortcuts.reset();
+            self.shortcut_capture = None;
+            self.shortcut_feedback = Some(ShortcutFeedback::Reset);
+        }
+
+        if self.shortcut_capture.is_some() {
+            ui.add_space(6.0);
+            ui.label(text("en", M::ShortcutRecordPrompt, &[]));
+        }
+        if let Some(feedback) = self.shortcut_feedback {
+            let feedback = match feedback {
+                ShortcutFeedback::Saved => text("en", M::ShortcutSaved, &[]),
+                ShortcutFeedback::Cleared => text("en", M::ShortcutCleared, &[]),
+                ShortcutFeedback::Reset => text("en", M::ShortcutResetComplete, &[]),
+                ShortcutFeedback::Cancelled => text("en", M::Cancel, &[]),
+                ShortcutFeedback::Conflict(action) => {
+                    let action = text("en", action.message_key(), &[]);
+                    text("en", M::ShortcutConflict, &[("action", &action)])
+                }
+                ShortcutFeedback::UnknownConflict => text("en", M::ShortcutConflictUnknown, &[]),
+                ShortcutFeedback::UnsafeInterrupt => text("en", M::ShortcutUnsafeInterrupt, &[]),
+                ShortcutFeedback::ModifierRequired => text("en", M::ShortcutModifierRequired, &[]),
+                ShortcutFeedback::Invalid => text("en", M::ShortcutInvalid, &[]),
+            };
+            ui.add_space(6.0);
+            ui.colored_label(self.colors().warning, feedback);
+        }
+    }
+
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
         ui.heading("Workspace");
         egui::ScrollArea::vertical()
@@ -4200,36 +4292,98 @@ impl ButtonsApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (new_tab, close_tab, reopen_tab, copy, paste, settings, quit) = ctx.input(|input| {
-            let command = input.modifiers.command && input.modifiers.shift;
-            (
-                command && input.key_pressed(egui::Key::T),
-                command && input.key_pressed(egui::Key::W),
-                command && input.key_pressed(egui::Key::U),
-                command && input.key_pressed(egui::Key::C),
-                command && input.key_pressed(egui::Key::V),
-                command && input.key_pressed(egui::Key::Comma),
-                command && input.key_pressed(egui::Key::Q),
-            )
+        let pressed = ctx.input(|input| {
+            input.events.iter().find_map(|event| match event {
+                egui::Event::Key {
+                    key,
+                    pressed: true,
+                    repeat: false,
+                    modifiers,
+                    ..
+                } => Some((*key, *modifiers)),
+                _ => None,
+            })
         });
+
+        if let Some(action) = self.shortcut_capture {
+            if !self.show_settings {
+                self.shortcut_capture = None;
+                self.shortcut_feedback = Some(ShortcutFeedback::Cancelled);
+                return;
+            }
+            if let Some((egui::Key::Escape, modifiers)) = pressed {
+                if !modifiers.command && !modifiers.ctrl && !modifiers.alt && !modifiers.shift {
+                    self.shortcut_capture = None;
+                    self.shortcut_feedback = Some(ShortcutFeedback::Cancelled);
+                    return;
+                }
+            }
+            if let Some((key, modifiers)) = pressed {
+                let Some(chord) = ShortcutChord::from_input(key, modifiers) else {
+                    self.shortcut_feedback = Some(ShortcutFeedback::Invalid);
+                    return;
+                };
+                if !chord.is_valid() {
+                    self.shortcut_feedback = Some(ShortcutFeedback::ModifierRequired);
+                    return;
+                }
+                match self.preferences.shortcuts.assign(action, chord) {
+                    Ok(()) => {
+                        self.shortcut_capture = None;
+                        self.shortcut_feedback = Some(ShortcutFeedback::Saved);
+                    }
+                    Err(ShortcutAssignError::Invalid) => {
+                        self.shortcut_feedback = Some(ShortcutFeedback::Invalid)
+                    }
+                    Err(ShortcutAssignError::ReservedTerminalInterrupt) => {
+                        self.shortcut_feedback = Some(ShortcutFeedback::UnsafeInterrupt)
+                    }
+                    Err(ShortcutAssignError::Conflict(other)) => {
+                        self.shortcut_feedback = Some(ShortcutFeedback::Conflict(other))
+                    }
+                    Err(ShortcutAssignError::UnknownConflict) => {
+                        self.shortcut_feedback = Some(ShortcutFeedback::UnknownConflict)
+                    }
+                }
+            }
+            return;
+        }
+
+        // Do not trigger app commands while Settings and its text fields own input.
+        if self.show_settings || self.show_preset_editor {
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
-        {
-            if new_tab {
-                self.dispatch_ui_or_notice(
-                    None,
-                    Action::Create {
-                        profile_id: self.preferences.default_shell_id.clone(),
-                    },
-                    ctx,
-                );
+        if self.show_tab_rename {
+            return;
+        }
+        let matched = pressed.and_then(|(key, modifiers)| {
+            ShortcutAction::ALL.into_iter().find(|action| {
+                self.preferences
+                    .shortcuts
+                    .binding(*action)
+                    .is_some_and(|binding| binding.matches(key, modifiers))
+            })
+        });
+        let Some(action) = matched else {
+            return;
+        };
+
+        #[cfg(not(target_arch = "wasm32"))]
+        match action {
+            ShortcutAction::NewTab => self.dispatch_ui_or_notice(
+                None,
+                Action::Create {
+                    profile_id: self.preferences.default_shell_id.clone(),
+                },
+                ctx,
+            ),
+            ShortcutAction::CloseTab if !self.tabs.is_empty() => {
+                self.dispatch_ui_or_notice(Some(Target::Active), Action::Close, ctx)
             }
-            if close_tab && !self.tabs.is_empty() {
-                self.dispatch_ui_or_notice(Some(Target::Active), Action::Close, ctx);
-            }
-            if reopen_tab {
-                self.dispatch_ui_or_notice(None, Action::Reopen, ctx);
-            }
-            if copy {
+            ShortcutAction::CloseTab => {}
+            ShortcutAction::ReopenTab => self.dispatch_ui_or_notice(None, Action::Reopen, ctx),
+            ShortcutAction::CopySelection => {
                 if let Some(tab) = self.tabs.get(self.focused) {
                     let selected = tab.backend.selectable_content();
                     if !selected.is_empty() {
@@ -4237,16 +4391,20 @@ impl ButtonsApp {
                     }
                 }
             }
-            if paste {
-                ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
-            }
+            ShortcutAction::Paste => ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste),
+            ShortcutAction::OpenSettings | ShortcutAction::Quit => {}
         }
-        let _ = (new_tab, close_tab, reopen_tab, copy, paste);
-        if settings {
-            self.show_settings = true;
+        #[cfg(target_arch = "wasm32")]
+        match action {
+            ShortcutAction::OpenSettings => self.show_settings = true,
+            ShortcutAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            _ => {}
         }
-        if quit {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        #[cfg(not(target_arch = "wasm32"))]
+        match action {
+            ShortcutAction::OpenSettings => self.show_settings = true,
+            ShortcutAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            _ => {}
         }
     }
 }

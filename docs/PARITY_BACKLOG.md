@@ -43,7 +43,7 @@ constraints.
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
 | Dock behavior | Partial | `src/components/PresetBar.tsx` | Top and left docks resize, collapse, auto-hide, and support compact wrapping without covering terminal content. |
-| Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Port every supported command, expose editable bindings, detect conflicts, and verify macOS/Windows modifier behavior. |
+| Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Seven native app actions have editable recorded bindings, conflict checks, reset/clear, and Ctrl+C protection; verify recording in the GUI and complete the remaining original actions. |
 | Status controls | Partial | `src/components/StatusBar.tsx` | Show live shell/tab/pane state and restore the useful layout, zoom, opacity, effect, and assistant controls. |
 
 ## P1 — visual system

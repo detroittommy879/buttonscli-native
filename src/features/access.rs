@@ -144,6 +144,7 @@ mod tests {
     fn free_and_internal_have_distinct_default_access() {
         let runtime = RuntimeAccess::default();
         assert!(resolve(FeatureKey::PaneLayout, &runtime, &None, 100).available);
+        assert!(resolve(FeatureKey::KeyboardShortcuts, &runtime, &None, 100).available);
         assert_eq!(
             resolve(FeatureKey::QuickSecrets, &runtime, &None, 100).discoverability,
             Discoverability::Hidden

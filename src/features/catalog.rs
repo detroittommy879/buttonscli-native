@@ -6,6 +6,7 @@ pub enum FeatureKey {
     ThemeSelection,
     TerminalScrollbar,
     PaneDivider,
+    KeyboardShortcuts,
     SettingsAppearance,
     OriginalSettingsImport,
     GuidedOnboarding,
@@ -22,13 +23,14 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
         Self::ThemeSelection,
         Self::TerminalScrollbar,
         Self::PaneDivider,
+        Self::KeyboardShortcuts,
         Self::SettingsAppearance,
         Self::OriginalSettingsImport,
         Self::GuidedOnboarding,
@@ -52,6 +54,7 @@ impl FeatureKey {
             Self::ThemeSelection => "themeSelection",
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
+            Self::KeyboardShortcuts => "keyboardShortcuts",
             Self::SettingsAppearance => "settingsAppearance",
             Self::OriginalSettingsImport => "originalSettingsImport",
             Self::GuidedOnboarding => "guidedOnboarding",
@@ -78,6 +81,7 @@ impl FeatureKey {
             | K::TabWrapping
             | K::TerminalScrollbar
             | K::PaneDivider => (T::Free, true, R::Active, "layout"),
+            K::KeyboardShortcuts => (T::Free, true, R::Active, "shortcuts"),
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
             K::SettingsAppearance | K::OriginalSettingsImport => {
                 (T::Free, true, R::Active, "settings")

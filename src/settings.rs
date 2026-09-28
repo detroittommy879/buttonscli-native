@@ -1,5 +1,6 @@
 use crate::assistant::provider::ProviderSettings;
 use crate::fonts::Typography;
+use crate::shortcuts::ShortcutSettings;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -111,6 +112,7 @@ pub(crate) struct Preferences {
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
     pub(crate) pane_divider: PaneDividerAppearance,
     pub(crate) provider_settings: ProviderSettings,
+    pub(crate) shortcuts: ShortcutSettings,
     pub(crate) chrome_corner_radius: u8,
     pub(crate) default_shell_id: String,
     pub(crate) default_working_directory: String,
@@ -135,6 +137,7 @@ impl Default for Preferences {
             pane_split_ratios: std::collections::BTreeMap::new(),
             pane_divider: PaneDividerAppearance::default(),
             provider_settings: ProviderSettings::default(),
+            shortcuts: ShortcutSettings::default(),
             chrome_corner_radius: 6,
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
@@ -156,6 +159,7 @@ impl Preferences {
     pub(crate) fn normalize_theme_sources(&mut self) {
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
         self.provider_settings.normalize(&mut Vec::new());
+        self.shortcuts.normalize();
         for source in [
             &mut self.app_theme_id,
             &mut self.terminal_theme_id,

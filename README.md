@@ -53,9 +53,11 @@ The first build downloads and compiles the Rust dependency graph. Linux needs
 the usual X11 or Wayland development packages. See `docs/BUILDING.md` for the
 full platform notes.
 
-Useful shortcuts are Ctrl+Shift+T (new tab), Ctrl+Shift+W (close tab),
-Ctrl+Shift+U (reopen tab), Ctrl+Shift+C/V (copy/paste), Ctrl+Shift+, (Settings),
-and Ctrl+Shift+Q (quit).
+Default shortcuts are `Primary+Shift+T` (new tab), `Primary+Shift+W` (close),
+`Primary+Shift+U` (reopen), `Primary+Shift+C/V` (copy/paste),
+`Primary+Shift+,` (Settings), and `Primary+Shift+Q` (quit). Primary means Ctrl
+on Windows/Linux and Command on macOS. Edit or clear these under
+**Settings → Shortcuts**; see [Keyboard shortcuts](docs/SHORTCUTS.md).
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

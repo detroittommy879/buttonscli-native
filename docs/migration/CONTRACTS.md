@@ -39,7 +39,7 @@ Parse the original JSON in memory alongside typed projections. Do not reduce it 
 | `presets[]`, `sshPresets[]` | `label`, `command`, optional `sendEnter`; characterize original absent-value default; explicit false must survive |
 | `window.defaultShell`, `window.customShellProfiles[]` | Translate command-based original selection to native shell IDs; preserve unmapped profile fields; native working-directory extensions stay in sidecar |
 | `theme.app`, `theme.terminal`, `theme.typography`, `effects` | Project actual saved values, not only a built-in theme ID; keep unsupported values round-trippable |
-| `keyboard`, `layout`, `window.opacity` | Preserve until individual features are implemented; only patch owned fields |
+| `keyboard`, `layout`, `window.opacity` | Preserve in the sanitized compatibility document until a native mapping exists; current native shortcut bindings use their own profile schema and do not activate original custom bindings |
 | `assistant.namedProviders`, `activeProviderId` and deprecated provider forms | Import metadata and normalize using original migration behavior; keys follow credential policy below |
 | `localization` | Respect mode/manual locale and prior confirmation; do not force onboarding again |
 | `features`, `plugins`, future keys | Retain; local config is not proof of paid access |

@@ -7,6 +7,7 @@
 - Added editable named AI provider settings with active provider selection, endpoint and model fields, plus OS-stored or session-only API keys. Keys are not saved in native settings files.
 - Added explicit provider connection tests and optional model discovery. Requests run in the background, stop at redirects, time out after 20 seconds, and cap response bodies at 1 MiB.
 - Added a separate AI Help window with streamed answers, bounded in-session conversation history, retry, and optional previewed terminal context. Context is sourced from the selected terminal's existing screen/scrollback grid and redaction is best effort.
+- Added editable app shortcuts under Settings, with keyboard recording, duplicate detection, clearing and reset. Ctrl+C and Primary+C without Shift remain reserved for terminal interrupt.
 - AI Help can suggest up to two commands or supported terminal keys. Sending each suggestion requires an explicit review action and rechecks its pinned terminal session ID. Commands are inserted literally and Enter is sent only when the user chooses Insert + Enter.
 - Kept provider requests behind the Pro `aiHelp` feature gate. This build has no entitlement service yet; debug builds have an explicit environment-only development override.
 - Added the Pro `automationRemoteControl` local API on an ephemeral `127.0.0.1` port. It provides status, tab list/create/rename, bounded output reads, send/run/key actions, layouts, and active-profile presets through the app-thread session dispatcher.

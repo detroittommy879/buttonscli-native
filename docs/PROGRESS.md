@@ -1,5 +1,23 @@
 # Reconstruction journal
 
+## 2026-09-28 — U01 editable native shortcuts
+
+Added a persisted shortcut map and Settings recorder for new tab, close,
+reopen, copy, paste, open Settings, and quit. It keeps the existing
+Primary+Shift defaults, supports platform-aware Primary/Ctrl/Alt/Shift
+matching, rejects duplicate bindings and Ctrl+C/Primary+C without Shift, and
+lets users clear one binding or restore defaults. Unknown future shortcut
+entries survive round trips and reserve their chords. Added the free
+`keyboardShortcuts` catalog entry. Original custom keyboard preferences stay
+preserved in compatibility data but are not activated because several of the
+legacy actions do not exist in this native build.
+
+`cargo fmt --all`, Windows `cargo check --bin buttonscli` and
+`cargo build --bin buttonscli` passed. Four focused shortcut tests and three
+feature-access tests passed. The Settings recorder has not had manual GUI
+acceptance. The wasm target is not installed in this Windows toolchain, so this
+shared settings UI has not been cross-compiled there.
+
 ## 2026-09-28 — C05 optional MCP adapter source and protocol smoke
 
 Adapted the read-only original stdio helper template into a native MCP server

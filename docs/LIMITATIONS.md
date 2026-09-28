@@ -53,6 +53,10 @@ not a backlog disguised as release notes.
   launch behavior still need their platform verification passes.
 - Profile switching, detached Settings, full UI localization, accounts, and
   updater/release infrastructure are not part of this lean core yet.
+- Settings has a keyboard-only recorder for seven native app shortcuts, with
+  duplicate detection and terminal Ctrl+C protection. The GUI recorder has not
+  had manual desktop acceptance. Original custom shortcut settings remain
+  preserved in compatibility data and are not activated by native import.
 - AI Help has editable providers, a separate-window source path, streaming,
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
   release builds stay locked until entitlement integration exists. The
