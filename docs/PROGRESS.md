@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — R01 stable session action dispatcher
+
+Added `session/actions.rs` with original-style active/ID/tab-ID/title resolution, ambiguity errors, a 64-request bounded reply queue, deadlines and explicit access/readiness/closed/unsupported errors. Submission pins the active terminal ID; execution rechecks that ID on the app thread, including hidden sessions. Native create/reopen/focus/rename/move/close/layout/count UI mutations now pass through this action path. Rename dialogs pin IDs rather than vector positions. Tests cover queued focus changes, reorder/close, duplicate titles, hidden IDs, saturation, deadlines and failed shell launch; existing pane remap tests continue to pass. This is free core infrastructure. The future control server must request repaint after background enqueue and apply its own feature-access decision before submission. `Send` remains deliberately unsupported until R04.
+
 ## 2026-09-28 — L08 per-terminal and random themes, source pass
 
 Added stable-session-ID terminal theme overrides and Theme Settings actions for This terminal, Theme all, Random current/all and Use global. Theme all updates the persisted default and clears overrides even for hidden tabs; new tabs inherit it. Random selection excludes each terminal's current theme when alternatives exist. Terminal palettes and supported gradient/effect settings change through the existing live TerminalView path; app chrome remains global. Recent-close recovery carries an override to the new session, while restart clears overrides because sessions are not restored. Tests cover ID-scoped presentation, theme-all reset and non-repeating random choices. Windows source tests and Clippy pass; Fedora live PTY, 1/4/10-pane, personal-theme and contrast checks remain. Access tier: free (`themeSelection`).

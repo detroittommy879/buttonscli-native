@@ -1,6 +1,10 @@
 use crate::fonts::{self, FontZone};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layout::{self, Bounds, LayoutMode};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::session::actions::{
+    self, Action, ActionError, Dispatcher, Inbox, SessionInfo, Snapshot, Target,
+};
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
 use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
@@ -30,6 +34,8 @@ use egui_term::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Duration;
 
 pub struct ButtonsApp {
     preferences: Preferences,
@@ -77,6 +83,10 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
+    session_dispatcher: Dispatcher,
+    #[cfg(not(target_arch = "wasm32"))]
+    session_inbox: Inbox,
+    #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
     detected_shells: Vec<DetectedShell>,
@@ -85,7 +95,7 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     show_tab_rename: bool,
     #[cfg(not(target_arch = "wasm32"))]
-    renaming_tab: Option<usize>,
+    renaming_tab: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     tab_title_draft: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -257,6 +267,8 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         let (events_tx, events_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
+        let (session_dispatcher, session_inbox) = actions::bounded(64);
+        #[cfg(not(target_arch = "wasm32"))]
         let (import_tx, import_rx) = mpsc::channel();
         Self {
             preferences,
@@ -303,6 +315,10 @@ impl ButtonsApp {
             import_rx,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            session_dispatcher,
+            #[cfg(not(target_arch = "wasm32"))]
+            session_inbox,
             #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -510,6 +526,134 @@ impl ButtonsApp {
             .collect();
         for (index, theme_id) in replacements {
             self.set_theme_for_tab(index, &theme_id);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn session_snapshot(&self) -> Snapshot {
+        Snapshot {
+            sessions: self
+                .tabs
+                .iter()
+                .map(|tab| SessionInfo {
+                    id: tab.id,
+                    title: tab.title.clone(),
+                    ready: true,
+                    exited: tab.exited,
+                })
+                .collect(),
+            active_id: self.tabs.get(self.focused).map(|tab| tab.id),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn dispatch_ui_action(
+        &mut self,
+        target: Option<Target>,
+        action: Action,
+        ctx: &egui::Context,
+    ) -> Result<Option<u64>, ActionError> {
+        let pending = self.session_dispatcher.submit(
+            &self.session_snapshot(),
+            target,
+            action,
+            true,
+            Duration::from_secs(2),
+        )?;
+        self.process_session_actions(ctx);
+        pending.recv_timeout(Duration::from_millis(50))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn dispatch_ui_or_notice(
+        &mut self,
+        target: Option<Target>,
+        action: Action,
+        ctx: &egui::Context,
+    ) {
+        if let Err(error) = self.dispatch_ui_action(target, action, ctx) {
+            if error != ActionError::LaunchFailed || self.notice.is_none() {
+                self.notice = Some(error.to_string());
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_session_actions(&mut self, ctx: &egui::Context) {
+        while let Some(request) = self.session_inbox.try_next() {
+            let result = request.validate(&self.session_snapshot()).and_then(|()| {
+                self.execute_session_action(request.target_id, &request.action, ctx)
+            });
+            request.finish(result);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn execute_session_action(
+        &mut self,
+        target_id: Option<u64>,
+        action: &Action,
+        ctx: &egui::Context,
+    ) -> Result<Option<u64>, ActionError> {
+        let index = target_id.and_then(|id| self.tabs.iter().position(|tab| tab.id == id));
+        match action {
+            Action::Create { profile_id } => {
+                let old_len = self.tabs.len();
+                self.open_tab_with_profile(ctx.clone(), profile_id);
+                if self.tabs.len() == old_len {
+                    return Err(ActionError::LaunchFailed);
+                }
+                Ok(self.tabs.last().map(|tab| tab.id))
+            }
+            Action::Reopen => {
+                let old_len = self.tabs.len();
+                self.reopen_closed_tab(ctx.clone());
+                if self.tabs.len() == old_len {
+                    return Err(ActionError::NotFound);
+                }
+                Ok(self.tabs.last().map(|tab| tab.id))
+            }
+            Action::Focus => {
+                self.activate_tab(index.ok_or(ActionError::Closed)?);
+                Ok(target_id)
+            }
+            Action::Close => {
+                self.close_tab(index.ok_or(ActionError::Closed)?);
+                Ok(target_id)
+            }
+            Action::Move { direction } => {
+                let index = index.ok_or(ActionError::Closed)?;
+                let destination = match direction {
+                    -1 => index.saturating_sub(1),
+                    1 => (index + 1).min(self.tabs.len() - 1),
+                    _ => return Err(ActionError::InvalidInput),
+                };
+                self.move_tab(index, destination);
+                Ok(target_id)
+            }
+            Action::Rename { title } => {
+                let title = title.trim();
+                if title.is_empty() {
+                    return Err(ActionError::InvalidInput);
+                }
+                self.tabs[index.ok_or(ActionError::Closed)?].rename(title.to_owned());
+                Ok(target_id)
+            }
+            Action::Layout { mode } => {
+                let layout = match mode {
+                    LayoutMode::Single => PaneLayout::Single,
+                    LayoutMode::Columns => PaneLayout::Columns,
+                    LayoutMode::Rows => PaneLayout::Rows,
+                    LayoutMode::Grid => PaneLayout::Grid,
+                };
+                self.set_pane_layout(layout, ctx);
+                Ok(None)
+            }
+            Action::VisibleCount { count } => {
+                self.set_visible_pane_count(*count, ctx);
+                Ok(None)
+            }
+            Action::Send(_) => Err(ActionError::Unsupported),
         }
     }
 
@@ -731,42 +875,47 @@ impl ButtonsApp {
         let Some(tab) = self.tabs.get(index) else {
             return;
         };
-        self.renaming_tab = Some(index);
+        self.renaming_tab = Some(tab.id);
         self.tab_title_draft.clone_from(&tab.title);
         self.tab_rename_error = None;
         self.show_tab_rename = true;
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn save_tab_rename(&mut self) -> bool {
+    fn save_tab_rename(&mut self, ctx: &egui::Context) -> bool {
         let title = self.tab_title_draft.trim();
         if title.is_empty() {
             self.tab_rename_error = Some("A tab title is required.".into());
             return false;
         }
-        let Some(index) = self.renaming_tab else {
+        let Some(id) = self.renaming_tab else {
             return false;
         };
-        let Some(tab) = self.tabs.get_mut(index) else {
-            self.tab_rename_error = Some("That terminal is no longer open.".into());
-            return false;
-        };
-        tab.rename(title.to_owned());
-        self.tab_rename_error = None;
-        true
+        let result = self.dispatch_ui_action(
+            Some(Target::Id(id)),
+            Action::Rename {
+                title: title.to_owned(),
+            },
+            ctx,
+        );
+        self.tab_rename_error = result.as_ref().err().map(ToString::to_string);
+        result.is_ok()
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn perform_tab_action(&mut self, action: TabAction) {
-        match action {
-            TabAction::Activate(index) => self.activate_tab(index),
-            TabAction::Rename(index) => self.open_tab_rename(index),
-            TabAction::MoveLeft(index) if index > 0 => self.move_tab(index, index - 1),
-            TabAction::MoveRight(index) if index + 1 < self.tabs.len() => {
-                self.move_tab(index, index + 1);
+    fn perform_tab_action(&mut self, action: TabAction, ctx: &egui::Context) {
+        let (index, operation) = match action {
+            TabAction::Activate(index) => (index, Action::Focus),
+            TabAction::Rename(index) => {
+                self.open_tab_rename(index);
+                return;
             }
-            TabAction::Close(index) => self.close_tab(index),
-            TabAction::MoveLeft(_) | TabAction::MoveRight(_) => {}
+            TabAction::MoveLeft(index) => (index, Action::Move { direction: -1 }),
+            TabAction::MoveRight(index) => (index, Action::Move { direction: 1 }),
+            TabAction::Close(index) => (index, Action::Close),
+        };
+        if let Some(id) = self.tabs.get(index).map(|tab| tab.id) {
+            self.dispatch_ui_or_notice(Some(Target::Id(id)), operation, ctx);
         }
     }
 
@@ -955,7 +1104,13 @@ impl ButtonsApp {
         if self.tabs.is_empty() {
             ui.centered_and_justified(|ui| {
                 if ui.button("Open a terminal").clicked() {
-                    self.open_tab(context.clone());
+                    self.dispatch_ui_or_notice(
+                        None,
+                        Action::Create {
+                            profile_id: self.preferences.default_shell_id.clone(),
+                        },
+                        context,
+                    );
                 }
             });
             return;
@@ -1136,7 +1291,13 @@ impl ButtonsApp {
                     ui.menu_button("File", |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui.button("New terminal  Ctrl+Shift+T").clicked() {
-                            self.open_tab(ctx.clone());
+                            self.dispatch_ui_or_notice(
+                                None,
+                                Action::Create {
+                                    profile_id: self.preferences.default_shell_id.clone(),
+                                },
+                                ctx,
+                            );
                             ui.close_menu();
                         }
                         #[cfg(not(target_arch = "wasm32"))]
@@ -1152,7 +1313,11 @@ impl ButtonsApp {
                                 }
                             });
                             if let Some(profile_id) = launch {
-                                self.open_tab_with_profile(ctx.clone(), &profile_id);
+                                self.dispatch_ui_or_notice(
+                                    None,
+                                    Action::Create { profile_id },
+                                    ctx,
+                                );
                                 ui.close_menu();
                             }
                         }
@@ -1164,7 +1329,7 @@ impl ButtonsApp {
                             )
                             .clicked()
                         {
-                            self.reopen_closed_tab(ctx.clone());
+                            self.dispatch_ui_or_notice(None, Action::Reopen, ctx);
                             ui.close_menu();
                         }
                         ui.separator();
@@ -1282,13 +1447,13 @@ impl ButtonsApp {
                     }
                 });
                 if let Some(action) = action {
-                    self.perform_tab_action(action);
+                    self.perform_tab_action(action, ctx);
                 }
                 if let Some(profile_id) = add {
-                    self.open_tab_with_profile(ctx.clone(), &profile_id);
+                    self.dispatch_ui_or_notice(None, Action::Create { profile_id }, ctx);
                 }
                 if reopen {
-                    self.reopen_closed_tab(ctx.clone());
+                    self.dispatch_ui_or_notice(None, Action::Reopen, ctx);
                 }
             });
     }
@@ -1478,28 +1643,28 @@ impl ButtonsApp {
                             .on_hover_text("Single pane")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::Single, ctx);
+                            self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Single }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Columns, "COL")
                             .on_hover_text("Arrange visible terminals in columns")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::Columns, ctx);
+                            self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Columns }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Rows, "ROW")
                             .on_hover_text("Arrange visible terminals in rows")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::Rows, ctx);
+                            self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Rows }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Grid, "GRID")
                             .on_hover_text("Tile visible terminals in a balanced grid")
                             .clicked()
                         {
-                            self.set_pane_layout(PaneLayout::Grid, ctx);
+                            self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Grid }, ctx);
                         }
                         if ui
                             .add_enabled(
@@ -1516,7 +1681,7 @@ impl ButtonsApp {
                             .on_hover_text("Show one fewer terminal")
                             .clicked()
                         {
-                            self.set_visible_pane_count(pane_count - 1, ctx);
+                            self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count - 1 }, ctx);
                         }
                         ui.label(
                             RichText::new(if !self.rendered_panes.is_empty() && self.rendered_panes.len() < pane_count { format!("{}/{pane_count}", self.rendered_panes.len()) } else { pane_count.to_string() })
@@ -1528,7 +1693,7 @@ impl ButtonsApp {
                             .on_hover_text("Show one more terminal")
                             .clicked()
                         {
-                            self.set_visible_pane_count(pane_count + 1, ctx);
+                            self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count + 1 }, ctx);
                         }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -2589,7 +2754,7 @@ impl ButtonsApp {
                     }
                 });
             });
-        if save && self.save_tab_rename() {
+        if save && self.save_tab_rename(ctx) {
             open = false;
         }
         if cancel {
@@ -2627,13 +2792,19 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         {
             if new_tab {
-                self.open_tab(ctx.clone());
+                self.dispatch_ui_or_notice(
+                    None,
+                    Action::Create {
+                        profile_id: self.preferences.default_shell_id.clone(),
+                    },
+                    ctx,
+                );
             }
             if close_tab && !self.tabs.is_empty() {
-                self.close_tab(self.focused);
+                self.dispatch_ui_or_notice(Some(Target::Active), Action::Close, ctx);
             }
             if reopen_tab {
-                self.reopen_closed_tab(ctx.clone());
+                self.dispatch_ui_or_notice(None, Action::Reopen, ctx);
             }
             if copy {
                 if let Some(tab) = self.tabs.get(self.focused) {
@@ -3416,6 +3587,8 @@ impl eframe::App for ButtonsApp {
         self.process_import_events(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_session_actions(ctx);
         self.shortcuts(ctx);
         self.top_menu(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -3548,6 +3721,25 @@ mod tests {
         assert_eq!(app.preferences.gradient_theme_id, "aurora");
         assert_eq!(app.preferences.effects_theme_id, "aurora");
         assert_eq!(app.terminal_presentation_for(7).id, "aurora");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn session_dispatcher_does_not_report_failed_tab_creation_as_success() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let result = app.dispatch_ui_action(
+            None,
+            Action::Create {
+                profile_id: "missing-profile".into(),
+            },
+            &egui::Context::default(),
+        );
+        assert_eq!(result, Err(ActionError::LaunchFailed));
+        assert!(app.tabs.is_empty());
+        assert!(app
+            .notice
+            .as_deref()
+            .is_some_and(|message| message.contains("missing-profile")));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

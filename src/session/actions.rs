@@ -1,0 +1,405 @@
+//! Stable, app-thread-owned session actions. Producers pin a target before queuing.
+
+use std::fmt;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
+use std::time::{Duration, Instant};
+
+use crate::layout::LayoutMode;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct SessionInfo {
+    pub id: u64,
+    pub title: String,
+    pub ready: bool,
+    pub exited: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Snapshot {
+    pub sessions: Vec<SessionInfo>,
+    pub active_id: Option<u64>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Target {
+    Active,
+    Id(u64),
+    #[allow(dead_code)] // Used by the control API after C01.
+    Selector(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum Action {
+    Create {
+        profile_id: String,
+    },
+    Reopen,
+    Focus,
+    Close,
+    Move {
+        direction: i8,
+    },
+    Rename {
+        title: String,
+    },
+    Layout {
+        mode: LayoutMode,
+    },
+    VisibleCount {
+        count: usize,
+    },
+    /// Reserved until R04; never report success for input before it is wired.
+    #[allow(dead_code)] // Input execution is wired in R04.
+    Send(Vec<u8>),
+}
+
+impl Action {
+    fn needs_target(&self) -> bool {
+        matches!(
+            self,
+            Self::Focus | Self::Close | Self::Move { .. } | Self::Rename { .. } | Self::Send(_)
+        )
+    }
+
+    fn needs_ready(&self) -> bool {
+        matches!(self, Self::Send(_))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ActionError {
+    NoActive,
+    NotFound,
+    AmbiguousTitle,
+    NotReady,
+    Exited,
+    Closed,
+    Timeout,
+    QueueFull,
+    ShuttingDown,
+    DeniedAccess,
+    Unsupported,
+    InvalidInput,
+    LaunchFailed,
+}
+
+impl fmt::Display for ActionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::NoActive => "no active terminal is available",
+            Self::NotFound => "terminal was not found",
+            Self::AmbiguousTitle => "terminal title is ambiguous; use its ID",
+            Self::NotReady => "terminal is not ready",
+            Self::Exited => "terminal process has exited",
+            Self::Closed => "terminal closed before the action ran",
+            Self::Timeout => "session action timed out",
+            Self::QueueFull => "session action queue is full",
+            Self::ShuttingDown => "session action dispatcher has stopped",
+            Self::DeniedAccess => "feature access denied",
+            Self::Unsupported => "session action is not implemented",
+            Self::InvalidInput => "session action input is invalid",
+            Self::LaunchFailed => "terminal could not start",
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for ActionError {}
+
+impl Snapshot {
+    pub(crate) fn resolve(&self, target: &Target) -> Result<u64, ActionError> {
+        match target {
+            Target::Active => self.active_id.ok_or(ActionError::NoActive),
+            Target::Id(id) => self
+                .sessions
+                .iter()
+                .any(|session| session.id == *id)
+                .then_some(*id)
+                .ok_or(ActionError::NotFound),
+            Target::Selector(selector) if selector.eq_ignore_ascii_case("active") => {
+                self.resolve(&Target::Active)
+            }
+            Target::Selector(selector) => {
+                if let Ok(id) = selector.parse::<u64>() {
+                    if self.sessions.iter().any(|session| session.id == id) {
+                        return Ok(id);
+                    }
+                }
+                if let Some(id) = selector
+                    .strip_prefix("tab-")
+                    .and_then(|id| id.parse::<u64>().ok())
+                {
+                    if self.sessions.iter().any(|session| session.id == id) {
+                        return Ok(id);
+                    }
+                }
+                let mut matches = self
+                    .sessions
+                    .iter()
+                    .filter(|session| session.title.eq_ignore_ascii_case(selector));
+                let first = matches.next().ok_or(ActionError::NotFound)?;
+                if matches.next().is_some() {
+                    return Err(ActionError::AmbiguousTitle);
+                }
+                Ok(first.id)
+            }
+        }
+    }
+
+    fn validate_current(&self, id: u64, action: &Action) -> Result<(), ActionError> {
+        let session = self
+            .sessions
+            .iter()
+            .find(|session| session.id == id)
+            .ok_or(ActionError::Closed)?;
+        if action.needs_ready() && !session.ready {
+            return Err(ActionError::NotReady);
+        }
+        if action.needs_ready() && session.exited {
+            return Err(ActionError::Exited);
+        }
+        Ok(())
+    }
+}
+
+pub(crate) struct QueuedAction {
+    pub target_id: Option<u64>,
+    pub action: Action,
+    deadline: Instant,
+    reply: SyncSender<Result<Option<u64>, ActionError>>,
+}
+
+impl QueuedAction {
+    pub(crate) fn validate(&self, current: &Snapshot) -> Result<(), ActionError> {
+        if Instant::now() >= self.deadline {
+            return Err(ActionError::Timeout);
+        }
+        if let Some(id) = self.target_id {
+            current.validate_current(id, &self.action)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn finish(self, result: Result<Option<u64>, ActionError>) {
+        let _ = self.reply.try_send(result);
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct Dispatcher {
+    sender: SyncSender<QueuedAction>,
+}
+
+pub(crate) struct Inbox {
+    receiver: Receiver<QueuedAction>,
+}
+
+pub(crate) struct Pending {
+    receiver: Receiver<Result<Option<u64>, ActionError>>,
+}
+
+impl Pending {
+    pub(crate) fn recv_timeout(&self, timeout: Duration) -> Result<Option<u64>, ActionError> {
+        match self.receiver.recv_timeout(timeout) {
+            Ok(result) => result,
+            Err(RecvTimeoutError::Timeout) => Err(ActionError::Timeout),
+            Err(RecvTimeoutError::Disconnected) => Err(ActionError::ShuttingDown),
+        }
+    }
+}
+
+pub(crate) fn bounded(capacity: usize) -> (Dispatcher, Inbox) {
+    let (sender, receiver) = mpsc::sync_channel(capacity);
+    (Dispatcher { sender }, Inbox { receiver })
+}
+
+impl Dispatcher {
+    pub(crate) fn submit(
+        &self,
+        snapshot: &Snapshot,
+        target: Option<Target>,
+        action: Action,
+        allowed: bool,
+        timeout: Duration,
+    ) -> Result<Pending, ActionError> {
+        if !allowed {
+            return Err(ActionError::DeniedAccess);
+        }
+        if timeout.is_zero() {
+            return Err(ActionError::Timeout);
+        }
+        let target_id = if action.needs_target() {
+            let id = snapshot.resolve(&target.ok_or(ActionError::InvalidInput)?)?;
+            snapshot.validate_current(id, &action)?;
+            Some(id)
+        } else {
+            None
+        };
+        let (reply, receiver) = mpsc::sync_channel(1);
+        self.sender
+            .try_send(QueuedAction {
+                target_id,
+                action,
+                deadline: Instant::now() + timeout.min(Duration::from_secs(30)),
+                reply,
+            })
+            .map_err(|error| match error {
+                TrySendError::Full(_) => ActionError::QueueFull,
+                TrySendError::Disconnected(_) => ActionError::ShuttingDown,
+            })?;
+        Ok(Pending { receiver })
+    }
+}
+
+impl Inbox {
+    pub(crate) fn try_next(&self) -> Option<QueuedAction> {
+        self.receiver.try_recv().ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn snapshot() -> Snapshot {
+        Snapshot {
+            sessions: vec![
+                SessionInfo {
+                    id: 1,
+                    title: "term1".into(),
+                    ready: true,
+                    exited: false,
+                },
+                SessionInfo {
+                    id: 2,
+                    title: "term2".into(),
+                    ready: true,
+                    exited: false,
+                },
+            ],
+            active_id: Some(1),
+        }
+    }
+
+    #[test]
+    fn selector_precedence_and_duplicate_titles() {
+        let mut state = snapshot();
+        state.sessions[1].title = "term1".into();
+        assert_eq!(state.resolve(&Target::Selector("active".into())), Ok(1));
+        assert_eq!(state.resolve(&Target::Selector("2".into())), Ok(2));
+        assert_eq!(state.resolve(&Target::Selector("tab-2".into())), Ok(2));
+        assert_eq!(
+            state.resolve(&Target::Selector("TERM1".into())),
+            Err(ActionError::AmbiguousTitle)
+        );
+    }
+
+    #[test]
+    fn queued_active_target_stays_pinned_after_focus_reorder_and_close() {
+        let (dispatcher, inbox) = bounded(2);
+        let pending = dispatcher
+            .submit(
+                &snapshot(),
+                Some(Target::Active),
+                Action::Rename {
+                    title: "renamed".into(),
+                },
+                true,
+                Duration::from_secs(1),
+            )
+            .unwrap();
+        let request = inbox.try_next().unwrap();
+        assert_eq!(request.target_id, Some(1));
+        let mut reordered = snapshot();
+        reordered.sessions.reverse();
+        reordered.active_id = Some(2);
+        assert_eq!(request.validate(&reordered), Ok(()));
+        reordered.sessions.retain(|session| session.id != 1);
+        assert_eq!(request.validate(&reordered), Err(ActionError::Closed));
+        request.finish(Err(ActionError::Closed));
+        assert_eq!(
+            pending.recv_timeout(Duration::from_secs(1)),
+            Err(ActionError::Closed)
+        );
+    }
+
+    #[test]
+    fn hidden_sessions_resolve_and_queue_is_bounded() {
+        let mut state = snapshot();
+        for id in 3..=15 {
+            state.sessions.push(SessionInfo {
+                id,
+                title: format!("term{id}"),
+                ready: true,
+                exited: false,
+            });
+        }
+        let (dispatcher, inbox) = bounded(1);
+        let _first = dispatcher
+            .submit(
+                &state,
+                Some(Target::Id(15)),
+                Action::Focus,
+                true,
+                Duration::from_secs(1),
+            )
+            .unwrap();
+        assert!(matches!(
+            dispatcher.submit(
+                &state,
+                Some(Target::Id(14)),
+                Action::Focus,
+                true,
+                Duration::from_secs(1)
+            ),
+            Err(ActionError::QueueFull)
+        ));
+        assert_eq!(inbox.try_next().unwrap().target_id, Some(15));
+    }
+
+    #[test]
+    fn readiness_access_and_deadline_fail_closed() {
+        let mut state = snapshot();
+        state.sessions[0].ready = false;
+        let (dispatcher, inbox) = bounded(1);
+        assert!(matches!(
+            dispatcher.submit(
+                &state,
+                Some(Target::Active),
+                Action::Send(vec![1]),
+                true,
+                Duration::from_secs(1)
+            ),
+            Err(ActionError::NotReady)
+        ));
+        assert!(matches!(
+            dispatcher.submit(
+                &state,
+                Some(Target::Active),
+                Action::Focus,
+                false,
+                Duration::from_secs(1)
+            ),
+            Err(ActionError::DeniedAccess)
+        ));
+        assert!(matches!(
+            dispatcher.submit(
+                &state,
+                Some(Target::Active),
+                Action::Focus,
+                true,
+                Duration::ZERO
+            ),
+            Err(ActionError::Timeout)
+        ));
+        assert!(inbox.try_next().is_none());
+        let (reply, _pending) = mpsc::sync_channel(1);
+        let expired = QueuedAction {
+            target_id: Some(1),
+            action: Action::Focus,
+            deadline: Instant::now() - Duration::from_millis(1),
+            reply,
+        };
+        assert_eq!(expired.validate(&snapshot()), Err(ActionError::Timeout));
+    }
+}

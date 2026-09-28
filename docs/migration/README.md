@@ -2,7 +2,7 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
-Implementation update, 2026-09-28: F01–F04 and S01–S06 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, L07 has visible saved dividers, L08 has per-terminal/random/theme-all controls, and L09 has a saved chrome radius. L01/L03/L05/L07/L08/L09 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes and previewed snapshot import now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+Implementation update, 2026-09-28: F01–F04, S01–S06 and R01 are implemented in the Windows source tree. L02 and L04 are implemented on Windows; L03 has a responsive reducer, L05 has a real-grid scrollbar path, L07 has visible saved dividers, L08 has per-terminal/random/theme-all controls, and L09 has a saved chrome radius. L01/L03/L05/L07/L08/L09 still await Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs, native-profile themes, previewed snapshot import and a stable session action queue now exist. The import creates separate profiles and skips an identical repeat; native credential transfer and interactive GUI acceptance remain open. CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
 
 ## Read in this order
 
@@ -28,7 +28,7 @@ Keep egui/eframe, Alacritty, offline assets, and event-driven rendering. Port be
 
 ## What the audit establishes
 
-- N `src/app.rs` provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. Preferences now save in versioned native storage, with one-time fallback reading of earlier eframe data.
+- N `src/app.rs` provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. UI tab/layout mutations now use the stable-ID `session/actions.rs` queue. Preferences save in versioned native storage, with one-time fallback reading of earlier eframe data.
 - N now plans COL/ROW/GRID from available viewport size and minimum cell bounds, hides overflow without closing its PTYs, and includes the focused session in the rendered slice. Tabs wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive Fedora reproduction and resize evidence.
 - N `src/theme.rs::ThemeCatalog::load` reads embedded assets (555 legacy choices plus four native themes). Native-profile personal theme files load separately; Settings can now import valid original-profile files after preview.
 - O `src-tauri/src/main.rs` resolves `~/.buttonscli/active-profile.json`, `profiles/<name>/config.json`, profile `themes/` and `shaders/`; root `config.json` is a migration fallback.
