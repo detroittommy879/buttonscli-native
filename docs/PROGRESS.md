@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L05 real-grid scrollbar source implementation
+
+Exposed retained history, viewport lines, display offset and alternate-screen/mouse-reporting mode from the vendored Alacritty adapter without a new PTY reader or outer ScrollArea. The native pane reserves a narrow track; wheel and thumb drag both use the backend's `Scroll` command. Geometry tests cover fresh output, resize/truncation, top/bottom dragging and hidden modes; a vendored-grid test exercises actual scroll-up, top and history truncation. Windows `cargo test` passed 68 library and 2 fixture tests; vendored `egui_term` passed 7 tests; strict Clippy passed with the known unrelated test-module lint exempted. Fedora/Windows GUI selection, PTY-size and alternate-screen checks remain open before L05 acceptance. Access tier: free (`terminalScrollbar`).
+
 ## 2026-09-28 — L03 responsive pane layout source implementation
 
 Added a pure, stable-session-ID layout reducer for COL, ROW and GRID. It plans from the available workspace size using 320 × 160 logical-point review bounds plus a font-size estimate for 40 columns and 8 rows, keeps the focused session in view, and hides overflow without closing PTYs; the tab strip and status count expose the effective view. The render tree wraps COL across/down and ROW down/across, with shape-specific divider keys so ratios return after resizing back. Wide/narrow/focus, large-font and new-tab-at-capacity tests were added. Windows release suite passed 64 library and 2 fixture tests; the final source additions passed 65 debug library tests and strict Clippy with the known unrelated lint exempted. A live Fedora X11/Wayland GUI and `stty size` pass are still needed before L03 acceptance. Access tier: free (`paneLayout`).

@@ -29,6 +29,38 @@ pub type TerminalMode = TermMode;
 pub type PtyEvent = Event;
 pub type SelectionType = AlacrittySelectionType;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScrollbackState {
+    pub history_lines: usize,
+    pub viewport_lines: usize,
+    /// Zero is the live bottom; `history_lines` is the oldest retained line.
+    pub display_offset: usize,
+    pub mouse_reporting: bool,
+    pub alternate_screen: bool,
+}
+
+impl ScrollbackState {
+    fn from_content(content: &RenderableContent) -> Self {
+        Self {
+            history_lines: content.grid.history_size(),
+            viewport_lines: content.grid.screen_lines(),
+            display_offset: content.grid.display_offset(),
+            mouse_reporting: content
+                .terminal_mode
+                .intersects(TermMode::MOUSE_MODE),
+            alternate_screen: content
+                .terminal_mode
+                .contains(TermMode::ALT_SCREEN),
+        }
+    }
+
+    pub fn available(self) -> bool {
+        self.history_lines > 0
+            && !self.alternate_screen
+            && !self.mouse_reporting
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum BackendCommand {
     Write(Vec<u8>),
@@ -275,6 +307,11 @@ impl TerminalBackend {
 
     pub fn last_content(&self) -> &RenderableContent {
         &self.last_content
+    }
+
+    /// A no-lock snapshot updated by `TerminalView` after input and resize.
+    pub fn scrollback_state(&self) -> ScrollbackState {
+        ScrollbackState::from_content(self.last_content())
     }
 
     fn process_link_action(
@@ -572,5 +609,36 @@ pub struct EventProxy(mpsc::Sender<Event>);
 impl EventListener for EventProxy {
     fn send_event(&self, event: Event) {
         let _ = self.0.send(event.clone());
+    }
+}
+
+#[cfg(test)]
+mod scrollback_tests {
+    use super::*;
+    use alacritty_terminal::vte::ansi::Color;
+
+    #[test]
+    fn snapshot_tracks_retained_grid_offset_and_mode() {
+        let mut content = RenderableContent {
+            grid: Grid::new(24, 80, 100),
+            ..Default::default()
+        };
+        assert!(!ScrollbackState::from_content(&content).available());
+        content.grid.scroll_up::<Color>(&(Line(0)..Line(24)), 60);
+        let state = ScrollbackState::from_content(&content);
+        assert_eq!(state.viewport_lines, 24);
+        assert_eq!(state.history_lines, 60);
+        assert_eq!(state.display_offset, 0);
+        content.grid.scroll_display(Scroll::Top);
+        assert_eq!(ScrollbackState::from_content(&content).display_offset, 60);
+        content.grid.update_history(10);
+        let truncated = ScrollbackState::from_content(&content);
+        assert_eq!(truncated.history_lines, 10);
+        assert_eq!(truncated.display_offset, 10);
+        content.terminal_mode =
+            TermMode::ALT_SCREEN | TermMode::MOUSE_REPORT_CLICK;
+        assert!(!ScrollbackState::from_content(&content).available());
+        content.grid.clear_history();
+        assert_eq!(ScrollbackState::from_content(&content).history_lines, 0);
     }
 }

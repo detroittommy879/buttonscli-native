@@ -38,7 +38,7 @@ constraints.
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
 | Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults and multi-row tab strip are implemented; verify wrapped interactions and pane mapping on Fedora. |
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Pure geometry reducer and wrapped tree are implemented; verify add/remove/focus, PTY resize, ratio restoration and no blank panes on Fedora. |
-| Visible scrollbars | Missing | native `vendor/egui_term` | Each terminal displays real scrollback position and can drag to scroll without breaking selection or PTY size. |
+| Visible scrollbars | Partial | native `vendor/egui_term` | Real grid history, viewport and offset drive a per-pane drag track; verify selection, PTY size, wheel and alternate-screen behavior on Fedora/Windows. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |

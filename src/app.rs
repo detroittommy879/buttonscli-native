@@ -18,9 +18,14 @@ use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 
 #[cfg(not(target_arch = "wasm32"))]
+use crate::scrollbar;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::terminal::{next_available_title, DetectedShell, ShellLaunch, TerminalTab};
 #[cfg(not(target_arch = "wasm32"))]
-use egui_term::{BackgroundGradient, FontSettings, PtyEvent, TerminalFont, TerminalView};
+use egui_term::{
+    BackendCommand, BackgroundGradient, FontSettings, PtyEvent, TerminalBackend, TerminalFont,
+    TerminalView,
+};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 
@@ -2506,7 +2511,7 @@ fn terminal_surface(
     terminal_bold_font_id: FontId,
     draw_bold_bright: bool,
     theme: &ThemeDefinition,
-) -> egui::Response {
+) -> bool {
     let terminal_font = TerminalFont::new(FontSettings {
         font_type: terminal_font_id,
         bold_font_type: Some(terminal_bold_font_id),
@@ -2543,15 +2548,87 @@ fn terminal_surface(
                 angle_degrees,
             },
         });
+    let available = ui.available_size();
+    let scrollbar_width = if available.x >= 80.0 { 14.0 } else { 0.0 };
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(focused)
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
-        .set_draw_bold_bright(draw_bold_bright);
+        .set_draw_bold_bright(draw_bold_bright)
+        .set_size(egui::vec2(
+            (available.x - scrollbar_width).max(1.0),
+            available.y,
+        ));
     let response = ui.add(terminal);
     paint_terminal_effects(ui, response.rect, theme, tab.id, time);
-    response
+    let scrollbar_clicked = if scrollbar_width > 0.0 {
+        let track = egui::Rect::from_min_size(
+            egui::pos2(response.rect.right(), response.rect.top()),
+            egui::vec2(scrollbar_width, response.rect.height()),
+        );
+        paint_terminal_scrollbar(ui, &mut tab.backend, tab.id, track, theme)
+    } else {
+        false
+    };
+    response.clicked() || scrollbar_clicked
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn paint_terminal_scrollbar(
+    ui: &mut egui::Ui,
+    backend: &mut TerminalBackend,
+    terminal_id: u64,
+    track: egui::Rect,
+    theme: &ThemeDefinition,
+) -> bool {
+    let state = backend.scrollback_state();
+    let Some(thumb) = scrollbar::thumb(state, track.height()) else {
+        return false;
+    };
+    let thumb_rect = egui::Rect::from_min_size(
+        egui::pos2(track.left() + 3.0, track.top() + thumb.top),
+        egui::vec2((track.width() - 6.0).max(2.0), thumb.height),
+    );
+    ui.painter().rect_filled(
+        track.shrink2(egui::vec2(4.0, 0.0)),
+        3.0,
+        theme.colors.border,
+    );
+    ui.painter()
+        .rect_filled(thumb_rect, 3.0, theme.colors.accent);
+    let response = ui.interact(
+        track,
+        ui.id().with(("terminal-scrollbar", terminal_id)),
+        egui::Sense::click_and_drag(),
+    );
+    let grab_id = ui.id().with(("terminal-scrollbar-grab", terminal_id));
+    if let Some(pointer) = response.interact_pointer_pos() {
+        if response.drag_started() {
+            let grab = if thumb_rect.contains(pointer) {
+                pointer.y - thumb_rect.top()
+            } else {
+                thumb.height / 2.0
+            };
+            ui.ctx().data_mut(|data| data.insert_temp(grab_id, grab));
+        }
+        if response.clicked() || response.dragged() {
+            let grab = ui
+                .ctx()
+                .data(|data| data.get_temp::<f32>(grab_id))
+                .unwrap_or(thumb.height / 2.0);
+            let target =
+                scrollbar::offset_for_pointer(state, track.height(), pointer.y - track.top(), grab);
+            let delta = target as i64 - state.display_offset as i64;
+            if delta != 0 {
+                backend.process_command(BackendCommand::Scroll(
+                    delta.clamp(i32::MIN as i64, i32::MAX as i64) as i32,
+                ));
+                ui.ctx().request_repaint();
+            }
+        }
+    }
+    response.clicked() || response.drag_started()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2756,9 +2833,7 @@ fn render_pane_tree(
                 state.terminal_bold_font.clone(),
                 state.draw_bold_bright,
                 state.theme,
-            )
-            .clicked()
-            {
+            ) {
                 *state.clicked = Some(*index);
             }
         }

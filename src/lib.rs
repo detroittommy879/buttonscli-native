@@ -4,6 +4,8 @@ pub mod fonts;
 pub mod i18n;
 #[cfg(not(target_arch = "wasm32"))]
 mod layout;
+#[cfg(not(target_arch = "wasm32"))]
+mod scrollbar;
 mod settings;
 pub mod theme;
 

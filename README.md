@@ -11,7 +11,8 @@ sandboxed interactive demo and never exposes a visitor's local shell.
 
 Current desktop features include:
 
-- real local shell sessions with production VT parsing and scrollback;
+- real local shell sessions with production VT parsing, scrollback, and a
+  draggable per-terminal scrollbar when retained history exists;
 - native GPU-rendered tabs that wrap into more rows, and draggable COL, ROW,
   and GRID layouts for up to ten terminal panes; panes wrap when space is tight,
   with the focused session visible and all tabs reachable from the strip;

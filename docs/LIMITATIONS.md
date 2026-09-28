@@ -20,6 +20,10 @@ not a backlog disguised as release notes.
   retaining the other sessions in the tab strip. Every branch has a draggable
   divider, stores its ratio, and can be returned to balanced defaults from the
   status bar. Fedora GUI resizing and PTY behavior still need direct review.
+- A terminal with retained scrollback shows a draggable scrollbar based on the
+  Alacritty grid's real history and display offset. The track hides in alternate
+  screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior
+  still need GUI review on Fedora and Windows.
 - All 555 legacy theme selections are present. Linear, radial, and conic
   multi-stop terminal gradients preserve their angle/position; animated drift,
   static, and scanlines also render natively. Repeating gradients, hsync warp,
