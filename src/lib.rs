@@ -1,4 +1,5 @@
 pub mod app;
+pub mod features;
 pub mod fonts;
 mod settings;
 pub mod theme;
