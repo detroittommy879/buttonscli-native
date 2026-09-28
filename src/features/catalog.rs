@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum FeatureKey {
     PaneLayout,
+    TabNaming,
     ThemeSelection,
     TerminalScrollbar,
     PaneDivider,
@@ -19,8 +20,9 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::PaneLayout,
+        Self::TabNaming,
         Self::ThemeSelection,
         Self::TerminalScrollbar,
         Self::PaneDivider,
@@ -41,6 +43,7 @@ impl FeatureKey {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::PaneLayout => "paneLayout",
+            Self::TabNaming => "tabNaming",
             Self::ThemeSelection => "themeSelection",
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
@@ -64,7 +67,7 @@ impl FeatureKey {
         use FeatureTier as T;
         use Rollout as R;
         let (tier, enabled, rollout, owner) = match self {
-            K::PaneLayout | K::TerminalScrollbar | K::PaneDivider => {
+            K::PaneLayout | K::TabNaming | K::TerminalScrollbar | K::PaneDivider => {
                 (T::Free, true, R::Active, "layout")
             }
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),

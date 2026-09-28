@@ -14,7 +14,8 @@ Current desktop features include:
 - real local shell sessions with production VT parsing and scrollback;
 - native GPU-rendered tabs and draggable recursive column, row, or balanced-grid
   layouts for up to ten simultaneous terminal panes;
-- tab rename, reorder, and recent-close recovery with pane-safe index updates;
+- new tabs named `term1`, `term2`, and so on, with rename, reorder, and
+  recent-close recovery with pane-safe index updates;
 - detected and custom shell profiles with persisted default/per-tab selection,
   arguments, and working directories;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
@@ -40,6 +41,11 @@ full platform notes.
 Useful shortcuts are Ctrl+Shift+T (new tab), Ctrl+Shift+W (close tab),
 Ctrl+Shift+U (reopen tab), Ctrl+Shift+C/V (copy/paste), Ctrl+Shift+, (Settings),
 and Ctrl+Shift+Q (quit).
+
+New tab numbers increase within each app run. Closing or reopening a tab does
+not reuse its number; restarting begins at `term1` because sessions are not
+restored. A custom tab name survives reorder and recent-close recovery. Shell
+names and terminal-reported titles do not replace the tab name automatically.
 
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.

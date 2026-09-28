@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — L02 stable `termN` tab names
+
+New PTYs receive `term1`, `term2`, etc. from a run-local monotonic title counter, skipping an already open matching custom title. Shell name, working directory and terminal-reported title remain separate metadata; terminal title escape sequences no longer replace the visible default or explicit rename. Reopened tabs get a new number unless they had an explicit custom name. README explains close/restart behavior. Access tier: free (`tabNaming`). Windows release tests and Clippy were run; Fedora GUI and future CLI selector acceptance remain open.
+
 ## 2026-09-28 — L01 layout source decision
 
 Recorded current COL/ROW/GRID behavior for 1–10 panes and target wrap/minimum-size rules in `docs/migration/LAYOUT-DECISION.md`. Source confirms both pane and tab strip need independent wrapping. Fedora X11/Wayland interaction and screenshots are still pending, so L01's manual acceptance is open. No runtime code changed. Access tier: free.

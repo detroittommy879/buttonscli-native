@@ -8,6 +8,9 @@ pub struct TerminalTab {
     pub id: u64,
     pub title: String,
     pub custom_title: Option<String>,
+    pub shell_name: String,
+    pub working_directory: Option<PathBuf>,
+    pub reported_title: Option<String>,
     pub profile_id: String,
     pub backend: TerminalBackend,
     pub exited: bool,
@@ -71,11 +74,13 @@ impl ShellLaunch {
 impl TerminalTab {
     pub fn spawn(
         id: u64,
+        title: String,
         context: egui::Context,
         events: Sender<(u64, PtyEvent)>,
         launch: ShellLaunch,
     ) -> anyhow::Result<Self> {
-        let title = shell_title(&launch.command);
+        let shell_name = shell_title(&launch.command);
+        let working_directory = launch.working_directory.clone();
         let settings = BackendSettings {
             shell: launch.command,
             args: launch.args,
@@ -87,6 +92,9 @@ impl TerminalTab {
             id,
             title,
             custom_title: None,
+            shell_name,
+            working_directory,
+            reported_title: None,
             profile_id: launch.profile_id,
             backend,
             exited: false,
@@ -242,6 +250,20 @@ fn shell_title(shell: &str) -> String {
         .to_owned()
 }
 
+pub(crate) fn next_available_title(start: u64, taken: &[String]) -> (String, u64) {
+    let mut number = start.max(1);
+    loop {
+        let title = format!("term{number}");
+        let next = number
+            .checked_add(1)
+            .expect("terminal title number exhausted");
+        if !taken.iter().any(|existing| existing == &title) {
+            return (title, next);
+        }
+        number = next;
+    }
+}
+
 #[cfg(unix)]
 fn default_shell() -> (String, Vec<String>) {
     (
@@ -252,7 +274,17 @@ fn default_shell() -> (String, Vec<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{detected_shells, shell_title, split_command_line};
+    use super::{detected_shells, next_available_title, shell_title, split_command_line};
+
+    #[test]
+    fn default_titles_increase_and_skip_existing_custom_names() {
+        let (first, next) = next_available_title(1, &[]);
+        assert_eq!((first.as_str(), next), ("term1", 2));
+        let (second, next) = next_available_title(next, &["term2".to_owned()]);
+        assert_eq!((second.as_str(), next), ("term3", 4));
+        let (after_close, next) = next_available_title(next, &[]);
+        assert_eq!((after_close.as_str(), next), ("term4", 5));
+    }
 
     #[test]
     fn shell_title_uses_executable_name() {

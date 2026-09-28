@@ -10,7 +10,7 @@ use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::terminal::{DetectedShell, ShellLaunch, TerminalTab};
+use crate::terminal::{next_available_title, DetectedShell, ShellLaunch, TerminalTab};
 #[cfg(not(target_arch = "wasm32"))]
 use egui_term::{BackgroundGradient, FontSettings, PtyEvent, TerminalFont, TerminalView};
 #[cfg(not(target_arch = "wasm32"))]
@@ -57,6 +57,8 @@ pub struct ButtonsApp {
     pane_layout: PaneLayout,
     #[cfg(not(target_arch = "wasm32"))]
     next_id: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    next_title_number: u64,
     #[cfg(not(target_arch = "wasm32"))]
     events_tx: Sender<(u64, PtyEvent)>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -207,6 +209,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             next_id: 1,
             #[cfg(not(target_arch = "wasm32"))]
+            next_title_number: 1,
+            #[cfg(not(target_arch = "wasm32"))]
             events_tx,
             #[cfg(not(target_arch = "wasm32"))]
             events_rx,
@@ -314,8 +318,11 @@ impl ButtonsApp {
         };
         let id = self.next_id;
         self.next_id += 1;
-        match TerminalTab::spawn(id, context, self.events_tx.clone(), launch) {
+        let taken: Vec<String> = self.tabs.iter().map(|tab| tab.title.clone()).collect();
+        let (title, next_title_number) = next_available_title(self.next_title_number, &taken);
+        match TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch) {
             Ok(tab) => {
+                self.next_title_number = next_title_number;
                 self.tabs.push(tab);
                 let index = self.tabs.len() - 1;
                 if self.tabs.len() == 1 || self.pane_layout == PaneLayout::Single {
@@ -550,10 +557,8 @@ impl ButtonsApp {
         while let Ok((id, event)) = self.events_rx.try_recv() {
             if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
                 match event {
-                    PtyEvent::Title(title)
-                        if tab.custom_title.is_none() && !title.trim().is_empty() =>
-                    {
-                        tab.title = title;
+                    PtyEvent::Title(title) if !title.trim().is_empty() => {
+                        tab.reported_title = Some(title);
                     }
                     PtyEvent::Exit | PtyEvent::ChildExit(_) => tab.exited = true,
                     _ => {}
