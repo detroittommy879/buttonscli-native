@@ -39,9 +39,13 @@ use egui_term::{
     TerminalView,
 };
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::mpsc::{self, Receiver, Sender};
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::Mutex;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,6 +143,12 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_models: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
+    ai_help_state: Arc<Mutex<AiHelpWindowState>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    ai_help_tx: Sender<AiHelpCommand>,
+    #[cfg(not(target_arch = "wasm32"))]
+    ai_help_rx: Receiver<AiHelpCommand>,
+    #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
     session_dispatcher: Dispatcher,
@@ -224,6 +234,45 @@ enum CredentialEvent {
 enum ProviderEvent {
     Tested(String, Result<(), String>),
     Models(String, Result<Vec<String>, String>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum AiHelpCommand {
+    PreviewContext,
+    Submit(
+        String,
+        Option<crate::session::context::TerminalContext>,
+        Option<u64>,
+    ),
+    Deliver {
+        target_id: Option<u64>,
+        action: crate::assistant::reply::SuggestedAction,
+        press_enter: bool,
+    },
+    OpenSettings,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct AiHelpWindowState {
+    open: bool,
+    input: String,
+    messages: Vec<(bool, String)>,
+    history: Vec<(bool, String)>,
+    last_request: Option<(
+        String,
+        Option<crate::session::context::TerminalContext>,
+        Option<u64>,
+    )>,
+    busy: bool,
+    error: Option<String>,
+    status: Option<String>,
+    cancel: Option<Arc<AtomicBool>>,
+    reviewed_actions: Vec<crate::assistant::reply::SuggestedAction>,
+    include_context: bool,
+    context_preview: Option<crate::session::context::TerminalContext>,
+    context_busy: bool,
+    target: Option<(u64, String)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -359,6 +408,8 @@ impl ButtonsApp {
         let (credential_tx, credential_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (provider_tx, provider_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (ai_help_tx, ai_help_rx) = mpsc::channel();
         Self {
             preferences,
             themes: ThemeCatalog::load(),
@@ -428,6 +479,12 @@ impl ButtonsApp {
             provider_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             provider_models: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            ai_help_state: Arc::new(Mutex::new(AiHelpWindowState::default())),
+            #[cfg(not(target_arch = "wasm32"))]
+            ai_help_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            ai_help_rx,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -768,7 +825,14 @@ impl ButtonsApp {
                 self.set_visible_pane_count(*count, ctx);
                 Ok(None)
             }
-            Action::Send(_) => Err(ActionError::Unsupported),
+            Action::Send(bytes) => {
+                let id = target_id.ok_or(ActionError::Closed)?;
+                self.tabs
+                    .get_mut(index.ok_or(ActionError::Closed)?)
+                    .ok_or(ActionError::Closed)?
+                    .write(bytes);
+                Ok(Some(id))
+            }
         }
     }
 
@@ -1468,6 +1532,23 @@ impl ButtonsApp {
                         }
                     });
                     ui.menu_button("Help", |ui| {
+                        if ui
+                            .button(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelp,
+                                &[],
+                            ))
+                            .clicked()
+                        {
+                            if let Ok(mut state) = self.ai_help_state.lock() {
+                                state.open = true;
+                                state.target = self
+                                    .tabs
+                                    .get(self.focused)
+                                    .map(|tab| (tab.id, tab.title.clone()));
+                            }
+                            ui.close_menu();
+                        }
                         if ui.button("About ButtonsCLI").clicked() {
                             self.show_about = true;
                             ui.close_menu();
@@ -2251,6 +2332,631 @@ impl ButtonsApp {
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ai_help_window(&self, ctx: &egui::Context) {
+        let state_open = self.ai_help_state.lock().is_ok_and(|state| state.open);
+        if !state_open {
+            return;
+        }
+        let state = Arc::clone(&self.ai_help_state);
+        let actions = self.ai_help_tx.clone();
+        let title = crate::i18n::text("en", crate::i18n::MessageKey::AiHelp, &[]);
+        ctx.show_viewport_deferred(
+            egui::ViewportId::from_hash_of("buttonscli-ai-help"),
+            egui::ViewportBuilder::default()
+                .with_title(title.clone())
+                .with_inner_size([740.0, 620.0]),
+            move |child_ctx, class| {
+                let Ok(mut state) = state.lock() else {
+                    return;
+                };
+                if child_ctx.input(|input| input.viewport().close_requested()) {
+                    state.open = false;
+                    child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    return;
+                }
+                let body = |ui: &mut egui::Ui, state: &mut AiHelpWindowState| {
+                    use crate::i18n::{text, MessageKey};
+                    ui.heading(text("en", MessageKey::AiHelp, &[]));
+                    ui.label(text("en", MessageKey::AiHelpDescription, &[]));
+                    if !ai_help_available() {
+                        ui.separator();
+                        ui.label(text("en", MessageKey::AiHelpLockedProvider, &[]));
+                        if ui
+                            .button(text("en", MessageKey::AiHelpProviderSettings, &[]))
+                            .clicked()
+                        {
+                            let _ = actions.send(AiHelpCommand::OpenSettings);
+                        }
+                    }
+                    egui::ScrollArea::vertical()
+                        .stick_to_bottom(true)
+                        .show(ui, |ui| {
+                            for (assistant, message) in &state.messages {
+                                ui.group(|ui| {
+                                    ui.label(
+                                        RichText::new(if *assistant {
+                                            text("en", MessageKey::AiHelp, &[])
+                                        } else {
+                                            text("en", MessageKey::AiHelpYou, &[])
+                                        })
+                                        .strong(),
+                                    );
+                                    ui.label(message);
+                                });
+                            }
+                            if state.messages.is_empty() {
+                                ui.label(text("en", MessageKey::AiHelpConversationSession, &[]));
+                            }
+                            for action in &state.reviewed_actions {
+                                let target_id = state.target.as_ref().map(|target| target.0);
+                                let target_title = state.target.as_ref().map_or_else(
+                                    || text("en", MessageKey::AiHelpNoTarget, &[]),
+                                    |target| target.1.clone(),
+                                );
+                                ui.group(|ui| match action {
+                                    crate::assistant::reply::SuggestedAction::Command {
+                                        label,
+                                        description,
+                                        command,
+                                        send_enter,
+                                    } => {
+                                        ui.strong(text(
+                                            "en",
+                                            MessageKey::AiHelpReviewCommand,
+                                            &[("label", label)],
+                                        ));
+                                        ui.label(text(
+                                            "en",
+                                            MessageKey::AiHelpTarget,
+                                            &[("target", &target_title)],
+                                        ));
+                                        ui.label(description);
+                                        ui.monospace(command);
+                                        ui.label(text(
+                                            "en",
+                                            if *send_enter {
+                                                MessageKey::AiHelpWouldEnter
+                                            } else {
+                                                MessageKey::AiHelpWouldNotEnter
+                                            },
+                                            &[],
+                                        ));
+                                        ui.horizontal(|ui| {
+                                            if ui
+                                                .add_enabled(
+                                                    target_id.is_some(),
+                                                    egui::Button::new(text(
+                                                        "en",
+                                                        MessageKey::AiHelpInsert,
+                                                        &[],
+                                                    )),
+                                                )
+                                                .clicked()
+                                            {
+                                                let _ = actions.send(AiHelpCommand::Deliver {
+                                                    target_id,
+                                                    action: action.clone(),
+                                                    press_enter: false,
+                                                });
+                                            }
+                                            if ui
+                                                .add_enabled(
+                                                    target_id.is_some(),
+                                                    egui::Button::new(text(
+                                                        "en",
+                                                        MessageKey::AiHelpInsertEnter,
+                                                        &[],
+                                                    )),
+                                                )
+                                                .clicked()
+                                            {
+                                                let _ = actions.send(AiHelpCommand::Deliver {
+                                                    target_id,
+                                                    action: action.clone(),
+                                                    press_enter: true,
+                                                });
+                                            }
+                                        });
+                                    }
+                                    crate::assistant::reply::SuggestedAction::Control {
+                                        label,
+                                        description,
+                                        key,
+                                    } => {
+                                        ui.strong(text(
+                                            "en",
+                                            MessageKey::AiHelpReviewControl,
+                                            &[("label", label)],
+                                        ));
+                                        ui.label(text(
+                                            "en",
+                                            MessageKey::AiHelpTarget,
+                                            &[("target", &target_title)],
+                                        ));
+                                        ui.label(description);
+                                        ui.label(text(
+                                            "en",
+                                            MessageKey::AiHelpTerminalKey,
+                                            &[("key", &format!("{key:?}"))],
+                                        ));
+                                        if ui
+                                            .add_enabled(
+                                                target_id.is_some(),
+                                                egui::Button::new(text(
+                                                    "en",
+                                                    MessageKey::AiHelpSendReviewedKey,
+                                                    &[],
+                                                )),
+                                            )
+                                            .clicked()
+                                        {
+                                            let _ = actions.send(AiHelpCommand::Deliver {
+                                                target_id,
+                                                action: action.clone(),
+                                                press_enter: false,
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    if let Some(error) = &state.error {
+                        ui.colored_label(Color32::LIGHT_RED, error);
+                    }
+                    if let Some(status) = &state.status {
+                        ui.label(RichText::new(status).color(Color32::LIGHT_GREEN));
+                    }
+                    if state.busy {
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(text("en", MessageKey::AiHelpWaitingProvider, &[]));
+                            if ui.button(text("en", MessageKey::Cancel, &[])).clicked() {
+                                if let Some(cancel) = &state.cancel {
+                                    cancel.store(true, Ordering::Relaxed);
+                                }
+                            }
+                        });
+                    }
+                    if state.error.is_some() && !state.busy {
+                        if let Some((question, context, target)) = state.last_request.clone() {
+                            if ui
+                                .button(text("en", MessageKey::AiHelpRetry, &[]))
+                                .clicked()
+                            {
+                                let _ =
+                                    actions.send(AiHelpCommand::Submit(question, context, target));
+                            }
+                        }
+                    }
+                    ui.separator();
+                    ui.add_enabled_ui(!state.busy && ai_help_available(), |ui| {
+                        let changed = ui
+                            .checkbox(
+                                &mut state.include_context,
+                                text("en", MessageKey::AiHelpIncludeContext, &[]),
+                            )
+                            .changed();
+                        if changed {
+                            state.context_preview = None;
+                        }
+                        if state.include_context {
+                            if ui
+                                .add_enabled(
+                                    !state.context_busy,
+                                    egui::Button::new(text(
+                                        "en",
+                                        MessageKey::AiHelpPreviewContext,
+                                        &[],
+                                    )),
+                                )
+                                .clicked()
+                            {
+                                state.context_busy = true;
+                                state.context_preview = None;
+                                let _ = actions.send(AiHelpCommand::PreviewContext);
+                            }
+                            if state.context_busy {
+                                ui.spinner();
+                                ui.label(text("en", MessageKey::AiHelpPreparingContext, &[]));
+                            }
+                            if let Some(preview) = &state.context_preview {
+                                ui.label(text(
+                                    "en",
+                                    MessageKey::AiHelpIncludedTerminal,
+                                    &[
+                                        ("title", &preview.title),
+                                        ("shell", &preview.shell),
+                                        ("id", &preview.session_id.to_string()),
+                                    ],
+                                ));
+                                egui::ScrollArea::vertical()
+                                    .max_height(150.0)
+                                    .show(ui, |ui| {
+                                        ui.monospace(&preview.output);
+                                    });
+                                ui.small(text("en", MessageKey::AiHelpContextSentPrivacy, &[]));
+                            }
+                        }
+                        ui.add(
+                            egui::TextEdit::multiline(&mut state.input)
+                                .desired_rows(3)
+                                .hint_text(text("en", MessageKey::AiHelpQuestionHint, &[])),
+                        );
+                        let context_ready =
+                            !state.include_context || state.context_preview.is_some();
+                        if ui
+                            .add_enabled(
+                                context_ready,
+                                egui::Button::new(text("en", MessageKey::AiHelpSend, &[])),
+                            )
+                            .clicked()
+                        {
+                            let question = std::mem::take(&mut state.input).trim().to_owned();
+                            if !question.is_empty() {
+                                let context = state
+                                    .include_context
+                                    .then(|| state.context_preview.clone())
+                                    .flatten();
+                                let target = context
+                                    .as_ref()
+                                    .map(|context| context.session_id)
+                                    .or_else(|| state.target.as_ref().map(|target| target.0));
+                                let _ =
+                                    actions.send(AiHelpCommand::Submit(question, context, target));
+                            }
+                        }
+                    });
+                };
+                match class {
+                    egui::ViewportClass::Embedded => {
+                        egui::Window::new(title.clone()).show(child_ctx, |ui| body(ui, &mut state));
+                    }
+                    _ => {
+                        egui::CentralPanel::default().show(child_ctx, |ui| body(ui, &mut state));
+                    }
+                }
+            },
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_ai_help_commands(&mut self, ctx: &egui::Context) {
+        while let Ok(command) = self.ai_help_rx.try_recv() {
+            match command {
+                AiHelpCommand::OpenSettings => {
+                    self.show_settings = true;
+                    self.settings_tab = SettingsTab::Providers;
+                }
+                AiHelpCommand::Deliver {
+                    target_id,
+                    action,
+                    press_enter,
+                } => {
+                    if !ai_help_available() {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpRequiresPro,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    }
+                    let Some(target_id) = target_id else {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpNoTarget,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    };
+                    let bytes = match &action {
+                        crate::assistant::reply::SuggestedAction::Command { command, .. } => {
+                            crate::session::input::command_bytes(command, press_enter)
+                        }
+                        crate::assistant::reply::SuggestedAction::Control { key, .. } => {
+                            Ok(crate::session::input::key_bytes(match key {
+                                crate::assistant::reply::ControlKey::CtrlC => {
+                                    crate::session::input::TerminalKey::CtrlC
+                                }
+                                crate::assistant::reply::ControlKey::CtrlD => {
+                                    crate::session::input::TerminalKey::CtrlD
+                                }
+                                crate::assistant::reply::ControlKey::CtrlZ => {
+                                    crate::session::input::TerminalKey::CtrlZ
+                                }
+                                crate::assistant::reply::ControlKey::Enter => {
+                                    crate::session::input::TerminalKey::Enter
+                                }
+                                crate::assistant::reply::ControlKey::Tab => {
+                                    crate::session::input::TerminalKey::Tab
+                                }
+                                crate::assistant::reply::ControlKey::Escape => {
+                                    crate::session::input::TerminalKey::Escape
+                                }
+                                crate::assistant::reply::ControlKey::Up => {
+                                    crate::session::input::TerminalKey::Up
+                                }
+                                crate::assistant::reply::ControlKey::Down => {
+                                    crate::session::input::TerminalKey::Down
+                                }
+                                crate::assistant::reply::ControlKey::Left => {
+                                    crate::session::input::TerminalKey::Left
+                                }
+                                crate::assistant::reply::ControlKey::Right => {
+                                    crate::session::input::TerminalKey::Right
+                                }
+                            })
+                            .to_vec())
+                        }
+                    };
+                    let result = bytes
+                        .map_err(|_| ActionError::InvalidInput)
+                        .and_then(|bytes| {
+                            self.dispatch_ui_action(
+                                Some(Target::Id(target_id)),
+                                Action::Send(bytes),
+                                ctx,
+                            )
+                            .map(|_| ())
+                        });
+                    if let Ok(mut state) = self.ai_help_state.lock() {
+                        match result {
+                            Ok(()) => {
+                                state.error = None;
+                                state.status = Some(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::AiHelpInputSent,
+                                    &[("id", &target_id.to_string())],
+                                ));
+                            }
+                            Err(error) => {
+                                state.status = None;
+                                state.error = Some(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::AiHelpDeliveryFailed,
+                                    &[("reason", &error.to_string())],
+                                ));
+                            }
+                        }
+                    }
+                }
+                AiHelpCommand::PreviewContext => {
+                    let Some(tab) = self.tabs.get(self.focused) else {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpContextTerminalMissing,
+                                &[],
+                            ));
+                            state.context_busy = false;
+                        }
+                        continue;
+                    };
+                    let mut snapshot = crate::session::context::TerminalContext {
+                        session_id: tab.id,
+                        title: tab.title.clone(),
+                        shell: tab.shell_name.clone(),
+                        output: tab.backend.plain_text_tail(200_000),
+                    };
+                    if let Ok(mut state) = self.ai_help_state.lock() {
+                        state.context_busy = true;
+                        state.error = None;
+                        state.status = None;
+                    }
+                    let profile = self
+                        .native_store
+                        .as_ref()
+                        .map_or("default", NativeStore::profile_name)
+                        .to_owned();
+                    let provider = self.preferences.provider_settings.active().cloned();
+                    let session = Arc::clone(&self.credential_session);
+                    let shared = Arc::clone(&self.ai_help_state);
+                    let ctx = ctx.clone();
+                    std::thread::spawn(move || {
+                        let redaction_key = provider.map_or(Ok(None), |provider| {
+                            let reference = credentials::reference(&profile, &provider.id);
+                            provider_key(&session, &reference, provider.credential_ref.as_deref())
+                        });
+                        let redaction_key = match redaction_key {
+                            Ok(key) => key,
+                            Err(error) => {
+                                if let Ok(mut state) = shared.lock() {
+                                    state.error = Some(crate::i18n::text(
+                                        "en",
+                                        crate::i18n::MessageKey::AiHelpCredentialRedactionFailed,
+                                        &[("reason", &error.to_string())],
+                                    ));
+                                    state.context_busy = false;
+                                }
+                                ctx.request_repaint();
+                                return;
+                            }
+                        };
+                        snapshot.output = crate::session::context::redact_obvious_secrets(
+                            &snapshot.output,
+                            redaction_key.as_ref().map(|key| key.as_str()),
+                        );
+                        if let Ok(mut state) = shared.lock() {
+                            state.context_preview = Some(snapshot);
+                            state.context_busy = false;
+                        }
+                        ctx.request_repaint();
+                    });
+                }
+                AiHelpCommand::Submit(question, context, target) => {
+                    let target = target.or_else(|| self.tabs.get(self.focused).map(|tab| tab.id));
+                    if !ai_help_available() {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpRequiresPro,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    }
+                    let Some(provider) = self.preferences.provider_settings.active().cloned()
+                    else {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpProviderMissing,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    };
+                    if validate_endpoint(&provider.endpoint).is_err()
+                        || provider.model.trim().is_empty()
+                    {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpEndpointMissing,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    }
+                    if question.chars().count() > 16_384 {
+                        if let Ok(mut state) = self.ai_help_state.lock() {
+                            state.error = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::AiHelpQuestionTooLong,
+                                &[],
+                            ));
+                        }
+                        continue;
+                    }
+                    let (cancel, profile_name, history) = {
+                        let Ok(mut state) = self.ai_help_state.lock() else {
+                            continue;
+                        };
+                        if state.busy {
+                            continue;
+                        }
+                        if state.error.is_some()
+                            && state.messages.len() >= 2
+                            && state
+                                .messages
+                                .last()
+                                .is_some_and(|(assistant, _)| *assistant)
+                        {
+                            let retained = state.messages.len() - 2;
+                            state.messages.truncate(retained);
+                        }
+                        state.busy = true;
+                        state.error = None;
+                        state.reviewed_actions.clear();
+                        state.last_request = Some((question.clone(), context.clone(), target));
+                        state.target = target.map(|id| {
+                            let title = context
+                                .as_ref()
+                                .filter(|context| context.session_id == id)
+                                .map(|context| context.title.clone())
+                                .or_else(|| {
+                                    self.tabs
+                                        .iter()
+                                        .find(|tab| tab.id == id)
+                                        .map(|tab| tab.title.clone())
+                                })
+                                .unwrap_or_else(|| "closed terminal".into());
+                            (id, title)
+                        });
+                        state.messages.push((false, question.clone()));
+                        state.messages.push((true, String::new()));
+                        let cancel = Arc::new(AtomicBool::new(false));
+                        state.cancel = Some(Arc::clone(&cancel));
+                        (
+                            cancel,
+                            self.native_store
+                                .as_ref()
+                                .map_or("default", NativeStore::profile_name)
+                                .to_owned(),
+                            state.history.clone(),
+                        )
+                    };
+                    let expected_reference = credentials::reference(&profile_name, &provider.id);
+                    let session = Arc::clone(&self.credential_session);
+                    let state = Arc::clone(&self.ai_help_state);
+                    let ctx = ctx.clone();
+                    let prompt =
+                        crate::session::context::build_user_prompt(&question, context.as_ref());
+                    let system_prompt = crate::session::context::build_system_prompt();
+                    let request_question = question.clone();
+                    std::thread::spawn(move || {
+                        let result = provider_key(
+                            &session,
+                            &expected_reference,
+                            provider.credential_ref.as_deref(),
+                        )
+                        .map_err(|error| error.to_string())
+                        .and_then(|key| {
+                            crate::assistant::client::stream_completion(
+                                &crate::assistant::transport::ReqwestTransport,
+                                &provider,
+                                key,
+                                &system_prompt,
+                                &prompt,
+                                &history,
+                                &cancel,
+                                &mut |delta| {
+                                    if let Ok(mut state) = state.lock() {
+                                        if let Some((true, message)) = state.messages.last_mut() {
+                                            message.push_str(delta);
+                                        }
+                                    }
+                                    ctx.request_repaint();
+                                },
+                            )
+                            .map_err(|error| error.to_string())
+                        });
+                        if let Ok(mut state) = state.lock() {
+                            state.busy = false;
+                            state.cancel = None;
+                            match result {
+                                Ok(raw) => {
+                                    let parsed =
+                                        crate::assistant::reply::parse_assistant_reply(&raw);
+                                    let answer = parsed.answer;
+                                    if let Some((true, message)) = state.messages.last_mut() {
+                                        *message = answer.clone();
+                                    }
+                                    state.reviewed_actions = parsed.actions;
+                                    state.history.push((false, request_question));
+                                    state.history.push((true, answer));
+                                    if state.history.len() > 40 {
+                                        let excess = state.history.len() - 40;
+                                        state.history.drain(..excess);
+                                    }
+                                }
+                                Err(_error) if cancel.load(Ordering::Relaxed) => {
+                                    state.error = Some(crate::i18n::text(
+                                        "en",
+                                        crate::i18n::MessageKey::AiHelpRequestCancelled,
+                                        &[],
+                                    ))
+                                }
+                                Err(error) => {
+                                    state.error = Some(crate::i18n::text(
+                                        "en",
+                                        crate::i18n::MessageKey::AiHelpRequestFailed,
+                                        &[("reason", &error)],
+                                    ))
+                                }
+                            }
+                        }
+                        ctx.request_repaint();
+                    });
+                }
             }
         }
     }
@@ -4141,6 +4847,8 @@ impl eframe::App for ButtonsApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(not(target_arch = "wasm32"))]
+        self.process_ai_help_commands(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.process_import_events(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_credential_events();
@@ -4196,6 +4904,8 @@ impl eframe::App for ButtonsApp {
             });
 
         self.settings_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.ai_help_window(ctx);
         self.preset_editor_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_rename_window(ctx);
@@ -4204,6 +4914,12 @@ impl eframe::App for ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Ok(state) = self.ai_help_state.lock() {
+            if let Some(cancel) = &state.cancel {
+                cancel.store(true, Ordering::Relaxed);
+            }
+        }
         #[cfg(not(target_arch = "wasm32"))]
         for tab in &mut self.tabs {
             tab.request_exit();

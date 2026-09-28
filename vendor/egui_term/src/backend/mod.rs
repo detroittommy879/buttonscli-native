@@ -314,6 +314,44 @@ impl TerminalBackend {
         ScrollbackState::from_content(self.last_content())
     }
 
+    /// Copy a bounded plain-text tail from the grid snapshot already owned by the UI.
+    /// This does not read the PTY or acquire the terminal grid lock.
+    pub fn plain_text_tail(&self, max_chars: usize) -> String {
+        let limit = max_chars.min(200_000);
+        if limit == 0 {
+            return String::new();
+        }
+        let grid = &self.last_content.grid;
+        let columns = grid.columns();
+        if columns == 0 {
+            return String::new();
+        }
+        let history = grid.history_size();
+        let screen = grid.screen_lines();
+        let rows = limit
+            .div_ceil(columns)
+            .saturating_add(1)
+            .min(history.saturating_add(screen));
+        let first =
+            -(history.saturating_add(screen).saturating_sub(rows) as i32);
+        let mut output =
+            String::with_capacity(limit.min(rows.saturating_mul(columns)));
+        for row in first..screen as i32 {
+            let mut line = String::with_capacity(columns);
+            for column in 0..columns {
+                let ch = grid.index(Point::new(Line(row), Column(column))).c;
+                if ch != '\0' {
+                    line.push(ch);
+                }
+            }
+            output.push_str(line.trim_end());
+            output.push('\n');
+        }
+        let mut chars: Vec<char> = output.chars().rev().take(limit).collect();
+        chars.reverse();
+        chars.into_iter().collect()
+    }
+
     fn process_link_action(
         &mut self,
         terminal: &Term<EventProxy>,

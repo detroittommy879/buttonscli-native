@@ -48,8 +48,7 @@ pub(crate) enum Action {
     VisibleCount {
         count: usize,
     },
-    /// Reserved until R04; never report success for input before it is wired.
-    #[allow(dead_code)] // Input execution is wired in R04.
+    /// Literal bytes produced by the bounded input service.
     Send(Vec<u8>),
 }
 
@@ -63,6 +62,18 @@ impl Action {
 
     fn needs_ready(&self) -> bool {
         matches!(self, Self::Send(_))
+    }
+
+    fn validate(&self) -> Result<(), ActionError> {
+        if let Self::Send(bytes) = self {
+            if bytes.is_empty()
+                || bytes.len() > crate::session::input::MAX_INPUT_BYTES
+                || bytes.contains(&0)
+            {
+                return Err(ActionError::InvalidInput);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -78,6 +89,7 @@ pub(crate) enum ActionError {
     QueueFull,
     ShuttingDown,
     DeniedAccess,
+    #[allow(dead_code)]
     Unsupported,
     InvalidInput,
     LaunchFailed,
@@ -228,6 +240,7 @@ impl Dispatcher {
         if timeout.is_zero() {
             return Err(ActionError::Timeout);
         }
+        action.validate()?;
         let target_id = if action.needs_target() {
             let id = snapshot.resolve(&target.ok_or(ActionError::InvalidInput)?)?;
             snapshot.validate_current(id, &action)?;

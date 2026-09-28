@@ -1,5 +1,7 @@
 # Dependency-ordered implementation tasks
 
+Implementation status, 2026-09-28: A01–A04 source work is present. A05/A06 have a Windows viewport/window prototype and AI Help source integration; live GUI acceptance remains pending. R02 is decided for AI screen context, while R03's raw/CLI-compatible capture and R04's bracketed/slow delivery remain incomplete. See `docs/PROGRESS.md` and the decision notes for evidence and boundaries.
+
 Use [contracts](CONTRACTS.md) throughout. O/N paths are defined in [README](README.md). All new destination paths below are proposed. Each task is a separate reviewable commit; do not implement an entire phase in one Luna prompt. The original repository is a read-only reference unless a task explicitly changes its maintained contract. No such original-runtime change is required for the separate-folder plan.
 
 Task sizes: **S** = one isolated function/module and focused tests; **M** = one service plus a small UI seam. **Spike** = investigation/prototype with a written decision before implementation. If an M task needs unrelated modules, split it into tests/model/UI commits first. Time estimates are deliberately omitted: OS and vendored renderer work varies substantially.

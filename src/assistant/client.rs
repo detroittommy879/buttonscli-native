@@ -1,12 +1,15 @@
 //! Provider connection checks and model discovery. Responses are bounded by transport.
 
+use std::cell::Cell;
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use super::provider::{validate_endpoint, ProviderProfile};
-use super::transport::{HttpTransport, Method, Request, TransportError};
+use super::reply::{flatten_content, AnswerBuffer, ReplyError, SseDecoder, StreamItem};
+use super::transport::{HttpTransport, Method, Request, ResponseHead, TransportError};
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ClientError {
@@ -15,6 +18,9 @@ pub(crate) enum ClientError {
     Http(u16),
     Transport(TransportError),
     InvalidReply,
+    Reply(ReplyError),
+    Cancelled,
+    RequestTooLarge,
 }
 
 impl std::fmt::Display for ClientError {
@@ -25,6 +31,9 @@ impl std::fmt::Display for ClientError {
             Self::Http(status) => write!(f, "provider returned HTTP {status}"),
             Self::Transport(error) => write!(f, "{error}"),
             Self::InvalidReply => f.write_str("provider returned an invalid response"),
+            Self::Reply(error) => write!(f, "assistant response could not be read: {error:?}"),
+            Self::Cancelled => f.write_str("provider request was cancelled"),
+            Self::RequestTooLarge => f.write_str("provider request exceeded 1 MiB"),
         }
     }
 }
@@ -132,6 +141,152 @@ pub(crate) fn test_connection(
     }
 }
 
+pub(crate) fn stream_completion(
+    transport: &dyn HttpTransport,
+    provider: &ProviderProfile,
+    key: Option<Zeroizing<String>>,
+    system_prompt: &str,
+    prompt: &str,
+    history: &[(bool, String)],
+    cancelled: &AtomicBool,
+    on_delta: &mut dyn FnMut(&str),
+) -> Result<String, ClientError> {
+    validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
+    if provider.model.trim().is_empty() {
+        return Err(ClientError::Model);
+    }
+    let status = Cell::new(0_u16);
+    let is_sse = Cell::new(false);
+    let mut raw = Vec::new();
+    let mut decoder = SseDecoder::default();
+    let mut answer = AnswerBuffer::default();
+    let mut parser_error = None;
+    let mut on_head = |head: ResponseHead| {
+        status.set(head.status);
+        is_sse.set(
+            head.content_type
+                .as_deref()
+                .is_some_and(|value| value.to_ascii_lowercase().contains("text/event-stream")),
+        );
+    };
+    let mut on_chunk = |chunk: &[u8]| {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(TransportError::Cancelled);
+        }
+        if !is_sse.get() && raw.is_empty() {
+            let prefix = String::from_utf8_lossy(chunk)
+                .trim_start()
+                .to_ascii_lowercase();
+            is_sse.set(
+                prefix.starts_with("data:")
+                    || prefix.starts_with("event:")
+                    || prefix.starts_with(':'),
+            );
+        }
+        if is_sse.get() {
+            match decoder.push(chunk) {
+                Ok(items) => {
+                    for item in items {
+                        if let StreamItem::Delta(delta) = item {
+                            if let Err(error) = answer.append(&delta) {
+                                parser_error = Some(error);
+                                return Err(TransportError::Cancelled);
+                            }
+                            on_delta(&delta);
+                        }
+                    }
+                }
+                Err(error) => {
+                    parser_error = Some(error);
+                    return Err(TransportError::Cancelled);
+                }
+            }
+        } else {
+            raw.extend_from_slice(chunk);
+            if raw.len() > 1024 * 1024 {
+                return Err(TransportError::ResponseTooLarge);
+            }
+        }
+        Ok(())
+    };
+    let mut messages = Vec::with_capacity(history.len() + 2);
+    messages.push(json!({"role": "system", "content": system_prompt}));
+    messages.extend(history.iter().map(|(assistant, content)| {
+        json!({
+            "role": if *assistant { "assistant" } else { "user" },
+            "content": content,
+        })
+    }));
+    messages.push(json!({"role": "user", "content": prompt}));
+    let request_body = json!({"model": provider.model, "messages": messages, "stream": true});
+    if serde_json::to_vec(&request_body)
+        .map_err(|_| ClientError::InvalidReply)?
+        .len()
+        > 1024 * 1024
+    {
+        return Err(ClientError::RequestTooLarge);
+    }
+    let request = Request {
+        method: Method::Post,
+        url: provider.endpoint.clone(),
+        body: Some(request_body),
+        key,
+    };
+    let response = transport.execute_stream(request, cancelled, &mut on_head, &mut on_chunk);
+    drop(on_chunk);
+    if let Some(error) = parser_error {
+        return Err(ClientError::Reply(error));
+    }
+    response.map_err(|error| {
+        if error == TransportError::Cancelled {
+            ClientError::Cancelled
+        } else {
+            ClientError::Transport(error)
+        }
+    })?;
+    if cancelled.load(Ordering::Relaxed) {
+        return Err(ClientError::Cancelled);
+    }
+    if !(200..300).contains(&status.get()) {
+        return Err(ClientError::Http(status.get()));
+    }
+    if is_sse.get() {
+        for item in decoder.finish().map_err(ClientError::Reply)? {
+            if let StreamItem::Delta(delta) = item {
+                answer.append(&delta).map_err(ClientError::Reply)?;
+                on_delta(&delta);
+            }
+        }
+        if answer.text().is_empty() {
+            return Err(ClientError::InvalidReply);
+        }
+        Ok(answer.into_string())
+    } else {
+        let body = completion_content(&raw)?;
+        let mut bounded = AnswerBuffer::default();
+        bounded.append(&body).map_err(ClientError::Reply)?;
+        on_delta(bounded.text());
+        Ok(bounded.into_string())
+    }
+}
+
+fn completion_content(body: &[u8]) -> Result<String, ClientError> {
+    let value: Value = serde_json::from_slice(body).map_err(|_| ClientError::InvalidReply)?;
+    let choice = value
+        .get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+        .ok_or(ClientError::InvalidReply)?;
+    flatten_content(
+        choice
+            .get("message")
+            .and_then(|message| message.get("content"))
+            .or_else(|| choice.get("text")),
+    )
+    .filter(|content| !content.is_empty())
+    .ok_or(ClientError::InvalidReply)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::transport::{Response, TransportError};
@@ -147,6 +302,7 @@ mod tests {
             Ok(Response {
                 status: self.status,
                 body: self.body.clone(),
+                content_type: Some("application/json".into()),
             })
         }
     }
