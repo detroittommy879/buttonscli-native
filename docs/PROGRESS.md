@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — S02 pure legacy config projection
+
+Added JSON document parsing and a UI-free projection for command/SSH presets, shell profiles/default selection, bundled font-compatible typography, locale, provider endpoint/model metadata and retained visual/settings objects. Explicit empty preset lists stay empty; absent `sendEnter` follows the original trailing-newline rule, while explicit false and command whitespace survive. The serialized compatible copy removes known credential fields recursively and omits unknown top-level blocks pending an import choice. The first focused test had an invalid expectation that the fixture contained an unknown top-level key; corrected it and added a separate unknown-key case. No real settings were read or written. Import preview, persistence and revalidation remain S03–S05. Access tier: free.
+
 ## 2026-09-28 — L04 wrapped native tab strip
 
 Replaced the fixed 40-point, sideways-scrolling tab row with egui 0.31's `horizontal_wrapped` layout in a content-sized top panel. Existing tab activation, rename, menus, add/reopen and reorder actions remain on the same controls. README records the visible behavior; access tier: free (`tabWrapping`). Windows full release tests (44 library, 2 fixture) and Clippy with the known unrelated lint exempted passed. Narrow-window/Fedora X11 and Wayland interaction, long-name clipping and DPI behavior still need GUI review; source/API checks are not those manual checks.
