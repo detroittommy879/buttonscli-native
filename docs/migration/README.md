@@ -2,6 +2,8 @@
 
 Planning baseline: 2026-09-27. This is a source-grounded implementation specification, not a claim that the listed features have been ported.
 
+Implementation update, 2026-09-28: F01–F04 and S01–S04 are committed. L02 and L04 are implemented on Windows; L01 has a source decision but awaits Fedora GUI evidence. Native-owned settings, `termN` names, wrapped tabs and native-profile theme loading now exist. The previewed original-app import (S05), responsive pane geometry (L03), CLI and AI Help remain open. See [the progress journal](../PROGRESS.md) for tests and limits. The audit facts below describe the planning baseline where superseded by this update.
+
 ## Read in this order
 
 1. This file: priorities, current gaps, architecture, and milestones.
@@ -26,9 +28,9 @@ Keep egui/eframe, Alacritty, offline assets, and event-driven rendering. Port be
 
 ## What the audit establishes
 
-- N `src/app.rs` already provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. Its `Preferences` use eframe storage (`eframe::APP_KEY`); they are not the original profile config.
-- N `pane_tree` forces every COL pane into one horizontal strip and every ROW pane into one vertical strip; GRID chooses `ceil(sqrt(count))` columns. The tab strip scrolls sideways on one row, and `TerminalTab::spawn` starts with the shell name as the tab title. These source facts fit the reported problems, which still need interactive reproduction.
-- N `src/theme.rs::ThemeCatalog::load` reads embedded assets. The displayed 559 choices are 555 legacy catalog entries plus four native themes, not proof that personal theme files are loaded.
+- N `src/app.rs` provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. Preferences now save in versioned native storage, with one-time fallback reading of earlier eframe data.
+- N `pane_tree` still forces every COL pane into one horizontal strip and every ROW pane into one vertical strip; GRID chooses `ceil(sqrt(count))` columns. Tabs now wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive reproduction.
+- N `src/theme.rs::ThemeCatalog::load` reads embedded assets (555 legacy choices plus four native themes). Native-profile personal theme files are now loaded separately; import from the original profile is pending.
 - O `src-tauri/src/main.rs` resolves `~/.buttonscli/active-profile.json`, `profiles/<name>/config.json`, profile `themes/` and `shaders/`; root `config.json` is a migration fallback.
 - O `src-tauri/src/control_api.rs` exposes an authenticated `/v1` API; O `scripts/buttonsclictl.mjs` already supports an explicit discovery-file environment override. This makes reuse of the existing CLI practical before writing a Rust CLI.
 - N has no equivalent control server or assistant implementation. Its numeric tab IDs can support stable external IDs; vector positions must not become those IDs.
@@ -45,12 +47,12 @@ The supplied screenshot is visual context for the current native UI, not an inst
 
 | Capability | Native baseline / original source | Destination and priority |
 |---|---|---|
-| Legacy active profile/config import | Missing; O backend path helpers, configStore and types | P0 `storage/`; optional import into separate native root |
+| Legacy active profile/config import | Read-only resolver and sanitized projection exist; preview/commit UI missing | P0 finish S05/S06 optional import into separate native root |
 | Existing command/SSH presets | Native editor present, isolated storage; O `PresetBar.tsx` | P0 compatible import/native save, order and type-only semantics |
-| Personal themes | Embedded catalog only; O customThemeStorage/themeHydration | P0 disk catalog loading; P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
+| Personal themes | Native-profile JSON loader exists; original-profile import missing | P0 finish import; P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
 | Shell profiles | Present but simpler discovery; O shellProfiles, backend discovery | P1 preserve settings; P2 Windows Terminal/WSL/wrappers and platform checks |
 | COL/ROW/GRID | Half-working per user; source uses fixed sequences | P0 reproduce and fix focus, resize, new-tab placement and width-aware second row |
-| Tab strip/names | One horizontally scrolling row; shell name starts title | P0 default `term1`, `term2` etc; wrap tabs into further rows |
+| Tab strip/names | `termN` and multi-row strip implemented; Fedora interaction pending | P0 GUI acceptance for narrow/many-tab layouts |
 | Docking library | N uses a custom pane tree | P0 evaluate compatible `egui_dock` 0.16 as a bounded prototype |
 | Tabs/panes | Present, ten visible panes; O tabStore/sessionStore | P0 stable IDs/action dispatcher; preserve hidden tab targeting and lifecycle |
 | Agent control CLI | Missing; O control_api, controlSync, scripts/buttonsclictl | P1 compatible `/v1`, instance-safe discovery, Agent Inst. handoff |
@@ -65,8 +67,8 @@ The supplied screenshot is visual context for the current native UI, not an inst
 | Theme generation | Missing; O themeDesignerService/themeRecipeDesignerService | P3 after editable theme format and AI transport |
 | Shader Lab/generation | Missing; O ShaderLabCard/shaderDesignerService | P3 separate shader compatibility/design spike; GLSL is not automatically WGPU-compatible |
 | Transparency/window controls | Missing/partial; O windowManager and window config | P2 platform capabilities and explicit unsupported fallback |
-| Localization/onboarding | Missing; O i18n and AppOnboardingTour | Foundation early for new strings; full catalog/UI audit P2 |
-| Feature access | Missing registry; O features/catalog/access/runtimeConfigService | Foundation early; reuse keys/tiers, central execution gates |
+| Localization/onboarding | Native lookup seam exists; existing UI and onboarding remain untranslated | Full catalog/UI audit P2 |
+| Feature access | Central catalog/resolver exists; future UI/actions still need gates | Reuse keys/tiers at each new execution path |
 | Profiles UI | Deferred; O catalog disables it despite broader guide wording | Read active profile now; create/switch UI remains internal unless product policy changes |
 | Quick Secrets | Missing; O secretVaultService/SecretVaultPanel | Internal, late separate security/storage task; do not auto-unlock or migrate secrets |
 | Read-only display/help tabs | Missing; O DisplayTabPane/startupDisplayService | P3 native text/Markdown subset; arbitrary browsing is a separate decision |

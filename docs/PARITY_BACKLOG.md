@@ -22,7 +22,7 @@ constraints.
 | Area | Status | Next acceptance milestone |
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
-| Tabs and sessions | Partial | `termN` naming and multi-row tab strip; keep lifecycle/index regressions covered |
+| Tabs and sessions | Partial | `termN` naming and multi-row tab strip are implemented; finish pane reflow and Fedora interaction checks |
 | Pane layouts | Partial | Reproduce/fix COL/ROW/GRID and width-aware wrapping on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Import/edit/share plus remaining effect rendering and online fonts |
@@ -36,7 +36,7 @@ constraints.
 | --- | --- | --- | --- |
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
-| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults, multi-row tab strip, create/close/focus/rename/reorder/reopen and correct pane mapping. |
+| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults and multi-row tab strip are implemented; verify wrapped interactions and pane mapping on Fedora. |
 | Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | COL/ROW/GRID add/remove/focus up to 10 visible sessions; wrap on constrained room, avoid unusable PTY sizes and preserve independent split ratios. |
 | Visible scrollbars | Missing | native `vendor/egui_term` | Each terminal displays real scrollback position and can drag to scroll without breaking selection or PTY size. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |

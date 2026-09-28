@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — Migration documentation sync
+
+Updated the planning baseline and parity backlog to distinguish implemented native storage, theme loading and wrapped tabs from pending original-app import, pane reflow and Fedora GUI acceptance. This corrects stale source-audit statements without changing runtime behavior.
+
 ## 2026-09-28 — S04 native personal theme loading
 
 The active native profile now loads version 1 personal theme JSON documents beside the 559 embedded choices. Internal IDs include profile and filename, so duplicate legacy metadata IDs cannot replace embedded themes or each other. Raw documents retain unsupported effect fields; bad/oversized/escaped files produce isolated warnings. The first focused test incorrectly classified embedded `basic2` as a native theme; source shows it is a legacy bundle, and the assertion was corrected. Temporary-profile tests cover collisions, a bad file, preserved data, profile isolation and the full embedded catalog. Original profile themes are not imported yet. GUI theme switching without PTY respawn remains a manual check. Access tier: free (`themeSelection`).

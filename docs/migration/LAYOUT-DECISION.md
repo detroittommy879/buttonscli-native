@@ -2,6 +2,8 @@
 
 This is the source-based part of L01. Fedora X11/Wayland interaction and screenshots remain to be recorded before calling L01 accepted. Checked native source at `a5192cb` on Windows, 2026-09-28. No PTY or GUI observation is claimed here.
 
+Since this source pass, L02 assigned `termN` titles and L04 replaced the fixed tab strip with wrapping. The pane-tree geometry described below is still current; the old tab-strip description is historical baseline evidence.
+
 ## Current behavior to reproduce
 
 `set_visible_pane_count` creates up to ten sessions, retains the focused pane first, and fills remaining slots from visible then existing tabs. Choosing a hidden tab replaces the focused visible slot. `pane_tree` puts every COL pane in one horizontal split chain, every ROW pane in one vertical chain, and GRID in `ceil(sqrt(n))` columns. The tab strip has a fixed 40-point height and horizontal scrolling. The 10-point split gap and 80-point minimum on each side do not guarantee useful leaf size in a long split chain.
