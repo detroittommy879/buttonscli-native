@@ -8,14 +8,15 @@ Planning baseline: 2026-09-27. This is a source-grounded implementation specific
 2. [Compatibility contracts](CONTRACTS.md): imported data, control API, AI, and access rules.
 3. [Implementation tasks](TASKS.md): bounded tasks suitable for GPT-6-luna, dependencies, acceptance checks.
 4. [Testing and handoff](TESTING.md): fixtures, regression locations, platform checks, and task prompt.
+5. [`egui_dock` research](DOCKING-RESEARCH.md): compatible version, limits and Fedora prototype decision.
 
 Original source root (O): `G:/ccc/z_terminals/w111erd`, HEAD `032c9f21a17f17e48974f57259b1ad4a6506b858`.
 Native destination root (N): `G:/z/buttonscli-native`, baseline HEAD `ab84efafa6dbd8a03a76e8b06358a824d8dca19d`.
-Paths prefixed O or N below are relative to those roots. Recheck revisions before implementation; the original checkout has unrelated local changes. Do not stage or repair those changes.
+Paths prefixed O or N below are relative to those roots on this Windows host; map them to the corresponding clones in Fedora. Recheck revisions before implementation; the original checkout has unrelated local changes. Do not stage or repair those changes.
 
 ## Recommended order
 
-**Separate native settings with optional legacy import → stable terminal services → compatible agent control → separate AI Help window → everyday workflow parity → advanced visuals → optional services and distribution.**
+**Separate native settings with optional legacy import → fix tabs and pane layouts → stable terminal services → agent control and plain AI Help → theme/window polish → optional services and distribution.**
 
 User clarification during planning: use a second settings folder. The native app owns `~/.buttonscli-native/`; `~/.buttonscli/` is an optional read-only import source. No live shared writes or synchronization are required. Import compatible settings rather than copying live control tokens, helpers, sessions, and secrets wholesale.
 
@@ -26,12 +27,13 @@ Keep egui/eframe, Alacritty, offline assets, and event-driven rendering. Port be
 ## What the audit establishes
 
 - N `src/app.rs` already provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. Its `Preferences` use eframe storage (`eframe::APP_KEY`); they are not the original profile config.
+- N `pane_tree` forces every COL pane into one horizontal strip and every ROW pane into one vertical strip; GRID chooses `ceil(sqrt(count))` columns. The tab strip scrolls sideways on one row, and `TerminalTab::spawn` starts with the shell name as the tab title. These source facts fit the reported problems, which still need interactive reproduction.
 - N `src/theme.rs::ThemeCatalog::load` reads embedded assets. The displayed 559 choices are 555 legacy catalog entries plus four native themes, not proof that personal theme files are loaded.
 - O `src-tauri/src/main.rs` resolves `~/.buttonscli/active-profile.json`, `profiles/<name>/config.json`, profile `themes/` and `shaders/`; root `config.json` is a migration fallback.
 - O `src-tauri/src/control_api.rs` exposes an authenticated `/v1` API; O `scripts/buttonsclictl.mjs` already supports an explicit discovery-file environment override. This makes reuse of the existing CLI practical before writing a Rust CLI.
 - N has no equivalent control server or assistant implementation. Its numeric tab IDs can support stable external IDs; vector positions must not become those IDs.
 - O `src/types/index.ts` stores named provider keys in config, and `configStore.ts` serializes the config. Safe native credential storage needs a deliberate compatibility policy.
-- O feature catalog marks AI Help, agent mode, and automation as `pro`; profile management is disabled/internal. Reading the active profile is still necessary even if profile-management UI stays hidden.
+- O feature catalog marks AI Help and automation as `pro`; profile management is disabled/internal. Native AI scope is plain Help: explain terminal context and suggest commands for review. Agent Mode, full-permission execution and Stall Recovery are out of scope.
 - N CI currently checks Linux and WASM. Platform-portable code is not proof of macOS or Windows interaction parity.
 - Fresh audit validation: `cargo test --release` succeeded on Windows with 29 library tests, zero failures; binary/doc targets have zero tests. No new interactive GUI, macOS, Linux, throughput, or AI-provider certification was performed.
 
@@ -45,17 +47,19 @@ The supplied screenshot is visual context for the current native UI, not an inst
 |---|---|---|
 | Legacy active profile/config import | Missing; O backend path helpers, configStore and types | P0 `storage/`; optional import into separate native root |
 | Existing command/SSH presets | Native editor present, isolated storage; O `PresetBar.tsx` | P0 compatible import/native save, order and type-only semantics |
-| Personal themes | Embedded catalog only; O customThemeStorage/themeHydration | P0 disk catalog loading; P2 CRUD and editor |
+| Personal themes | Embedded catalog only; O customThemeStorage/themeHydration | P0 disk catalog loading; P1 random/per-terminal/auto-all themes; P2 CRUD and editor |
 | Shell profiles | Present but simpler discovery; O shellProfiles, backend discovery | P1 preserve settings; P2 Windows Terminal/WSL/wrappers and platform checks |
+| COL/ROW/GRID | Half-working per user; source uses fixed sequences | P0 reproduce and fix focus, resize, new-tab placement and width-aware second row |
+| Tab strip/names | One horizontally scrolling row; shell name starts title | P0 default `term1`, `term2` etc; wrap tabs into further rows |
+| Docking library | N uses a custom pane tree | P0 evaluate compatible `egui_dock` 0.16 as a bounded prototype |
 | Tabs/panes | Present, ten visible panes; O tabStore/sessionStore | P0 stable IDs/action dispatcher; preserve hidden tab targeting and lifecycle |
 | Agent control CLI | Missing; O control_api, controlSync, scripts/buttonsclictl | P1 compatible `/v1`, instance-safe discovery, Agent Inst. handoff |
 | MCP | Missing; O control_mcp_helper_template.mjs | P1 after CLI acceptance; optional Node helper, no Node GUI dependency |
-| AI Help | Missing; O AssistantPanel/DetachedAssistantWindow/useAIAssistantChat | P1 provider transport, reviewed actions, actual independent native window |
-| Agent Mode | Missing; O chat hook, assistantActions, prompts | P2 bounded approval/observe loop after reviewed Help |
-| Stall Recovery | Missing; O assistantIdleAutomation and hook | P2 text first; vision after opt-in screenshot pipeline |
-| Terminal search, clear, select all, zoom | Baseline terminal interaction exists; O TerminalPane/terminalRegistry/terminalZoom | P2 focused service/UI tasks; verify each operation rather than infer parity |
+| Plain AI Help | Missing; O AssistantPanel/DetachedAssistantWindow/useAIAssistantChat | P1 import endpoints/keys, explain terminal, suggest reviewed commands in a separate window |
+| Terminal scrollbar/search/zoom | Wheel scroll exists, visible scrollbar missing | P1 real per-pane scrollbar; P2 search, clear, select all and zoom |
 | Paste/input shortcuts | Basic clipboard present; O keyboardShortcuts/clipboardService | P1 input contract; P2 editable keys, slow paste, bracketed mode |
-| Dock/status/settings behavior | Partial; O PresetBar/StatusBar/SettingsDialog | P2 compact/auto-hide/resizing; live edits and Revert & Close; detached settings |
+| Dividers/rounding | Draggable gaps appear only on hover; tabs are rectangular | P1 visible, theme-saveable colored dividers; optional tab/panel corner radius |
+| Dock/status/settings behavior | Partial; O PresetBar/StatusBar/SettingsDialog | P1 detached Settings for live theme preview; P2 compact/auto-hide/resizing and Revert & Close |
 | Fonts/appearance | Bundled fonts/scopes present; O fontLoader/themeDesignerService | P2 system/custom fonts and editing; P3 opt-in downloads |
 | Effects | Static/scanlines and gradient subset present; O plugins/effects, config types | P3 native effect modules, master/calm controls, performance caps |
 | Theme generation | Missing; O themeDesignerService/themeRecipeDesignerService | P3 after editable theme format and AI transport |
@@ -97,12 +101,13 @@ Network, disk parsing, model discovery, and credential access run outside egui's
 |---|---|
 | M0 foundation | Synthetic fixtures, existing regression baseline, central access and text keys; no runtime regression |
 | M1 familiar workspace | Optional import of existing active profile, presets, personal themes into native root; malformed files isolated; original never written |
-| M2 agent-ready | Existing CLI controls an explicitly selected native instance; all command families tested; original/native coexist safely |
-| M3 useful AI Help | Separate native window, provider test/model input, bounded context, cancel/retry, reviewed actions tied to original target |
-| M4 daily replacement | Safe native saves/re-import, keyboard/search/paste, polished settings/docks, localization and platform behavior verified |
-| M5 advanced parity | Bounded agent mode and optional visual/AI tools within measured performance limits |
-| M6 distributable | Platform evidence, credentials/entitlements, signed native artifacts and isolated updates |
+| M2 daily terminal layout | COL/ROW/GRID work under resize, panes and tabs wrap, visible scrollbars/dividers, stable `termN` titles, no PTY loss |
+| M3 agent-ready | Existing CLI controls an explicitly selected native instance; all command families tested; original/native coexist safely |
+| M4 useful AI Help | Separate native window, imported or new provider settings, bounded context, explain/suggest, cancel/retry and reviewed actions |
+| M5 daily replacement | Safe native saves/re-import, random/per-terminal themes, detached Settings, keyboard/search/paste and platform checks |
+| M6 optional visuals | Advanced effects and theme tools within measured performance limits |
+| M7 distributable | Platform evidence, credentials/entitlements, signed native artifacts and isolated updates |
 
 Import is a snapshot, not ongoing synchronization. Both apps can subsequently edit their own folders independently. Re-import must preview conflicts with native edits and must never silently overwrite them.
 
-The first useful implementation batch is F01–F04, S01–S05, R01–R04, C01–C04 (see dependencies). Do not ask Luna to implement an entire milestone at once.
+The first useful implementation batch is F01–F04, L01–L10 and S01–S05 (see dependencies). Follow with R01–R04, C01–C04 and A01–A06. Do not ask Luna to implement an entire milestone at once.

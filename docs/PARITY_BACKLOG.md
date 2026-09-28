@@ -22,8 +22,8 @@ constraints.
 | Area | Status | Next acceptance milestone |
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
-| Tabs and sessions | Done | Keep lifecycle and pane-index regressions covered |
-| Pane layouts | Done | Keep split-tree, ratio persistence, and lifecycle regressions covered |
+| Tabs and sessions | Partial | `termN` naming and multi-row tab strip; keep lifecycle/index regressions covered |
+| Pane layouts | Partial | Reproduce/fix COL/ROW/GRID and width-aware wrapping on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Import/edit/share plus remaining effect rendering and online fonts |
 | AI Help | Missing | Provider settings, secure keys, context, answers, and safe actions |
@@ -36,8 +36,9 @@ constraints.
 | --- | --- | --- | --- |
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
-| Session tabs | Done | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | Create, close, focus, rename, reorder, reopen a recent close, and preserve the correct pane-to-tab mapping. |
-| Pane layouts | Done | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Columns, rows, and balanced grids add/remove/focus up to 10 visible sessions without corrupting tab mappings; recursive split branches resize independently and persist their ratios. |
+| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults, multi-row tab strip, create/close/focus/rename/reorder/reopen and correct pane mapping. |
+| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | COL/ROW/GRID add/remove/focus up to 10 visible sessions; wrap on constrained room, avoid unusable PTY sizes and preserve independent split ratios. |
+| Visible scrollbars | Missing | native `vendor/egui_term` | Each terminal displays real scrollback position and can drag to scroll without breaking selection or PTY size. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
@@ -56,6 +57,8 @@ constraints.
 | Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear, radial, and conic rendering preserve legacy type, angle, and named position; add repeating geometry, editable controls, and full animation parity. |
 | Terminal effects | Partial | `src/types/config.ts`, `src/components/HsyncDebugPanel.tsx` | Preserve current static/scanlines and add hsync warp, TV/simple/idle noise, row banding, glow, wallpaper, master switch, and focused-pane behavior. |
 | Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
+| Random/per-terminal/theme-all | Missing | native theme catalog and terminal palette | Random current/all, per-terminal assignment, global default, imported themes and live PTY preservation. |
+| Colored dividers/rounded chrome | Missing | native pane renderer and theme settings | Visible, draggable, theme-saveable separators and adjustable tab/panel radius. |
 | Theme designer | Missing | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts` | Generate preview candidates, self-correct invalid output, selectively apply, keep/save, and expose provenance. |
 | Shader Lab | Missing | `src/components/ShaderLabCard.tsx`, `src/services/shaderDesignerService.ts` | Edit/preview/save native GPU effects with a safe fallback and clear performance limits. |
 | Window appearance | Missing | feature `windowTransparency` | Persist opacity/transparency where supported and degrade clearly on unsupported compositors. |
@@ -69,12 +72,10 @@ preferences JSON.
 
 | Capability | Status | Legacy source | Acceptance criteria |
 | --- | --- | --- | --- |
-| Provider management | Missing | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Add/edit/test OpenAI-compatible endpoints, models, and keys; redact secrets in UI/logs/errors and persist them securely. |
-| AI Help window | Missing | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Dock/overlay opens reliably, streams or displays answers, supports cancellation/retry, and renders failures without affecting terminals. |
+| Provider management | Missing | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Import or add/edit/test OpenAI-compatible endpoints and models; optionally import selected legacy keys into OS storage, redacting secrets in UI/logs/errors. |
+| Plain AI Help window | Missing | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window explains bounded terminal output, answers questions and suggests reviewed commands; cancel/retry and failures do not affect terminals. |
 | Terminal context | Missing | `src/hooks/useAIAssistantChat.ts` | User chooses whether to include bounded recent output; preview exactly what leaves the machine and exclude obvious secrets where practical. |
 | Suggested actions | Missing | `src/services/assistantActions.ts` | Parse commands and control-key suggestions; show label/description; default to inserting text, and require a clear action before execution. |
-| Agentic mode | Missing | assistant hooks/services | Run bounded multi-step work with visible state, cancellation, permission gates, and auditable actions. |
-| Idle assistance | Missing | `src/hooks/useAssistantIdleAutomation.ts` | Detect configured idle conditions without runaway calls and let the user inspect/disable automation. |
 | AI theme/shader generation | Deferred | theme and shader designer services | Start after provider storage and the non-AI theme/shader editors are stable. |
 | Loopback control API | Missing | legacy Tauri control server, `src/services/controlSync.ts` | Bind to loopback only, authenticate every mutation, expose tab/pane/preset/input operations, rotate credentials, and test hostile requests. |
 | CLI and MCP helper | Deferred | `src/services/controlCliInstructions.ts` | Start after the native control contract is versioned; helper discovers local credentials without copying them into project config. |
@@ -84,7 +85,7 @@ preferences JSON.
 
 | Capability | Status | Legacy source | Acceptance criteria |
 | --- | --- | --- | --- |
-| Settings architecture | Partial | `src/components/SettingsDialog.tsx` | Every shipped feature has a discoverable setting; settings can detach if retained as a product requirement. |
+| Settings architecture | Partial | `src/components/SettingsDialog.tsx` | Every shipped feature has a discoverable setting; detached native window lets users see changes on the terminal. |
 | Profiles | Deferred | `src/store/profileStore.ts` | Resolve whether disabled legacy profile management should ship before rebuilding it. |
 | Guided onboarding | Missing | `src/components/AppOnboardingTour.tsx` | First-run tour and replay cover buttons, tabs, panes, status, and settings; fully keyboard accessible. |
 | Localization | Missing | `src/i18n/` | Externalize user-facing text, port supported locales, persist locale, and verify long/RTL strings where applicable. |
@@ -103,10 +104,14 @@ visual-first ordering and breaks the work into bounded implementation tasks.
 
 1. Establish `~/.buttonscli-native/` with optional import from the original
    `~/.buttonscli/`; leave the original settings untouched.
-2. Build stable session/output/input services and compatible `buttonsclictl`.
-3. Build secure provider configuration and a separate native AI Help window.
-4. Close everyday workflow gaps, then advanced assistant/effect capabilities.
-5. Verify platforms, accessibility, performance, and native releases throughout.
+2. Repair COL/ROW/GRID, tab wrapping/naming, scrollbars, per-terminal themes,
+   dividers and detached Settings on Fedora.
+3. Build stable session/output/input services and compatible `buttonsclictl`.
+4. Build imported provider configuration and plain, separate AI Help.
+5. Address optional effects, platform/accessibility/performance and releases.
+
+Agent Mode and Stall Recovery are outside the current native scope. Do not treat
+old settings for them as enabled behavior after import.
 
 ## Definition of done for a backlog row
 

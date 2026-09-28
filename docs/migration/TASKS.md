@@ -8,7 +8,7 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 
 ### F01 — Freeze synthetic compatibility examples [S, no dependency]
 - Read O config types/defaults/migrations, customThemeStorage, control API DTOs and CLI tests; N existing tests.
-- Add `tests/fixtures/legacy/` with synthetic old/current profiles, empty presets, false `sendEnter`, Unicode, unknown visual fields, malformed metadata, duplicate theme IDs, and fake provider credentials. Add provenance/source revision manifest; never copy the user's real settings.
+- Add `tests/fixtures/legacy/` with synthetic old/current profiles, empty presets, false `sendEnter`, Unicode, unknown visual fields, malformed metadata, duplicate theme IDs, and fake provider endpoints/credentials. Add provenance/source revision manifest; never copy the user's real settings.
 - Check fixtures represent actual original shapes and expected normalization. Add source-to-feature matrix to test documentation. Run current full native tests and record platform/toolchain.
 - Done: fixtures parse where intended; malformed cases are labeled; no runtime feature changed. Free infrastructure.
 
@@ -19,12 +19,59 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 
 ### F03 — Central feature resolver [M, F01]
 - Read O `features/catalog.ts`, `access.ts` and tests. Add N `features/catalog.rs`, `access.rs` with stable keys/tiers and an injectable entitlement source.
-- Cover free, locked pro, internal hidden, explicit development override, expired/offline grant and kill switch precedence. Declare new ordinary import/settings features free.
+- Cover free, locked pro, internal hidden, explicit development override, expired/offline grant and kill switch precedence. Declare new local layout, theme selection, scrollbar, divider and settings appearance features free. Do not implement native `agenticMode` or `assistantIdleAutomation` entries.
 - Done: one query API supports UI and execution; no inferred purchased access, network calls, or secret-vault exposure. Pro keys remain pro even when development mode enables them.
 
 ### F04 — Native text catalog seam [S, F01]
 - Read O `i18n/messages.ts`, `locale.ts`; create native translation lookup with fallback and interpolation tests. Add keys for upcoming import, automation and assistant surfaces across shipped locale catalogs.
 - Done: new features use catalog keys; wholesale existing UI translation is U05. Free.
+
+## L — repair daily terminal layout (M2)
+
+These are early tasks because the user reports partially working layouts. First reproduce on the Fedora workstation VM with harmless local PTYs; source inspection alone does not certify interaction.
+
+### L01 — Layout behavior matrix [S, no dependency]
+- Record actual behavior of COL, ROW and GRID for 1–10 visible panes while adding, focusing, closing and resizing. Inspect N `set_pane_layout`, `set_visible_pane_count`, `pane_tree`, `render_pane_tree` and existing pane tests. Define COL/ROW/GRID semantics with screenshots and a minimum useful pane width/height.
+- Decide whether “second row” applies to the pane grid and the tab strip; this plan covers both. COL should fill left-to-right then continue below when width is insufficient; ROW should arrange top-to-bottom within usable height then continue in another column if needed; GRID balances rows/columns within minimum sizes. If space is too small, use a documented overflow/focus affordance rather than tiny unusable PTYs.
+- Done: `docs/migration/LAYOUT-DECISION.md` has reproducible cases, viewport sizes and expected pane order. No dependency or rewrite. Free.
+
+### L02 — Stable `termN` titles [S, L01]
+- Change new-tab title assignment in N `TerminalTab::spawn`/app to `term1`, `term2`, etc. Separate shell/cwd metadata from the user-facing title; explicit rename wins and survives reorder/reopen as intended.
+- Test first tab, close then create, restart policy, duplicate prevention, custom shell path, title changes from terminal escape sequences, and CLI ID/title targeting. Make the numbering rule explicit in docs. Free.
+
+### L03 — Responsive pane layout reducer [M, L01]
+- Extract geometry/count/pane order into a pure module, then wire COL/ROW/GRID. Use available width/height and minimum terminal cell bounds; preserve stable session IDs, focus and persisted divider ratios when panes wrap/reflow.
+- Test 2–10 panes at narrow/wide bounds, resize back and forth, new/hidden tab, close focused pane, equal/unequal split ratios and PTY resize events. On Fedora verify no blank panes or shell respawn. Free.
+
+### L04 — Multi-row tab strip [S, L02]
+- Replace the fixed 40-pixel, horizontal-scroll-only tab bar with a wrapping layout that grows to two or more rows. Keep add/reopen/menu controls reachable, keyboard tab navigation, drag/reorder behavior and clear active/visible states.
+- Test long/renamed titles, narrow window, many tabs, zoom/DPI and tab close while wrapped. If egui docking is adopted later, keep this as the product requirement. Free.
+
+### L05 — Visible terminal scrollbars [M, L03]
+- Expose scrollback length, viewport size and display offset from the vendored Alacritty adapter through a narrow API. Add a per-pane scrollbar that shares wheel/drag state; hide or disable appropriately in alternate-screen mouse mode.
+- Test scroll position after new output, resize, truncation, clear, switching panes and dragging to bottom. No outer `ScrollArea` around terminal cells, which would steal selection or misreport PTY dimensions. Free.
+
+### L06 — Docking library compatibility probe [Spike, L01]
+- Prototype `egui_dock` **0.16** in a disposable branch or example against pinned egui/eframe 0.31; current `egui_dock` 0.21 targets egui 0.36. Evaluate tab move/close/rename, split resize, stable PTY ownership, serialization, minimum pane size, Fedora X11/Wayland, and native window drag-out.
+- Compare with the existing recursive pane tree. `egui_dock` supports binary dock splits and separate egui windows, but its README says it lacks direct multi-child grid support. It may help tab docking while custom responsive COL/ROW/GRID remains. Do not adopt it solely for rounded tabs or wrap: test those requirements explicitly.
+- Done: `docs/migration/DOCKING-DECISION.md` records exact version/dependency tree, runnable prototype, regression/performance cost and go/no-go decision. No production dependency until it passes. Free.
+
+### L07 — Colored, saved pane dividers [S, L03, S03]
+- Paint each split separator even when idle; expose color and thickness with theme inheritance plus user override. Save divider values in native theme documents/editor and native preferences; clamp thickness so hit area remains usable.
+- Test rows/columns/grid at different scale factors, contrast, drag vs text selection, theme switch, export/import and restart. Free.
+
+### L08 — Random/per-terminal/theme-all controls [M, S04, S03, L03]
+- Add Random Theme (from eligible loaded themes), Set Theme for This Terminal and Theme All. Per-terminal choice keys by stable terminal ID; new terminals inherit the current global default; theme-all explicitly replaces overrides for all open terminals, including hidden tabs. Preserve each theme's terminal palette/gradient/effects scopes; app chrome remains global.
+- Use a fresh draw or bag to avoid repeating the same theme when alternatives exist; allow randomizing current pane or all panes. Save the global default and any restorable tab assignments in native settings and expose a current-theme label. Define close/reopen and restart behavior without binding a theme to a reused vector index; if sessions are not restored, do not promise their old per-tab assignments survive restart.
+- Test 1/4/10 panes, two different themes at once, focused-pane changes, global theme apply, theme-all, random, imported personal themes, no PTY remount, and persisted choice. Free.
+
+### L09 — Adjustable corner radius [S, S03, L04]
+- Add a small style setting for tab and non-terminal chrome radius; default to current look or a restrained rounded preset. Apply via egui style/button/frame APIs without rounding terminal cell clip bounds.
+- Test scale, focus outlines, hit targets, dark theme contrast and persistence. Free.
+
+### L10 — Native secondary viewport probe [Spike, no dependency]
+- Use pinned egui/eframe 0.31 `Context::show_viewport_deferred` or `show_viewport_immediate` in a tiny example with fake settings data. On Fedora X11 and Wayland, test separate OS window, monitor move, focus, close/reopen and main-window close; identify fallback and shared-state pattern.
+- Done: `docs/migration/VIEWPORT-DECISION.md` records exact API used and tested display backend. Reuse for Settings (U04) and Help (A05). Free infrastructure.
 
 ## S — independent data root and importer (M1)
 
@@ -50,8 +97,8 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 
 ### S05 — Import preview and transaction [M, S03, S04, F04]
 - Add `storage/import.rs` and Settings import surface; default source `~/.buttonscli`, active profile selected. Preview categories, counts, unsupported fields, excluded data and conflicts.
-- Implement staged commit/rollback, change-since-preview detection, cancellation and import manifest. Offer first-run import without forcing it.
-- Test source tree hashes unchanged, fresh native destination, existing native edits, failure halfway, no preset execution, excluded runtime/auth files and fake key redaction.
+- Implement staged commit/rollback, change-since-preview detection, cancellation and import manifest. Offer first-run import without forcing it. Preview named AI endpoints/models; show API-key import as unavailable until A01's credential adapter is wired, never silently skip a checked option.
+- Test source tree hashes unchanged, fresh native destination, existing native edits, failure halfway, no preset execution, excluded runtime/auth files and fake key redaction. No key appears in native config, manifests, logs or backups.
 - Done: user imports presets/settings/themes into `~/.buttonscli-native` and restarts successfully; original app still reads identical original files. Free.
 
 ### S06 — Safe repeated import and profile selection [S, S05]
@@ -83,7 +130,7 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 - Test Ctrl+C bytes, CRLF normalization, Unicode pacing, cancellation and close during paste. Preserve terminal mode rules and focused-session UI behavior.
 - Done: presets, GUI paste, CLI and AI cannot drift into separate unsafe send paths. Free core.
 
-## C — agent control (M2)
+## C — agent control (M3)
 
 ### C01 — `/v1` DTOs and authenticated transport [M, R01, F03]
 - Read O `control_api.rs` DTOs/routes/auth/errors. Add native control DTOs and loopback server, background runtime, request deadlines and bounded queue.
@@ -103,7 +150,7 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 ### C04 — Create/rename/layout/preset routes [M, C02, C03, S05]
 - Implement remaining existing routes through dispatcher/current native profile. Preserve existing selector and preset ambiguity behavior.
 - Execute the existing CLI command matrix against a test-owned native instance. Include stdin/file/base64, literal type-only presets, hidden tabs and layout mapping.
-- Done: documented command surface works with explicit native discovery; M2 direct CLI milestone. Pro.
+- Done: documented command surface works with explicit native discovery; M3 direct CLI milestone. Pro.
 
 ### C05 — Optional MCP adapter [S, C04]
 - Inspect and pin O `control_mcp_helper_template.mjs`; adapt native discovery without embedding tokens in setup. Add protocol smoke tests with fake API/explicit descriptor.
@@ -113,11 +160,11 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 - Implement only if removing helper Node dependency is desired. Reuse fixture contract for flags, JSON, exit codes and payload sources; no server behavior changes in this task.
 - Done: existing Node and Rust helper pass identical conformance cases. Pro surface; defer until AI Help is useful.
 
-## A — reviewed AI Help (M3)
+## A — plain, reviewed AI Help (M4)
 
-### A01 — Provider models and credential adapter [M, S03, F03, F04]
-- Add named provider metadata, active provider, legacy normalization and OS-store/session-only credential trait. Separate explicit key import from normal settings import.
-- Test fake credential store failures, missing key, multiple/deprecated providers, redacted error formatting, and no keys in native serialized config/manifests.
+### A01 — Provider models and credential adapter [M, S05, F03, F04]
+- Add named provider metadata, active provider, legacy normalization and OS-store/session-only credential trait. Activate S05's separate key import choice with a concrete preview and confirmation; import endpoint/model settings even when keys are skipped.
+- Test fake credential store failures, missing key, multiple/deprecated providers, redacted error formatting, selected key import, and no keys in native serialized config/manifests.
 - Done: native provider settings persist; original credentials remain untouched. `aiHelp`: pro.
 
 ### A02 — Direct HTTP/model discovery [M, A01]
@@ -135,17 +182,17 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 - Port representative original assistantActions and prompt freshness regression cases; test switched focus, closed/replaced target, stale reply, denied feature and credential masking.
 - Done: explicit insert/run/key actions, no automatic execution, bounded context and no clipboard/file collection. Pro.
 
-### A05 — Independent window prototype [Spike, F04; can precede A04]
-- Test pinned eframe multi-viewport implementation with fake assistant state on available OS; verify focus, keyboard, monitor/DPI move, main-window shutdown and reopen.
+### A05 — Independent Help window prototype [Spike, L10, F04; can precede A04]
+- Apply the L10 viewport decision to fake assistant state on Fedora first; verify focus, keyboard, monitor/DPI move, main-window shutdown and reopen.
 - Deliver short decision note identifying any dependency/platform blocker. Avoid framework upgrade as a side effect; a required upgrade becomes its own task.
 - Done: demonstrably separate window on tested OS, with untested OS clearly recorded. Pro surface.
 
 ### A06 — Wire AI Help window [M, A04, A05]
 - Add `ui/assistant.rs` and controller; status/menu open, provider setup, transcript, cancel/retry, context toggle, action review and errors.
 - Test controller without GUI; manually exercise independent window and fake provider while shells stream. Close/reopen must not duplicate workers or lose shells.
-- Done: M3 acceptance; docs accurately describe tested platforms and limitations. Pro.
+- Done: M4 acceptance: ask a question, explain the selected terminal and suggest a command; insert/run only after separate review. No agent loop or background watcher. Docs describe tested platforms and limits. Pro.
 
-## U — everyday replacement (M4)
+## U — everyday replacement (M5)
 
 Each row is an independent task; take one at a time. Existing feature keys retain original tiers; new local conveniences default free.
 
@@ -154,24 +201,15 @@ Each row is an independent task; take one at a time. Existing feature keys retai
 | U01 / R04, F04 | Editable shortcuts, conflict detection; O keyboardShortcuts and tests | Pure key normalization/platform modifier tests; keyboard-only settings; no shell Ctrl+C interception |
 | U02 / R03, F04 | Terminal search, next/previous, clear, select-all; O TerminalPane/registry | Hidden/active target, wrapped/wide Unicode and scrollback fixtures; clear must not close/restart shell |
 | U03 / S03, F04 | Dock compact/resize/auto-hide and status zoom/effect controls | Fake-time auto-hide test, focus preserved, zero-size pane prevention, no redraw spin when idle |
-| U04 / S03, A05 | Detached Settings, live preview and Revert & Close | Restore only session changes, no shell remount, close/reopen/DPI checks |
+| U04 / S03, L10 | Detached Settings, live preview and Revert & Close; schedule early to make theme editing visible | Reuse viewport probe, restore only session changes, no shell remount, close/reopen/DPI/monitor checks; offer in-window fallback if unsupported |
 | U05 / F04, U01 | Port full visible string catalog, onboarding and locale selector | Locale key completeness, no repeated first-run prompt, long labels, glyph fallback, keyboard focus; manual RTL/IME assessment |
-| U06 / S02, R01 | Shell discovery/profile expansion; O shellProfiles/backend | Windows cmd/PowerShell/pwsh/WSL/wrappers and Unix login shells, quoted paths and failed launch; no assumption commands are shell-independent |
+| U06 / S02, R01 | Shell discovery/profile expansion; O shellProfiles/backend | Fedora Bash/Zsh/Fish/Nushell first, then Windows cmd/PowerShell/pwsh/WSL and macOS shells; quoted paths and failed launch |
 | U07 / S04, S03 | Theme CRUD/import/export and non-AI editor | Round-trip supported/unknown visual fields, collision/filename handling, scoped preview/cancel and restart; no terminal respawn |
 | U08 / U07 | System/custom fonts; O fontLoader/catalog | Missing-font fallback, invalid font file, offline startup, regular/bold widths and Unicode selection; online download separate opt-in subtask |
 | U09 / F03, F04 | Window opacity plus capability display | Platform-specific compositors/DPI; unsupported setting does not break rendering; free `windowTransparency` |
 | U10 / R01, F04 | Cool Stuff copy/type setup and external links | Exact platform script selection from source, type without Enter, visible destination; no automatic install or network script execution |
 
-## B — advanced assistant (M5, after useful Help)
-
-| ID / dependencies | Scope | Acceptance/tests |
-|---|---|---|
-| B01 / A06, C03 | Agent-mode pure state machine then controller integration (`agenticMode`, pro) | Fake clock/provider: one approved action per step, fresh output delta, max steps, timeout/no output stop, cancellation at each state, access loss |
-| B02 / B01 | Full-permission and longer-task modes | Explicit session warning/choice; imported flags cannot enable execution; longer-task mode never grants permissions |
-| B03 / B01 | Text Stall Recovery (`assistantIdleAutomation`, pro) | Per-tab enable, debounce/cooldown, budget, active work suppression, no recursive self-trigger, closed tab cancellation |
-| B04 / B03 | Vision capture spike, then separate implementation | Correct terminal crop/scale on supported OS, explicit opt-in, two timestamps, bounded frequency, no other window/clipboard capture; skip provider call without valid captures |
-
-## V — advanced visuals (M5)
+## V — optional advanced visuals (M6)
 
 Use `src/plugins/effects/` for new effects; each effect is independently enabled, measurable and reversible. Preserve imported unsupported values until implemented.
 
@@ -183,7 +221,7 @@ Use `src/plugins/effects/` for new effects; each effect is independently enabled
 | V04 / V01 | Shader Lab design spike, then editor/compiler tasks (`shaderLab`, free beta) | Explicit old GLSL-to-native strategy, unsupported shader warning, compile failure recovery, bounded compile resources and GPU fallback; no claim of automatic shader compatibility |
 | V05 / V04, A06 | Shader generation (`vibeCodeShaders`, pro) | Same provider/cancel policy, validated candidates, no unchecked generated shader activation |
 
-## P — optional product/platform work (M6)
+## P — optional product/platform work (M7)
 
 | ID / dependencies | Scope | Acceptance/tests |
 |---|---|---|
@@ -191,7 +229,7 @@ Use `src/plugins/effects/` for new effects; each effect is independently enabled
 | P02 / F03, A01 | Internal Quick Secrets design and implementation | Separate encryption/unlock/autolock review, fake key store, wrong password/recovery tests, explicit target paste; no auto-import vault |
 | P03 / R01, F04 | Native read-only text/Markdown guide/display tabs | No PTY input to display tab; URL/content bounds, safe external open, offline failures. Arbitrary browsing/webview remains deferred |
 | P04 / F03 | Feedback/privacy/analytics | Explicit opt-in policy, redaction, mock non-2xx responses, original receiver/schema contract tests if service reused; never rely on UI success only |
-| P05 / M3 | Cross-platform local build/smoke scripts | Windows/macOS/Linux X11/Wayland evidence; WASM has no local HTTP/PTY/credential features; no automatic GitHub desktop builds introduced |
+| P05 / M4 | Cross-platform local build/smoke scripts | Fedora X11/Wayland first, then Windows/macOS evidence; WASM has no local HTTP/PTY/credential features; no automatic GitHub desktop builds introduced |
 | P06 / P05, P01 | Native packaging/signing/update design then platform adapters | Distinct native product/artifact IDs and settings root; tampered signature rejected; rollback; no Tauri channel/pointer overwrite; manual local release workflow |
 
 Cloud settings sync, hosted theme sharing, JSON workbench and cloud text vault remain new product work, not migration blockers. Do not implement them merely because the original Account UI lists them.

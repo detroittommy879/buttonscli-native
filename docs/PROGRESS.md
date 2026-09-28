@@ -1,5 +1,26 @@
 # Reconstruction journal
 
+## 2026-09-27 — Plan refined for native daily use and Fedora
+
+Updated `docs/migration/` after the user narrowed AI Help to explanations and
+reviewed command suggestions and reported layout issues. Removed Agent Mode,
+full-permission and Stall Recovery implementation tasks. Added bounded tasks for
+COL/ROW/GRID repair, wrapped pane and tab rows, `termN` names, visible
+scrollbars, random/per-terminal/theme-all controls, saved divider colors,
+rounded chrome and detached Settings. Existing Tauri provider endpoints/models
+are in the import preview; selected API keys can be imported to a native OS
+credential store after explicit confirmation, without copying control/auth
+files. Fedora X11/Wayland is the first manual validation target.
+
+Reviewed upstream `egui_dock`: current 0.21 targets egui 0.36; 0.16 matches the
+app's pinned egui 0.31. Its docking features may help, but automatic responsive
+grid behavior still needs a product layout reducer. Added a version-pinned
+Fedora prototype task and `docs/migration/DOCKING-RESEARCH.md`. Confirmed the
+locally installed egui 0.31.1 source exposes secondary viewport APIs; actual
+window behavior remains for the Fedora probe. No runtime code or live settings
+were changed. Documentation references and Git diff checks were run; a GUI
+smoke, dependency build and OS credential-store import are not yet verified.
+
 ## 2026-09-27 — Source-audited migration specification
 
 Compared the native models/backend/theme loader with the current local Tauri
