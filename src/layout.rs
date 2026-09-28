@@ -33,6 +33,7 @@ pub(crate) fn minimum_for_font(size: f32) -> Bounds {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn plan(
     mode: LayoutMode,
     ordered_ids: &[u64],
@@ -40,6 +41,26 @@ pub(crate) fn plan(
     previous_start: usize,
     bounds: Bounds,
     minimum: Bounds,
+) -> LayoutPlan {
+    plan_with_grid_columns(
+        mode,
+        ordered_ids,
+        focused_id,
+        previous_start,
+        bounds,
+        minimum,
+        None,
+    )
+}
+
+pub(crate) fn plan_with_grid_columns(
+    mode: LayoutMode,
+    ordered_ids: &[u64],
+    focused_id: u64,
+    previous_start: usize,
+    bounds: Bounds,
+    minimum: Bounds,
+    requested_grid_columns: Option<usize>,
 ) -> LayoutPlan {
     if ordered_ids.is_empty() {
         return LayoutPlan {
@@ -58,6 +79,11 @@ pub(crate) fn plan(
         .max(1.0) as usize;
     let capacity = match mode {
         LayoutMode::Single => 1,
+        LayoutMode::Grid if requested_grid_columns.is_some() => requested_grid_columns
+            .unwrap_or(1)
+            .clamp(1, max_columns)
+            .saturating_mul(max_rows)
+            .max(1),
         _ => max_columns.saturating_mul(max_rows).max(1),
     };
     let count = ordered_ids.len().min(capacity);
@@ -82,7 +108,12 @@ pub(crate) fn plan(
             let rows = count.min(max_rows);
             (rows, count.div_ceil(rows))
         }
-        LayoutMode::Grid => best_grid(count, max_rows, max_columns, bounds, minimum),
+        LayoutMode::Grid => requested_grid_columns
+            .map(|columns| {
+                let columns = count.min(columns.clamp(1, max_columns));
+                (count.div_ceil(columns), columns)
+            })
+            .unwrap_or_else(|| best_grid(count, max_rows, max_columns, bounds, minimum)),
     };
     LayoutPlan {
         ids,

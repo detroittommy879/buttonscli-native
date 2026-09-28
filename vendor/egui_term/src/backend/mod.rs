@@ -28,6 +28,7 @@ use std::sync::{mpsc, Arc};
 pub type TerminalMode = TermMode;
 pub type PtyEvent = Event;
 pub type SelectionType = AlacrittySelectionType;
+pub type ByteObserver = Arc<dyn Fn(&[u8]) + Send + Sync + 'static>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ScrollbackState {
@@ -172,6 +173,7 @@ pub struct TerminalBackend {
     size: TerminalSize,
     notifier: Notifier,
     last_content: RenderableContent,
+    input_observer: Option<ByteObserver>,
 }
 
 impl TerminalBackend {
@@ -180,6 +182,25 @@ impl TerminalBackend {
         app_context: egui::Context,
         pty_event_proxy_sender: Sender<(u64, PtyEvent)>,
         settings: BackendSettings,
+    ) -> Result<Self> {
+        Self::new_with_observers(
+            id,
+            app_context,
+            pty_event_proxy_sender,
+            settings,
+            None,
+            None,
+        )
+    }
+
+    /// Attach lightweight callbacks to input writes and the existing PTY read loop.
+    pub fn new_with_observers(
+        id: u64,
+        app_context: egui::Context,
+        pty_event_proxy_sender: Sender<(u64, PtyEvent)>,
+        settings: BackendSettings,
+        input_observer: Option<ByteObserver>,
+        output_observer: Option<ByteObserver>,
     ) -> Result<Self> {
         let pty_config = tty::Options {
             shell: Some(tty::Shell::new(settings.shell, settings.args)),
@@ -201,8 +222,14 @@ impl TerminalBackend {
             hovered_hyperlink: None,
         };
         let term = Arc::new(FairMutex::new(term));
-        let pty_event_loop =
-            EventLoop::new(term.clone(), event_proxy, pty, false, false)?;
+        let pty_event_loop = EventLoop::new_with_output_observer(
+            term.clone(),
+            event_proxy,
+            pty,
+            false,
+            false,
+            output_observer,
+        )?;
         let notifier = Notifier(pty_event_loop.channel());
         let url_regex = RegexSearch::new(r#"(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file://|git://|ssh:|ftp://)[^\u{0000}-\u{001F}\u{007F}-\u{009F}<>"\s{-}\^⟨⟩`]+"#).unwrap();
         let _pty_event_loop_thread = pty_event_loop.spawn();
@@ -228,6 +255,7 @@ impl TerminalBackend {
             size: terminal_size,
             notifier,
             last_content: initial_content,
+            input_observer,
         })
     }
 
@@ -236,6 +264,9 @@ impl TerminalBackend {
         let mut term = term.lock();
         match cmd {
             BackendCommand::Write(input) => {
+                if let Some(observer) = &self.input_observer {
+                    observer(&input);
+                }
                 self.write(input);
                 term.scroll_display(Scroll::Bottom);
             },

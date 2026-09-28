@@ -26,6 +26,14 @@ Current desktop features include:
 - separate command and SSH docks, editable persisted presets with type/run
   behavior, all 555 bundled legacy theme selections, and personal version 1
   theme JSON files from the active native profile's `themes/` folder;
+- editable AI provider endpoints and model IDs, plus a separate AI Help window
+  with streamed answers, previewed optional terminal context, and explicitly
+  reviewed suggestions; the Pro gate is still closed in release builds until
+  native entitlement integration exists;
+- an authenticated, loopback-only agent control API with an exact-instance
+  **Agent Inst.** handoff and optional Node CLI; it supports tab creation,
+  rename, layouts, presets, bounded output reads, and raw, bracketed, or paced
+  input, but is still Pro-gated and not enabled in release builds;
 - 26 bundled font faces grouped into 19 selectable families, with independent
   typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
   including separate terminal regular/bold faces;
@@ -63,8 +71,9 @@ creates a separate native profile with settings, command and SSH presets, and
 valid personal themes. Repeating the same snapshot preserves native edits;
 changed source data creates another profile. Import never runs saved commands.
 API keys, runtime/auth files and session history are excluded. Provider names,
-endpoints and models are retained as inert compatibility data; native AI Help
-and credential transfer are not implemented yet.
+endpoints and models are retained as inert compatibility data and can be edited
+under **Settings → AI providers**. Keys can be saved in the operating system's
+credential store or kept for the current session.
 
 Personal themes are read when the desktop app starts. A broken theme file is
 skipped without removing other themes. Imported files are copied only after
@@ -81,10 +90,13 @@ but reset after app restart because terminal sessions are not restored.
 Architecture decisions, verified behavior, and honest remaining gaps live in
 `docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.
 
+See [`docs/AI-HELP.md`](docs/AI-HELP.md) for provider and review behavior, and
+[`docs/CONTROL-API.md`](docs/CONTROL-API.md) for the native agent-control
+handoff, supported routes, and current access limits.
+
 The [feature migration plan](docs/migration/README.md) compares the original
-Tauri app with this native implementation and defines prioritized, testable
-tasks for optional settings import, agent control, AI Help, and remaining parity.
-It describes planned work, not currently shipped capabilities.
+Tauri app with this native implementation, records source/build evidence for
+completed work, and tracks remaining platform and acceptance checks.
 
 The theme and font catalogs are embedded into the executable. They do not make
 network requests and remain available offline.

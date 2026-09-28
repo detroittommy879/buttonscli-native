@@ -1,24 +1,27 @@
-# Output capture decision
+# Output capture seam and decision
 
 Date: 2026-09-28  
-Scope: R02 decision for AI Help context. This does not complete the CLI-compatible R03 output service.
+Scope: R02 seam decision and R03 bounded CLI-compatible raw output source implementation. This does not claim runtime acceptance or sustained-output performance.
 
-## Selected seam
+## Decision
 
-AI Help takes a bounded plain-text tail from the `TerminalBackend::last_content.grid` snapshot already owned by the renderer. The snapshot is copied after `TerminalView` synchronizes with the Alacritty terminal. `plain_text_tail(200_000)` reads that retained grid without acquiring the terminal grid mutex or introducing another PTY reader. The context is therefore a rendering of current screen and scrollback state: escape sequences and overwritten carriage-return text are already represented as terminal cells, while cell attributes and raw byte history are not included.
+Observe output from Alacritty's existing PTY reader. Do not start a second reader and do not substitute the rendered grid for the CLI transcript.
 
-The preview is generated only for the focused terminal when the user explicitly requests it. It is redacted and shown before sending. This is appropriate for plain AI Help context, which needs readable terminal state rather than an exact byte transcript.
+The native tree vendors the pinned `alacritty_terminal` 0.25.1 source. Before modification, its registry `src/event_loop.rs` had SHA-256 `DE90C5512A9A0FDEE7DA38FAD468629F78A6D0D9AB7BA5ED115901D374CA6645`. The patch adds an optional `OutputObserver` to `EventLoop`; `pty_read` invokes it with the same byte slice from the same `Read` chunk before passing the bytes to Alacritty's parser. `egui_term::TerminalBackend::new_with_observers` supplies this output callback and an input callback. The existing constructor remains compatible and passes no observers.
 
-## Alternatives and scope
+Each `TerminalTab` owns an `Arc<OutputCapture>`. This also observes hidden tabs because their normal backend reader remains alive. The capture performs the same per-chunk `String::from_utf8_lossy` conversion as the original app's PTY forwarding path. It keeps a Unicode-safe 200,000-character tail, records whether truncation occurred, stores the latest logical input, and tracks input/output wall-clock timestamps plus an output sequence. Reads support bounded character or line ranges from either end. ANSI escapes and carriage returns are retained as raw text; no shell exit status is inferred.
 
-- A second PTY reader is rejected: it would compete with the existing owner and can consume bytes the terminal needs.
-- Capturing raw bytes in the PTY event loop would preserve a transcript, but requires instrumentation at the single existing reader, bounded per-session storage, UTF-8/ANSI handling, activity/freshness semantics and hidden-session lifecycle coverage. That is materially broader than AI context and is not implemented here.
-- A `Wakeup` or repaint signal alone is not output data and cannot provide transcript semantics.
+AI Help continues to use the distinct `TerminalBackend::last_content.grid` snapshot. That surface is normalized screen/scrollback text, not this raw capture. Its optional preview is still explicit, bounded, and shown before provider submission.
 
-The selected implementation changes only the vendored backend snapshot accessor and the native AI Help preview. It allocates a bounded text copy on explicit preview; it does not measure sustained-output allocation cost in this batch.
+## Alternatives and boundaries
 
-## Fixture and remaining work
+- A second PTY reader can consume bytes needed by the renderer, so it is rejected.
+- A grid snapshot cannot preserve ANSI/control bytes, identical redraw activity, or a byte transcript, so it is not the `/v1` read source.
+- A repaint or wakeup event is not output data.
+- The observer adds chunk conversion and bounded-tail work to the existing reader. No allocation, lock-time, or sustained-throughput benchmark has been run.
 
-Use a future R03 transcript fixture containing ANSI color, cursor movement, carriage-return redraw, split UTF-8 bytes, blank lines and alternate-screen transitions. Assert separately on exact raw capture and normalized AI snapshot; do not compare the two as if they had identical contracts.
+## Evidence and remaining acceptance
 
-The current AI snapshot accessor is present and compiles on Windows. R03 remains open for a raw/CLI-compatible output service, per-session activity/freshness metadata, hidden-tab observation guarantees, and throughput/lock measurements. The AI snapshot path has not had an interactive GUI or sustained-output run.
+Windows `cargo fmt --all` and `cargo check --bin buttonscli` passed after the implementation. Source inspection confirms the observer is called inside the existing single PTY `Read` loop and before parsing. The native API reads the per-session capture and uses output sequence plus text for quiet/match waits.
+
+The planned transcript fixture still needs ANSI color, cursor movement, carriage-return redraw, split UTF-8 chunks, blank lines and alternate-screen transitions. No tests were run in this implementation pass; split-byte equivalence with the original chunk-wise lossy conversion, hidden-session behavior, close/cancel races and output performance remain unverified at runtime. The AI grid preview and CLI raw transcript must continue to be validated as separate contracts.

@@ -6,6 +6,8 @@ not a backlog disguised as release notes.
 ## Platform verification
 
 - Linux Mint/X11 is the only desktop target run manually so far.
+- Windows source checks pass, but the detached Help window, native control API,
+  Node handoff and real PTY input/output have not had a live Windows pass.
 - Eframe and Alacritty expose macOS and Windows implementations, and the app has
   no Unix-only UI code, but those targets still need native CI and manual tests.
 - The browser package compiles and packages successfully. The available VM
@@ -49,14 +51,25 @@ not a backlog disguised as release notes.
   profiles, default/per-tab selection, arguments, and working directories. The
   Linux paths have been exercised manually; Windows and macOS discovery and
   launch behavior still need their platform verification passes.
-- Profile switching, detached settings, AI Help, the loopback automation API,
-  localization, accounts, and updater/release infrastructure are not part of
-  this lean core yet.
+- Profile switching, detached Settings, full UI localization, accounts, and
+  updater/release infrastructure are not part of this lean core yet.
+- AI Help has editable providers, a separate-window source path, streaming,
+  bounded optional terminal context and reviewed suggestions. It is Pro-gated;
+  release builds stay locked until entitlement integration exists. The
+  `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
+  live window/provider/credential interaction is certified.
+- Native agent control has an authenticated loopback API, exact-instance
+  discovery, a Node helper and tab/layout/preset/input routes in source. It is
+  Pro-gated; release builds stay locked until entitlement integration exists.
+  The `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1` override works only in debug
+  builds. The HTTP/PTY flow and Agent Inst. clipboard handoff have not been
+  runtime-tested.
 - Desktop Settings can preview and import an original-app profile as a new native
   snapshot. There is no general profile switcher. Selected keys for imported
   providers can transfer to the OS credential store; other legacy keys are not
-  migrated. Imported provider metadata does not activate AI Help. Repeat imports
-  skip identical snapshots and do not overwrite native edits.
+  migrated. Imported provider metadata can be edited and used by AI Help when
+  its feature gate is open. Repeat imports skip identical snapshots and do not
+  overwrite native edits.
 - Images, color emoji rendering, sixel graphics, ligatures across cells, and
   advanced IME behavior need focused renderer tests.
 

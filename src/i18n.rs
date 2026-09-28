@@ -14,6 +14,8 @@ pub enum MessageKey {
     ImportConflict,
     AutomationControl,
     AutomationLocked,
+    AgentInst,
+    AgentInstructionsCopied,
     AiHelp,
     AiHelpExplain,
     AiHelpSuggest,
@@ -98,7 +100,7 @@ pub enum MessageKey {
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 88] = [
+    pub const ALL: [Self; 90] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -106,6 +108,8 @@ impl MessageKey {
         Self::ImportConflict,
         Self::AutomationControl,
         Self::AutomationLocked,
+        Self::AgentInst,
+        Self::AgentInstructionsCopied,
         Self::AiHelp,
         Self::AiHelpExplain,
         Self::AiHelpSuggest,
@@ -215,6 +219,8 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::ImportConflict => "{count} item(s) need a conflict choice.",
         MessageKey::AutomationControl => "Agent control",
         MessageKey::AutomationLocked => "Agent control requires Pro access.",
+        MessageKey::AgentInst => "Agent Inst.",
+        MessageKey::AgentInstructionsCopied => "Native agent instructions copied to clipboard.",
         MessageKey::AiHelp => "AI Help",
         MessageKey::AiHelpExplain => "Explain this terminal",
         MessageKey::AiHelpSuggest => "Suggest a command",

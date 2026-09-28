@@ -26,8 +26,8 @@ constraints.
 | Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Personal-theme snapshot import exists; finish edit/share, effect rendering and online fonts |
-| AI Help | Partial | Provider settings, secure key storage, connection test and model discovery exist; finish context, answers, and reviewed actions |
-| Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
+| AI Help | Partial | Provider settings, secure key storage, connection test, model discovery, separate-window conversation, bounded context and reviewed actions exist in source; finish GUI/provider acceptance |
+| Local automation | Partial | Authenticated loopback API, per-instance handoff, and Node helper exist in source; finish route/runtime contract acceptance |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
 
 ## P0 — terminal workspace
@@ -72,13 +72,13 @@ preferences JSON.
 
 | Capability | Status | Legacy source | Acceptance criteria |
 | --- | --- | --- | --- |
-| Provider management | Partial | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Add/edit/import endpoints and models, selected-key transfer, Test Connection and model discovery are implemented; finish UI/manual provider review. |
-| Plain AI Help window | Missing | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window explains bounded terminal output, answers questions and suggests reviewed commands; cancel/retry and failures do not affect terminals. |
-| Terminal context | Missing | `src/hooks/useAIAssistantChat.ts` | User chooses whether to include bounded recent output; preview exactly what leaves the machine and exclude obvious secrets where practical. |
-| Suggested actions | Missing | `src/services/assistantActions.ts` | Parse commands and control-key suggestions; show label/description; default to inserting text, and require a clear action before execution. |
+| Provider management | Partial | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Native add/edit/import endpoints and models, selected-key transfer, Test Connection and model discovery are implemented in source; finish UI/manual provider review. |
+| Plain AI Help window | Partial | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window source path explains bounded terminal output and suggests reviewed commands; finish GUI/provider acceptance. |
+| Terminal context | Partial | `src/hooks/useAIAssistantChat.ts` | Optional bounded grid preview, explicit send and best-effort redaction are implemented; finish privacy/runtime review. |
+| Suggested actions | Partial | `src/services/assistantActions.ts` | Commands and allowlisted control keys are parsed and require explicit target-bound review; finish runtime regression and GUI checks. |
 | AI theme/shader generation | Deferred | theme and shader designer services | Start after provider storage and the non-AI theme/shader editors are stable. |
-| Loopback control API | Missing | legacy Tauri control server, `src/services/controlSync.ts` | Bind to loopback only, authenticate every mutation, expose tab/pane/preset/input operations, rotate credentials, and test hostile requests. |
-| CLI and MCP helper | Deferred | `src/services/controlCliInstructions.ts` | Start after the native control contract is versioned; helper discovers local credentials without copying them into project config. |
+| Loopback control API | Partial | legacy Tauri control server, `src/services/controlSync.ts` | Native loopback/auth/instance discovery and tab/pane/preset/input routes exist in source; finish hostile-request and PTY runtime checks. |
+| CLI and MCP helper | Partial | `src/services/controlCliInstructions.ts` | Pinned native Node helper discovers the exact native instance without copying tokens into handoff text; verify CLI contract. MCP remains optional and open. |
 | Quick secret vault | Missing | `src/components/SecretVaultPanel.tsx`, `src/services/secretVaultService.ts` | Encrypt at rest with explicit unlock, never render secrets into logs, and paste only into the selected terminal after direct user intent. |
 
 ## P2 — settings, product, and distribution

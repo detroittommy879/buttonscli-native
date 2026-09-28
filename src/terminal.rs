@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
-use egui_term::{BackendCommand, BackendSettings, PtyEvent, TerminalBackend};
+use egui_term::{BackendCommand, BackendSettings, ByteObserver, PtyEvent, TerminalBackend};
+
+use crate::session::output::OutputCapture;
 
 pub struct TerminalTab {
     pub id: u64,
@@ -13,6 +16,7 @@ pub struct TerminalTab {
     pub reported_title: Option<String>,
     pub profile_id: String,
     pub backend: TerminalBackend,
+    pub(crate) output: Arc<OutputCapture>,
     pub exited: bool,
 }
 
@@ -86,7 +90,23 @@ impl TerminalTab {
             args: launch.args,
             working_directory: launch.working_directory,
         };
-        let backend = TerminalBackend::new(id, context, events, settings)?;
+        let output = Arc::new(OutputCapture::default());
+        let input_capture = Arc::clone(&output);
+        let input_observer: ByteObserver = Arc::new(move |bytes| {
+            input_capture.record_input_bytes(bytes);
+        });
+        let output_capture = Arc::clone(&output);
+        let output_observer: ByteObserver = Arc::new(move |bytes| {
+            output_capture.record_output_bytes(bytes);
+        });
+        let backend = TerminalBackend::new_with_observers(
+            id,
+            context,
+            events,
+            settings,
+            Some(input_observer),
+            Some(output_observer),
+        )?;
 
         Ok(Self {
             id,
@@ -97,6 +117,7 @@ impl TerminalTab {
             reported_title: None,
             profile_id: launch.profile_id,
             backend,
+            output,
             exited: false,
         })
     }

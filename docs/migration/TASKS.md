@@ -1,6 +1,6 @@
 # Dependency-ordered implementation tasks
 
-Implementation status, 2026-09-28: A01–A04 source work is present. A05/A06 have a Windows viewport/window prototype and AI Help source integration; live GUI acceptance remains pending. R02 is decided for AI screen context, while R03's raw/CLI-compatible capture and R04's bracketed/slow delivery remain incomplete. See `docs/PROGRESS.md` and the decision notes for evidence and boundaries.
+Implementation status, 2026-09-28: R02–R04 and C01–C04 now have Windows source implementations, alongside A01–A04 and the A05/A06 Windows viewport and AI Help source path. Windows `cargo check` and Node syntax checks pass. The R02 throughput/fixture work, C01–C04 contract/runtime checks, GUI handoff, AI provider interactions and cross-platform acceptance remain unverified; do not treat source/build success as those acceptance gates. C05 (optional MCP adapter) and C06 (optional Rust CLI) remain open. See `docs/PROGRESS.md`, `docs/CONTROL-API.md` and the decision notes for current evidence and boundaries.
 
 Use [contracts](CONTRACTS.md) throughout. O/N paths are defined in [README](README.md). All new destination paths below are proposed. Each task is a separate reviewable commit; do not implement an entire phase in one Luna prompt. The original repository is a read-only reference unless a task explicitly changes its maintained contract. No such original-runtime change is required for the separate-folder plan.
 

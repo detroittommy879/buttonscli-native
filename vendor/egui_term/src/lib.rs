@@ -7,7 +7,8 @@ mod view;
 
 pub use backend::settings::BackendSettings;
 pub use backend::{
-    BackendCommand, PtyEvent, ScrollbackState, TerminalBackend, TerminalMode,
+    BackendCommand, ByteObserver, PtyEvent, ScrollbackState, TerminalBackend,
+    TerminalMode,
 };
 pub use bindings::{Binding, BindingAction, InputKind, KeyboardBinding};
 pub use font::{FontSettings, TerminalFont};

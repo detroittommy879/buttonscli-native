@@ -1,5 +1,7 @@
 pub mod app;
 mod assistant;
+#[cfg(not(target_arch = "wasm32"))]
+mod control;
 pub mod features;
 pub mod fonts;
 pub mod i18n;

@@ -4,6 +4,8 @@ use crate::assistant::credentials::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 use crate::assistant::provider::{validate_endpoint, ProviderProfile};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::control::ControlServer;
 use crate::fonts::{self, FontZone};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layout::{self, Bounds, LayoutMode};
@@ -47,6 +49,8 @@ use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::RwLock;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use zeroize::{Zeroize, Zeroizing};
@@ -71,6 +75,30 @@ fn ai_help_available() -> bool {
         .map(|duration| duration.as_secs())
         .unwrap_or_default();
     access::resolve(FeatureKey::AiHelp, &runtime, &None, now).available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn remote_control_available() -> bool {
+    use crate::features::{
+        access::{self, RuntimeAccess},
+        catalog::FeatureKey,
+    };
+    let mut runtime = RuntimeAccess {
+        pro_enabled: true,
+        ..RuntimeAccess::default()
+    };
+    if cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL").is_ok_and(|value| value == "1")
+    {
+        runtime
+            .development_overrides
+            .insert(FeatureKey::AutomationRemoteControl);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    access::resolve(FeatureKey::AutomationRemoteControl, &runtime, &None, now).available
 }
 
 pub struct ButtonsApp {
@@ -143,6 +171,10 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_models: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
+    control_server: Option<ControlServer>,
+    #[cfg(not(target_arch = "wasm32"))]
+    control_snapshot: Arc<RwLock<Snapshot>>,
+    #[cfg(not(target_arch = "wasm32"))]
     ai_help_state: Arc<Mutex<AiHelpWindowState>>,
     #[cfg(not(target_arch = "wasm32"))]
     ai_help_tx: Sender<AiHelpCommand>,
@@ -178,6 +210,8 @@ pub struct ButtonsApp {
     focused: usize,
     #[cfg(not(target_arch = "wasm32"))]
     pane_layout: PaneLayout,
+    #[cfg(not(target_arch = "wasm32"))]
+    grid_column_override: Option<usize>,
     #[cfg(not(target_arch = "wasm32"))]
     next_id: u64,
     #[cfg(not(target_arch = "wasm32"))]
@@ -391,6 +425,25 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
         #[cfg(not(target_arch = "wasm32"))]
+        if remote_control_available() {
+            app.publish_control_snapshot();
+            if let Some(native_root) = app
+                .native_store
+                .as_ref()
+                .map(|store| store.root_dir().to_path_buf())
+            {
+                match ControlServer::start(
+                    &native_root,
+                    Arc::clone(&app.control_snapshot),
+                    app.session_dispatcher.clone(),
+                    cc.egui_ctx.clone(),
+                ) {
+                    Ok(server) => app.control_server = Some(server),
+                    Err(error) => app.notice = Some(format!("Native control API failed: {error}")),
+                }
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
             app.notice = Some(format!("Native settings could not load: {error}"));
         }
@@ -480,6 +533,10 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            control_server: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            control_snapshot: Arc::new(RwLock::new(Snapshot::default())),
+            #[cfg(not(target_arch = "wasm32"))]
             ai_help_state: Arc::new(Mutex::new(AiHelpWindowState::default())),
             #[cfg(not(target_arch = "wasm32"))]
             ai_help_tx,
@@ -515,6 +572,8 @@ impl ButtonsApp {
             focused: 0,
             #[cfg(not(target_arch = "wasm32"))]
             pane_layout: PaneLayout::Single,
+            #[cfg(not(target_arch = "wasm32"))]
+            grid_column_override: None,
             #[cfg(not(target_arch = "wasm32"))]
             next_id: 1,
             #[cfg(not(target_arch = "wasm32"))]
@@ -710,11 +769,45 @@ impl ButtonsApp {
                 .map(|tab| SessionInfo {
                     id: tab.id,
                     title: tab.title.clone(),
+                    shell: tab.shell_name.clone(),
                     ready: true,
                     exited: tab.exited,
+                    output: tab.output.snapshot(),
+                    output_capture: Arc::clone(&tab.output),
                 })
                 .collect(),
             active_id: self.tabs.get(self.focused).map(|tab| tab.id),
+            visible_ids: self
+                .visible_panes
+                .iter()
+                .filter_map(|index| self.tabs.get(*index).map(|tab| tab.id))
+                .collect(),
+            presets: self
+                .preferences
+                .presets
+                .iter()
+                .map(|preset| crate::session::actions::PresetInfo {
+                    kind: "preset".into(),
+                    label: preset.label.clone(),
+                    command: preset.command.clone(),
+                    send_enter: preset.send_enter,
+                })
+                .chain(self.preferences.ssh_presets.iter().map(|preset| {
+                    crate::session::actions::PresetInfo {
+                        kind: "sshPreset".into(),
+                        label: preset.label.clone(),
+                        command: preset.command.clone(),
+                        send_enter: preset.send_enter,
+                    }
+                }))
+                .collect(),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn publish_control_snapshot(&self) {
+        if let Ok(mut current) = self.control_snapshot.write() {
+            *current = self.session_snapshot();
         }
     }
 
@@ -756,6 +849,7 @@ impl ButtonsApp {
             let result = request.validate(&self.session_snapshot()).and_then(|()| {
                 self.execute_session_action(request.target_id, &request.action, ctx)
             });
+            self.publish_control_snapshot();
             request.finish(result);
         }
     }
@@ -777,6 +871,9 @@ impl ButtonsApp {
                 }
                 Ok(self.tabs.last().map(|tab| tab.id))
             }
+            Action::CreateNamed { name, shell, cwd } => self
+                .open_named_tab(ctx.clone(), name, shell.as_deref(), cwd.as_deref())
+                .map(Some),
             Action::Reopen => {
                 let old_len = self.tabs.len();
                 self.reopen_closed_tab(ctx.clone());
@@ -812,6 +909,7 @@ impl ButtonsApp {
                 Ok(target_id)
             }
             Action::Layout { mode } => {
+                self.grid_column_override = None;
                 let layout = match mode {
                     LayoutMode::Single => PaneLayout::Single,
                     LayoutMode::Columns => PaneLayout::Columns,
@@ -821,8 +919,29 @@ impl ButtonsApp {
                 self.set_pane_layout(layout, ctx);
                 Ok(None)
             }
+            Action::GridColumns { columns } => {
+                self.grid_column_override = *columns;
+                Ok(None)
+            }
             Action::VisibleCount { count } => {
                 self.set_visible_pane_count(*count, ctx);
+                Ok(None)
+            }
+            Action::ShowTabs { ids } => {
+                let visible = ids
+                    .iter()
+                    .map(|id| {
+                        self.tabs
+                            .iter()
+                            .position(|tab| tab.id == *id)
+                            .ok_or(ActionError::NotFound)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                if visible.len() > 1 && self.pane_layout == PaneLayout::Single {
+                    self.pane_layout = PaneLayout::Grid;
+                }
+                self.visible_panes = visible;
+                self.focused = *self.visible_panes.last().ok_or(ActionError::InvalidInput)?;
                 Ok(None)
             }
             Action::Send(bytes) => {
@@ -871,6 +990,47 @@ impl ButtonsApp {
             }
             Err(error) => self.notice = Some(format!("Could not start shell: {error}")),
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_named_tab(
+        &mut self,
+        context: egui::Context,
+        name: &str,
+        shell: Option<&str>,
+        cwd: Option<&str>,
+    ) -> Result<u64, ActionError> {
+        let cwd_input = cwd.unwrap_or(&self.preferences.default_working_directory);
+        let working_directory =
+            resolve_working_directory(cwd_input).map_err(|_| ActionError::LaunchFailed)?;
+        let mut launch = if let Some(shell) = shell {
+            ShellLaunch::from_command_line("control-custom", shell, working_directory.clone())
+                .map_err(|_| ActionError::LaunchFailed)?
+        } else {
+            self.shell_launch(&self.preferences.default_shell_id)
+                .map_err(|_| ActionError::LaunchFailed)?
+        };
+        if cwd.is_some() {
+            launch.working_directory = working_directory;
+        }
+
+        let id = self.next_id;
+        let taken: Vec<String> = self.tabs.iter().map(|tab| tab.title.clone()).collect();
+        let (fallback_title, next_title_number) =
+            next_available_title(self.next_title_number, &taken);
+        let mut tab =
+            TerminalTab::spawn(id, fallback_title, context, self.events_tx.clone(), launch)
+                .map_err(|_| ActionError::LaunchFailed)?;
+        tab.rename(name.trim().to_owned());
+        self.next_id = self.next_id.saturating_add(1);
+        self.next_title_number = next_title_number;
+        self.tabs.push(tab);
+        let index = self.tabs.len() - 1;
+        self.visible_panes =
+            pane_state_after_new_tab(&self.visible_panes, self.focused, index, self.pane_layout);
+        self.focused = index;
+        self.notice = None;
+        Ok(id)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1323,7 +1483,7 @@ impl ButtonsApp {
             PaneLayout::Rows => LayoutMode::Rows,
             PaneLayout::Grid => LayoutMode::Grid,
         };
-        let plan = layout::plan(
+        let plan = layout::plan_with_grid_columns(
             mode,
             &ordered_ids,
             focused_id,
@@ -1333,6 +1493,7 @@ impl ButtonsApp {
                 height: rect.height(),
             },
             layout::minimum_for_font(terminal_font.size),
+            self.grid_column_override,
         );
         self.layout_window_start = plan.window_start;
         visible = plan
@@ -1893,6 +2054,29 @@ impl ButtonsApp {
                         }
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if self.control_server.is_some()
+                            && ui
+                                .small_button(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::AgentInst,
+                                    &[],
+                                ))
+                                .clicked()
+                        {
+                            let instructions = self
+                                .control_server
+                                .as_ref()
+                                .map(ControlServer::agent_instructions);
+                            if let Some(instructions) = instructions {
+                                ctx.copy_text(instructions);
+                                self.notice = Some(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::AgentInstructionsCopied,
+                                    &[],
+                                ));
+                            }
+                        }
                         if ui.small_button("Settings").clicked() {
                             self.show_settings = true;
                         }
@@ -4847,6 +5031,8 @@ impl eframe::App for ButtonsApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(not(target_arch = "wasm32"))]
+        self.publish_control_snapshot();
+        #[cfg(not(target_arch = "wasm32"))]
         self.process_ai_help_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_import_events(ctx);
@@ -4914,6 +5100,8 @@ impl eframe::App for ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.control_server.take();
         #[cfg(not(target_arch = "wasm32"))]
         if let Ok(state) = self.ai_help_state.lock() {
             if let Some(cancel) = &state.cancel {

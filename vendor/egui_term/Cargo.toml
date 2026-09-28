@@ -31,7 +31,7 @@ name = "egui_term"
 path = "src/lib.rs"
 
 [dependencies.alacritty_terminal]
-version = "0.25.0"
+path = "../alacritty_terminal"
 
 [dependencies.anyhow]
 version = "1.0.96"

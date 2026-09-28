@@ -2,6 +2,16 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-28 Windows source/build check
+
+`cargo fmt --all`, `cargo check --bin buttonscli`, `node --check
+scripts/buttonsclictl.mjs`, and the helper's `--help` path passed after adding
+AI Help and the native control API. This is source/build evidence only. Tests,
+live Windows GUI/API/PTY interaction, provider calls, output throughput, and
+Linux/macOS runtime validation were not run for those changes. The detailed
+current boundary is in `docs/PROGRESS.md`, `docs/AI-HELP.md`, and
+`docs/CONTROL-API.md`.
+
 ## Automated gates
 
 The following completed successfully:

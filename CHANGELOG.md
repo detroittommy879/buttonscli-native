@@ -9,6 +9,10 @@
 - Added a separate AI Help window with streamed answers, bounded in-session conversation history, retry, and optional previewed terminal context. Context is sourced from the selected terminal's existing screen/scrollback grid and redaction is best effort.
 - AI Help can suggest up to two commands or supported terminal keys. Sending each suggestion requires an explicit review action and rechecks its pinned terminal session ID. Commands are inserted literally and Enter is sent only when the user chooses Insert + Enter.
 - Kept provider requests behind the Pro `aiHelp` feature gate. This build has no entitlement service yet; debug builds have an explicit environment-only development override.
+- Added the Pro `automationRemoteControl` local API on an ephemeral `127.0.0.1` port. It provides status, tab list/create/rename, bounded output reads, send/run/key actions, layouts, and active-profile presets through the app-thread session dispatcher.
+- Added an `Agent Inst.` status-bar handoff, a native per-instance discovery descriptor, and an optional version-pinned Node CLI installed under `~/.buttonscli-native/helpers/`. Handoff text selects one exact native descriptor and never includes its token; the helper does not fall back to the original app.
+- Added a single-reader raw PTY output observer with a 200,000-character per-session tail and activity metadata. Native CLI input supports raw, bracketed, and paced UTF-8 delivery; quiet waits report observation state, not a shell exit code.
+- Kept remote control unavailable by default in release builds until entitlement integration exists. Debug builds can opt in with `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`.
 - COL, ROW and GRID panes now wrap within minimum viewport bounds. Overflow sessions stay open and reachable through tabs, and resizing back restores the larger layout.
 - Added a per-pane scrollbar driven by real terminal scrollback; it hides in alternate-screen and mouse-reporting modes.
 - Pane dividers remain visible when idle and can inherit the active app theme or use a saved custom color and painted width.

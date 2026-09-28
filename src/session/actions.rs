@@ -10,14 +10,27 @@ use crate::layout::LayoutMode;
 pub(crate) struct SessionInfo {
     pub id: u64,
     pub title: String,
+    pub shell: String,
     pub ready: bool,
     pub exited: bool,
+    pub output: crate::session::output::OutputSnapshot,
+    pub output_capture: std::sync::Arc<crate::session::output::OutputCapture>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Snapshot {
     pub sessions: Vec<SessionInfo>,
     pub active_id: Option<u64>,
+    pub visible_ids: Vec<u64>,
+    pub presets: Vec<PresetInfo>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PresetInfo {
+    pub kind: String,
+    pub label: String,
+    pub command: String,
+    pub send_enter: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -33,6 +46,11 @@ pub(crate) enum Action {
     Create {
         profile_id: String,
     },
+    CreateNamed {
+        name: String,
+        shell: Option<String>,
+        cwd: Option<String>,
+    },
     Reopen,
     Focus,
     Close,
@@ -45,8 +63,14 @@ pub(crate) enum Action {
     Layout {
         mode: LayoutMode,
     },
+    GridColumns {
+        columns: Option<usize>,
+    },
     VisibleCount {
         count: usize,
+    },
+    ShowTabs {
+        ids: Vec<u64>,
     },
     /// Literal bytes produced by the bounded input service.
     Send(Vec<u8>),
@@ -64,16 +88,54 @@ impl Action {
         matches!(self, Self::Send(_))
     }
 
-    fn validate(&self) -> Result<(), ActionError> {
-        if let Self::Send(bytes) = self {
-            if bytes.is_empty()
-                || bytes.len() > crate::session::input::MAX_INPUT_BYTES
-                || bytes.contains(&0)
+    pub(crate) fn validate(&self) -> Result<(), ActionError> {
+        match self {
+            Self::Send(bytes)
+                if bytes.is_empty()
+                    || bytes.len() > crate::session::input::MAX_INPUT_BYTES
+                    || bytes.contains(&0) =>
             {
-                return Err(ActionError::InvalidInput);
+                Err(ActionError::InvalidInput)
             }
+            Self::CreateNamed { name, shell, cwd }
+                if name.trim().is_empty()
+                    || name.len() > 256
+                    || name.chars().any(char::is_control)
+                    || shell.as_ref().is_some_and(|shell| {
+                        shell.trim().is_empty()
+                            || shell.len() > 4096
+                            || shell.chars().any(|ch| matches!(ch, '\0' | '\n' | '\r'))
+                    })
+                    || cwd.as_ref().is_some_and(|cwd| {
+                        cwd.len() > 32_768 || cwd.chars().any(char::is_control)
+                    }) =>
+            {
+                Err(ActionError::InvalidInput)
+            }
+            Self::Rename { title }
+                if title.trim().is_empty()
+                    || title.len() > 256
+                    || title.chars().any(char::is_control) =>
+            {
+                Err(ActionError::InvalidInput)
+            }
+            Self::GridColumns {
+                columns: Some(columns),
+            } if !(1..=10).contains(columns) => Err(ActionError::InvalidInput),
+            Self::ShowTabs { ids }
+                if ids.is_empty()
+                    || ids.len() > 10
+                    || ids
+                        .iter()
+                        .copied()
+                        .collect::<std::collections::HashSet<_>>()
+                        .len()
+                        != ids.len() =>
+            {
+                Err(ActionError::InvalidInput)
+            }
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -280,17 +342,29 @@ mod tests {
                 SessionInfo {
                     id: 1,
                     title: "term1".into(),
+                    shell: "bash".into(),
                     ready: true,
                     exited: false,
+                    output: crate::session::output::OutputSnapshot::default(),
+                    output_capture: std::sync::Arc::new(
+                        crate::session::output::OutputCapture::default(),
+                    ),
                 },
                 SessionInfo {
                     id: 2,
                     title: "term2".into(),
+                    shell: "bash".into(),
                     ready: true,
                     exited: false,
+                    output: crate::session::output::OutputSnapshot::default(),
+                    output_capture: std::sync::Arc::new(
+                        crate::session::output::OutputCapture::default(),
+                    ),
                 },
             ],
             active_id: Some(1),
+            visible_ids: vec![1],
+            presets: Vec::new(),
         }
     }
 
@@ -343,8 +417,13 @@ mod tests {
             state.sessions.push(SessionInfo {
                 id,
                 title: format!("term{id}"),
+                shell: "bash".into(),
                 ready: true,
                 exited: false,
+                output: crate::session::output::OutputSnapshot::default(),
+                output_capture: std::sync::Arc::new(
+                    crate::session::output::OutputCapture::default(),
+                ),
             });
         }
         let (dispatcher, inbox) = bounded(1);
