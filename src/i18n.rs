@@ -57,10 +57,15 @@ pub enum MessageKey {
     KeyRemoveFailed,
     ImportKeysResult,
     ImportKeysFailed,
+    TestConnection,
+    DiscoverModels,
+    ConnectionSucceeded,
+    ModelsFound,
+    AiHelpLockedProvider,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 50] = [
+    pub const ALL: [Self; 55] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -111,6 +116,11 @@ impl MessageKey {
         Self::KeyRemoveFailed,
         Self::ImportKeysResult,
         Self::ImportKeysFailed,
+        Self::TestConnection,
+        Self::DiscoverModels,
+        Self::ConnectionSucceeded,
+        Self::ModelsFound,
+        Self::AiHelpLockedProvider,
     ];
 }
 
@@ -184,6 +194,11 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::KeyRemoveFailed => "Key was not removed: {reason}",
         MessageKey::ImportKeysResult => "Import complete. {saved} API key(s) saved; {failed} could not be saved. New terminals use the imported profile.",
         MessageKey::ImportKeysFailed => "Settings imported, but API keys could not be transferred: {reason}",
+        MessageKey::TestConnection => "Test connection",
+        MessageKey::DiscoverModels => "Discover models",
+        MessageKey::ConnectionSucceeded => "Provider returned a valid chat response.",
+        MessageKey::ModelsFound => "Found {count} models.",
+        MessageKey::AiHelpLockedProvider => "AI Help is a Pro feature. In development builds, set BUTTONSCLI_NATIVE_DEV_AI_HELP=1 to exercise the provider connection tools.",
     }
 }
 

@@ -1,5 +1,9 @@
 # Reconstruction journal
 
+## 2026-09-28 — A02 provider HTTP and model discovery, Windows source pass
+
+Added an app-owned blocking Reqwest transport used only on worker threads, with TLS verification, no redirects, 5-second connect/20-second total timeouts, and a 1 MiB response cap. The provider editor now tests its selected model using a short chat request and can discover/sort compatible model IDs; empty discovery leaves manual entry intact. HTTP errors report status only, and transport errors do not echo URLs, response bodies, or keys. The Pro gate remains closed without entitlements; debug builds require the explicit `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override. Fake-transport unit cases are present but were not run in this pass; Windows binary `cargo check` passed. Live local fake-server behavior and provider UI review remain. Access tier: `aiHelp` is pro.
+
 ## 2026-09-28 — A01 provider metadata and credentials, Windows source pass
 
 Added named provider metadata in native preferences, an AI providers Settings tab, editable HTTP(S) endpoints and model IDs, OS credential storage through `keyring` 3.6.3, and explicit session-only keys. Credential calls run on workers; UI shows only generic errors and never persists key values. Legacy import now offers a separate unchecked key-transfer choice. Only keys corresponding to imported providers transfer; old files are read only, and older native imports recover provider metadata from their sanitized compatibility file. Added fake-store tests for success/failure, key redaction, source preservation and recovery. Windows library tests and strict Clippy pass. A live credential-store/GUI pass and AI request pipeline remain. Access tier: `aiHelp` is pro; provider configuration itself does not execute AI or imply entitlement.

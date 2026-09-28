@@ -26,7 +26,7 @@ constraints.
 | Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Personal-theme snapshot import exists; finish edit/share, effect rendering and online fonts |
-| AI Help | Partial | Provider settings and secure key storage exist; finish connection, context, answers, and reviewed actions |
+| AI Help | Partial | Provider settings, secure key storage, connection test and model discovery exist; finish context, answers, and reviewed actions |
 | Local automation | Missing | Authenticated loopback API plus CLI/MCP helper |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
 
@@ -72,7 +72,7 @@ preferences JSON.
 
 | Capability | Status | Legacy source | Acceptance criteria |
 | --- | --- | --- | --- |
-| Provider management | Partial | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Add/edit/import endpoints and models plus selected-key transfer are implemented; finish Test Connection and runtime error review. |
+| Provider management | Partial | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Add/edit/import endpoints and models, selected-key transfer, Test Connection and model discovery are implemented; finish UI/manual provider review. |
 | Plain AI Help window | Missing | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window explains bounded terminal output, answers questions and suggests reviewed commands; cancel/retry and failures do not affect terminals. |
 | Terminal context | Missing | `src/hooks/useAIAssistantChat.ts` | User chooses whether to include bounded recent output; preview exactly what leaves the machine and exclude obvious secrets where practical. |
 | Suggested actions | Missing | `src/services/assistantActions.ts` | Parse commands and control-key suggestions; show label/description; default to inserting text, and require a clear action before execution. |

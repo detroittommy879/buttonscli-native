@@ -47,6 +47,28 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use zeroize::{Zeroize, Zeroizing};
 
+#[cfg(not(target_arch = "wasm32"))]
+fn ai_help_available() -> bool {
+    use crate::features::{
+        access::{self, RuntimeAccess},
+        catalog::FeatureKey,
+    };
+    let mut runtime = RuntimeAccess {
+        pro_enabled: true,
+        ..RuntimeAccess::default()
+    };
+    if cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_HELP").is_ok_and(|value| value == "1")
+    {
+        runtime.development_overrides.insert(FeatureKey::AiHelp);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    access::resolve(FeatureKey::AiHelp, &runtime, &None, now).available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
     themes: ThemeCatalog,
@@ -106,6 +128,16 @@ pub struct ButtonsApp {
     credential_tx: Sender<CredentialEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     credential_rx: Receiver<CredentialEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_tx: Sender<ProviderEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_rx: Receiver<ProviderEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_models: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -186,6 +218,12 @@ enum CredentialEvent {
         session_only: bool,
         result: Result<(), credentials::CredentialError>,
     },
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum ProviderEvent {
+    Tested(String, Result<(), String>),
+    Models(String, Result<Vec<String>, String>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -319,6 +357,8 @@ impl ButtonsApp {
         let (import_tx, import_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (credential_tx, credential_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (provider_tx, provider_rx) = mpsc::channel();
         Self {
             preferences,
             themes: ThemeCatalog::load(),
@@ -378,6 +418,16 @@ impl ButtonsApp {
             credential_tx,
             #[cfg(not(target_arch = "wasm32"))]
             credential_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_message: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1848,6 +1898,10 @@ impl ButtonsApp {
         let warning_color = self.colors().warning;
         ui.heading(text("en", M::Providers, &[]));
         ui.label(text("en", M::ProviderHelp, &[]));
+        let ai_unlocked = ai_help_available();
+        if !ai_unlocked {
+            ui.label(text("en", M::AiHelpLockedProvider, &[]));
+        }
         let settings = &mut self.preferences.provider_settings;
         let prior = settings.active_provider_id.clone();
         egui::ComboBox::from_label(text("en", M::ActiveProvider, &[]))
@@ -1954,8 +2008,85 @@ impl ButtonsApp {
                 egui::Button::new(text("en", M::RemoveProvider, &[])),
             )
             .clicked();
+        let mut test_connection = false;
+        let mut discover_models = false;
+        ui.horizontal(|ui| {
+            test_connection = ui
+                .add_enabled(
+                    ai_unlocked
+                        && !self.provider_busy
+                        && validate_endpoint(&provider.endpoint).is_ok()
+                        && !provider.model.trim().is_empty(),
+                    egui::Button::new(text("en", M::TestConnection, &[])),
+                )
+                .clicked();
+            discover_models = ui
+                .add_enabled(
+                    ai_unlocked
+                        && !self.provider_busy
+                        && validate_endpoint(&provider.endpoint).is_ok(),
+                    egui::Button::new(text("en", M::DiscoverModels, &[])),
+                )
+                .clicked();
+        });
+        if !self.provider_models.is_empty() {
+            egui::ComboBox::from_label(text("en", M::ProviderModel, &[]))
+                .selected_text(&provider.model)
+                .show_ui(ui, |ui| {
+                    for model in &self.provider_models {
+                        ui.selectable_value(&mut provider.model, model.clone(), model);
+                    }
+                });
+        }
+        if self.provider_busy {
+            ui.spinner();
+        }
+        if let Some(message) = &self.provider_message {
+            ui.label(message);
+        }
         if let Some(message) = &self.credential_message {
             ui.label(message);
+        }
+        if test_connection || discover_models {
+            let profile_name = profile_name.to_owned();
+            let provider = provider.clone();
+            let reference = credentials::reference(&profile_name, &provider.id);
+            let credential_ref = provider.credential_ref.clone();
+            let session = Arc::clone(&self.credential_session);
+            let tx = self.provider_tx.clone();
+            let ctx = ctx.clone();
+            self.provider_busy = true;
+            self.provider_message = None;
+            self.provider_models.clear();
+            std::thread::spawn(move || {
+                let key = provider_key(&session, &reference, credential_ref.as_deref());
+                let event = match key {
+                    Ok(key) if test_connection => ProviderEvent::Tested(
+                        provider.id.clone(),
+                        crate::assistant::client::test_connection(
+                            &crate::assistant::transport::ReqwestTransport,
+                            &provider,
+                            key,
+                        )
+                        .map_err(|error| error.to_string()),
+                    ),
+                    Ok(key) => ProviderEvent::Models(
+                        provider.id.clone(),
+                        crate::assistant::client::discover_models(
+                            &crate::assistant::transport::ReqwestTransport,
+                            &provider,
+                            key,
+                        )
+                        .map_err(|error| error.to_string()),
+                    ),
+                    Err(error) if test_connection => {
+                        ProviderEvent::Tested(provider.id, Err(error.to_string()))
+                    }
+                    Err(error) => ProviderEvent::Models(provider.id, Err(error.to_string())),
+                };
+                let _ = tx.send(event);
+                ctx.request_repaint();
+            });
         }
         if save {
             let value = Zeroizing::new(std::mem::take(&mut self.credential_draft));
@@ -2083,6 +2214,43 @@ impl ButtonsApp {
                         ));
                     }
                 },
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_provider_events(&mut self) {
+        while let Ok(event) = self.provider_rx.try_recv() {
+            self.provider_busy = false;
+            match event {
+                ProviderEvent::Tested(provider_id, result)
+                    if provider_id == self.preferences.provider_settings.active_provider_id =>
+                {
+                    self.provider_message = Some(match result {
+                        Ok(()) => crate::i18n::text(
+                            "en",
+                            crate::i18n::MessageKey::ConnectionSucceeded,
+                            &[],
+                        ),
+                        Err(error) => error,
+                    });
+                }
+                ProviderEvent::Models(provider_id, result)
+                    if provider_id == self.preferences.provider_settings.active_provider_id =>
+                {
+                    match result {
+                        Ok(models) => {
+                            self.provider_message = Some(crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::ModelsFound,
+                                &[("count", &models.len().to_string())],
+                            ));
+                            self.provider_models = models;
+                        }
+                        Err(error) => self.provider_message = Some(error),
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -3903,6 +4071,30 @@ fn preset_hover_text(preset: &CommandPreset) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn provider_key(
+    session: &SessionCredentialStore,
+    expected_reference: &str,
+    stored_reference: Option<&str>,
+) -> Result<Option<Zeroizing<String>>, credentials::CredentialError> {
+    match session.get(expected_reference) {
+        Ok(key) => return Ok(Some(key)),
+        Err(credentials::CredentialError::Missing) => {}
+        Err(error) => return Err(error),
+    }
+    match stored_reference {
+        Some(reference) if reference == expected_reference => {
+            match SystemCredentialStore.get(reference) {
+                Ok(key) => Ok(Some(key)),
+                Err(credentials::CredentialError::Missing) => Ok(None),
+                Err(error) => Err(error),
+            }
+        }
+        Some(_) => Err(credentials::CredentialError::InvalidReference),
+        None => Ok(None),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(
     ui: &mut egui::Ui,
     collection: PresetCollection,
@@ -3952,6 +4144,8 @@ impl eframe::App for ButtonsApp {
         self.process_import_events(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_credential_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_provider_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
         #[cfg(not(target_arch = "wasm32"))]
