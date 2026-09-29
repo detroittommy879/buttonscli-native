@@ -39,6 +39,41 @@ function Invoke-ControlApi {
     Invoke-RestMethod @request
 }
 
+function Invoke-NativeCli {
+    param(
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [string]$StdinText
+    )
+
+    $previousInfoPath = $env:BUTTONSCLI_CONTROL_INFO_PATH
+    $env:BUTTONSCLI_CONTROL_INFO_PATH = $script:descriptorPath
+    try {
+        if ($PSBoundParameters.ContainsKey('StdinText')) {
+            $output = $StdinText | & $script:nodePath $script:cliHelperPath @Arguments 2>&1
+        }
+        else {
+            $output = & $script:nodePath $script:cliHelperPath @Arguments 2>&1
+        }
+        $exitCode = $LASTEXITCODE
+        $outputText = ($output | Out-String).Trim()
+        if ($exitCode -ne 0) {
+            throw "buttonsclictl $($Arguments[0]) failed with exit code ${exitCode}: $outputText"
+        }
+        if ($Arguments -contains '--json') {
+            return ConvertFrom-Json -InputObject $outputText
+        }
+        return $outputText
+    }
+    finally {
+        if ($null -eq $previousInfoPath) {
+            Remove-Item Env:BUTTONSCLI_CONTROL_INFO_PATH -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:BUTTONSCLI_CONTROL_INFO_PATH = $previousInfoPath
+        }
+    }
+}
+
 function Wait-ControlTabReady {
     param([Parameter(Mandatory)][string]$TabId)
 
@@ -59,35 +94,6 @@ function Wait-ControlTabReady {
         Start-Sleep -Milliseconds 100
     }
     throw "Timed out waiting for test PTY $TabId to become ready."
-}
-
-function Invoke-MarkerCommand {
-    param(
-        [Parameter(Mandatory)][string]$TabId,
-        [Parameter(Mandatory)][string]$Marker
-    )
-
-    $selector = [Uri]::EscapeDataString($TabId)
-    $payload = @{
-        text = "Write-Output '$Marker'"
-        waitForText = $Marker
-        chars = 8192
-        quietMs = 1200
-        maxWaitMs = 12000
-        intervalMs = 50
-        enter = $true
-    }
-    $result = Invoke-ControlApi -Method POST -Path "/v1/tabs/$selector/run" -Body $payload
-    if ($result.timedOut -or $result.completionReason -ne 'matched-text' -or
-        -not $result.text.Contains($Marker)) {
-        throw "PTY output observer did not capture marker '$Marker'; reason=$($result.completionReason), timeout=$($result.timedOut)."
-    }
-
-    $read = Invoke-ControlApi -Method GET -Path "/v1/tabs/$selector/read?chars=8192&from=bottom"
-    if (-not $read.text.Contains($Marker)) {
-        throw "Read API did not return PTY marker '$Marker'."
-    }
-    $result
 }
 
 Push-Location $repoRoot
@@ -140,23 +146,63 @@ try {
     }
 
     $descriptor = Get-Content -LiteralPath $descriptorPath -Raw | ConvertFrom-Json
+    $script:descriptorPath = $descriptorPath
     $script:baseUrl = $descriptor.baseUrl
     $script:headers = @{ Authorization = "Bearer $($descriptor.authToken)" }
+    $node = Get-Command node.exe -ErrorAction Stop
+    $script:nodePath = $node.Source
+    $helperDir = Join-Path $nativeRoot 'helpers'
+    $script:cliHelperPath = Get-ChildItem -LiteralPath $helperDir -Filter 'buttonsclictl-*.mjs' -File |
+        Select-Object -First 1 -ExpandProperty FullName
+    if (-not $script:cliHelperPath) {
+        throw 'Native control server did not install the pinned Node CLI helper.'
+    }
+
     $status = Invoke-ControlApi -Method GET -Path '/v1/status'
     if ($status.instanceId -ne $descriptor.instanceId) {
         throw 'Control status instance ID did not match its descriptor.'
     }
-
-    $visibleBody = @{
-        name = 'Control Live Visible'
-        shell = $shellCommand
-        cwd = $smokeHome
+    $cliStatus = Invoke-NativeCli -Arguments @('status', '--json')
+    if ($cliStatus.instanceId -ne $descriptor.instanceId) {
+        throw 'Installed Node CLI did not connect to the selected test instance.'
     }
-    $visible = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body $visibleBody
+    $null = Invoke-NativeCli -Arguments @('tabs', '--json')
+
+    $visible = Invoke-NativeCli -Arguments @(
+        'create-tab', '--name', 'Control Live Visible', '--shell', $shellCommand,
+        '--cwd', $smokeHome, '--json'
+    )
     $visibleTabId = $visible.tab.tabId
     Wait-ControlTabReady $visibleTabId | Out-Null
+    $renamed = Invoke-NativeCli -Arguments @(
+        'rename-tab', '--tab', $visibleTabId, '--name', 'Control Live Visible Renamed', '--json'
+    )
+    if ($renamed.tab.title -ne 'Control Live Visible Renamed') {
+        throw 'Installed Node CLI did not rename the test tab.'
+    }
+
     $visibleMarker = "BUTTONSCLI_VISIBLE_$([guid]::NewGuid().ToString('N'))"
-    $null = Invoke-MarkerCommand $visibleTabId $visibleMarker
+    $visibleRun = Invoke-NativeCli -Arguments @(
+        'run', '--tab', $visibleTabId, '--text', "Write-Output '$visibleMarker'",
+        '--wait-for-text', $visibleMarker, '--chars', '8192', '--timeout-ms', '12000',
+        '--interval-ms', '50', '--json'
+    )
+    if ($visibleRun.timedOut -or $visibleRun.completionReason -ne 'matched-text' -or
+        -not $visibleRun.text.Contains($visibleMarker)) {
+        throw "Installed Node CLI did not capture visible PTY output marker '$visibleMarker'."
+    }
+    $read = Invoke-NativeCli -Arguments @('read', '--tab', $visibleTabId, '--lines', '120', '--json')
+    if (-not $read.text.Contains($visibleMarker)) {
+        throw 'Installed Node CLI read did not return the visible PTY marker.'
+    }
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-text', '--tab', $visibleTabId, '--text', $visibleMarker,
+        '--timeout-ms', '2500', '--interval-ms', '50', '--json'
+    )
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-quiet', '--tab', $visibleTabId, '--quiet-ms', '200',
+        '--timeout-ms', '5000', '--interval-ms', '50', '--json'
+    )
 
     $hiddenBody = @{
         name = 'Control Live Foreground'
@@ -172,7 +218,92 @@ try {
         throw 'Creating a second tab did not move the first test PTY into the background.'
     }
     $hiddenMarker = "BUTTONSCLI_HIDDEN_$([guid]::NewGuid().ToString('N'))"
-    $hiddenRun = Invoke-MarkerCommand $visibleTabId $hiddenMarker
+    $hiddenRun = Invoke-NativeCli -Arguments @(
+        'run', '--tab', $visibleTabId, '--text', "Write-Output '$hiddenMarker'",
+        '--wait-for-text', $hiddenMarker, '--chars', '8192', '--timeout-ms', '12000',
+        '--interval-ms', '50', '--json'
+    )
+    if ($hiddenRun.timedOut -or $hiddenRun.completionReason -ne 'matched-text' -or
+        -not $hiddenRun.text.Contains($hiddenMarker)) {
+        throw "Installed Node CLI did not capture background PTY output marker '$hiddenMarker'."
+    }
+    $null = Invoke-NativeCli -Arguments @('presets', '--json')
+
+    $base64Marker = "BUTTONSCLI_BASE64_$([guid]::NewGuid().ToString('N'))"
+    $base64Command = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("Write-Output '$base64Marker'"))
+    $null = Invoke-NativeCli -Arguments @(
+        'send', '--tab', $visibleTabId, '--base64', $base64Command, '--enter', '--json'
+    )
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-text', '--tab', $visibleTabId, '--text', $base64Marker,
+        '--timeout-ms', '5000', '--interval-ms', '50', '--json'
+    )
+
+    $fileMarker = "BUTTONSCLI_FILE_$([guid]::NewGuid().ToString('N'))"
+    $payloadFile = Join-Path $smokeHome 'cli-payload.txt'
+    [System.IO.File]::WriteAllText(
+        $payloadFile,
+        "Write-Output '$fileMarker'",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $null = Invoke-NativeCli -Arguments @(
+        'send', '--tab', $visibleTabId, '--file', $payloadFile, '--enter', '--json'
+    )
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-text', '--tab', $visibleTabId, '--text', $fileMarker,
+        '--timeout-ms', '5000', '--interval-ms', '50', '--json'
+    )
+
+    $stdinMarker = "BUTTONSCLI_STDIN_$([guid]::NewGuid().ToString('N'))"
+    $stdinCommand = "Write-Output '$stdinMarker'"
+    $null = Invoke-NativeCli -Arguments @(
+        'send', '--tab', $visibleTabId, '--stdin', '--enter', '--json'
+    ) -StdinText $stdinCommand
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-text', '--tab', $visibleTabId, '--text', $stdinMarker,
+        '--timeout-ms', '5000', '--interval-ms', '50', '--json'
+    )
+
+    $presets = Invoke-NativeCli -Arguments @('presets', '--json')
+    $typeOnlyPreset = $presets.presets |
+        Where-Object { $_.label -eq 'SSH Template' -and -not $_.sendEnter } |
+        Select-Object -First 1
+    if ($null -eq $typeOnlyPreset) {
+        throw 'Default type-only SSH Template preset was missing from the test profile.'
+    }
+    $null = Invoke-NativeCli -Arguments @(
+        'preset-run', '--label', $typeOnlyPreset.label, '--tab', $visibleTabId, '--json'
+    )
+    $typeOnlyState = (Invoke-ControlApi -Method GET -Path '/v1/tabs').tabs |
+        Where-Object { $_.tabId -eq $visibleTabId } |
+        Select-Object -First 1
+    if ($typeOnlyState.lastInput -ne $typeOnlyPreset.command) {
+        throw 'Type-only preset did not leave its literal command at the PTY input cursor.'
+    }
+
+    $null = Invoke-NativeCli -Arguments @('key', 'ctrl+c', '--tab', $visibleTabId, '--json')
+
+    $layout = Invoke-NativeCli -Arguments @(
+        'open-layout', '--layout', 'grid', '--name', 'Control CLI Grid A',
+        '--name', 'Control CLI Grid B', '--columns', '2', '--shell', $shellCommand,
+        '--cwd', $smokeHome, '--json'
+    )
+    if (-not $layout.ok -or $layout.layout -ne 'grid' -or $layout.columns -ne 2 -or
+        $layout.tabs.Count -ne 2 -or $layout.visibleTabIds.Count -ne 2) {
+        throw 'Installed Node CLI did not open the requested two-tab grid layout.'
+    }
+    foreach ($layoutTab in $layout.tabs) {
+        Wait-ControlTabReady $layoutTab.tabId | Out-Null
+        if (-not ($layout.visibleTabIds -contains $layoutTab.tabId)) {
+            throw "Grid tab $($layoutTab.tabId) was not included in the visible pane mapping."
+        }
+    }
+    $cliTabs = Invoke-NativeCli -Arguments @('tabs', '--json')
+    foreach ($layoutTab in $layout.tabs) {
+        if (-not ($cliTabs.tabs | Where-Object { $_.tabId -eq $layoutTab.tabId })) {
+            throw "Installed Node CLI did not list layout tab $($layoutTab.tabId)."
+        }
+    }
 
     $ownedShellProcesses = @(
         Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" |
@@ -184,7 +315,8 @@ try {
     $ownedShellIds = @($ownedShellProcesses | ForEach-Object { [uint32]$_.ProcessId })
 
     Write-Output "Control API status authenticated for instance $($descriptor.instanceId)."
-    Write-Output "Visible and background PTYs both captured unique output markers."
+    Write-Output 'Installed Node CLI exercised status, tabs, create, rename, read, waits, run, send (base64/file/stdin), key, type-only preset, and grid layout.'
+    Write-Output 'Visible and background PTYs both captured unique output markers.'
     Write-Output "Background run completion: $($hiddenRun.completionReason); timed out: $($hiddenRun.timedOut)."
 }
 finally {

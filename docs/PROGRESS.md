@@ -17,13 +17,15 @@ Added `scripts/test-control-live.ps1`. It builds or launches the debug app with
 a disposable home and development-only control access, authenticates with that
 instance's descriptor, creates two PowerShell PTYs, and confirms unique output
 markers through run/read while one PTY is visible and then backgrounded. On
-shutdown the test verifies the two test-owned shell child processes exit and
-removes only its GUID-named temp root. The full build-and-run and a second
-`-SkipBuild` run passed. WGPU emitted validation-layer/registry warnings, but
-the app and API test completed successfully. This verifies Windows live
-visible/background capture and app-shutdown cleanup; cancellation during paced
-input, full CLI/MCP-client workflows, GUI focus/typing, and Linux/macOS runtime
-checks remain open.
+shutdown the test verifies the test-owned shell child processes exit and
+removes only its GUID-named temp root. The installed Node helper was exercised
+against that app for status, tabs, create, rename, read, both waits, run, send
+from base64/file/stdin, key, type-only preset, and a two-pane grid. The full
+build-and-run and `-SkipBuild` run passed. WGPU emitted validation-layer and
+registry warnings, but both app/test runs completed successfully. This verifies
+the live Windows CLI matrix and visible/background capture; cancellation during
+paced input, external MCP-client launch, direct GUI focus/typing, and
+Linux/macOS runtime checks remain open.
 
 ## 2026-09-29 — R02 output transcript fixture and microbenchmark
 
