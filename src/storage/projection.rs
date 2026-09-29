@@ -103,6 +103,13 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
             }
         }
     }
+    if let Some(minutes) = document
+        .get("features")
+        .and_then(|features| features.get("secretVaultAutoLockMinutes"))
+        .and_then(Value::as_u64)
+    {
+        preferences.quick_secrets_auto_lock_minutes = minutes.min(120) as u32;
+    }
     if let Some(layout) = document.get("layout").and_then(Value::as_object) {
         project_dock_preferences(layout, &mut preferences, &mut warnings);
     }
@@ -555,5 +562,28 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning == "window.opacity was clamped to native limits"));
+    }
+
+    #[test]
+    fn quick_secrets_idle_lock_import_is_bounded_and_does_not_enable_the_vault() {
+        let document = LegacyDocument::parse(
+            br#"{"features":{"secretVaultEnabled":true,"secretVaultAutoLockMinutes":999}}"#,
+        )
+        .unwrap();
+        let projection = project(&document);
+        assert_eq!(projection.preferences.quick_secrets_auto_lock_minutes, 120);
+        assert!(projection.safe_config["features"]
+            .get("secretVaultEnabled")
+            .is_none());
+        assert_eq!(
+            crate::features::access::resolve(
+                crate::features::catalog::FeatureKey::QuickSecrets,
+                &crate::features::access::RuntimeAccess::default(),
+                &None,
+                0,
+            )
+            .discoverability,
+            crate::features::access::Discoverability::Hidden
+        );
     }
 }

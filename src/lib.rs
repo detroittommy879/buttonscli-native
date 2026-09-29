@@ -19,6 +19,8 @@ pub mod plugins;
 #[cfg(not(target_arch = "wasm32"))]
 mod scrollbar;
 #[cfg(not(target_arch = "wasm32"))]
+mod secret_vault;
+#[cfg(not(target_arch = "wasm32"))]
 mod session;
 mod settings;
 mod shortcuts;

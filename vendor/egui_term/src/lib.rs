@@ -5,6 +5,7 @@ mod theme;
 mod types;
 mod view;
 
+pub use alacritty_terminal::event_loop::SensitiveInput;
 pub use backend::settings::BackendSettings;
 pub use backend::{
     BackendCommand, ByteObserver, PtyEvent, ScrollbackState, TerminalBackend,

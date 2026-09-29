@@ -126,6 +126,7 @@ pub(crate) struct Preferences {
     pub(crate) default_shell_id: String,
     pub(crate) default_working_directory: String,
     pub(crate) custom_shell_profiles: Vec<ShellProfile>,
+    pub(crate) quick_secrets_auto_lock_minutes: u32,
 }
 
 impl Default for Preferences {
@@ -160,6 +161,7 @@ impl Default for Preferences {
             default_shell_id: "system".into(),
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
+            quick_secrets_auto_lock_minutes: 15,
         }
     }
 }
@@ -219,6 +221,7 @@ impl Preferences {
         };
         self.window_opacity = crate::window_opacity::clamp(self.window_opacity);
         self.dock_peek_radius = self.dock_peek_radius.min(24);
+        self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
         self.shortcuts.normalize();
         for source in [

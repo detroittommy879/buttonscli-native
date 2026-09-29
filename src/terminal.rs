@@ -139,6 +139,12 @@ impl TerminalTab {
             .process_command(BackendCommand::Write(text.as_ref().to_vec()));
     }
 
+    pub fn write_sensitive(&mut self, input: egui_term::SensitiveInput) {
+        self.output.record_sensitive_input();
+        self.backend
+            .process_command(BackendCommand::WriteSensitive(input));
+    }
+
     pub fn run(&mut self, command: &str) {
         self.write(format!("{command}\r"));
     }

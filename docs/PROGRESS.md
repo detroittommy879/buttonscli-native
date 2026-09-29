@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-09-29 — P02 internal Quick Secrets vault
+
+Implemented a debug-only internal vault gated through the central feature
+resolver and `BUTTONSCLI_NATIVE_DEV_QUICK_SECRETS=1`. It stores a versioned,
+profile-bound Argon2id/AES-256-GCM ciphertext file outside settings and legacy
+imports. Create/unlock KDF work runs off the UI thread; manual, idle, window
+close, profile change, and app shutdown clear the in-memory key and entries.
+Forgetting the passphrase requires a second confirmation before deleting the
+vault. A user must select a stable ready terminal for each single-line Paste or
+Paste + Enter action. Sensitive input uses a zeroizing PTY queue and bypasses
+the last-input observer; shell echo can still appear in output, including
+opt-in AI Help context. No legacy vault data is imported.
+
+All 168 Windows library tests pass, including fake-repository encryption,
+wrong-passphrase, profile binding, corruption, idle lock and conflict cases;
+disk revision/delete, import bounds, localized safety copy and multiline
+rejection are also covered. The interactive GUI and PTY echo behavior remain
+unverified. Access tier: internal; the feature remains hidden in release
+builds.
+
 ## 2026-09-29 — P01 fail-closed runtime config client
 
 Added a bounded, redirect-free runtime-config request using the existing

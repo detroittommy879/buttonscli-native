@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread::JoinHandle;
 use std::time::Instant;
+use zeroize::Zeroizing;
 
 use log::error;
 use polling::{Event as PollingEvent, Events, PollMode};
@@ -32,11 +33,66 @@ pub enum Msg {
     /// Data that should be written to the PTY.
     Input(Cow<'static, [u8]>),
 
+    /// Sensitive literal input. Its queued and partially written buffers are
+    /// zeroized when the event loop releases them and it bypasses text observers.
+    SensitiveInput(SensitiveInput),
+
     /// Indicates that the `EventLoop` should shut down, as Alacritty is shutting down.
     Shutdown,
 
     /// Instruction to resize the PTY.
     Resize(WindowSize),
+}
+
+/// PTY input that must not be formatted or retained after its write completes.
+pub struct SensitiveInput(Zeroizing<Vec<u8>>);
+
+impl SensitiveInput {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(Zeroizing::new(bytes))
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+
+    pub fn into_inner(mut self) -> Zeroizing<Vec<u8>> {
+        std::mem::replace(&mut self.0, Zeroizing::new(Vec::new()))
+    }
+}
+
+impl Clone for SensitiveInput {
+    fn clone(&self) -> Self {
+        Self::new(self.as_bytes().to_vec())
+    }
+}
+
+impl fmt::Debug for SensitiveInput {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str("SensitiveInput([redacted])")
+    }
+}
+
+impl PartialEq for SensitiveInput {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for SensitiveInput {}
+
+enum WriteData {
+    Plain(Cow<'static, [u8]>),
+    Sensitive(SensitiveInput),
+}
+
+impl WriteData {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Plain(bytes) => bytes.as_ref(),
+            Self::Sensitive(bytes) => bytes.as_bytes(),
+        }
+    }
 }
 
 /// The main event loop.
@@ -114,7 +170,10 @@ where
     fn drain_recv_channel(&mut self, state: &mut State) -> bool {
         while let Some(msg) = self.rx.recv() {
             match msg {
-                Msg::Input(input) => state.write_list.push_back(input),
+                Msg::Input(input) => state.write_list.push_back(WriteData::Plain(input)),
+                Msg::SensitiveInput(input) => {
+                    state.write_list.push_back(WriteData::Sensitive(input))
+                }
                 Msg::Resize(window_size) => self.pty.on_resize(window_size),
                 Msg::Shutdown => return false,
             }
@@ -358,7 +417,7 @@ where
 
 /// Helper type which tracks how much of a buffer has been written.
 struct Writing {
-    source: Cow<'static, [u8]>,
+    source: WriteData,
     written: usize,
 }
 
@@ -376,6 +435,15 @@ impl event::Notify for Notifier {
         }
 
         let _ = self.0.send(Msg::Input(bytes));
+    }
+}
+
+impl Notifier {
+    pub fn notify_sensitive(&self, input: SensitiveInput) {
+        if input.as_bytes().is_empty() {
+            return;
+        }
+        let _ = self.0.send(Msg::SensitiveInput(input));
     }
 }
 
@@ -431,7 +499,7 @@ impl EventLoopSender {
 /// would otherwise be mutated on the `EventLoop` goes here.
 #[derive(Default)]
 pub struct State {
-    write_list: VecDeque<Cow<'static, [u8]>>,
+    write_list: VecDeque<WriteData>,
     writing: Option<Writing>,
     parser: ansi::Processor,
 }
@@ -467,11 +535,8 @@ impl State {
 
 impl Writing {
     #[inline]
-    fn new(c: Cow<'static, [u8]>) -> Writing {
-        Writing {
-            source: c,
-            written: 0,
-        }
+    fn new(source: WriteData) -> Writing {
+        Writing { source, written: 0 }
     }
 
     #[inline]
@@ -481,12 +546,12 @@ impl Writing {
 
     #[inline]
     fn remaining_bytes(&self) -> &[u8] {
-        &self.source[self.written..]
+        &self.source.as_bytes()[self.written..]
     }
 
     #[inline]
     fn finished(&self) -> bool {
-        self.written >= self.source.len()
+        self.written >= self.source.as_bytes().len()
     }
 }
 

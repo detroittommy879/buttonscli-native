@@ -86,6 +86,9 @@ features = [
 ]
 default-features = false
 
+[dependencies.zeroize]
+version = "1.8"
+
 [dev-dependencies.serde_json]
 version = "1.0.0"
 

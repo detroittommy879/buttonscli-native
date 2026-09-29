@@ -128,6 +128,18 @@ impl OutputCapture {
         self.activity_at_ms.store(now, Ordering::Relaxed);
     }
 
+    /// Update activity after a vault paste without retaining its literal bytes.
+    pub(crate) fn record_sensitive_input(&self) {
+        let Ok(mut state) = self.state.lock() else {
+            return;
+        };
+        state.last_input.clear();
+        let now = now_ms();
+        state.last_input_at_ms = Some(now);
+        state.last_updated_at_ms = now;
+        self.activity_at_ms.store(now, Ordering::Relaxed);
+    }
+
     /// Lock-free timestamp used by the renderer's idle-effect scheduler.
     pub(crate) fn last_updated_at_ms(&self) -> u64 {
         self.activity_at_ms.load(Ordering::Relaxed)
@@ -194,6 +206,16 @@ mod tests {
         let after_output = capture.last_updated_at_ms();
         assert!(after_output >= after_input);
         assert_eq!(after_output, capture.snapshot().last_updated_at_ms);
+    }
+
+    #[test]
+    fn sensitive_input_updates_activity_without_keeping_prior_input_text() {
+        let capture = OutputCapture::default();
+        capture.record_input_bytes(b"previous ordinary command");
+        capture.record_sensitive_input();
+        let snapshot = capture.snapshot();
+        assert!(snapshot.last_input.is_empty());
+        assert!(snapshot.last_input_at_ms.is_some());
     }
 }
 

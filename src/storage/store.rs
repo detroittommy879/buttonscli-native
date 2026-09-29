@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::assistant::provider::ProviderSettings;
 use crate::settings::Preferences;
@@ -12,6 +13,7 @@ use crate::settings::Preferences;
 use super::paths::{sanitize_profile_name, NativeDataRoot};
 
 const MAX_NATIVE_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_QUICK_SECRETS_BYTES: u64 = 1024 * 1024;
 const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug)]
@@ -81,6 +83,7 @@ pub struct LoadedNative {
     pub revision: u64,
 }
 
+#[derive(Clone)]
 pub struct NativeStore {
     root: NativeDataRoot,
     legacy_root: PathBuf,
@@ -122,6 +125,108 @@ impl NativeStore {
     pub(crate) fn root_dir(&self) -> &Path {
         &self.root.0
     }
+
+    /// Read the active profile's encrypted Quick Secrets payload without
+    /// projecting or rewriting any other settings.
+    pub(crate) fn read_quick_secrets(&self) -> Result<Option<Vec<u8>>, StoreError> {
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        let path = self.profile_dir().join("quick-secrets.vault");
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        ensure_native_path(&self.root.0, &path)?;
+        if !metadata.is_file() {
+            return Err(StoreError::InvalidDocument);
+        }
+        Ok(Some(read_limited(&path, MAX_QUICK_SECRETS_BYTES)?))
+    }
+
+    /// Compare-and-replace ciphertext under the native store lock. This
+    /// prevents two unlocked app instances from silently overwriting edits.
+    pub(crate) fn save_quick_secrets(
+        &self,
+        expected_digest: Option<[u8; 32]>,
+        bytes: &[u8],
+    ) -> Result<[u8; 32], StoreError> {
+        if bytes.len() as u64 > MAX_QUICK_SECRETS_BYTES {
+            return Err(StoreError::TooLarge);
+        }
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        fs::create_dir_all(&self.root.0)?;
+        let lock_path = self.root.0.join(".native.lock");
+        ensure_native_path(&self.root.0, &lock_path)?;
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(lock_path)?;
+        lock.try_lock_exclusive().map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                StoreError::Busy
+            } else {
+                StoreError::Io(error)
+            }
+        })?;
+        let path = self.profile_dir().join("quick-secrets.vault");
+        let current = self.read_quick_secrets()?;
+        let current_digest = current
+            .as_deref()
+            .map(|current| Sha256::digest(current).into());
+        if current_digest != expected_digest {
+            return Err(StoreError::StaleRevision);
+        }
+        ensure_native_path(&self.root.0, &self.profile_dir())?;
+        fs::create_dir_all(self.profile_dir())?;
+        ensure_native_path(&self.root.0, &path)?;
+        atomic_replace(&path, bytes)?;
+        Ok(Sha256::digest(bytes).into())
+    }
+
+    /// Delete only the active profile's vault after the caller has confirmed
+    /// the destructive reset.
+    pub(crate) fn delete_quick_secrets(&self, expected_digest: [u8; 32]) -> Result<(), StoreError> {
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        let lock_path = self.root.0.join(".native.lock");
+        ensure_native_path(&self.root.0, &lock_path)?;
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(lock_path)?;
+        lock.try_lock_exclusive().map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                StoreError::Busy
+            } else {
+                StoreError::Io(error)
+            }
+        })?;
+        let path = self.profile_dir().join("quick-secrets.vault");
+        let Some(current) = self.read_quick_secrets()? else {
+            return Err(StoreError::StaleRevision);
+        };
+        let current_digest: [u8; 32] = Sha256::digest(&current).into();
+        if current_digest != expected_digest {
+            return Err(StoreError::StaleRevision);
+        }
+        ensure_native_path(&self.root.0, &path)?;
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    /// Confirmed reset path for a forgotten passphrase. The digest is captured
+    /// before the locked delete, which still detects a concurrent replacement.
+    pub(crate) fn forget_quick_secrets(&self) -> Result<(), StoreError> {
+        let Some(current) = self.read_quick_secrets()? else {
+            return Err(StoreError::StaleRevision);
+        };
+        let expected: [u8; 32] = Sha256::digest(&current).into();
+        self.delete_quick_secrets(expected)
+    }
+
     fn native_path(&self) -> PathBuf {
         self.profile_dir().join("native.json")
     }
@@ -660,6 +765,36 @@ mod tests {
         assert!(loaded.preferences.presets.is_empty());
         assert_eq!(first.save(Some(1), &preferences).unwrap(), 2);
         assert_eq!(second.load().unwrap().unwrap().revision, 2);
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn quick_secrets_ciphertext_is_profile_scoped_and_deletion_checks_revision() {
+        let (native, original) = roots();
+        let first = NativeStore::open(NativeDataRoot(native.clone()), original.clone()).unwrap();
+        let second = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        assert_eq!(first.read_quick_secrets().unwrap(), None);
+
+        let old = b"opaque encrypted payload";
+        let old_digest = first.save_quick_secrets(None, old).unwrap();
+        assert_eq!(
+            second.read_quick_secrets().unwrap().as_deref(),
+            Some(old.as_slice())
+        );
+        assert!(matches!(
+            second.save_quick_secrets(None, b"stale write"),
+            Err(StoreError::StaleRevision)
+        ));
+
+        first
+            .save_quick_secrets(Some(old_digest), b"replacement ciphertext")
+            .unwrap();
+        assert!(matches!(
+            first.delete_quick_secrets(old_digest),
+            Err(StoreError::StaleRevision)
+        ));
+        first.forget_quick_secrets().unwrap();
+        assert_eq!(second.read_quick_secrets().unwrap(), None);
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

@@ -4,7 +4,9 @@ use crate::types::Size;
 use alacritty_terminal::event::{
     Event, EventListener, Notify, OnResize, WindowSize,
 };
-use alacritty_terminal::event_loop::{EventLoop, Msg, Notifier};
+use alacritty_terminal::event_loop::{
+    EventLoop, Msg, Notifier, SensitiveInput,
+};
 use alacritty_terminal::grid::{Dimensions, Scroll};
 use alacritty_terminal::index::{Column, Direction, Line, Point, Side};
 use alacritty_terminal::selection::{
@@ -68,6 +70,7 @@ impl ScrollbackState {
 #[derive(Debug, Clone)]
 pub enum BackendCommand {
     Write(Vec<u8>),
+    WriteSensitive(SensitiveInput),
     Scroll(i32),
     Resize(Size, Size),
     SelectStart(SelectionType, f32, f32),
@@ -292,6 +295,10 @@ impl TerminalBackend {
                     observer(&input);
                 }
                 self.write(input);
+                term.scroll_display(Scroll::Bottom);
+            },
+            BackendCommand::WriteSensitive(input) => {
+                self.notifier.notify_sensitive(input);
                 term.scroll_display(Scroll::Bottom);
             },
             BackendCommand::Scroll(delta) => {

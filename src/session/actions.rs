@@ -74,18 +74,28 @@ pub(crate) enum Action {
     },
     /// Literal bytes produced by the bounded input service.
     Send(Vec<u8>),
+    /// Vault bytes use a redacted, zeroizing transport through the PTY writer.
+    SendSensitive {
+        input: egui_term::SensitiveInput,
+        press_enter: bool,
+    },
 }
 
 impl Action {
     fn needs_target(&self) -> bool {
         matches!(
             self,
-            Self::Focus | Self::Close | Self::Move { .. } | Self::Rename { .. } | Self::Send(_)
+            Self::Focus
+                | Self::Close
+                | Self::Move { .. }
+                | Self::Rename { .. }
+                | Self::Send(_)
+                | Self::SendSensitive { .. }
         )
     }
 
     fn needs_ready(&self) -> bool {
-        matches!(self, Self::Send(_))
+        matches!(self, Self::Send(_) | Self::SendSensitive { .. })
     }
 
     pub(crate) fn validate(&self) -> Result<(), ActionError> {
@@ -94,6 +104,16 @@ impl Action {
                 if bytes.is_empty()
                     || bytes.len() > crate::session::input::MAX_INPUT_BYTES
                     || bytes.contains(&0) =>
+            {
+                Err(ActionError::InvalidInput)
+            }
+            Self::SendSensitive { input, .. }
+                if input.as_bytes().is_empty()
+                    || input.as_bytes().len() > crate::session::input::MAX_INPUT_BYTES
+                    || input
+                        .as_bytes()
+                        .iter()
+                        .any(|byte| matches!(byte, 0 | b'\r' | b'\n')) =>
             {
                 Err(ActionError::InvalidInput)
             }
@@ -493,5 +513,24 @@ mod tests {
             reply,
         };
         assert_eq!(expired.validate(&snapshot()), Err(ActionError::Timeout));
+    }
+
+    #[test]
+    fn sensitive_action_debug_redacts_payload_and_rejects_multiline_input() {
+        let secret = b"do-not-print-this";
+        let action = Action::SendSensitive {
+            input: egui_term::SensitiveInput::new(secret.to_vec()),
+            press_enter: false,
+        };
+        assert!(!format!("{action:?}").contains("do-not-print-this"));
+        assert_eq!(action.validate(), Ok(()));
+        assert_eq!(
+            Action::SendSensitive {
+                input: egui_term::SensitiveInput::new(b"first\nsecond".to_vec()),
+                press_enter: false,
+            }
+            .validate(),
+            Err(ActionError::InvalidInput)
+        );
     }
 }

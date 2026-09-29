@@ -204,6 +204,9 @@ pub fn literal(locale: &str, english: &str) -> String {
         };
         return translated.to_owned();
     }
+    if let Some(translated) = quick_secrets_translation(locale, english) {
+        return translated.to_owned();
+    }
     let source_key = catalog_alias(english);
     let translations = literal_catalog().messages.get(source_key).or_else(|| {
         let mut matches = literal_catalog()
@@ -217,6 +220,533 @@ pub fn literal(locale: &str, english: &str) -> String {
         .and_then(|translations| translations.get(locale))
         .cloned()
         .unwrap_or_else(|| english.to_owned())
+}
+
+fn quick_secrets_translation(locale: &str, english: &str) -> Option<&'static str> {
+    let value = match (english, locale) {
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "es",
+        ) => "No hay recuperación. Si olvidas esta frase de contraseña, elimina la bóveda y crea otra.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "zh-CN",
+        ) => "无法恢复。如果忘记此密码短语，请删除保险库并重新创建。",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "fr",
+        ) => "Aucune récupération. Si vous oubliez cette phrase secrète, supprimez le coffre et créez-en un nouveau.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "ja",
+        ) => "復旧手段はありません。このパスフレーズを忘れた場合は、保管庫を削除して新しく作成してください。",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "hi",
+        ) => "इसे पुनर्प्राप्त नहीं किया जा सकता। पासफ़्रेज़ भूलने पर वॉल्ट हटाकर नया बनाएँ।",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "de",
+        ) => "Keine Wiederherstellung möglich. Wenn du diese Passphrase vergisst, lösche den Tresor und erstelle einen neuen.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "pt-BR",
+        ) => "Não há recuperação. Se você esquecer esta frase secreta, exclua o cofre e crie outro.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "it",
+        ) => "Non è possibile recuperarla. Se dimentichi la passphrase, elimina il vault e creane uno nuovo.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "ru",
+        ) => "Восстановление невозможно. Если вы забудете эту парольную фразу, удалите хранилище и создайте новое.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "uk",
+        ) => "Відновлення неможливе. Якщо забудете цю парольну фразу, видаліть сховище та створіть нове.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "ko",
+        ) => "복구할 수 없습니다. 이 암호 문구를 잊으면 보관함을 삭제하고 새로 만들어야 합니다.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "ar",
+        ) => "لا يمكن الاسترداد. إذا نسيت عبارة المرور، فاحذف الخزنة وأنشئ واحدة جديدة.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "tr",
+        ) => "Kurtarma yok. Bu parolayı unutursanız kasayı silip yenisini oluşturun.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "pl",
+        ) => "Nie można odzyskać dostępu. Jeśli zapomnisz hasła, usuń sejf i utwórz nowy.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "nl",
+        ) => "Herstel is niet mogelijk. Als je deze wachtwoordzin vergeet, verwijder dan de kluis en maak een nieuwe.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "sv",
+        ) => "Det går inte att återställa. Om du glömmer lösenfrasen måste du ta bort valvet och skapa ett nytt.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "da",
+        ) => "Adgang kan ikke gendannes. Hvis du glemmer adgangsfrasen, skal du slette boksen og oprette en ny.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "fi",
+        ) => "Palautusta ei ole. Jos unohdat tunnuslauseen, poista holvi ja luo uusi.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "no",
+        ) => "Gjenoppretting er ikke mulig. Hvis du glemmer passordfrasen, må du slette hvelvet og opprette et nytt.",
+        (
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "zh-TW",
+        ) => "無法復原。如果忘記此密語，請刪除保險庫並重新建立。",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "es",
+        ) => "Elige un terminal listo. El shell puede mostrar el texto pegado en la salida del terminal.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "zh-CN",
+        ) => "请明确选择一个就绪的终端。Shell 可能会将粘贴的文本回显到终端输出中。",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "fr",
+        ) => "Choisissez un terminal prêt. Le shell peut afficher le texte collé dans sa sortie.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "ja",
+        ) => "使用可能な端末を選択してください。シェルが貼り付けたテキストを端末出力に表示する場合があります。",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "hi",
+        ) => "तैयार टर्मिनल चुनें। शेल चिपकाए गए पाठ को टर्मिनल आउटपुट में दिखा सकता है।",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "de",
+        ) => "Wähle ein bereites Terminal. Die Shell kann eingefügten Text in der Terminalausgabe anzeigen.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "pt-BR",
+        ) => "Escolha um terminal pronto. O shell pode exibir o texto colado na saída do terminal.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "it",
+        ) => "Scegli un terminale pronto. La shell potrebbe mostrare il testo incollato nell'output del terminale.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "ru",
+        ) => "Выберите готовый терминал. Оболочка может отобразить вставленный текст в выводе терминала.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "uk",
+        ) => "Виберіть готовий термінал. Оболонка може показати вставлений текст у виводі термінала.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "ko",
+        ) => "사용 가능한 터미널을 선택하세요. 셸이 붙여넣은 텍스트를 터미널 출력에 표시할 수 있습니다.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "ar",
+        ) => "اختر طرفية جاهزة. قد تعرض الصدفة النص الملصق في مخرجات الطرفية.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "tr",
+        ) => "Hazır bir terminal seçin. Kabuk, yapıştırılan metni terminal çıktısında gösterebilir.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "pl",
+        ) => "Wybierz gotowy terminal. Powłoka może wyświetlić wklejony tekst w swoim wyjściu.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "nl",
+        ) => "Kies een gereed terminal. De shell kan geplakte tekst in de terminaluitvoer tonen.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "sv",
+        ) => "Välj en klar terminal. Skalet kan visa inklistrad text i terminalutdata.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "da",
+        ) => "Vælg en klar terminal. Skallen kan vise indsat tekst i terminalens output.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "fi",
+        ) => "Valitse valmis pääte. Komentotulkki voi näyttää liitetyn tekstin päätteen tulosteessa.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "no",
+        ) => "Velg en klar terminal. Skallet kan vise innlimt tekst i terminalutdata.",
+        (
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "zh-TW",
+        ) => "請選擇可用的終端機。Shell 可能會將貼上的文字回顯到終端機輸出。",
+        ("Forget vault", "es") => "Olvidar bóveda",
+        ("Forget vault", "zh-CN") => "忘记保险库",
+        ("Forget vault", "fr") => "Oublier le coffre",
+        ("Forget vault", "ja") => "保管庫を削除",
+        ("Forget vault", "hi") => "वॉल्ट भूलें",
+        ("Forget vault", "de") => "Tresor vergessen",
+        ("Forget vault", "pt-BR") => "Esquecer cofre",
+        ("Forget vault", "it") => "Dimentica vault",
+        ("Forget vault", "ru") => "Забыть хранилище",
+        ("Forget vault", "uk") => "Забути сховище",
+        ("Forget vault", "ko") => "보관함 삭제",
+        ("Forget vault", "ar") => "نسيان الخزنة",
+        ("Forget vault", "tr") => "Kasayı unut",
+        ("Forget vault", "pl") => "Usuń sejf",
+        ("Forget vault", "nl") => "Kluis vergeten",
+        ("Forget vault", "sv") => "Glöm valvet",
+        ("Forget vault", "da") => "Glem boks",
+        ("Forget vault", "fi") => "Unohda holvi",
+        ("Forget vault", "no") => "Glem hvelvet",
+        ("Forget vault", "zh-TW") => "忘記保險庫",
+        ("Delete vault and secrets", "es") => "Eliminar la bóveda y sus secretos",
+        ("Delete vault and secrets", "zh-CN") => "删除保险库和其中的秘密",
+        ("Delete vault and secrets", "fr") => "Supprimer le coffre et ses secrets",
+        ("Delete vault and secrets", "ja") => "保管庫と秘密を削除",
+        ("Delete vault and secrets", "hi") => "वॉल्ट और उसके रहस्य हटाएँ",
+        ("Delete vault and secrets", "de") => "Tresor und Geheimnisse löschen",
+        ("Delete vault and secrets", "pt-BR") => "Excluir o cofre e seus segredos",
+        ("Delete vault and secrets", "it") => "Elimina vault e segreti",
+        ("Delete vault and secrets", "ru") => "Удалить хранилище и секреты",
+        ("Delete vault and secrets", "uk") => "Видалити сховище та секрети",
+        ("Delete vault and secrets", "ko") => "보관함과 비밀 삭제",
+        ("Delete vault and secrets", "ar") => "حذف الخزنة والأسرار",
+        ("Delete vault and secrets", "tr") => "Kasayı ve sırları sil",
+        ("Delete vault and secrets", "pl") => "Usuń sejf i sekrety",
+        ("Delete vault and secrets", "nl") => "Kluis en geheimen verwijderen",
+        ("Delete vault and secrets", "sv") => "Ta bort valvet och hemligheterna",
+        ("Delete vault and secrets", "da") => "Slet boksen og hemmelighederne",
+        ("Delete vault and secrets", "fi") => "Poista holvi ja salaisuudet",
+        ("Delete vault and secrets", "no") => "Slett hvelvet og hemmelighetene",
+        ("Delete vault and secrets", "zh-TW") => "刪除保險庫和其中的秘密",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "es",
+        ) => "Esto eliminará permanentemente todos los secretos guardados en el perfil activo.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "zh-CN",
+        ) => "这将永久删除当前配置中的所有已保存秘密。",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "fr",
+        ) => "Cela supprimera définitivement tous les secrets enregistrés dans le profil actif.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "ja",
+        ) => "現在のプロファイルに保存されているすべての秘密が完全に削除されます。",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "hi",
+        ) => "इससे सक्रिय प्रोफ़ाइल में सहेजे गए सभी रहस्य स्थायी रूप से हट जाएँगे।",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "de",
+        ) => "Dadurch werden alle gespeicherten Geheimnisse im aktiven Profil dauerhaft gelöscht.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "pt-BR",
+        ) => "Isso excluirá permanentemente todos os segredos salvos no perfil ativo.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "it",
+        ) => "Questo eliminerà definitivamente tutti i segreti salvati nel profilo attivo.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "ru",
+        ) => "Все сохранённые секреты активного профиля будут удалены без возможности восстановления.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "uk",
+        ) => "Усі збережені секрети активного профілю буде видалено без можливості відновлення.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "ko",
+        ) => "활성 프로필에 저장된 모든 비밀이 영구적으로 삭제됩니다.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "ar",
+        ) => "سيؤدي هذا إلى حذف جميع الأسرار المحفوظة في الملف النشط نهائيًا.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "tr",
+        ) => "Bu işlem etkin profildeki tüm kayıtlı sırları kalıcı olarak siler.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "pl",
+        ) => "Spowoduje to trwałe usunięcie wszystkich zapisanych sekretów z aktywnego profilu.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "nl",
+        ) => "Hiermee worden alle opgeslagen geheimen in het actieve profiel definitief verwijderd.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "sv",
+        ) => "Detta tar permanent bort alla sparade hemligheter i den aktiva profilen.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "da",
+        ) => "Dette sletter permanent alle gemte hemmeligheder i den aktive profil.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "fi",
+        ) => "Tämä poistaa pysyvästi kaikki aktiiviseen profiiliin tallennetut salaisuudet.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "no",
+        ) => "Dette sletter alle lagrede hemmeligheter i den aktive profilen permanent.",
+        (
+            "This permanently deletes every saved secret in the active profile.",
+            "zh-TW",
+        ) => "這會永久刪除目前設定檔中儲存的所有秘密。",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "es",
+        ) => "Usa una frase de contraseña de al menos 12 caracteres.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "zh-CN",
+        ) => "请使用至少 12 个字符的密码短语。",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "fr",
+        ) => "Utilisez une phrase secrète d'au moins 12 caractères.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "ja",
+        ) => "12 文字以上のパスフレーズを使用してください。",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "hi",
+        ) => "कम से कम 12 अक्षरों वाला पासफ़्रेज़ इस्तेमाल करें।",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "de",
+        ) => "Verwende eine Passphrase mit mindestens 12 Zeichen.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "pt-BR",
+        ) => "Use uma frase secreta com pelo menos 12 caracteres.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "it",
+        ) => "Usa una passphrase di almeno 12 caratteri.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "ru",
+        ) => "Используйте парольную фразу длиной не менее 12 символов.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "uk",
+        ) => "Використовуйте парольну фразу щонайменше з 12 символів.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "ko",
+        ) => "12자 이상의 암호 문구를 사용하세요.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "ar",
+        ) => "استخدم عبارة مرور لا تقل عن 12 حرفًا.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "tr",
+        ) => "En az 12 karakterlik bir parola kullanın.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "pl",
+        ) => "Użyj hasła o długości co najmniej 12 znaków.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "nl",
+        ) => "Gebruik een wachtwoordzin van minimaal 12 tekens.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "sv",
+        ) => "Använd en lösenfras med minst 12 tecken.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "da",
+        ) => "Brug en adgangsfrase på mindst 12 tegn.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "fi",
+        ) => "Käytä vähintään 12 merkin tunnuslausetta.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "no",
+        ) => "Bruk en passordfrase på minst 12 tegn.",
+        (
+            "Use a passphrase with at least 12 characters.",
+            "zh-TW",
+        ) => "請使用至少 12 個字元的密語。",
+        (
+            "The passphrase did not unlock this vault.",
+            "es",
+        ) => "La frase de contraseña no desbloqueó esta bóveda.",
+        (
+            "The passphrase did not unlock this vault.",
+            "zh-CN",
+        ) => "此密码短语无法解锁保险库。",
+        (
+            "The passphrase did not unlock this vault.",
+            "fr",
+        ) => "Cette phrase secrète n'a pas déverrouillé le coffre.",
+        (
+            "The passphrase did not unlock this vault.",
+            "ja",
+        ) => "このパスフレーズでは保管庫を解除できませんでした。",
+        (
+            "The passphrase did not unlock this vault.",
+            "hi",
+        ) => "इस पासफ़्रेज़ से वॉल्ट अनलॉक नहीं हुआ।",
+        (
+            "The passphrase did not unlock this vault.",
+            "de",
+        ) => "Mit dieser Passphrase ließ sich der Tresor nicht entsperren.",
+        (
+            "The passphrase did not unlock this vault.",
+            "pt-BR",
+        ) => "Esta frase secreta não desbloqueou o cofre.",
+        (
+            "The passphrase did not unlock this vault.",
+            "it",
+        ) => "Questa passphrase non ha sbloccato il vault.",
+        (
+            "The passphrase did not unlock this vault.",
+            "ru",
+        ) => "Эта парольная фраза не открыла хранилище.",
+        (
+            "The passphrase did not unlock this vault.",
+            "uk",
+        ) => "Ця парольна фраза не розблокувала сховище.",
+        (
+            "The passphrase did not unlock this vault.",
+            "ko",
+        ) => "이 암호 문구로 보관함을 잠금 해제하지 못했습니다.",
+        (
+            "The passphrase did not unlock this vault.",
+            "ar",
+        ) => "لم تفتح عبارة المرور هذه الخزنة.",
+        (
+            "The passphrase did not unlock this vault.",
+            "tr",
+        ) => "Bu parola kasanın kilidini açmadı.",
+        (
+            "The passphrase did not unlock this vault.",
+            "pl",
+        ) => "To hasło nie odblokowało sejfu.",
+        (
+            "The passphrase did not unlock this vault.",
+            "nl",
+        ) => "Met deze wachtwoordzin is de kluis niet ontgrendeld.",
+        (
+            "The passphrase did not unlock this vault.",
+            "sv",
+        ) => "Lösenfrasen låste inte upp valvet.",
+        (
+            "The passphrase did not unlock this vault.",
+            "da",
+        ) => "Adgangsfrasen låste ikke boksen op.",
+        (
+            "The passphrase did not unlock this vault.",
+            "fi",
+        ) => "Tunnuslause ei avannut holvia.",
+        (
+            "The passphrase did not unlock this vault.",
+            "no",
+        ) => "Passordfrasen låste ikke opp hvelvet.",
+        (
+            "The passphrase did not unlock this vault.",
+            "zh-TW",
+        ) => "此密語無法解鎖保險庫。",
+        (
+            "Quick Secrets could not complete this action.",
+            "es",
+        ) => "Quick Secrets no pudo completar esta acción.",
+        (
+            "Quick Secrets could not complete this action.",
+            "zh-CN",
+        ) => "Quick Secrets 无法完成此操作。",
+        (
+            "Quick Secrets could not complete this action.",
+            "fr",
+        ) => "Quick Secrets n'a pas pu terminer cette action.",
+        (
+            "Quick Secrets could not complete this action.",
+            "ja",
+        ) => "Quick Secrets はこの操作を完了できませんでした。",
+        (
+            "Quick Secrets could not complete this action.",
+            "hi",
+        ) => "Quick Secrets यह कार्रवाई पूरी नहीं कर सका।",
+        (
+            "Quick Secrets could not complete this action.",
+            "de",
+        ) => "Quick Secrets konnte diese Aktion nicht abschließen.",
+        (
+            "Quick Secrets could not complete this action.",
+            "pt-BR",
+        ) => "O Quick Secrets não conseguiu concluir esta ação.",
+        (
+            "Quick Secrets could not complete this action.",
+            "it",
+        ) => "Quick Secrets non è riuscito a completare questa azione.",
+        (
+            "Quick Secrets could not complete this action.",
+            "ru",
+        ) => "Quick Secrets не удалось выполнить это действие.",
+        (
+            "Quick Secrets could not complete this action.",
+            "uk",
+        ) => "Quick Secrets не вдалося виконати цю дію.",
+        (
+            "Quick Secrets could not complete this action.",
+            "ko",
+        ) => "Quick Secrets에서 이 작업을 완료하지 못했습니다.",
+        (
+            "Quick Secrets could not complete this action.",
+            "ar",
+        ) => "تعذر على Quick Secrets إكمال هذا الإجراء.",
+        (
+            "Quick Secrets could not complete this action.",
+            "tr",
+        ) => "Quick Secrets bu işlemi tamamlayamadı.",
+        (
+            "Quick Secrets could not complete this action.",
+            "pl",
+        ) => "Quick Secrets nie udało się ukończyć tej czynności.",
+        (
+            "Quick Secrets could not complete this action.",
+            "nl",
+        ) => "Quick Secrets kon deze actie niet voltooien.",
+        (
+            "Quick Secrets could not complete this action.",
+            "sv",
+        ) => "Quick Secrets kunde inte slutföra åtgärden.",
+        (
+            "Quick Secrets could not complete this action.",
+            "da",
+        ) => "Quick Secrets kunne ikke fuldføre handlingen.",
+        (
+            "Quick Secrets could not complete this action.",
+            "fi",
+        ) => "Quick Secrets ei voinut suorittaa tätä toimintoa.",
+        (
+            "Quick Secrets could not complete this action.",
+            "no",
+        ) => "Quick Secrets kunne ikke fullføre denne handlingen.",
+        (
+            "Quick Secrets could not complete this action.",
+            "zh-TW",
+        ) => "Quick Secrets 無法完成此操作。",
+        _ => return None,
+    };
+    Some(value)
 }
 
 fn catalog_alias(english: &str) -> &str {
@@ -1017,6 +1547,29 @@ mod tests {
             ),
             "Ingrese el código enviado a a@test."
         );
+    }
+
+    #[test]
+    fn quick_secrets_safety_and_recovery_copy_is_localized_in_every_shipped_locale() {
+        let strings = [
+            "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+            "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+            "Forget vault",
+            "Delete vault and secrets",
+            "This permanently deletes every saved secret in the active profile.",
+            "Use a passphrase with at least 12 characters.",
+            "The passphrase did not unlock this vault.",
+            "Quick Secrets could not complete this action.",
+        ];
+        for locale in SUPPORTED_LOCALES {
+            for english in strings {
+                let translated = literal(locale, english);
+                assert!(!translated.is_empty(), "missing {english} in {locale}");
+                if locale != "en" {
+                    assert_ne!(translated, english, "untranslated {english} in {locale}");
+                }
+            }
+        }
     }
 
     #[test]

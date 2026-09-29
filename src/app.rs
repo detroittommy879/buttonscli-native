@@ -98,6 +98,38 @@ fn theme_generation_available() -> bool {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn quick_secrets_available() -> bool {
+    use crate::features::{access, catalog::FeatureKey};
+    let mut runtime = crate::account::current_runtime_config().access();
+    if cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_QUICK_SECRETS").is_ok_and(|value| value == "1")
+    {
+        runtime
+            .development_overrides
+            .insert(FeatureKey::QuickSecrets);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    access::resolve(FeatureKey::QuickSecrets, &runtime, &None, now).available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn quick_secrets_error_text(locale: &str, error: crate::secret_vault::VaultError) -> String {
+    let message = match error {
+        crate::secret_vault::VaultError::PassphraseTooShort => {
+            "Use a passphrase with at least 12 characters."
+        }
+        crate::secret_vault::VaultError::UnlockFailed => {
+            "The passphrase did not unlock this vault."
+        }
+        _ => "Quick Secrets could not complete this action.",
+    };
+    crate::i18n::literal(locale, message)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn remote_control_available() -> bool {
     use crate::features::{access, catalog::FeatureKey};
     let mut runtime = crate::account::current_runtime_config().access();
@@ -388,6 +420,38 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     ai_help_rx: Receiver<AiHelpCommand>,
     #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_open: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_tx: Sender<QuickSecretsEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_rx: Receiver<QuickSecretsEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_vault_exists: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_session: Option<crate::secret_vault::VaultSession>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_passphrase_draft: Zeroizing<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_confirm_draft: Zeroizing<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_label_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_secret_draft: Zeroizing<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_add_open: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_selected_target: Option<u64>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_pending_delete: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_confirm_forget: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    quick_secrets_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
     tabs: Vec<TerminalTab>,
     #[cfg(not(target_arch = "wasm32"))]
     session_dispatcher: Dispatcher,
@@ -549,6 +613,12 @@ enum AiHelpCommand {
         press_enter: bool,
     },
     OpenSettings,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct QuickSecretsEvent {
+    generation: u64,
+    result: Result<crate::secret_vault::VaultSession, crate::secret_vault::VaultError>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -799,6 +869,8 @@ impl ButtonsApp {
         let (theme_generation_tx, theme_generation_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (ai_help_tx, ai_help_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (quick_secrets_tx, quick_secrets_rx) = mpsc::channel();
         Self {
             preferences,
             locale,
@@ -967,6 +1039,38 @@ impl ButtonsApp {
             ai_help_tx,
             #[cfg(not(target_arch = "wasm32"))]
             ai_help_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_open: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_generation: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_vault_exists: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_session: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_passphrase_draft: Zeroizing::new(String::new()),
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_confirm_draft: Zeroizing::new(String::new()),
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_label_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_secret_draft: Zeroizing::new(String::new()),
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_add_open: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_selected_target: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_pending_delete: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_confirm_forget: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            quick_secrets_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             tabs: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1399,6 +1503,21 @@ impl ButtonsApp {
                     .get_mut(index.ok_or(ActionError::Closed)?)
                     .ok_or(ActionError::Closed)?
                     .write(bytes);
+                Ok(Some(id))
+            }
+            Action::SendSensitive { input, press_enter } => {
+                if !quick_secrets_available() {
+                    return Err(ActionError::DeniedAccess);
+                }
+                let id = target_id.ok_or(ActionError::Closed)?;
+                let tab = self
+                    .tabs
+                    .get_mut(index.ok_or(ActionError::Closed)?)
+                    .ok_or(ActionError::Closed)?;
+                tab.write_sensitive(input.clone());
+                if *press_enter {
+                    tab.write(b"\r");
+                }
                 Ok(Some(id))
             }
         }
@@ -2333,6 +2452,17 @@ impl ButtonsApp {
                     ui.menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
                         ui.checkbox(&mut self.preferences.show_sidebar, "Command dock");
                         ui.checkbox(&mut self.preferences.show_presets, "Preset bar");
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if quick_secrets_available() {
+                            ui.separator();
+                            if ui
+                                .button(crate::i18n::literal(&self.locale, "Quick Secrets"))
+                                .clicked()
+                            {
+                                self.open_quick_secrets();
+                                ui.close_menu();
+                            }
+                        }
                     });
                     #[cfg(not(target_arch = "wasm32"))]
                     if cool_stuff_available() {
@@ -4409,6 +4539,514 @@ impl ButtonsApp {
                     ));
                 }
             }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_quick_secrets_events(&mut self) {
+        while let Ok(event) = self.quick_secrets_rx.try_recv() {
+            if event.generation != self.quick_secrets_generation {
+                continue;
+            }
+            self.quick_secrets_busy = false;
+            match event.result {
+                Ok(session)
+                    if self.quick_secrets_open
+                        && quick_secrets_available()
+                        && self
+                            .native_store
+                            .as_ref()
+                            .is_some_and(|store| store.profile_name() == session.profile()) =>
+                {
+                    self.quick_secrets_vault_exists = true;
+                    self.quick_secrets_session = Some(session);
+                    self.quick_secrets_message = None;
+                    self.quick_secrets_passphrase_draft.zeroize();
+                    self.quick_secrets_confirm_draft.zeroize();
+                }
+                Ok(mut session) => {
+                    session.lock();
+                }
+                Err(error) => {
+                    self.quick_secrets_message =
+                        Some(quick_secrets_error_text(&self.locale, error));
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn lock_quick_secrets(&mut self) {
+        if let Some(mut session) = self.quick_secrets_session.take() {
+            session.lock();
+        }
+        self.quick_secrets_passphrase_draft.zeroize();
+        self.quick_secrets_confirm_draft.zeroize();
+        self.quick_secrets_secret_draft.zeroize();
+        self.quick_secrets_pending_delete = None;
+        self.quick_secrets_confirm_forget = false;
+        self.quick_secrets_add_open = false;
+        self.quick_secrets_label_draft.clear();
+        self.quick_secrets_selected_target = None;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn maintain_quick_secrets(&mut self, ctx: &egui::Context) {
+        let active_profile = self
+            .native_store
+            .as_ref()
+            .map(|store| store.profile_name().to_owned());
+        if !quick_secrets_available() {
+            self.quick_secrets_open = false;
+            self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
+            self.quick_secrets_busy = false;
+            self.lock_quick_secrets();
+            return;
+        }
+        if !self.quick_secrets_open
+            || self
+                .quick_secrets_session
+                .as_ref()
+                .is_some_and(|session| active_profile.as_deref() != Some(session.profile()))
+        {
+            if self.quick_secrets_session.is_some() {
+                self.lock_quick_secrets();
+            }
+            return;
+        }
+
+        let auto_lock = self.preferences.quick_secrets_auto_lock_minutes;
+        if let Some(session) = self.quick_secrets_session.as_mut() {
+            if session.expire_if_idle(std::time::Instant::now(), auto_lock) {
+                self.quick_secrets_session = None;
+                self.quick_secrets_secret_draft.zeroize();
+                self.quick_secrets_message = None;
+            } else if let Some(deadline) = session.idle_deadline(auto_lock) {
+                ctx.request_repaint_after(
+                    deadline.saturating_duration_since(std::time::Instant::now()),
+                );
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_quick_secrets(&mut self) {
+        let Some(store) = self.native_store.as_ref() else {
+            self.quick_secrets_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Quick Secrets could not complete this action.",
+            ));
+            return;
+        };
+        match store.read_quick_secrets() {
+            Ok(vault) => {
+                self.quick_secrets_vault_exists = vault.is_some();
+                self.quick_secrets_message = None;
+            }
+            Err(error) => {
+                self.quick_secrets_vault_exists = true;
+                log::warn!("Quick Secrets vault read failed: {error}");
+                self.quick_secrets_message = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Quick Secrets could not complete this action.",
+                ));
+            }
+        }
+        self.quick_secrets_selected_target = None;
+        self.quick_secrets_open = true;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn begin_quick_secrets_unlock(&mut self, create: bool, ctx: &egui::Context) {
+        if !quick_secrets_available() || self.quick_secrets_busy {
+            return;
+        }
+        let Some(store) = self.native_store.clone() else {
+            self.quick_secrets_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Quick Secrets could not complete this action.",
+            ));
+            return;
+        };
+        if create {
+            if self.quick_secrets_passphrase_draft.chars().count() < 12 {
+                self.quick_secrets_message = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Use a passphrase with at least 12 characters.",
+                ));
+                return;
+            }
+            if *self.quick_secrets_passphrase_draft != *self.quick_secrets_confirm_draft {
+                self.quick_secrets_message = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Unlock codes do not match yet.",
+                ));
+                return;
+            }
+        }
+        let passphrase = std::mem::replace(
+            &mut self.quick_secrets_passphrase_draft,
+            Zeroizing::new(String::new()),
+        );
+        self.quick_secrets_confirm_draft.zeroize();
+        self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
+        let generation = self.quick_secrets_generation;
+        let profile = store.profile_name().to_owned();
+        let sender = self.quick_secrets_tx.clone();
+        let context = ctx.clone();
+        self.quick_secrets_busy = true;
+        let spawn = std::thread::Builder::new()
+            .name("buttonscli-quick-secrets-kdf".into())
+            .spawn(move || {
+                let result = if create {
+                    crate::secret_vault::VaultSession::create(&store, &profile, passphrase)
+                } else {
+                    crate::secret_vault::VaultSession::unlock(&store, &profile, passphrase)
+                };
+                let _ = sender.send(QuickSecretsEvent { generation, result });
+                context.request_repaint();
+            });
+        if spawn.is_err() {
+            self.quick_secrets_busy = false;
+            self.quick_secrets_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Quick Secrets could not complete this action.",
+            ));
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn quick_secrets_window(&mut self, ctx: &egui::Context) {
+        if !self.quick_secrets_open {
+            return;
+        }
+        let mut open = self.quick_secrets_open;
+        egui::Window::new(crate::i18n::literal(&self.locale, "Quick Secrets"))
+            .id(egui::Id::new("native-quick-secrets"))
+            .open(&mut open)
+            .resizable(true)
+            .default_width(520.0)
+            .show(ctx, |ui| {
+                ui.label(crate::i18n::literal(
+                    &self.locale,
+                    "No recovery. If you forget this passphrase, delete the vault and create a new one.",
+                ));
+                ui.small(crate::i18n::literal(
+                    &self.locale,
+                    "Choose a ready terminal. The shell may echo pasted text into terminal output.",
+                ));
+                ui.horizontal(|ui| {
+                    ui.label(crate::i18n::literal(&self.locale, "Quick Secrets Auto-Lock"));
+                    egui::ComboBox::from_id_salt("quick-secrets-auto-lock")
+                        .selected_text(self.preferences.quick_secrets_auto_lock_minutes.to_string())
+                        .show_ui(ui, |ui| {
+                            for minutes in [0, 5, 15, 30, 60, 120] {
+                                ui.selectable_value(
+                                    &mut self.preferences.quick_secrets_auto_lock_minutes,
+                                    minutes,
+                                    minutes.to_string(),
+                                );
+                            }
+                        });
+                });
+                ui.small(crate::i18n::literal(
+                    &self.locale,
+                    "Set how many minutes the unlock code stays active after you open the vault. Use 0 to require manual locking only.",
+                ));
+                ui.separator();
+
+                if let Some(message) = &self.quick_secrets_message {
+                    ui.colored_label(self.colors().warning, message);
+                }
+                if self.quick_secrets_busy {
+                    ui.spinner();
+                    ui.label(crate::i18n::literal(&self.locale, "Working…"));
+                } else if self.quick_secrets_session.is_none() {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut *self.quick_secrets_passphrase_draft)
+                            .password(true)
+                            .hint_text(crate::i18n::literal(&self.locale, "Unlock code")),
+                    );
+                    let create = !self.quick_secrets_vault_exists;
+                    if create {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut *self.quick_secrets_confirm_draft)
+                                .password(true)
+                                .hint_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Confirm unlock code",
+                                )),
+                        );
+                    }
+                    if ui
+                        .add_enabled(
+                            !self.quick_secrets_busy,
+                            egui::Button::new(crate::i18n::literal(
+                                &self.locale,
+                                if create { "Create vault" } else { "Unlock vault" },
+                            )),
+                        )
+                        .clicked()
+                    {
+                        self.begin_quick_secrets_unlock(create, ctx);
+                    }
+                } else {
+                    let store = self.native_store.clone();
+                    let ready_targets: Vec<_> = self
+                        .tabs
+                        .iter()
+                        .filter(|tab| !tab.exited)
+                        .map(|tab| (tab.id, tab.title.clone()))
+                        .collect();
+                    if self.quick_secrets_selected_target.is_some_and(|selected| {
+                        !ready_targets.iter().any(|(id, _)| *id == selected)
+                    }) {
+                        self.quick_secrets_selected_target = None;
+                    }
+                    ui.horizontal(|ui| {
+                        ui.label(crate::i18n::literal(&self.locale, "Terminal"));
+                        let selected = self
+                            .quick_secrets_selected_target
+                            .and_then(|id| ready_targets.iter().find(|(candidate, _)| *candidate == id))
+                            .map(|(_, title)| title.as_str())
+                            .unwrap_or("No terminal selected");
+                        egui::ComboBox::from_id_salt("quick-secrets-target")
+                            .selected_text(crate::i18n::literal(&self.locale, selected))
+                            .show_ui(ui, |ui| {
+                                for (id, title) in &ready_targets {
+                                    ui.selectable_value(
+                                        &mut self.quick_secrets_selected_target,
+                                        Some(*id),
+                                        title,
+                                    );
+                                }
+                            });
+                    });
+                    let entries: Vec<_> = self
+                        .quick_secrets_session
+                        .as_ref()
+                        .map(|session| {
+                            session
+                                .entries()
+                                .iter()
+                                .map(|entry| (entry.id.clone(), entry.label.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    if entries.is_empty() {
+                        ui.label(crate::i18n::literal(&self.locale, "No secrets saved yet."));
+                    }
+                    let mut delivery = None;
+                    let mut remove_entry = None;
+                    for (id, label) in entries {
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(&label);
+                                if ui
+                                    .add_enabled(
+                                        self.quick_secrets_selected_target.is_some(),
+                                        egui::Button::new(crate::i18n::literal(
+                                            &self.locale,
+                                            "paste only",
+                                        )),
+                                    )
+                                    .clicked()
+                                {
+                                    delivery = Some((id.clone(), false));
+                                }
+                                if ui
+                                    .add_enabled(
+                                        self.quick_secrets_selected_target.is_some(),
+                                        egui::Button::new(crate::i18n::literal(
+                                            &self.locale,
+                                            "paste + enter",
+                                        )),
+                                    )
+                                    .clicked()
+                                {
+                                    delivery = Some((id.clone(), true));
+                                }
+                                let confirming = self.quick_secrets_pending_delete.as_deref()
+                                    == Some(id.as_str());
+                                let delete_label = if confirming {
+                                    crate::i18n::formatted_literal(
+                                        &self.locale,
+                                        "Delete secret {label}",
+                                        &[("label", &label)],
+                                    )
+                                } else {
+                                    crate::i18n::literal(&self.locale, "Delete")
+                                };
+                                if ui.small_button(delete_label).clicked() {
+                                    if confirming {
+                                        remove_entry = Some(id.clone());
+                                    } else {
+                                        self.quick_secrets_pending_delete = Some(id.clone());
+                                    }
+                                }
+                            });
+                        });
+                    }
+                    if let Some(id) = remove_entry {
+                        if let (Some(session), Some(store)) =
+                            (self.quick_secrets_session.as_mut(), store.as_ref())
+                        {
+                            self.quick_secrets_message = match session.remove(store, &id) {
+                                Ok(()) => None,
+                                Err(error) => Some(quick_secrets_error_text(&self.locale, error)),
+                            };
+                        }
+                        self.quick_secrets_pending_delete = None;
+                    }
+                    if let Some((id, press_enter)) = delivery {
+                        if !quick_secrets_available() {
+                            self.quick_secrets_message = Some(crate::i18n::literal(
+                                &self.locale,
+                                "Quick Secrets could not complete this action.",
+                            ));
+                        } else if let (Some(target), Some(session)) = (
+                            self.quick_secrets_selected_target,
+                            self.quick_secrets_session.as_mut(),
+                        ) {
+                            let prepared = session.prepare_send(&id);
+                            match prepared {
+                                Ok(input) => self.dispatch_ui_or_notice(
+                                    Some(Target::Id(target)),
+                                    Action::SendSensitive { input, press_enter },
+                                    ctx,
+                                ),
+                                Err(error) => {
+                                    self.quick_secrets_message =
+                                        Some(quick_secrets_error_text(&self.locale, error));
+                                }
+                            }
+                        }
+                    }
+
+                    ui.separator();
+                    if self.quick_secrets_add_open {
+                        if ui
+                            .button(crate::i18n::literal(
+                                &self.locale,
+                                "Hide add secret form",
+                            ))
+                            .clicked()
+                        {
+                            self.quick_secrets_add_open = false;
+                            self.quick_secrets_secret_draft.zeroize();
+                            self.quick_secrets_label_draft.clear();
+                        }
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.quick_secrets_label_draft)
+                                    .hint_text(crate::i18n::literal(&self.locale, "Label")),
+                            );
+                            ui.add(
+                                egui::TextEdit::singleline(&mut *self.quick_secrets_secret_draft)
+                                    .password(true)
+                                    .hint_text(crate::i18n::literal(&self.locale, "Secret text")),
+                            );
+                            if ui
+                                .add_enabled(
+                                    !self.quick_secrets_label_draft.trim().is_empty()
+                                        && !self.quick_secrets_secret_draft.is_empty(),
+                                    egui::Button::new(crate::i18n::literal(
+                                        &self.locale,
+                                        "Save",
+                                    )),
+                                )
+                                .clicked()
+                            {
+                                if let (Some(session), Some(store)) =
+                                    (self.quick_secrets_session.as_mut(), store.as_ref())
+                                {
+                                    self.quick_secrets_message = match session.add(
+                                        store,
+                                        &self.quick_secrets_label_draft,
+                                        &self.quick_secrets_secret_draft,
+                                    ) {
+                                        Ok(()) => {
+                                            self.quick_secrets_label_draft.clear();
+                                            self.quick_secrets_secret_draft.zeroize();
+                                            None
+                                        }
+                                        Err(error) => {
+                                            Some(quick_secrets_error_text(&self.locale, error))
+                                        }
+                                    };
+                                }
+                            }
+                        });
+                    } else if ui
+                        .button(crate::i18n::literal(&self.locale, "Add secret"))
+                        .clicked()
+                    {
+                        self.quick_secrets_label_draft.clear();
+                        self.quick_secrets_secret_draft.zeroize();
+                        self.quick_secrets_pending_delete = None;
+                        self.quick_secrets_confirm_forget = false;
+                        self.quick_secrets_add_open = true;
+                    }
+
+                    ui.separator();
+                    if ui
+                        .button(crate::i18n::literal(&self.locale, "Lock vault"))
+                        .clicked()
+                    {
+                        self.lock_quick_secrets();
+                    }
+                }
+                if self.quick_secrets_vault_exists && !self.quick_secrets_busy {
+                    ui.separator();
+                    if self.quick_secrets_confirm_forget {
+                        ui.label(crate::i18n::literal(
+                            &self.locale,
+                            "This permanently deletes every saved secret in the active profile.",
+                        ));
+                        ui.horizontal(|ui| {
+                            if ui
+                                .button(crate::i18n::literal(
+                                    &self.locale,
+                                    "Delete vault and secrets",
+                                ))
+                                .clicked()
+                            {
+                                let result = match (
+                                    self.quick_secrets_session.take(),
+                                    self.native_store.as_ref(),
+                                ) {
+                                    (Some(session), Some(store)) => session.forget(store),
+                                    (None, Some(store)) => store
+                                        .forget_quick_secrets()
+                                        .map_err(|_| crate::secret_vault::VaultError::Storage),
+                                    (_, None) => Err(crate::secret_vault::VaultError::Storage),
+                                };
+                                self.lock_quick_secrets();
+                                self.quick_secrets_vault_exists = result.is_err();
+                                self.quick_secrets_message = result
+                                    .err()
+                                    .map(|error| quick_secrets_error_text(&self.locale, error));
+                            }
+                            if ui
+                                .button(crate::i18n::literal(&self.locale, "Cancel"))
+                                .clicked()
+                            {
+                                self.quick_secrets_confirm_forget = false;
+                            }
+                        });
+                    } else if ui
+                        .button(crate::i18n::literal(&self.locale, "Forget vault"))
+                        .clicked()
+                    {
+                        self.quick_secrets_confirm_forget = true;
+                    }
+                }
+            });
+        if !open {
+            self.quick_secrets_open = false;
+            self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
+            self.quick_secrets_busy = false;
+            self.lock_quick_secrets();
         }
     }
 
@@ -7008,6 +7646,12 @@ impl ButtonsApp {
                             )
                         }
                         Ok(ImportCommit::Imported { store, preferences }) => {
+                            self.quick_secrets_generation =
+                                self.quick_secrets_generation.wrapping_add(1);
+                            self.quick_secrets_busy = false;
+                            self.quick_secrets_open = false;
+                            self.quick_secrets_vault_exists = false;
+                            self.lock_quick_secrets();
                             let mut preferences = *preferences;
                             preferences.normalize_theme_sources();
                             self.themes = ThemeCatalog::load();
@@ -8920,6 +9564,10 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_generation_events();
         #[cfg(not(target_arch = "wasm32"))]
+        self.process_quick_secrets_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.maintain_quick_secrets(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
@@ -8981,6 +9629,8 @@ impl eframe::App for ButtonsApp {
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.ai_help_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.quick_secrets_window(ctx);
         self.preset_editor_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_rename_window(ctx);
@@ -8993,6 +9643,8 @@ impl eframe::App for ButtonsApp {
     fn on_exit(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
         self.control_server.take();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.lock_quick_secrets();
         #[cfg(not(target_arch = "wasm32"))]
         if let Ok(state) = self.ai_help_state.lock() {
             if let Some(cancel) = &state.cancel {
