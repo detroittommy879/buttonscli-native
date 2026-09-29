@@ -273,6 +273,9 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             "scanlinesEnabled": theme.effects.scanlines_strength > 0.0,
             "scanlinesStrength": theme.effects.scanlines_strength,
             "scanlinesPeriod": theme.effects.scanlines_period,
+            "rowBandingEnabled": theme.effects.row_banding_enabled,
+            "rowBandingColor": to_hex(theme.effects.row_banding_color),
+            "rowBandingOpacity": theme.effects.row_banding_opacity * 100.0,
         },
     })
 }
@@ -503,6 +506,19 @@ mod tests {
             let document = document_from_theme(&theme, "Repeat");
             assert_eq!(document["theme"]["terminal"]["gradientType"], expected);
         }
+    }
+
+    #[test]
+    fn exported_personal_themes_keep_row_banding_configuration() {
+        let mut theme = crate::theme::ThemeCatalog::load().get("basic2").clone();
+        theme.effects.row_banding_enabled = true;
+        theme.effects.row_banding_color = egui::Color32::from_rgb(0x12, 0x34, 0x56);
+        theme.effects.row_banding_opacity = 0.12;
+
+        let document = document_from_theme(&theme, "Bands");
+        assert_eq!(document["effects"]["rowBandingEnabled"], true);
+        assert_eq!(document["effects"]["rowBandingColor"], "#123456");
+        assert_eq!(document["effects"]["rowBandingOpacity"], 12.0);
     }
 
     #[test]

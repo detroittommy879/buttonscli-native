@@ -999,6 +999,9 @@ impl ButtonsApp {
                 effects.scanlines_strength
             },
             scanlines_period: effects.scanlines_period,
+            row_banding_enabled: effects.row_banding_enabled,
+            row_banding_color: effects.row_banding_color,
+            row_banding_opacity: effects.row_banding_opacity,
         };
         theme
     }
@@ -5046,6 +5049,55 @@ impl ButtonsApp {
                         "/effects/scanlinesStrength",
                     );
                 }
+                if effects_master_switch_available() {
+                    theme_document_toggle(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Row banding",
+                        "/effects/rowBandingEnabled",
+                    );
+                    if document["effects"]["rowBandingEnabled"] == true {
+                        if document["effects"].get("rowBandingColor").is_none() {
+                            set_theme_document_value(
+                                &mut document,
+                                "/effects/rowBandingColor",
+                                json!("#00ff44"),
+                            );
+                        }
+                        if document["effects"].get("rowBandingOpacity").is_none() {
+                            set_theme_document_value(
+                                &mut document,
+                                "/effects/rowBandingOpacity",
+                                json!(6),
+                            );
+                        }
+                        theme_color_setting(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Row banding color",
+                            "/effects/rowBandingColor",
+                        );
+                        let mut opacity = document["effects"]["rowBandingOpacity"]
+                            .as_f64()
+                            .unwrap_or(6.0) as f32;
+                        if ui
+                            .add(
+                                egui::Slider::new(&mut opacity, 0.0..=35.0)
+                                    .suffix("%")
+                                    .text(crate::i18n::literal(&locale, "Row banding opacity")),
+                            )
+                            .changed()
+                        {
+                            set_theme_document_value(
+                                &mut document,
+                                "/effects/rowBandingOpacity",
+                                json!(opacity),
+                            );
+                        }
+                    }
+                }
                 ui.label(
                     RichText::new(crate::i18n::literal(
                         &locale,
@@ -6995,6 +7047,11 @@ fn terminal_surface(
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
+        .set_row_banding(if effects_master_switch_available() {
+            crate::plugins::effects::row_banding::overlay_color(&theme.effects)
+        } else {
+            None
+        })
         .set_draw_bold_bright(draw_bold_bright)
         .set_size(egui::vec2(
             (available.x - scrollbar_width).max(1.0),
@@ -8009,21 +8066,25 @@ mod tests {
             gradient_animation: true,
             static_opacity: 0.12,
             scanlines_strength: 0.08,
+            row_banding_enabled: true,
             ..TerminalEffects::default()
         };
         assert_eq!(
             pane_effects_for_focus(&effects, true, true).gradient,
             effects.gradient
         );
+        assert!(pane_effects_for_focus(&effects, true, true).row_banding_enabled);
         let unfocused = pane_effects_for_focus(&effects, false, true);
         assert!(unfocused.gradient.is_none());
         assert!(!unfocused.gradient_animation);
         assert_eq!(unfocused.static_opacity, 0.0);
         assert_eq!(unfocused.scanlines_strength, 0.0);
+        assert!(!unfocused.row_banding_enabled);
         assert_eq!(
             pane_effects_for_focus(&effects, false, false).gradient,
             effects.gradient
         );
+        assert!(pane_effects_for_focus(&effects, false, false).row_banding_enabled);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

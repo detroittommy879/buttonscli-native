@@ -46,6 +46,7 @@ pub struct TerminalView<'a> {
     font: TerminalFont,
     theme: TerminalTheme,
     background_gradient: Option<BackgroundGradient>,
+    row_banding_color: Option<Color32>,
     draw_bold_bright: bool,
     bindings_layout: BindingsLayout,
 }
@@ -117,6 +118,7 @@ impl<'a> TerminalView<'a> {
             font: TerminalFont::default(),
             theme: TerminalTheme::default(),
             background_gradient: None,
+            row_banding_color: None,
             draw_bold_bright: false,
             bindings_layout: BindingsLayout::new(),
         }
@@ -136,6 +138,14 @@ impl<'a> TerminalView<'a> {
         gradient: Option<BackgroundGradient>,
     ) -> Self {
         self.background_gradient = gradient;
+        self
+    }
+
+    /// Add a translucent tint to every second terminal row. The band pitch
+    /// comes from the measured terminal cell height, not a font-size guess.
+    #[inline]
+    pub fn set_row_banding(mut self, color: Option<Color32>) -> Self {
+        self.row_banding_color = color;
         self
     }
 
@@ -420,8 +430,41 @@ impl<'a> TerminalView<'a> {
             }
         }
 
+        if let Some(color) = self.row_banding_color {
+            shapes.extend(row_banding_shapes(layout.rect, cell_height, color));
+        }
+
         painter.extend(shapes);
     }
+}
+
+fn row_banding_shapes(
+    rect: Rect,
+    cell_height: f32,
+    color: Color32,
+) -> Vec<Shape> {
+    if !cell_height.is_finite() || cell_height <= 0.0 || color.a() == 0 {
+        return Vec::new();
+    }
+
+    let rows = (rect.height() / cell_height).ceil().max(0.0) as usize;
+    (1..rows)
+        .step_by(2)
+        .filter_map(|row| {
+            let top = rect.top() + row as f32 * cell_height;
+            let bottom = (top + cell_height).min(rect.bottom());
+            (bottom > top).then(|| {
+                Shape::Rect(RectShape::filled(
+                    Rect::from_min_max(
+                        Pos2::new(rect.left(), top),
+                        Pos2::new(rect.right(), bottom),
+                    ),
+                    CornerRadius::ZERO,
+                    color,
+                ))
+            })
+        })
+        .collect()
 }
 
 fn background_gradient_mesh(rect: Rect, gradient: BackgroundGradient) -> Mesh {
@@ -1076,5 +1119,39 @@ mod background_gradient_tests {
         let conic = conic_gradient_mesh(rect, colors(), [0.5, 0.5], 45.0, true);
         assert_eq!(conic.vertices.len(), 64 * 3);
         assert_eq!(conic.indices.len(), 64 * 3);
+    }
+
+    #[test]
+    fn row_bands_follow_cell_pitch_and_clip_the_last_partial_row() {
+        let rect =
+            Rect::from_min_max(Pos2::new(2.0, 3.0), Pos2::new(22.0, 38.0));
+        let color = Color32::from_rgba_unmultiplied(1, 2, 3, 24);
+        let shapes = row_banding_shapes(rect, 10.0, color);
+        assert_eq!(shapes.len(), 2);
+
+        let Shape::Rect(first) = &shapes[0] else {
+            panic!("expected a filled row band");
+        };
+        assert_eq!(
+            first.rect,
+            Rect::from_min_max(Pos2::new(2.0, 13.0), Pos2::new(22.0, 23.0))
+        );
+        assert_eq!(first.fill, color);
+
+        let Shape::Rect(last) = &shapes[1] else {
+            panic!("expected a filled row band");
+        };
+        assert_eq!(
+            last.rect,
+            Rect::from_min_max(Pos2::new(2.0, 33.0), Pos2::new(22.0, 38.0))
+        );
+    }
+
+    #[test]
+    fn row_banding_skips_zero_alpha_and_invalid_cell_heights() {
+        let rect = Rect::from_min_max(Pos2::ZERO, Pos2::new(10.0, 30.0));
+        assert!(row_banding_shapes(rect, 10.0, Color32::TRANSPARENT).is_empty());
+        assert!(row_banding_shapes(rect, 0.0, Color32::WHITE).is_empty());
+        assert!(row_banding_shapes(rect, f32::NAN, Color32::WHITE).is_empty());
     }
 }

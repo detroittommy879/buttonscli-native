@@ -58,9 +58,11 @@ not a backlog disguised as release notes.
   repeating multi-stop terminal gradients preserve their type and geometry;
   animated drift, static, and scanlines also render natively. The master-off
   setting stops animation, and effects can be limited to the focused pane.
+  Row banding now tints every other terminal row using the measured cell pitch.
   HSync warp, TV/simple noise variants, glow, wallpaper drawing, and the theme
-  designer are not rendered yet. Their original fields remain in the embedded
-  JSON migration assets.
+  designer are not rendered yet. HSync needs an offscreen renderer path; see
+  [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). Other original
+  fields remain in the embedded JSON migration assets.
 - The 20 bundled font families work offline. Native Settings also discovers
   local system fonts and imports profile-local `.ttf` / `.otf` files. Online
   Google Font downloads are deferred; online-only names in imported themes

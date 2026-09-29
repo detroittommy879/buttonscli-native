@@ -272,7 +272,7 @@ pub struct TerminalColors {
     pub bright_white: String,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct TerminalEffects {
     pub gradient: Option<[Color32; 4]>,
     pub gradient_geometry: GradientGeometry,
@@ -282,6 +282,27 @@ pub struct TerminalEffects {
     pub static_density: f32,
     pub scanlines_strength: f32,
     pub scanlines_period: f32,
+    pub row_banding_enabled: bool,
+    pub row_banding_color: Color32,
+    pub row_banding_opacity: f32,
+}
+
+impl Default for TerminalEffects {
+    fn default() -> Self {
+        Self {
+            gradient: None,
+            gradient_geometry: GradientGeometry::default(),
+            gradient_animation: false,
+            master_disabled: false,
+            static_opacity: 0.0,
+            static_density: 0.2,
+            scanlines_strength: 0.0,
+            scanlines_period: 4.0,
+            row_banding_enabled: false,
+            row_banding_color: Color32::from_rgb(0, 255, 68),
+            row_banding_opacity: 0.06,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -618,6 +639,16 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
             0.0
         },
         scanlines_period: number("scanlinesPeriod", 4.0).clamp(2.0, 16.0),
+        // Preserve the user's choice and parameters when the master switch is
+        // off. The renderer applies the master gate at the point of use.
+        row_banding_enabled: effects
+            .get("rowBandingEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        row_banding_color: string_at(effects, "rowBandingColor")
+            .and_then(parse_color)
+            .unwrap_or(Color32::from_rgb(0, 255, 68)),
+        row_banding_opacity: unit("rowBandingOpacity", 0.06).clamp(0.0, 0.35),
     }
 }
 
@@ -951,6 +982,28 @@ mod tests {
             assert_eq!(theme.effects.static_opacity, 0.0, "{kind}");
             assert_eq!(theme.effects.scanlines_strength, 0.0, "{kind}");
         }
+    }
+
+    #[test]
+    fn row_banding_values_round_trip_and_master_disable_only_suppresses_rendering() {
+        let document = serde_json::json!({
+            "metadata": {"id": "bands", "name": "Bands"},
+            "theme": {"terminal": {}},
+            "effects": {
+                "masterDisabled": true,
+                "rowBandingEnabled": true,
+                "rowBandingColor": "#123456",
+                "rowBandingOpacity": 6
+            }
+        });
+        let theme = parse_legacy_value("bands", &document, ThemeSource::Personal).unwrap();
+        assert!(theme.effects.row_banding_enabled);
+        assert_eq!(
+            theme.effects.row_banding_color,
+            Color32::from_rgb(0x12, 0x34, 0x56)
+        );
+        assert!((theme.effects.row_banding_opacity - 0.06).abs() < f32::EPSILON);
+        assert!(crate::plugins::effects::row_banding::overlay_color(&theme.effects).is_none());
     }
 
     #[test]

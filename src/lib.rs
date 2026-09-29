@@ -11,6 +11,8 @@ pub mod i18n;
 #[cfg(not(target_arch = "wasm32"))]
 mod layout;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod plugins;
+#[cfg(not(target_arch = "wasm32"))]
 mod scrollbar;
 #[cfg(not(target_arch = "wasm32"))]
 mod session;

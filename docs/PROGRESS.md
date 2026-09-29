@@ -1,5 +1,22 @@
 # Reconstruction journal
 
+## 2026-09-29 — V02 HSync decision and row banding
+
+Recorded a native-renderer no-go for pixel-faithful HSync: the original
+composites xterm canvas layers and shifts every physical scanline, while the
+native renderer paints cells and glyphs directly with egui shapes. A correct
+port needs a separate bounded offscreen/GPU rendering spike. Implemented the
+independent row-banding effect using the renderer's actual terminal cell height,
+with color and opacity settings in personal themes, master-off and focused-pane
+gates, and preserved JSON export. It uses an every-other-row tint, matching the
+original visual cadence. Access tier: free (`effectsMasterSwitch`).
+
+Automated coverage checks legacy parameter projection, master-off behavior,
+focused-pane suppression, alpha/color resolution, theme export, exact cell-pitch
+geometry, and clipping of a partial final row. Windows GUI screenshots and
+frame-cost checks at 1/4/10 panes remain open. TV noise, simple/idle noise, glow,
+and wallpaper are still unimplemented.
+
 ## 2026-09-29 — V01 repeating gradients and focused effects
 
 Ported repeating linear, radial, and conic gradient modes through theme

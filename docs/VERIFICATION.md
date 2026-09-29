@@ -2,6 +2,15 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-29 V02 Windows source checks
+
+Row-banding configuration/master gates, focused-pane policy, RGBA conversion,
+personal-theme export, and cell-height-aligned overlay geometry have focused
+tests. The HSync decision is based on the original CPU/GPU implementation and
+the native renderer's direct epaint path; it does not claim runtime or GPU
+acceptance. Windows tests/builds and live screenshots at 1/4/10 panes plus
+frame-cost review remain to be run for this task.
+
 ## 2026-09-29 V01 Windows checks
 
 Repeating gradient sampling/mesh, legacy geometry projection, master-off
