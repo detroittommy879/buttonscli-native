@@ -4,14 +4,15 @@
 //! been supplied and backed up outside Git. Tests inject deterministic throwaway
 //! keys; no release endpoint or installer calls these functions yet.
 
-use ed25519_dalek::{Signature, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Read};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
-use zip::ZipArchive;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipArchive};
 
 const PRODUCT_ID: &str = "com.buttonscli.native";
 const MANIFEST_SCHEMA_VERSION: u32 = 1;
@@ -50,6 +51,25 @@ pub(crate) struct ReleaseManifest {
 pub(crate) struct ReleaseTarget<'a> {
     pub(crate) os: &'a str,
     pub(crate) arch: &'a str,
+}
+
+pub(crate) struct ReleaseBuildRequest<'a> {
+    pub(crate) source_directory: &'a Path,
+    pub(crate) output_directory: &'a Path,
+    pub(crate) signing_key_file: &'a Path,
+    pub(crate) version: &'a str,
+    pub(crate) target: ReleaseTarget<'a>,
+    pub(crate) minimum_updater_version: &'a str,
+    pub(crate) channel: &'a str,
+    pub(crate) key_id: &'a str,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ReleaseBuildResult {
+    pub(crate) artifact_path: PathBuf,
+    pub(crate) manifest_path: PathBuf,
+    pub(crate) signature_path: PathBuf,
+    pub(crate) public_key: [u8; 32],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,6 +112,29 @@ impl std::fmt::Display for VerifyError {
 }
 
 impl std::error::Error for VerifyError {}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ReleaseBuildError {
+    InvalidMetadata,
+    UnsafeSource,
+    SigningKey,
+    SigningKeyInsideSource,
+    TooManyFiles,
+    FileTooLarge,
+    PackageTooLarge,
+    MissingPackageExecutable,
+    InvalidArchive,
+    OutputAlreadyExists,
+    Io,
+}
+
+impl std::fmt::Display for ReleaseBuildError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "native package build failed: {self:?}")
+    }
+}
+
+impl std::error::Error for ReleaseBuildError {}
 
 // Do not invent or check in a release identity. This empty production allowlist
 // rejects every signature until a user-supplied public key is reviewed.
@@ -525,6 +568,323 @@ fn validate_target_package(artifact: &[u8], target_os: &str) -> Result<(), Verif
         }
     }
     Err(VerifyError::MissingPackageExecutable)
+}
+
+struct ReleaseFile {
+    source: PathBuf,
+    archive_name: String,
+    size: u64,
+    mode: u32,
+}
+
+/// Build a signed package from a prepared release directory. The caller must
+/// provide the key file; this function never creates or persists signing keys.
+pub(crate) fn build_signed_release_package(
+    request: ReleaseBuildRequest<'_>,
+) -> Result<ReleaseBuildResult, ReleaseBuildError> {
+    validate_release_build_metadata(&request)?;
+    let source_metadata = fs::symlink_metadata(request.source_directory)
+        .map_err(|_| ReleaseBuildError::UnsafeSource)?;
+    if is_link_or_reparse(&source_metadata) || !source_metadata.is_dir() {
+        return Err(ReleaseBuildError::UnsafeSource);
+    }
+    let source_root =
+        fs::canonicalize(request.source_directory).map_err(|_| ReleaseBuildError::UnsafeSource)?;
+    let output_directory = resolve_new_output_directory(request.output_directory)?;
+    if output_directory.starts_with(&source_root) {
+        return Err(ReleaseBuildError::UnsafeSource);
+    }
+
+    let key_metadata = fs::symlink_metadata(request.signing_key_file)
+        .map_err(|_| ReleaseBuildError::SigningKey)?;
+    if is_link_or_reparse(&key_metadata) || !key_metadata.is_file() || key_metadata.len() != 32 {
+        return Err(ReleaseBuildError::SigningKey);
+    }
+    let key_path =
+        fs::canonicalize(request.signing_key_file).map_err(|_| ReleaseBuildError::SigningKey)?;
+    if key_path.starts_with(&source_root) {
+        return Err(ReleaseBuildError::SigningKeyInsideSource);
+    }
+
+    let files = collect_release_files(&source_root)?;
+    if files.is_empty() {
+        return Err(ReleaseBuildError::UnsafeSource);
+    }
+    if request.target.os == "windows"
+        && !files.iter().any(|file| {
+            file.archive_name.eq_ignore_ascii_case("buttonscli.exe")
+                && !file.archive_name.contains('/')
+        })
+    {
+        return Err(ReleaseBuildError::MissingPackageExecutable);
+    }
+
+    let mut seed = zeroize::Zeroizing::new([0_u8; 32]);
+    File::open(&key_path)
+        .and_then(|mut file| file.read_exact(&mut seed[..]))
+        .map_err(|_| ReleaseBuildError::SigningKey)?;
+    let signing_key = SigningKey::from_bytes(&seed);
+    let public_key = signing_key.verifying_key().to_bytes();
+    let artifact = create_release_archive(&files)?;
+    validate_package_archive(&artifact).map_err(|_| ReleaseBuildError::InvalidArchive)?;
+    validate_target_package(&artifact, request.target.os)
+        .map_err(|_| ReleaseBuildError::MissingPackageExecutable)?;
+
+    let manifest = ReleaseManifest {
+        schema_version: MANIFEST_SCHEMA_VERSION,
+        product_id: PRODUCT_ID.into(),
+        version: request.version.into(),
+        target_os: request.target.os.into(),
+        target_arch: request.target.arch.into(),
+        artifact_basename: format!(
+            "buttonscli-native-{}-{}-{}.zip",
+            request.target.os, request.target.arch, request.version
+        ),
+        artifact_size: artifact.len() as u64,
+        sha256: format!("{:x}", Sha256::digest(&artifact)),
+        minimum_updater_version: request.minimum_updater_version.into(),
+        channel: request.channel.into(),
+        key_id: request.key_id.into(),
+    };
+    let manifest_bytes =
+        serde_json::to_vec(&manifest).map_err(|_| ReleaseBuildError::InvalidMetadata)?;
+    if manifest_bytes.len() > MAX_MANIFEST_BYTES {
+        return Err(ReleaseBuildError::InvalidMetadata);
+    }
+    let signature_bytes = signing_key.sign(&manifest_bytes).to_bytes();
+
+    let staging_directory = create_release_staging_directory(&output_directory)?;
+    let result = (|| {
+        let artifact_path = staging_directory.join(&manifest.artifact_basename);
+        let manifest_path = staging_directory.join("release.json");
+        let signature_path = staging_directory.join("release.sig");
+        write_new_file(&artifact_path, &artifact)?;
+        write_new_file(&manifest_path, &manifest_bytes)?;
+        write_new_file(&signature_path, &signature_bytes)?;
+        fs::rename(&staging_directory, &output_directory).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                ReleaseBuildError::OutputAlreadyExists
+            } else {
+                ReleaseBuildError::Io
+            }
+        })?;
+        Ok(ReleaseBuildResult {
+            artifact_path: output_directory.join(&manifest.artifact_basename),
+            manifest_path: output_directory.join("release.json"),
+            signature_path: output_directory.join("release.sig"),
+            public_key,
+        })
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&staging_directory);
+    }
+    result
+}
+
+fn validate_release_build_metadata(
+    request: &ReleaseBuildRequest<'_>,
+) -> Result<(), ReleaseBuildError> {
+    if request.version.len() > MAX_RELEASE_VERSION_BYTES
+        || request.minimum_updater_version.len() > MAX_RELEASE_VERSION_BYTES
+    {
+        return Err(ReleaseBuildError::InvalidMetadata);
+    }
+    let version =
+        semver::Version::parse(request.version).map_err(|_| ReleaseBuildError::InvalidMetadata)?;
+    semver::Version::parse(request.minimum_updater_version)
+        .map_err(|_| ReleaseBuildError::InvalidMetadata)?;
+    let valid_target = [&request.target.os, &request.target.arch]
+        .iter()
+        .all(|value| {
+            !value.is_empty()
+                && value.len() <= 32
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        });
+    if !valid_target
+        || request.key_id.is_empty()
+        || request.key_id.len() > 64
+        || !request
+            .key_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        || !matches!(request.channel, "stable" | "beta")
+        || (request.channel == "stable" && !version.pre.is_empty())
+    {
+        return Err(ReleaseBuildError::InvalidMetadata);
+    }
+    Ok(())
+}
+
+fn collect_release_files(root: &Path) -> Result<Vec<ReleaseFile>, ReleaseBuildError> {
+    let mut directories = vec![root.to_owned()];
+    let mut files = Vec::new();
+    let mut total_size = 0_u64;
+    while let Some(directory) = directories.pop() {
+        for entry in fs::read_dir(directory).map_err(|_| ReleaseBuildError::UnsafeSource)? {
+            let entry = entry.map_err(|_| ReleaseBuildError::UnsafeSource)?;
+            let path = entry.path();
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|_| ReleaseBuildError::UnsafeSource)?;
+            if is_link_or_reparse(&metadata) {
+                return Err(ReleaseBuildError::UnsafeSource);
+            }
+            if metadata.is_dir() {
+                directories.push(path);
+                continue;
+            }
+            if !metadata.is_file() {
+                return Err(ReleaseBuildError::UnsafeSource);
+            }
+
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|_| ReleaseBuildError::UnsafeSource)?;
+            let archive_name = relative
+                .components()
+                .map(|component| component.as_os_str().to_str())
+                .collect::<Option<Vec<_>>>()
+                .ok_or(ReleaseBuildError::UnsafeSource)?
+                .join("/");
+            validate_archive_entry(&archive_name).map_err(|_| ReleaseBuildError::UnsafeSource)?;
+            if metadata.len() > MAX_ARCHIVE_FILE_BYTES {
+                return Err(ReleaseBuildError::FileTooLarge);
+            }
+            total_size = total_size
+                .checked_add(metadata.len())
+                .ok_or(ReleaseBuildError::PackageTooLarge)?;
+            if total_size > MAX_ARTIFACT_BYTES {
+                return Err(ReleaseBuildError::PackageTooLarge);
+            }
+            if files.len() == MAX_ARCHIVE_ENTRIES {
+                return Err(ReleaseBuildError::TooManyFiles);
+            }
+            let mode = release_file_mode(&metadata, relative);
+            files.push(ReleaseFile {
+                source: path,
+                archive_name,
+                size: metadata.len(),
+                mode,
+            });
+        }
+    }
+    files.sort_by(|left, right| left.archive_name.cmp(&right.archive_name));
+    Ok(files)
+}
+
+fn release_file_mode(metadata: &fs::Metadata, relative: &Path) -> u32 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = relative;
+        metadata.permissions().mode() & 0o755
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = metadata;
+        if relative
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("buttonscli.exe"))
+        {
+            0o755
+        } else {
+            0o644
+        }
+    }
+}
+
+fn create_release_archive(files: &[ReleaseFile]) -> Result<Vec<u8>, ReleaseBuildError> {
+    let cursor = Cursor::new(Vec::new());
+    let mut archive = zip::ZipWriter::new(cursor);
+    for entry in files {
+        let options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .unix_permissions(entry.mode);
+        archive
+            .start_file(&entry.archive_name, options)
+            .map_err(|_| ReleaseBuildError::InvalidArchive)?;
+        let metadata =
+            fs::symlink_metadata(&entry.source).map_err(|_| ReleaseBuildError::UnsafeSource)?;
+        if is_link_or_reparse(&metadata) || !metadata.is_file() || metadata.len() != entry.size {
+            return Err(ReleaseBuildError::UnsafeSource);
+        }
+        let source = File::open(&entry.source).map_err(|_| ReleaseBuildError::UnsafeSource)?;
+        let copied = std::io::copy(&mut source.take(entry.size.saturating_add(1)), &mut archive)
+            .map_err(|_| ReleaseBuildError::UnsafeSource)?;
+        if copied != entry.size {
+            return Err(ReleaseBuildError::UnsafeSource);
+        }
+    }
+    let artifact = archive
+        .finish()
+        .map_err(|_| ReleaseBuildError::InvalidArchive)?
+        .into_inner();
+    if artifact.len() as u64 > MAX_ARTIFACT_BYTES {
+        return Err(ReleaseBuildError::PackageTooLarge);
+    }
+    Ok(artifact)
+}
+
+fn is_link_or_reparse(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    use std::os::windows::fs::MetadataExt;
+    #[cfg(windows)]
+    let is_reparse_point = metadata.file_attributes() & 0x400 != 0;
+    #[cfg(not(windows))]
+    let is_reparse_point = false;
+    metadata.file_type().is_symlink() || is_reparse_point
+}
+
+fn resolve_new_output_directory(path: &Path) -> Result<PathBuf, ReleaseBuildError> {
+    let leaf = path.file_name().ok_or(ReleaseBuildError::InvalidMetadata)?;
+    if leaf == "." || leaf == ".." {
+        return Err(ReleaseBuildError::InvalidMetadata);
+    }
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let metadata = fs::symlink_metadata(parent).map_err(|_| ReleaseBuildError::Io)?;
+    if is_link_or_reparse(&metadata) || !metadata.is_dir() {
+        return Err(ReleaseBuildError::Io);
+    }
+    let parent = fs::canonicalize(parent).map_err(|_| ReleaseBuildError::Io)?;
+    let output = parent.join(leaf);
+    match fs::symlink_metadata(&output) {
+        Ok(_) => return Err(ReleaseBuildError::OutputAlreadyExists),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(ReleaseBuildError::Io),
+    }
+    Ok(output)
+}
+
+fn create_release_staging_directory(output_directory: &Path) -> Result<PathBuf, ReleaseBuildError> {
+    let parent = output_directory
+        .parent()
+        .ok_or(ReleaseBuildError::InvalidMetadata)?;
+    for _ in 0..8 {
+        let staging = parent.join(format!(".native-release-{:016x}", fastrand::u64(..)));
+        match fs::create_dir(&staging) {
+            Ok(()) => return Ok(staging),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(_) => return Err(ReleaseBuildError::Io),
+        }
+    }
+    Err(ReleaseBuildError::Io)
+}
+
+fn write_new_file(path: &Path, contents: &[u8]) -> Result<(), ReleaseBuildError> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|_| ReleaseBuildError::Io)?;
+    file.write_all(contents)
+        .map_err(|_| ReleaseBuildError::Io)?;
+    file.sync_all().map_err(|_| ReleaseBuildError::Io)?;
+    Ok(())
 }
 
 fn is_windows_reserved_name(component: &str) -> bool {
@@ -1089,6 +1449,112 @@ mod tests {
         );
         assert!(!root.join("versions").exists());
 
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn release_builder_creates_verifiable_package_without_overwriting() {
+        let root = temporary_stage_root();
+        let source = root.join("input");
+        fs::create_dir(&source).unwrap();
+        fs::create_dir(source.join("assets")).unwrap();
+        fs::write(source.join("buttonscli.exe"), b"test executable").unwrap();
+        fs::write(source.join("assets/help.md"), b"help").unwrap();
+        let key_path = root.join("throwaway-signing-key.bin");
+        fs::write(&key_path, [0x5a; 32]).unwrap();
+        let output = root.join("release");
+
+        let built = build_signed_release_package(ReleaseBuildRequest {
+            source_directory: &source,
+            output_directory: &output,
+            signing_key_file: &key_path,
+            version: "1.2.3",
+            target: TARGET,
+            minimum_updater_version: "1.0.0",
+            channel: "stable",
+            key_id: TEST_KEY_ID,
+        })
+        .unwrap();
+
+        assert_eq!(built.public_key, signing_key().verifying_key().to_bytes());
+        let artifact = fs::read(&built.artifact_path).unwrap();
+        let manifest = fs::read(&built.manifest_path).unwrap();
+        let signature = fs::read(&built.signature_path).unwrap();
+        let trusted_key = TrustedSigningKey {
+            key_id: TEST_KEY_ID,
+            public_key: built.public_key,
+        };
+        assert_eq!(
+            verify_signed_package(
+                &manifest,
+                &signature,
+                &[trusted_key],
+                TARGET,
+                "1.2.2",
+                "1.0.0",
+                &artifact,
+            )
+            .unwrap()
+            .version,
+            "1.2.3"
+        );
+        assert_eq!(
+            build_signed_release_package(ReleaseBuildRequest {
+                source_directory: &source,
+                output_directory: &output,
+                signing_key_file: &key_path,
+                version: "1.2.3",
+                target: TARGET,
+                minimum_updater_version: "1.0.0",
+                channel: "stable",
+                key_id: TEST_KEY_ID,
+            }),
+            Err(ReleaseBuildError::OutputAlreadyExists)
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn release_builder_rejects_missing_windows_executable_and_embedded_key() {
+        let root = temporary_stage_root();
+        let source = root.join("input");
+        fs::create_dir(&source).unwrap();
+        fs::write(source.join("readme.txt"), b"not an app").unwrap();
+        let key_path = root.join("throwaway-signing-key.bin");
+        fs::write(&key_path, [0x5a; 32]).unwrap();
+        let output = root.join("release");
+
+        assert_eq!(
+            build_signed_release_package(ReleaseBuildRequest {
+                source_directory: &source,
+                output_directory: &output,
+                signing_key_file: &key_path,
+                version: "1.2.3",
+                target: TARGET,
+                minimum_updater_version: "1.0.0",
+                channel: "stable",
+                key_id: TEST_KEY_ID,
+            }),
+            Err(ReleaseBuildError::MissingPackageExecutable)
+        );
+        assert!(!output.exists());
+
+        let embedded_key = source.join("signing-key.bin");
+        fs::write(&embedded_key, [0x5a; 32]).unwrap();
+        assert_eq!(
+            build_signed_release_package(ReleaseBuildRequest {
+                source_directory: &source,
+                output_directory: &output,
+                signing_key_file: &embedded_key,
+                version: "1.2.3",
+                target: TARGET,
+                minimum_updater_version: "1.0.0",
+                channel: "stable",
+                key_id: TEST_KEY_ID,
+            }),
+            Err(ReleaseBuildError::SigningKeyInsideSource)
+        );
+        assert!(!output.exists());
         fs::remove_dir_all(root).unwrap();
     }
 }

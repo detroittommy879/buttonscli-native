@@ -16,9 +16,15 @@ name = "buttonscli"
 path = "src/main.rs"
 required-features = ["desktop"]
 
+[[bin]]
+name = "native-release"
+path = "src/bin/native-release.rs"
+required-features = ["release-tools"]
+
 [features]
 default = ["desktop"]
 desktop = []
+release-tools = []
 
 [dependencies]
 eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "persistence"] }

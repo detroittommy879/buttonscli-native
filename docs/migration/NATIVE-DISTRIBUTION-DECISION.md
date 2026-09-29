@@ -1,10 +1,10 @@
 # Native distribution and update decision
 
-Status: the strict verifier, bounded ZIP preflight, versioned staging core, and
-isolated tests are implemented on Windows. No package builder, active-version
-switch, rollback launcher, production key, or release endpoint exists. This is
-still a source and architecture decision for P06, not a claim that ButtonsCLI
-Native is distributable today.
+Status: the strict verifier, bounded ZIP preflight, versioned staging core,
+Windows local package builder, and isolated tests are implemented. No
+active-version switch, rollback launcher, production key, update UI, or release
+endpoint exists. This is not a claim that ButtonsCLI Native is distributable
+today.
 
 ## Product identity and release boundary
 
@@ -60,13 +60,31 @@ Tauri artifact pipeline.
 
 ## Local release workflow and gates
 
-The first workflow is manual and local: run the test/build gates, package into
-an external native release staging directory, sign with an external key path,
-verify the produced signature and artifact hash, and preserve previous
-artifacts for rollback. Do not add automatic GitHub desktop builds or publish
-to an existing ButtonsCLI/Tauri endpoint. Native update checks remain absent
-until the user supplies a production public-key trust root and a separate
-native release location.
+The first workflow is manual and local: run the test/build gates, prepare a
+directory containing the Windows `buttonscli.exe` and its runtime files, then
+run the opt-in builder. Its key file is exactly 32 raw Ed25519 seed bytes and
+must be supplied and stored outside the source directory and Git. The tool
+does not generate a key or overwrite an output directory; it emits the ZIP,
+`release.json`, `release.sig`, and the derived public key for review. Verify the
+signature and artifact hash, back up the key, and preserve previous artifacts
+for rollback. Do not add automatic GitHub desktop builds or publish to an
+existing ButtonsCLI/Tauri endpoint. Native update checks remain absent until a
+production public-key trust root and separate native release location are
+reviewed.
+
+Example Windows command (use paths for a prepared package and an externally
+managed key):
+
+```powershell
+cargo run --no-default-features --features release-tools --bin native-release -- package `
+  --source C:\release\prepared `
+  --output C:\release\1.2.3 `
+  --key-file C:\keys\buttonscli-native-ed25519.seed `
+  --version 1.2.3 --target-os windows --target-arch x86_64 `
+  --minimum-updater-version 1.0.0 --channel stable --key-id native-2026
+```
+
+The example uses placeholders; it does not create or select a real key.
 
 Required tests before any adapter can be called complete: valid signed package
 accepted; one-bit manifest/signature/artifact tampering rejected; wrong
@@ -87,7 +105,9 @@ become directory names, and staging roots reject symlinks and Windows reparse
 points. A verified archive can be extracted to a new versioned directory
 without changing active-version state; duplicate versions are not overwritten.
 Its compiled allowlist is intentionally empty;
-throwaway keys exist only in tests. P06 remains open: there is no package
-builder, active-version switch, rollback launcher, update UI, production trust
-key, or native release endpoint. This avoids generating an unbacked release
-key or routing native artifacts through the existing Tauri release system.
+throwaway keys exist only in tests. The local builder packages a prepared
+directory, validates it, and signs into a new output directory without
+replacing existing artifacts. P06 remains open: there is no active-version
+switch, rollback launcher, update UI, production trust key, or native release
+endpoint. The builder does not generate an unbacked release key or route native
+artifacts through the existing Tauri release system.

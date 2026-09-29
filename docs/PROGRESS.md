@@ -29,6 +29,20 @@ untouched. Fourteen focused tests pass. The production trust list remains empty;
 package creation, active-version switching, startup rollback and the launcher
 are still open. `cargo audit` is not installed in this checkout.
 
+## 2026-09-29 — P06 Windows local package builder
+
+Added an opt-in `native-release` command that packages a prepared directory,
+validates the resulting Windows ZIP, and writes the artifact, canonical
+manifest, and detached signature into a new output directory. It requires an
+external 32-byte seed file, rejects that key inside the package tree, refuses
+links/reparse points and unsafe paths, and prints the derived public key for
+manual trust-root review. Two throwaway-key tests verify the generated package,
+missing-executable rejection, key-location guard, and output collision. No
+production key was created or installed. P06 remains incomplete pending the
+production trust root, activation/rollback launcher, update UI, and release
+endpoint. The release tool is internal developer tooling and adds no customer
+entitlement tier.
+
 ## 2026-09-29 — MCP control contract coverage
 
 Expanded `scripts/test-mcp-smoke.mjs` from initialize/list/status into a
