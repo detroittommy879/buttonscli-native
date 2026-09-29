@@ -39,6 +39,7 @@ try {
     $startInfo.Environment['APPDATA'] = $roaming
     $startInfo.Environment['LOCALAPPDATA'] = $local
     $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG'] = '1'
+    $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_ACCOUNT'] = '1'
 
     if (-not ('ButtonsCliSmokeWindow' -as [type])) {
         Add-Type -TypeDefinition @'

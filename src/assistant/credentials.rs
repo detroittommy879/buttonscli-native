@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 const SERVICE: &str = "ButtonsCLI Native AI Help";
+const ACCOUNT_SERVICE: &str = "ButtonsCLI Native Account";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CredentialError {
@@ -19,7 +20,7 @@ impl std::fmt::Display for CredentialError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
             Self::InvalidReference => "credential reference is invalid",
-            Self::Missing => "no API key is saved for this provider",
+            Self::Missing => "saved credential was not found",
             Self::Unavailable => "the operating-system credential store is unavailable",
         };
         f.write_str(message)
@@ -52,10 +53,15 @@ pub(crate) struct SystemCredentialStore;
 impl SystemCredentialStore {
     #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     fn entry(reference: &str) -> Result<keyring::Entry, CredentialError> {
+        Self::entry_for(SERVICE, reference)
+    }
+
+    #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+    fn entry_for(service: &str, reference: &str) -> Result<keyring::Entry, CredentialError> {
         if !valid_reference(reference) {
             return Err(CredentialError::InvalidReference);
         }
-        keyring::Entry::new(SERVICE, reference).map_err(|_| CredentialError::Unavailable)
+        keyring::Entry::new(service, reference).map_err(|_| CredentialError::Unavailable)
     }
 }
 
@@ -99,6 +105,61 @@ impl CredentialStore for SystemCredentialStore {
             Err(CredentialError::Unavailable)
         }
     }
+}
+
+#[derive(Default)]
+pub(crate) struct SystemAccountCredentialStore;
+
+impl CredentialStore for SystemAccountCredentialStore {
+    fn put(&self, reference: &str, value: &str) -> Result<(), CredentialError> {
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        return SystemCredentialStore::entry_for(ACCOUNT_SERVICE, reference)?
+            .set_password(value)
+            .map_err(|_| CredentialError::Unavailable);
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let _ = (reference, value);
+            Err(CredentialError::Unavailable)
+        }
+    }
+
+    fn get(&self, reference: &str) -> Result<Zeroizing<String>, CredentialError> {
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        return match SystemCredentialStore::entry_for(ACCOUNT_SERVICE, reference)?.get_password() {
+            Ok(value) => Ok(Zeroizing::new(value)),
+            Err(keyring::Error::NoEntry) => Err(CredentialError::Missing),
+            Err(_) => Err(CredentialError::Unavailable),
+        };
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let _ = reference;
+            Err(CredentialError::Unavailable)
+        }
+    }
+
+    fn delete(&self, reference: &str) -> Result<(), CredentialError> {
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        return match SystemCredentialStore::entry_for(ACCOUNT_SERVICE, reference)?
+            .delete_credential()
+        {
+            Ok(()) => Ok(()),
+            Err(keyring::Error::NoEntry) => Err(CredentialError::Missing),
+            Err(_) => Err(CredentialError::Unavailable),
+        };
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+        {
+            let _ = reference;
+            Err(CredentialError::Unavailable)
+        }
+    }
+}
+
+pub(crate) fn account_token_reference(profile: &str) -> String {
+    reference(profile, "account-session-token")
+}
+
+pub(crate) fn account_expiry_reference(profile: &str) -> String {
+    reference(profile, "account-session-expiry")
 }
 
 #[derive(Default)]

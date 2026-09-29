@@ -229,7 +229,7 @@ Use `src/plugins/effects/` for new effects; each effect is independently enabled
 
 | ID / dependencies | Scope | Acceptance/tests |
 |---|---|---|
-| P01 / F03, A01 | Partial: fail-closed runtime-config client is wired to app startup; complete hosted entitlement adapter and optional account sign-in | Contract mock for auth expiry/revocation/offline, secure token storage, no secret migration; server entitlement authoritative; no paid release without verified gate behavior |
+| P01 / F03, A01 | Partial: fail-closed runtime-config client, free email-code sign-in, OS credential persistence, online restore, and five-minute grant refresh are implemented; live hosted verification remains open | Contract mock for auth expiry/revocation/offline, secure token storage, no secret migration; server entitlement authoritative; no paid release without verified gate behavior. Native Turnstile challenge is not implemented |
 | P02 / F03, A01 | Internal Quick Secrets design and implementation | Separate encryption/unlock/autolock review, fake key store, wrong password/recovery tests, explicit target paste; no auto-import vault |
 | P03 / R01, F04 | Native read-only text/Markdown guide/display tabs | No PTY input to display tab; URL/content bounds, safe external open, offline failures. Arbitrary browsing/webview remains deferred |
 | P04 / F03 | Feedback/privacy/analytics | Explicit opt-in policy, redaction, mock non-2xx responses, original receiver/schema contract tests if service reused; never rely on UI success only |

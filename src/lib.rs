@@ -1,5 +1,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 mod account;
+#[cfg(not(target_arch = "wasm32"))]
+mod account_api;
 pub mod app;
 mod assistant;
 #[cfg(not(target_arch = "wasm32"))]

@@ -1,6 +1,7 @@
 #[cfg(not(target_arch = "wasm32"))]
 use crate::assistant::credentials::{
-    self, CredentialStore, SessionCredentialStore, SystemCredentialStore,
+    self, CredentialStore, SessionCredentialStore, SystemAccountCredentialStore,
+    SystemCredentialStore,
 };
 #[cfg(not(target_arch = "wasm32"))]
 use crate::assistant::provider::{validate_endpoint, ProviderProfile};
@@ -73,7 +74,8 @@ fn ai_help_available() -> bool {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or_default();
-    access::resolve(FeatureKey::AiHelp, &runtime, &None, now).available
+    let entitlement = crate::account_api::current_entitlement();
+    access::resolve(FeatureKey::AiHelp, &runtime, &entitlement, now).available
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -91,7 +93,8 @@ fn theme_generation_available() -> bool {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or_default();
-    access::resolve(FeatureKey::VibeCodeThemes, &runtime, &None, now).available
+    let entitlement = crate::account_api::current_entitlement();
+    access::resolve(FeatureKey::VibeCodeThemes, &runtime, &entitlement, now).available
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -109,7 +112,25 @@ pub(crate) fn remote_control_available() -> bool {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or_default();
-    access::resolve(FeatureKey::AutomationRemoteControl, &runtime, &None, now).available
+    let entitlement = crate::account_api::current_entitlement();
+    access::resolve(
+        FeatureKey::AutomationRemoteControl,
+        &runtime,
+        &entitlement,
+        now,
+    )
+    .available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn account_signin_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::AccountSignIn,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -335,11 +356,29 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_models: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
+    account_tx: Sender<AccountEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_rx: Receiver<AccountEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_email_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_code_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_code_requested: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_notice: Option<AccountNotice>,
+    #[cfg(not(target_arch = "wasm32"))]
+    account_session: Option<crate::account_api::AccountSession>,
+    #[cfg(not(target_arch = "wasm32"))]
     theme_generation_tx: Sender<ThemeGenerationEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_generation_rx: Receiver<ThemeGenerationEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     control_server: Option<ControlServer>,
+    #[cfg(not(target_arch = "wasm32"))]
+    control_server_attempted: bool,
     #[cfg(not(target_arch = "wasm32"))]
     control_snapshot: Arc<RwLock<Snapshot>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -406,6 +445,8 @@ enum SettingsTab {
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
+    Account,
+    #[cfg(not(target_arch = "wasm32"))]
     Import,
 }
 
@@ -469,6 +510,23 @@ enum CredentialEvent {
 enum ProviderEvent {
     Tested(String, Result<(), String>),
     Models(String, Result<Vec<String>, String>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+enum AccountEvent {
+    CodeRequested(Result<crate::account_api::LoginCodeResult, crate::account_api::AccountError>),
+    SignedIn(Result<crate::account_api::AccountSession, crate::account_api::AccountError>),
+    Restored(Result<Option<crate::account_api::AccountSession>, crate::account_api::AccountError>),
+    SignedOut(bool),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy)]
+enum AccountNotice {
+    CodeSent,
+    CodeRequestFailed,
+    SignedIn,
+    SignInFailed,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -684,6 +742,7 @@ impl ButtonsApp {
             app.native_store = native_store;
             app.native_revision = native_revision;
             app.native_save_blocked = storage_error.is_some();
+            app.restore_account_session(cc.egui_ctx.clone());
             app.import_offer = app.native_revision.is_none()
                 && production_roots().is_ok_and(|(_, legacy)| legacy.0.exists());
             if let Some(store) = &app.native_store {
@@ -715,25 +774,6 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
         #[cfg(not(target_arch = "wasm32"))]
-        if remote_control_available() {
-            app.publish_control_snapshot();
-            if let Some(native_root) = app
-                .native_store
-                .as_ref()
-                .map(|store| store.root_dir().to_path_buf())
-            {
-                match ControlServer::start(
-                    &native_root,
-                    Arc::clone(&app.control_snapshot),
-                    app.session_dispatcher.clone(),
-                    cc.egui_ctx.clone(),
-                ) {
-                    Ok(server) => app.control_server = Some(server),
-                    Err(error) => app.notice = Some(format!("Native control API failed: {error}")),
-                }
-            }
-        }
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
             app.notice = Some(format!("Native settings could not load: {error}"));
         }
@@ -753,6 +793,8 @@ impl ButtonsApp {
         let (credential_tx, credential_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (provider_tx, provider_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (account_tx, account_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (theme_generation_tx, theme_generation_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
@@ -894,11 +936,29 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            account_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            account_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            account_email_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            account_code_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            account_code_requested: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            account_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            account_notice: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            account_session: None,
+            #[cfg(not(target_arch = "wasm32"))]
             theme_generation_tx,
             #[cfg(not(target_arch = "wasm32"))]
             theme_generation_rx,
             #[cfg(not(target_arch = "wasm32"))]
             control_server: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            control_server_attempted: false,
             #[cfg(not(target_arch = "wasm32"))]
             control_snapshot: Arc::new(RwLock::new(Snapshot::default())),
             #[cfg(not(target_arch = "wasm32"))]
@@ -3397,6 +3457,14 @@ impl ButtonsApp {
                         crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
                     );
                     #[cfg(not(target_arch = "wasm32"))]
+                    if account_signin_available() {
+                        ui.selectable_value(
+                            &mut self.settings_tab,
+                            SettingsTab::Account,
+                            crate::i18n::literal(&self.locale, "Account"),
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
                     ui.selectable_value(
                         &mut self.settings_tab,
                         SettingsTab::Import,
@@ -3421,6 +3489,10 @@ impl ButtonsApp {
             SettingsTab::Shortcuts => self.shortcut_settings(ui),
             #[cfg(not(target_arch = "wasm32"))]
             SettingsTab::Providers => self.provider_settings(ui, ctx),
+            #[cfg(not(target_arch = "wasm32"))]
+            SettingsTab::Account if account_signin_available() => self.account_settings(ui, ctx),
+            #[cfg(not(target_arch = "wasm32"))]
+            SettingsTab::Account => self.theme_settings(ui),
             #[cfg(not(target_arch = "wasm32"))]
             SettingsTab::Import => self.import_settings(ui, ctx),
         }
@@ -3541,6 +3613,393 @@ impl ButtonsApp {
             self.show_localization_onboarding = false;
         }
         self.refresh_locale();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn account_profile_name(&self) -> String {
+        self.native_store
+            .as_ref()
+            .map(|store| store.profile_name().to_owned())
+            .unwrap_or_else(|| "default".to_owned())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn restore_account_session(&mut self, context: egui::Context) {
+        if std::env::var("BUTTONSCLI_NATIVE_DISABLE_ACCOUNT").is_ok_and(|value| value == "1") {
+            return;
+        }
+        let profile = self.account_profile_name();
+        let sender = self.account_tx.clone();
+        self.account_busy = true;
+        let result = std::thread::Builder::new()
+            .name("buttonscli-account-restore".into())
+            .spawn(move || {
+                let credential_store = SystemAccountCredentialStore;
+                let token_reference = credentials::account_token_reference(&profile);
+                let expiry_reference = credentials::account_expiry_reference(&profile);
+                let restored = (|| {
+                    let token = match credential_store.get(&token_reference) {
+                        Ok(token) => token,
+                        Err(credentials::CredentialError::Missing) => {
+                            let _ = credential_store.delete(&expiry_reference);
+                            return Ok(None);
+                        }
+                        Err(_) => return Err(crate::account_api::AccountError::CredentialStore),
+                    };
+                    let expiry = match credential_store.get(&expiry_reference) {
+                        Ok(value) => value,
+                        Err(_) => {
+                            crate::account_api::remove_session_credentials(
+                                &credential_store,
+                                &token_reference,
+                                &expiry_reference,
+                            );
+                            return Ok(None);
+                        }
+                    };
+                    let expiry = match expiry.parse::<u64>() {
+                        Ok(expiry) => expiry,
+                        Err(_) => {
+                            crate::account_api::remove_session_credentials(
+                                &credential_store,
+                                &token_reference,
+                                &expiry_reference,
+                            );
+                            return Ok(None);
+                        }
+                    };
+                    let client = crate::account_api::AccountClient::production()?;
+                    match client.restore_session(token, expiry) {
+                        Ok(session) => Ok(Some(session)),
+                        Err(
+                            crate::account_api::AccountError::Http(401)
+                            | crate::account_api::AccountError::InvalidSession,
+                        ) => {
+                            crate::account_api::remove_session_credentials(
+                                &credential_store,
+                                &token_reference,
+                                &expiry_reference,
+                            );
+                            Ok(None)
+                        }
+                        Err(error) => Err(error),
+                    }
+                })();
+                let _ = sender.send(AccountEvent::Restored(restored));
+                context.request_repaint();
+            });
+        if result.is_err() {
+            self.account_busy = false;
+            self.account_notice = None;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn request_account_code(&mut self, context: &egui::Context) {
+        if self.account_busy || !account_signin_available() {
+            return;
+        }
+        let email = self.account_email_draft.trim().to_owned();
+        let sender = self.account_tx.clone();
+        let context = context.clone();
+        self.account_busy = true;
+        self.account_notice = None;
+        let result = std::thread::Builder::new()
+            .name("buttonscli-account-code".into())
+            .spawn(move || {
+                let response = crate::account_api::AccountClient::production()
+                    .and_then(|client| client.start_email_login(&email, None));
+                let _ = sender.send(AccountEvent::CodeRequested(response));
+                context.request_repaint();
+            });
+        if result.is_err() {
+            self.account_busy = false;
+            self.account_notice = Some(AccountNotice::CodeRequestFailed);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn verify_account_code(&mut self, context: &egui::Context) {
+        if self.account_busy || !account_signin_available() {
+            return;
+        }
+        let email = self.account_email_draft.trim().to_owned();
+        let code = self.account_code_draft.trim().to_owned();
+        let profile = self.account_profile_name();
+        let sender = self.account_tx.clone();
+        let context = context.clone();
+        self.account_busy = true;
+        self.account_notice = None;
+        let result = std::thread::Builder::new()
+            .name("buttonscli-account-verify".into())
+            .spawn(move || {
+                let response = crate::account_api::AccountClient::production().and_then(|client| {
+                    let session = client.verify_email_login(
+                        &email,
+                        &code,
+                        None,
+                        Some(concat!("ButtonsCLI Native ", env!("CARGO_PKG_VERSION"))),
+                    )?;
+                    let token_reference = credentials::account_token_reference(&profile);
+                    let expiry_reference = credentials::account_expiry_reference(&profile);
+                    match crate::account_api::save_session_credentials(
+                        &SystemAccountCredentialStore,
+                        &token_reference,
+                        &expiry_reference,
+                        &session,
+                    ) {
+                        Ok(()) => Ok(session),
+                        Err(_) => {
+                            let _ = client.logout(&session.token);
+                            crate::account_api::remove_session_credentials(
+                                &SystemAccountCredentialStore,
+                                &token_reference,
+                                &expiry_reference,
+                            );
+                            Err(crate::account_api::AccountError::CredentialStore)
+                        }
+                    }
+                });
+                let _ = sender.send(AccountEvent::SignedIn(response));
+                context.request_repaint();
+            });
+        if result.is_err() {
+            self.account_busy = false;
+            self.account_notice = Some(AccountNotice::SignInFailed);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn sign_out_account(&mut self, context: &egui::Context) {
+        let Some(session) = self.account_session.take() else {
+            return;
+        };
+        crate::account_api::set_current_entitlement(None);
+        let profile = self.account_profile_name();
+        let token_reference = credentials::account_token_reference(&profile);
+        let expiry_reference = credentials::account_expiry_reference(&profile);
+        let worker_token_reference = token_reference.clone();
+        let worker_expiry_reference = expiry_reference.clone();
+        let sender = self.account_tx.clone();
+        let context = context.clone();
+        self.account_busy = true;
+        self.account_notice = None;
+        let result = std::thread::Builder::new()
+            .name("buttonscli-account-logout".into())
+            .spawn(move || {
+                let logout = crate::account_api::AccountClient::production()
+                    .and_then(|client| client.logout(&session.token));
+                crate::account_api::remove_session_credentials(
+                    &SystemAccountCredentialStore,
+                    &worker_token_reference,
+                    &worker_expiry_reference,
+                );
+                let _ = sender.send(AccountEvent::SignedOut(logout.is_ok()));
+                context.request_repaint();
+            });
+        if result.is_err() {
+            crate::account_api::remove_session_credentials(
+                &SystemAccountCredentialStore,
+                &token_reference,
+                &expiry_reference,
+            );
+            self.account_busy = false;
+            self.account_notice = None;
+        }
+        self.account_code_requested = false;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_account_events(&mut self, context: &egui::Context) {
+        for event in self.account_rx.try_iter() {
+            self.account_busy = false;
+            match event {
+                AccountEvent::CodeRequested(Ok(_)) => {
+                    self.account_code_requested = true;
+                    self.account_notice = Some(AccountNotice::CodeSent);
+                }
+                AccountEvent::CodeRequested(Err(_)) => {
+                    self.account_notice = Some(AccountNotice::CodeRequestFailed);
+                }
+                AccountEvent::SignedIn(Ok(session)) | AccountEvent::Restored(Ok(Some(session))) => {
+                    crate::account_api::set_current_entitlement(Some(session.entitlement()));
+                    crate::account_api::start_entitlement_refresh(
+                        session.token.duplicate_for_refresh(),
+                        session.expires_at_unix,
+                        context.clone(),
+                    );
+                    self.account_email_draft.clone_from(&session.user.email);
+                    self.account_code_draft.clear();
+                    self.account_code_requested = false;
+                    self.account_session = Some(session);
+                    self.account_notice = Some(AccountNotice::SignedIn);
+                }
+                AccountEvent::SignedIn(Err(_)) => {
+                    self.account_notice = Some(AccountNotice::SignInFailed);
+                }
+                AccountEvent::Restored(Ok(None)) => {
+                    crate::account_api::set_current_entitlement(None);
+                    self.account_session = None;
+                }
+                AccountEvent::Restored(Err(_)) => {
+                    crate::account_api::set_current_entitlement(None);
+                    self.account_session = None;
+                    self.account_notice = None;
+                }
+                AccountEvent::SignedOut(success) => {
+                    crate::account_api::set_current_entitlement(None);
+                    self.account_session = None;
+                    self.account_email_draft.clear();
+                    self.account_code_draft.clear();
+                    let _ = success;
+                    self.account_notice = None;
+                }
+            }
+        }
+        if self
+            .account_session
+            .as_ref()
+            .is_some_and(|session| session.expires_at_unix <= crate::account_api::unix_now())
+        {
+            self.account_session = None;
+            crate::account_api::set_current_entitlement(None);
+            let profile = self.account_profile_name();
+            crate::account_api::remove_session_credentials(
+                &SystemAccountCredentialStore,
+                &credentials::account_token_reference(&profile),
+                &credentials::account_expiry_reference(&profile),
+            );
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn sync_control_server(&mut self, context: &egui::Context) {
+        if !remote_control_available() {
+            self.control_server.take();
+            self.control_server_attempted = false;
+            return;
+        }
+        if self.control_server.is_some() || self.control_server_attempted {
+            return;
+        }
+        self.control_server_attempted = true;
+        let Some(native_root) = self
+            .native_store
+            .as_ref()
+            .map(|store| store.root_dir().to_path_buf())
+        else {
+            return;
+        };
+        self.publish_control_snapshot();
+        match ControlServer::start(
+            &native_root,
+            Arc::clone(&self.control_snapshot),
+            self.session_dispatcher.clone(),
+            context.clone(),
+        ) {
+            Ok(server) => self.control_server = Some(server),
+            Err(error) => self.notice = Some(format!("Native control API failed: {error}")),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn account_settings(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
+        let locale = self.locale.clone();
+        ui.heading(crate::i18n::literal(&locale, "ButtonsCLI account"));
+        ui.add_space(8.0);
+        let mut request_code = false;
+        let mut verify_code = false;
+        let mut sign_out = false;
+
+        if let Some(session) = &self.account_session {
+            ui.horizontal(|ui| {
+                ui.label(crate::i18n::literal(&locale, "Signed in as"));
+                ui.strong(&session.user.email);
+            });
+            ui.add_space(8.0);
+            if ui
+                .add_enabled(
+                    !self.account_busy,
+                    egui::Button::new(crate::i18n::literal(&locale, "Sign out")),
+                )
+                .clicked()
+            {
+                sign_out = true;
+            }
+        } else {
+            ui.label(crate::i18n::literal(&locale, "No account signed in"));
+            ui.label(crate::i18n::literal(
+                &locale,
+                "Sign-in manages your ButtonsCLI account session and checks server access. Local terminals and provider settings work without an account.",
+            ));
+            ui.add_space(8.0);
+            ui.label(crate::i18n::literal(&locale, "Email address"));
+            ui.add_enabled_ui(!self.account_busy, |ui| {
+                ui.text_edit_singleline(&mut self.account_email_draft);
+            });
+            if self.account_code_requested {
+                ui.add_space(6.0);
+                ui.label(crate::i18n::formatted_literal(
+                    &locale,
+                    "Enter the code sent to {email}.",
+                    &[("email", &self.account_email_draft)],
+                ));
+                ui.add_enabled_ui(!self.account_busy, |ui| {
+                    ui.text_edit_singleline(&mut self.account_code_draft);
+                });
+                verify_code = ui
+                    .add_enabled(
+                        !self.account_busy && !self.account_code_draft.trim().is_empty(),
+                        egui::Button::new(crate::i18n::literal(&locale, "Continue")),
+                    )
+                    .clicked();
+            } else {
+                request_code = ui
+                    .add_enabled(
+                        !self.account_busy && self.account_email_draft.contains('@'),
+                        egui::Button::new(crate::i18n::literal(&locale, "Send code")),
+                    )
+                    .clicked();
+            }
+        }
+        if self.account_busy {
+            ui.spinner();
+        }
+        if let Some(notice) = self.account_notice {
+            let message = match notice {
+                AccountNotice::CodeSent => crate::i18n::literal(&locale, "Sign-in code sent."),
+                AccountNotice::SignedIn => {
+                    crate::i18n::literal(&locale, "Signed in to ButtonsCLI.")
+                }
+                AccountNotice::CodeRequestFailed => {
+                    crate::i18n::literal(&locale, "Could not send a sign-in code.")
+                }
+                AccountNotice::SignInFailed => {
+                    crate::i18n::literal(&locale, "Could not verify that code.")
+                }
+            };
+            ui.colored_label(
+                if matches!(
+                    notice,
+                    AccountNotice::CodeRequestFailed | AccountNotice::SignInFailed
+                ) {
+                    self.colors().warning
+                } else {
+                    self.colors().text
+                },
+                message,
+            );
+        }
+
+        if request_code {
+            self.request_account_code(context);
+        }
+        if verify_code {
+            self.verify_account_code(context);
+        }
+        if sign_out {
+            self.sign_out_account(context);
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -8454,6 +8913,10 @@ impl eframe::App for ButtonsApp {
         self.process_credential_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_provider_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_account_events(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.sync_control_server(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_generation_events();
         #[cfg(not(target_arch = "wasm32"))]

@@ -166,6 +166,44 @@ pub fn literal(locale: &str, english: &str) -> String {
     if locale == "en" {
         return english.to_owned();
     }
+    // The imported source catalog leaves this account action untranslated in three locales.
+    if english == "Sign out" {
+        let corrected = match locale {
+            "fr" => Some("Se déconnecter"),
+            "it" => Some("Disconnetti"),
+            "zh-TW" => Some("登出"),
+            _ => None,
+        };
+        if let Some(corrected) = corrected {
+            return corrected.to_owned();
+        }
+    }
+    if english == "Sign-in manages your ButtonsCLI account session and checks server access. Local terminals and provider settings work without an account." {
+        let translated = match locale {
+            "es" => "Iniciar sesión administra tu cuenta de ButtonsCLI y consulta los permisos del servidor. Los terminales locales y la configuración de proveedores funcionan sin una cuenta.",
+            "ja" => "サインインすると ButtonsCLI アカウントのセッションを管理し、サーバーのアクセス権を確認します。ローカル端末とプロバイダー設定はアカウントなしでも利用できます。",
+            "pt-BR" => "O login gerencia sua sessão da conta ButtonsCLI e verifica o acesso ao servidor. Os terminais locais e as configurações de provedores funcionam sem uma conta.",
+            "zh-CN" => "登录会管理你的 ButtonsCLI 账户会话并检查服务器访问权限。没有账户也可以使用本地终端和提供商设置。",
+            "fr" => "La connexion gère votre session ButtonsCLI et vérifie les autorisations du serveur. Les terminaux locaux et les paramètres des fournisseurs fonctionnent sans compte.",
+            "hi" => "साइन इन करने से आपका ButtonsCLI खाता सत्र प्रबंधित होता है और सर्वर की पहुँच जाँची जाती है। स्थानीय टर्मिनल और प्रदाता सेटिंग बिना खाते के भी काम करते हैं।",
+            "de" => "Die Anmeldung verwaltet deine ButtonsCLI-Kontositzung und prüft den Serverzugriff. Lokale Terminals und Anbietereinstellungen funktionieren auch ohne Konto.",
+            "it" => "L'accesso gestisce la sessione del tuo account ButtonsCLI e verifica i permessi del server. I terminali locali e le impostazioni dei provider funzionano anche senza un account.",
+            "ru" => "Вход управляет сеансом вашей учётной записи ButtonsCLI и проверяет доступ к серверу. Локальные терминалы и настройки провайдеров работают и без учётной записи.",
+            "ko" => "로그인하면 ButtonsCLI 계정 세션을 관리하고 서버 접근 권한을 확인합니다. 로컬 터미널과 공급자 설정은 계정 없이도 사용할 수 있습니다.",
+            "ar" => "تدير عملية تسجيل الدخول جلسة حساب ButtonsCLI وتتحقق من صلاحيات الوصول إلى الخادم. تعمل الطرفيات المحلية وإعدادات المزوّدين دون حساب.",
+            "tr" => "Oturum açmak ButtonsCLI hesabı oturumunuzu yönetir ve sunucu erişimini denetler. Yerel terminaller ve sağlayıcı ayarları hesap olmadan da çalışır.",
+            "pl" => "Logowanie zarządza sesją konta ButtonsCLI i sprawdza dostęp do serwera. Lokalne terminale i ustawienia dostawców działają bez konta.",
+            "nl" => "Aanmelden beheert je ButtonsCLI-accountsessie en controleert de servertoegang. Lokale terminals en providerinstellingen werken zonder account.",
+            "sv" => "Inloggning hanterar din ButtonsCLI-kontosession och kontrollerar serveråtkomst. Lokala terminaler och leverantörsinställningar fungerar utan konto.",
+            "da" => "Log ind administrerer din ButtonsCLI-kontosession og kontrollerer serveradgang. Lokale terminaler og udbyderindstillinger fungerer uden en konto.",
+            "fi" => "Kirjautuminen hallitsee ButtonsCLI-tilisi istuntoa ja tarkistaa palvelinkäyttöoikeudet. Paikalliset päätteet ja palveluasetukset toimivat ilman tiliä.",
+            "no" => "Innlogging administrerer ButtonsCLI-kontoøkten din og kontrollerer servertillgang. Lokale terminaler og leverandørinnstillinger fungerer uten en konto.",
+            "zh-TW" => "登入會管理你的 ButtonsCLI 帳戶工作階段並檢查伺服器存取權限。沒有帳戶也能使用本機終端機和提供者設定。",
+            "uk" => "Вхід керує сеансом вашого облікового запису ButtonsCLI та перевіряє доступ до сервера. Локальні термінали й налаштування провайдерів працюють без облікового запису.",
+            _ => english,
+        };
+        return translated.to_owned();
+    }
     let source_key = catalog_alias(english);
     let translations = literal_catalog().messages.get(source_key).or_else(|| {
         let mut matches = literal_catalog()
@@ -944,6 +982,41 @@ mod tests {
                 assert!(translations.contains_key(locale), "{locale}: {english}");
             }
         }
+    }
+
+    #[test]
+    fn account_sign_in_copy_is_localized_in_every_shipped_locale() {
+        let strings = [
+            "ButtonsCLI account",
+            "No account signed in",
+            "Sign-in manages your ButtonsCLI account session and checks server access. Local terminals and provider settings work without an account.",
+            "Email address",
+            "Enter the code sent to {email}.",
+            "Continue",
+            "Send code",
+            "Sign-in code sent.",
+            "Signed in to ButtonsCLI.",
+            "Could not send a sign-in code.",
+            "Could not verify that code.",
+            "Sign out",
+        ];
+        for locale in SUPPORTED_LOCALES {
+            for english in strings {
+                let translated = literal(locale, english);
+                assert!(!translated.is_empty(), "missing {english} in {locale}");
+                if locale != "en" {
+                    assert_ne!(translated, english, "untranslated {english} in {locale}");
+                }
+            }
+        }
+        assert_eq!(
+            formatted_literal(
+                "es",
+                "Enter the code sent to {email}.",
+                &[("email", "a@test")]
+            ),
+            "Ingrese el código enviado a a@test."
+        );
     }
 
     #[test]

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added free optional email-code account sign-in, with session tokens held in the operating system credential store, online session restoration, sign-out, and five-minute entitlement refresh. Failed or expired checks close server grants; sign-in alone does not unlock paid features.
+- Added background runtime-config refresh for native feature rollout flags. Pro defaults closed and failed refreshes clear cached flags.
 - Preserved enabled legacy Shader Lab flags in imported themes and added a localized warning in Themes settings. Native rendering does not execute those GLSL shaders; see the Shader Lab renderer decision.
 - Added a Pro-gated AI theme generator to Themes settings. It sends a bounded style brief and selected color palette to the active configured provider, checks schema and text contrast, allows one correction attempt, and keeps results as reviewable drafts until selected. Existing fonts, effects and unknown theme fields are preserved; saving always creates a new collision-safe file.
 - Added free row banding to native terminal themes, with editable color and opacity; the overlay follows actual terminal cell height and respects master-off/focused-pane effect settings. Documented why faithful HSync needs a separate offscreen renderer spike.

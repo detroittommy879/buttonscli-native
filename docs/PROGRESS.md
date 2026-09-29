@@ -13,6 +13,19 @@ secure session storage, entitlement refresh, and paid rollout verification
 remain open; no hosted service was changed. Access tier: internal rollout
 plumbing.
 
+## 2026-09-29 — P01 native account session path
+
+Added a native client for email-code start/verify, `/me`, entitlement resolve,
+and logout. The Account Settings tab uses the existing localized source
+catalog. Session token and expiry are stored under a dedicated OS credential
+service with profile-scoped references; partial writes roll back. Startup
+revalidates the saved session with the server, and grants refresh every five
+minutes. Expiry, revocation, network failure, or a failed refresh closes the
+grant. Account sign-in is free (`accountSignIn`); Pro features still require
+the central rollout and their own server grant. The isolated smoke disables
+both account and runtime-config requests. Live service behavior is unverified,
+and native Turnstile is not implemented. No hosted service was changed.
+
 ## 2026-09-29 — P01 server feature-grant groundwork
 
 Extended native entitlements to carry the server's explicit `activeFeatures`

@@ -27,10 +27,11 @@ pub enum FeatureKey {
     VibeCodeShaders,
     QuickSecrets,
     ProfileManagement,
+    AccountSignIn,
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -58,6 +59,7 @@ impl FeatureKey {
         Self::VibeCodeShaders,
         Self::QuickSecrets,
         Self::ProfileManagement,
+        Self::AccountSignIn,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -89,6 +91,7 @@ impl FeatureKey {
             Self::VibeCodeShaders => "vibeCodeShaders",
             Self::QuickSecrets => "quickSecrets",
             Self::ProfileManagement => "profileManagement",
+            Self::AccountSignIn => "accountSignIn",
         }
     }
 
@@ -124,6 +127,7 @@ impl FeatureKey {
             K::VibeCodeShaders => (T::Pro, false, R::Planned, "effects"),
             K::QuickSecrets => (T::Internal, false, R::Disabled, "security"),
             K::ProfileManagement => (T::Internal, false, R::Disabled, "settings"),
+            K::AccountSignIn => (T::Free, true, R::Active, "account"),
         };
         FeatureDefinition {
             key: self,
