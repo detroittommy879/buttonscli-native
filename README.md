@@ -36,6 +36,8 @@ Current desktop features include:
   with streamed answers, previewed optional terminal context, and explicitly
   reviewed suggestions; the Pro gate is still closed in release builds until
   native entitlement integration exists;
+- a read-only Guides window with bundled offline Quick Start and AI Help
+  guides, plus an opt-in bounded fetch from the trusted ButtonsCLI guide path;
 - an authenticated, loopback-only agent control API with an **Agent Inst.**
   handoff, optional Node CLI, and optional stdio MCP server; it supports tab
   creation, rename, layouts, presets, bounded output reads, and raw, bracketed,
@@ -81,6 +83,9 @@ platform support.
 
 See [Cool Stuff](docs/COOL-STUFF.md) for the bundled installer preview,
 copy/type behavior, and external provider links.
+
+See [Read-only guides](docs/READ-ONLY-GUIDES.md) for the offline guide window,
+online fetch limits, and browser-opening rules.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

@@ -8,6 +8,8 @@ mod assistant;
 mod control;
 #[cfg(not(target_arch = "wasm32"))]
 mod cool_stuff;
+#[cfg(not(target_arch = "wasm32"))]
+mod display;
 mod dock;
 pub mod features;
 pub mod fonts;

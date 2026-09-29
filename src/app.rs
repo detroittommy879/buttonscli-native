@@ -7,6 +7,8 @@ use crate::assistant::credentials::{
 use crate::assistant::provider::{validate_endpoint, ProviderProfile};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::control::ControlServer;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::display::{self, GuideTab};
 use crate::fonts::{self, FontZone};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layout::{self, Bounds, LayoutMode};
@@ -252,6 +254,17 @@ fn localization_settings_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn read_only_guides_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::ReadOnlyGuides,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
     locale: String,
@@ -302,6 +315,22 @@ pub struct ButtonsApp {
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    show_guides: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_tab: GuideTab,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_remote_body: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_fetch_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_fetch_error: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_fetch_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_tx: Sender<display::GuideEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    guide_rx: Receiver<display::GuideEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     show_terminal_search: bool,
     #[cfg(not(target_arch = "wasm32"))]
@@ -871,6 +900,8 @@ impl ButtonsApp {
         let (ai_help_tx, ai_help_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (quick_secrets_tx, quick_secrets_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (guide_tx, guide_rx) = mpsc::channel();
         Self {
             preferences,
             locale,
@@ -921,6 +952,22 @@ impl ButtonsApp {
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            show_guides: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_tab: GuideTab::QuickStart,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_remote_body: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_fetch_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_fetch_error: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_fetch_generation: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            guide_rx,
             #[cfg(not(target_arch = "wasm32"))]
             show_terminal_search: false,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2548,6 +2595,15 @@ impl ButtonsApp {
                         }
                     });
                     ui.menu_button(crate::i18n::literal(&self.locale, "Help"), |ui| {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if read_only_guides_available()
+                            && ui
+                                .button(crate::i18n::literal(&self.locale, "Read-only guides"))
+                                .clicked()
+                        {
+                            self.show_guides = true;
+                            ui.close_menu();
+                        }
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .add_enabled(
@@ -8316,6 +8372,194 @@ impl ButtonsApp {
         self.show_tab_rename = open;
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_guide_events(&mut self, ctx: &egui::Context) {
+        while let Ok(event) = self.guide_rx.try_recv() {
+            if event.generation != self.guide_fetch_generation {
+                continue;
+            }
+            self.guide_fetch_busy = false;
+            match event.result {
+                Ok(body) => {
+                    self.guide_remote_body = Some(body);
+                    self.guide_fetch_error = false;
+                    self.guide_tab = GuideTab::Online;
+                }
+                Err(_) => self.guide_fetch_error = true,
+            }
+            ctx.request_repaint();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn request_online_guide(&mut self, ctx: &egui::Context) {
+        if !read_only_guides_available() || self.guide_fetch_busy {
+            return;
+        }
+        self.guide_fetch_generation = self.guide_fetch_generation.wrapping_add(1).max(1);
+        let generation = self.guide_fetch_generation;
+        let sender = self.guide_tx.clone();
+        let request_context = ctx.clone();
+        self.guide_fetch_busy = true;
+        self.guide_fetch_error = false;
+        let spawned = std::thread::Builder::new()
+            .name("buttonscli-guide-fetch".into())
+            .spawn(move || {
+                let result = display::fetch_online_guide();
+                let _ = sender.send(display::GuideEvent { generation, result });
+                request_context.request_repaint();
+            });
+        if spawned.is_err() {
+            self.guide_fetch_busy = false;
+            self.guide_fetch_error = true;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn read_only_guides_window(&mut self, ctx: &egui::Context) {
+        if !read_only_guides_available() || !self.show_guides {
+            return;
+        }
+        let locale = self.locale.clone();
+        let mut open = self.show_guides;
+        let mut selected_tab = self.guide_tab;
+        let busy = self.guide_fetch_busy;
+        let fetch_error = self.guide_fetch_error;
+        let remote_body = self.guide_remote_body.clone();
+        let mut request_online = false;
+        let mut open_website = false;
+        egui::Window::new(crate::i18n::literal(&locale, "Read-only guides"))
+            .open(&mut open)
+            .default_size([760.0, 620.0])
+            .min_width(520.0)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    if ui
+                        .selectable_label(
+                            selected_tab == GuideTab::QuickStart,
+                            crate::i18n::literal(&locale, "Quick start"),
+                        )
+                        .clicked()
+                    {
+                        selected_tab = GuideTab::QuickStart;
+                    }
+                    if ui
+                        .selectable_label(
+                            selected_tab == GuideTab::AiHelp,
+                            crate::i18n::text(
+                                &locale,
+                                crate::i18n::MessageKey::AiHelp,
+                                &[],
+                            ),
+                        )
+                        .clicked()
+                    {
+                        selected_tab = GuideTab::AiHelp;
+                    }
+                    if ui
+                        .selectable_label(
+                            selected_tab == GuideTab::Online,
+                            crate::i18n::literal(&locale, "Online guide"),
+                        )
+                        .clicked()
+                    {
+                        selected_tab = GuideTab::Online;
+                    }
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        if ui
+                            .button(crate::i18n::literal(
+                                &locale,
+                                "Open ButtonsCLI website",
+                            ))
+                            .clicked()
+                        {
+                            open_website = true;
+                        }
+                    });
+                });
+                ui.separator();
+                if selected_tab == GuideTab::Online {
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(
+                                !busy,
+                                egui::Button::new(crate::i18n::literal(
+                                    &locale,
+                                    "Load online guide",
+                                )),
+                            )
+                            .clicked()
+                        {
+                            request_online = true;
+                        }
+                        if busy {
+                            ui.label(crate::i18n::literal(&locale, "Loading..."));
+                        }
+                    });
+                    if fetch_error {
+                        ui.colored_label(
+                            ui.visuals().error_fg_color,
+                            crate::i18n::literal(
+                                &locale,
+                                "The online guide could not load. Bundled guides are still available offline; check your connection and retry.",
+                            ),
+                        );
+                    }
+                }
+                let body = match selected_tab {
+                    GuideTab::QuickStart => display::bundled_body(GuideTab::QuickStart),
+                    GuideTab::AiHelp => display::bundled_body(GuideTab::AiHelp),
+                    GuideTab::Online => remote_body.as_deref(),
+                };
+                if let Some(body) = body {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for block in display::markdown_blocks(body) {
+                            match block {
+                                display::MarkdownBlock::Heading { level: 1, text } => {
+                                    ui.heading(text.replace("**", ""));
+                                }
+                                display::MarkdownBlock::Heading { text, .. } => {
+                                    ui.strong(text.replace("**", ""));
+                                }
+                                display::MarkdownBlock::Bullet(text) => {
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.label("•");
+                                        ui.label(text.replace("**", ""));
+                                    });
+                                }
+                                display::MarkdownBlock::Code(text) => {
+                                    ui.label(RichText::new(text).monospace());
+                                }
+                                display::MarkdownBlock::Paragraph(text) => {
+                                    ui.label(text.replace("**", ""));
+                                }
+                                display::MarkdownBlock::Spacer => ui.add_space(6.0),
+                                display::MarkdownBlock::Truncated => {
+                                    ui.weak(crate::i18n::literal(
+                                        &locale,
+                                        "Additional guide lines were omitted for responsiveness.",
+                                    ));
+                                }
+                            }
+                        }
+                    });
+                } else if selected_tab == GuideTab::Online {
+                    ui.weak(crate::i18n::literal(
+                        &locale,
+                        "Load online guide",
+                    ));
+                }
+            });
+        self.show_guides = open;
+        self.guide_tab = selected_tab;
+        if request_online {
+            self.request_online_guide(ctx);
+        }
+        if open_website && display::validate_external_url("https://buttonscli.com") {
+            ctx.open_url(egui::OpenUrl::new_tab("https://buttonscli.com"));
+        }
+    }
+
     fn about_window(&mut self, ctx: &egui::Context) {
         egui::Window::new(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
             .open(&mut self.show_about)
@@ -9566,6 +9810,8 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.process_quick_secrets_events();
         #[cfg(not(target_arch = "wasm32"))]
+        self.process_guide_events(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.maintain_quick_secrets(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
@@ -9627,6 +9873,8 @@ impl eframe::App for ButtonsApp {
             });
 
         self.settings_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.read_only_guides_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.ai_help_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -10224,6 +10472,42 @@ mod tests {
         let app = ButtonsApp::empty(Preferences::default());
         assert!(app.shell_launch("missing-profile").is_err());
         assert!(resolve_working_directory("definitely/not/a/real/buttonscli/path").is_err());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn guide_fetch_failure_keeps_bundled_guides_available_offline() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.guide_fetch_generation = 7;
+        app.guide_fetch_busy = true;
+        app.guide_tab = GuideTab::Online;
+        app.guide_tx
+            .send(display::GuideEvent {
+                generation: 7,
+                result: Err(display::GuideError::Network),
+            })
+            .unwrap();
+
+        app.process_guide_events(&egui::Context::default());
+
+        assert!(!app.guide_fetch_busy);
+        assert!(app.guide_fetch_error);
+        assert!(display::bundled_body(GuideTab::QuickStart).is_some());
+        assert!(display::bundled_body(GuideTab::AiHelp).is_some());
+        assert!(app.tabs.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn read_only_guides_window_renders_without_creating_a_terminal() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.show_guides = true;
+        let ctx = egui::Context::default();
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            app.read_only_guides_window(ctx);
+        });
+        assert!(app.show_guides);
+        assert!(app.tabs.is_empty());
     }
 
     #[test]

@@ -81,7 +81,7 @@ The supplied screenshot is visual context for the current native UI, not an inst
 | Feature access | Central catalog/resolver exists; future UI/actions still need gates | Reuse keys/tiers at each new execution path |
 | Profiles UI | Deferred; O catalog disables it despite broader guide wording | Read active profile now; create/switch UI remains internal unless product policy changes |
 | Quick Secrets | Missing; O secretVaultService/SecretVaultPanel | Internal, late separate security/storage task; do not auto-unlock or migrate secrets |
-| Read-only display/help tabs | Missing; O DisplayTabPane/startupDisplayService | P3 native text/Markdown subset; arbitrary browsing is a separate decision |
+| Read-only display/help tabs | Implemented as free offline-first reader; see [read-only guides](../READ-ONLY-GUIDES.md) | Explicit bounded fetch from trusted ButtonsCLI `/dsp/` only; no arbitrary browsing or webview; Windows GUI interaction remains unverified |
 | Cool Stuff/provider links | Missing; O CoolStuffDialog/coolStuffInstallers | P2 copy/type installer commands for review; never auto-run |
 | Accounts/entitlements | Missing; O auth/entitlement stores, services/auth-worker | P3 account contract and credential lifecycle; hosted paid validation required before paid shipping |
 | Cloud sync/sharing/JSON/vault | Catalog says planned, not shipped legacy parity | Deferred product work; do not recreate placeholders as “ported” features |

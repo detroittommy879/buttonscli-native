@@ -1515,6 +1515,29 @@ mod tests {
     }
 
     #[test]
+    fn guide_window_copy_is_localized_for_every_supported_locale() {
+        let strings = [
+            "Read-only guides",
+            "Quick start",
+            "Online guide",
+            "Load online guide",
+            "Open ButtonsCLI website",
+            "The online guide could not load. Bundled guides are still available offline; check your connection and retry.",
+            "Additional guide lines were omitted for responsiveness.",
+        ];
+        for locale in SUPPORTED_LOCALES {
+            for english in strings {
+                let translated = literal(locale, english);
+                assert_eq!(
+                    locale == "en" || translated != english,
+                    true,
+                    "missing translation for {locale}: {english}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn account_sign_in_copy_is_localized_in_every_shipped_locale() {
         let strings = [
             "ButtonsCLI account",

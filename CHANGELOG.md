@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a free read-only Guides window with bundled offline Quick Start and AI Help guides, plus an explicit bounded HTTPS Markdown fetch from the trusted ButtonsCLI guide path.
 - Added internal, debug-only Quick Secrets with a profile-bound encrypted vault, Argon2id key derivation, explicit confirmed reset, auto-lock, and reviewed single-line paste to a selected terminal. Release builds keep the feature hidden; terminal echo may still put pasted text in output.
 - Added free optional email-code account sign-in, with session tokens held in the operating system credential store, online session restoration, sign-out, and five-minute entitlement refresh. Failed or expired checks close server grants; sign-in alone does not unlock paid features.
 - Added background runtime-config refresh for native feature rollout flags. Pro defaults closed and failed refreshes clear cached flags.

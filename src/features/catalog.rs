@@ -28,10 +28,11 @@ pub enum FeatureKey {
     QuickSecrets,
     ProfileManagement,
     AccountSignIn,
+    ReadOnlyGuides,
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 29] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -60,6 +61,7 @@ impl FeatureKey {
         Self::QuickSecrets,
         Self::ProfileManagement,
         Self::AccountSignIn,
+        Self::ReadOnlyGuides,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -92,6 +94,7 @@ impl FeatureKey {
             Self::QuickSecrets => "quickSecrets",
             Self::ProfileManagement => "profileManagement",
             Self::AccountSignIn => "accountSignIn",
+            Self::ReadOnlyGuides => "readOnlyGuides",
         }
     }
 
@@ -128,6 +131,7 @@ impl FeatureKey {
             K::QuickSecrets => (T::Internal, false, R::Disabled, "security"),
             K::ProfileManagement => (T::Internal, false, R::Disabled, "settings"),
             K::AccountSignIn => (T::Free, true, R::Active, "account"),
+            K::ReadOnlyGuides => (T::Free, true, R::Active, "help"),
         };
         FeatureDefinition {
             key: self,
@@ -165,4 +169,19 @@ pub struct FeatureDefinition {
     pub rollout: Rollout,
     pub owner: &'static str,
     pub runtime_flag: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_only_guides_are_registered_as_active_free_access() {
+        assert!(FeatureKey::ALL.contains(&FeatureKey::ReadOnlyGuides));
+        let definition = FeatureKey::ReadOnlyGuides.definition();
+        assert_eq!(definition.key.as_str(), "readOnlyGuides");
+        assert_eq!(definition.tier, FeatureTier::Free);
+        assert_eq!(definition.rollout, Rollout::Active);
+        assert!(!definition.runtime_flag);
+    }
 }

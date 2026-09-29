@@ -1,5 +1,24 @@
 # Reconstruction journal
 
+## 2026-09-29 — P03 read-only guide tabs
+
+Added a free Help → Read-only guides window with bundled Quick Start and AI
+Help/provider setup tabs. A third tab can request one fixed ButtonsCLI `/dsp/`
+Markdown file after an explicit click. The request runs in a worker, requires
+HTTPS on the allowlisted host/path, rejects redirects, times out, validates
+text/plain or text/markdown, and caps content at 256 KiB and 8,192 rendered
+lines. Markdown is rendered as text; HTML and embedded links remain inert. A
+separate fixed ButtonsCLI browser button is the only external-open action.
+Fetch errors leave both bundled guides available offline. The guide feature is
+free (`readOnlyGuides`) and has no PTY/session action path.
+
+Windows validation passed: `cargo fmt --all -- --check`, all 178 library tests,
+2 synthetic fixture tests, `cargo check --bin buttonscli`, `cargo build --bin
+buttonscli`, and the isolated `scripts/native-smoke.ps1` startup pass with a
+1471×975 window. The smoke only verifies app startup; live guide-menu/tab
+interaction and the hosted request remain unverified. WGPU's missing optional
+Vulkan validation layer warning was nonfatal. Linux/macOS checks remain open.
+
 ## 2026-09-29 — P02 internal Quick Secrets vault
 
 Implemented a debug-only internal vault gated through the central feature
