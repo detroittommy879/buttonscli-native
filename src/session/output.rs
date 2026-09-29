@@ -1,5 +1,6 @@
 //! Bounded raw PTY output capture and activity metadata for CLI/AI consumers.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -43,9 +44,19 @@ impl Default for State {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct OutputCapture {
     state: Mutex<State>,
+    activity_at_ms: AtomicU64,
+}
+
+impl Default for OutputCapture {
+    fn default() -> Self {
+        let state = State::default();
+        Self {
+            activity_at_ms: AtomicU64::new(state.last_updated_at_ms),
+            state: Mutex::new(state),
+        }
+    }
 }
 
 impl std::fmt::Debug for OutputCapture {
@@ -91,6 +102,7 @@ impl OutputCapture {
         let now = now_ms();
         state.last_output_at_ms = Some(now);
         state.last_updated_at_ms = now;
+        self.activity_at_ms.store(now, Ordering::Relaxed);
         state.output_sequence = state.output_sequence.saturating_add(1);
     }
 
@@ -113,6 +125,12 @@ impl OutputCapture {
         let now = now_ms();
         state.last_input_at_ms = Some(now);
         state.last_updated_at_ms = now;
+        self.activity_at_ms.store(now, Ordering::Relaxed);
+    }
+
+    /// Lock-free timestamp used by the renderer's idle-effect scheduler.
+    pub(crate) fn last_updated_at_ms(&self) -> u64 {
+        self.activity_at_ms.load(Ordering::Relaxed)
     }
 
     pub(crate) fn snapshot(&self) -> OutputSnapshot {
@@ -156,6 +174,26 @@ impl OutputCapture {
             let start = lines.len().saturating_sub(limit);
             lines.into_iter().skip(start).collect::<Vec<_>>().join("\n")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn activity_timestamp_tracks_input_and_output_without_a_snapshot_lock() {
+        let capture = OutputCapture::default();
+        let created_at = capture.last_updated_at_ms();
+        capture.record_input_bytes(b"command");
+        let after_input = capture.last_updated_at_ms();
+        assert!(after_input >= created_at);
+        assert_eq!(after_input, capture.snapshot().last_updated_at_ms);
+
+        capture.record_output_bytes(b"result");
+        let after_output = capture.last_updated_at_ms();
+        assert!(after_output >= after_input);
+        assert_eq!(after_output, capture.snapshot().last_updated_at_ms);
     }
 }
 

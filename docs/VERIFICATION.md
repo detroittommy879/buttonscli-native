@@ -4,12 +4,18 @@ Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
 ## 2026-09-29 V02 Windows source checks
 
+Windows `cargo test` passes (142 library tests, 2 fixture tests),
+`cargo check --bin buttonscli`, `cargo build --bin buttonscli`, and the WASM
+library check pass. The WASM check reports 50 native-only dead-code warnings;
+the binary build reports the existing bin/lib PDB filename collision. The
+vendored renderer suite passed 16 tests in the preceding V02 row-banding check.
 Row-banding configuration/master gates, focused-pane policy, RGBA conversion,
 personal-theme export, and cell-height-aligned overlay geometry have focused
-tests. The HSync decision is based on the original CPU/GPU implementation and
+tests. Simple-noise tests cover idle timing, bounded/deterministic mesh output,
+master-off, legacy parameter mapping, lock-free PTY activity timestamps, and
+export. The HSync decision is based on the original CPU/GPU implementation and
 the native renderer's direct epaint path; it does not claim runtime or GPU
-acceptance. Windows tests/builds and live screenshots at 1/4/10 panes plus
-frame-cost review remain to be run for this task.
+acceptance. Live screenshots at 1/4/10 panes and frame-cost review remain open.
 
 ## 2026-09-29 V01 Windows checks
 

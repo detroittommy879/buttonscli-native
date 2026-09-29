@@ -7,8 +7,11 @@ not use AI.
 Open **Settings → Themes → Custom Theme Library**. **Save Variant** starts an
 unsaved copy of the theme used by the focused terminal. You can edit its name
 and description, app colors, terminal background and foreground, ANSI palette,
-pane divider, gradient, static effect, and scanlines. Font choices and fields
-the editor does not recognize are kept when you save.
+pane divider, gradient, static effect, scanlines, row banding, and simple noise.
+Simple noise supports amount, resolution, frame rate, brightness range, and an
+optional idle ramp driven by recent input/output in the visible terminals.
+Noise rendering is capped at 1,024 cells per pane. Font choices and fields the
+editor does not recognize are kept when you save.
 
 **Preview** applies the draft through the current **Apply:** scope controls.
 It updates the existing terminal and app presentation without restarting a

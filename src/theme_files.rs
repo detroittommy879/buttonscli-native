@@ -276,6 +276,16 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             "rowBandingEnabled": theme.effects.row_banding_enabled,
             "rowBandingColor": to_hex(theme.effects.row_banding_color),
             "rowBandingOpacity": theme.effects.row_banding_opacity * 100.0,
+            "simpleNoiseEnabled": theme.effects.simple_noise_enabled,
+            "simpleNoiseAmount": theme.effects.simple_noise_amount * 100.0,
+            "simpleNoiseResolution": theme.effects.simple_noise_resolution * 100.0,
+            "simpleNoiseFps": theme.effects.simple_noise_fps,
+            "simpleNoiseMinBrightness": theme.effects.simple_noise_min_brightness * 100.0,
+            "simpleNoiseMaxBrightness": theme.effects.simple_noise_max_brightness * 100.0,
+            "simpleNoiseIdleEnabled": theme.effects.simple_noise_idle_enabled,
+            "simpleNoiseIdleAmount": theme.effects.simple_noise_idle_amount * 100.0,
+            "simpleNoiseIdleDelaySeconds": theme.effects.simple_noise_idle_delay_seconds,
+            "simpleNoiseIdleRampSeconds": theme.effects.simple_noise_idle_ramp_seconds,
         },
     })
 }
@@ -519,6 +529,33 @@ mod tests {
         assert_eq!(document["effects"]["rowBandingEnabled"], true);
         assert_eq!(document["effects"]["rowBandingColor"], "#123456");
         assert_eq!(document["effects"]["rowBandingOpacity"], 12.0);
+    }
+
+    #[test]
+    fn exported_personal_themes_keep_simple_noise_configuration() {
+        let mut theme = crate::theme::ThemeCatalog::load().get("basic2").clone();
+        theme.effects.simple_noise_enabled = true;
+        theme.effects.simple_noise_amount = 0.24;
+        theme.effects.simple_noise_resolution = 0.5;
+        theme.effects.simple_noise_fps = 30;
+        theme.effects.simple_noise_min_brightness = 0.32;
+        theme.effects.simple_noise_max_brightness = 0.68;
+        theme.effects.simple_noise_idle_enabled = true;
+        theme.effects.simple_noise_idle_amount = 0.5;
+        theme.effects.simple_noise_idle_delay_seconds = 45.0;
+        theme.effects.simple_noise_idle_ramp_seconds = 8.0;
+
+        let document = document_from_theme(&theme, "Noise");
+        assert_eq!(document["effects"]["simpleNoiseEnabled"], true);
+        assert_eq!(document["effects"]["simpleNoiseAmount"], 24.0);
+        assert_eq!(document["effects"]["simpleNoiseResolution"], 50.0);
+        assert_eq!(document["effects"]["simpleNoiseFps"], 30);
+        assert_eq!(document["effects"]["simpleNoiseMinBrightness"], 32.0);
+        assert_eq!(document["effects"]["simpleNoiseMaxBrightness"], 68.0);
+        assert_eq!(document["effects"]["simpleNoiseIdleEnabled"], true);
+        assert_eq!(document["effects"]["simpleNoiseIdleAmount"], 50.0);
+        assert_eq!(document["effects"]["simpleNoiseIdleDelaySeconds"], 45.0);
+        assert_eq!(document["effects"]["simpleNoiseIdleRampSeconds"], 8.0);
     }
 
     #[test]

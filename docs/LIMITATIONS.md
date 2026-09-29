@@ -59,10 +59,15 @@ not a backlog disguised as release notes.
   animated drift, static, and scanlines also render natively. The master-off
   setting stops animation, and effects can be limited to the focused pane.
   Row banding now tints every other terminal row using the measured cell pitch.
-  HSync warp, TV/simple noise variants, glow, wallpaper drawing, and the theme
-  designer are not rendered yet. HSync needs an offscreen renderer path; see
+  Simple noise is a bounded pixelated grayscale overlay with a configurable
+  frame rate and optional idle ramp. Its mesh is capped at 1,024 cells per pane;
+  GUI frame-cost review remains open. HSync warp, TV noise, glow, wallpaper
+  drawing, and the theme designer are not rendered yet. HSync needs an
+  offscreen renderer path; see
   [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). Other original
-  fields remain in the embedded JSON migration assets.
+  fields remain in the embedded JSON migration assets. The original TV-noise
+  fields are configuration-only in the inspected source tree; no runtime
+  renderer was found, so the native app leaves them unsupported.
 - The 20 bundled font families work offline. Native Settings also discovers
   local system fonts and imports profile-local `.ttf` / `.otf` files. Online
   Google Font downloads are deferred; online-only names in imported themes

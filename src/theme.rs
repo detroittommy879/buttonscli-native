@@ -285,6 +285,16 @@ pub struct TerminalEffects {
     pub row_banding_enabled: bool,
     pub row_banding_color: Color32,
     pub row_banding_opacity: f32,
+    pub simple_noise_enabled: bool,
+    pub simple_noise_amount: f32,
+    pub simple_noise_resolution: f32,
+    pub simple_noise_fps: u32,
+    pub simple_noise_min_brightness: f32,
+    pub simple_noise_max_brightness: f32,
+    pub simple_noise_idle_enabled: bool,
+    pub simple_noise_idle_amount: f32,
+    pub simple_noise_idle_delay_seconds: f32,
+    pub simple_noise_idle_ramp_seconds: f32,
 }
 
 impl Default for TerminalEffects {
@@ -301,6 +311,16 @@ impl Default for TerminalEffects {
             row_banding_enabled: false,
             row_banding_color: Color32::from_rgb(0, 255, 68),
             row_banding_opacity: 0.06,
+            simple_noise_enabled: false,
+            simple_noise_amount: 0.24,
+            simple_noise_resolution: 0.5,
+            simple_noise_fps: 24,
+            simple_noise_min_brightness: 0.32,
+            simple_noise_max_brightness: 0.68,
+            simple_noise_idle_enabled: false,
+            simple_noise_idle_amount: 0.5,
+            simple_noise_idle_delay_seconds: 60.0,
+            simple_noise_idle_ramp_seconds: 6.0,
         }
     }
 }
@@ -616,6 +636,7 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
             value
         }
     };
+    let percent = |key: &str, fallback: f32| number(key, fallback) / 100.0;
 
     TerminalEffects {
         gradient,
@@ -649,6 +670,25 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
             .and_then(parse_color)
             .unwrap_or(Color32::from_rgb(0, 255, 68)),
         row_banding_opacity: unit("rowBandingOpacity", 0.06).clamp(0.0, 0.35),
+        // Preserve configured values across master-off; the effect runner
+        // checks the master switch before drawing or scheduling frames.
+        simple_noise_enabled: effects
+            .get("simpleNoiseEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        simple_noise_amount: percent("simpleNoiseAmount", 24.0).clamp(0.0, 1.0),
+        simple_noise_resolution: percent("simpleNoiseResolution", 50.0).clamp(0.08, 1.0),
+        simple_noise_fps: number("simpleNoiseFps", 24.0).clamp(0.0, 60.0) as u32,
+        simple_noise_min_brightness: percent("simpleNoiseMinBrightness", 32.0).clamp(0.0, 1.0),
+        simple_noise_max_brightness: percent("simpleNoiseMaxBrightness", 68.0).clamp(0.0, 1.0),
+        simple_noise_idle_enabled: effects
+            .get("simpleNoiseIdleEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        simple_noise_idle_amount: percent("simpleNoiseIdleAmount", 50.0).clamp(0.0, 1.0),
+        simple_noise_idle_delay_seconds: number("simpleNoiseIdleDelaySeconds", 60.0)
+            .clamp(0.0, 3_600.0),
+        simple_noise_idle_ramp_seconds: number("simpleNoiseIdleRampSeconds", 6.0).clamp(1.0, 300.0),
     }
 }
 
@@ -1004,6 +1044,43 @@ mod tests {
         );
         assert!((theme.effects.row_banding_opacity - 0.06).abs() < f32::EPSILON);
         assert!(crate::plugins::effects::row_banding::overlay_color(&theme.effects).is_none());
+    }
+
+    #[test]
+    fn simple_noise_settings_preserve_legacy_percentages_and_master_off() {
+        let document = serde_json::json!({
+            "metadata": {"id": "noise", "name": "Noise"},
+            "theme": {"terminal": {}},
+            "effects": {
+                "masterDisabled": true,
+                "simpleNoiseEnabled": true,
+                "simpleNoiseAmount": 24,
+                "simpleNoiseResolution": 50,
+                "simpleNoiseFps": 30,
+                "simpleNoiseMinBrightness": 32,
+                "simpleNoiseMaxBrightness": 68,
+                "simpleNoiseIdleEnabled": true,
+                "simpleNoiseIdleAmount": 50,
+                "simpleNoiseIdleDelaySeconds": 45,
+                "simpleNoiseIdleRampSeconds": 8
+            }
+        });
+        let theme = parse_legacy_value("noise", &document, ThemeSource::Personal).unwrap();
+        assert!(theme.effects.simple_noise_enabled);
+        assert_eq!(theme.effects.simple_noise_amount, 0.24);
+        assert_eq!(theme.effects.simple_noise_resolution, 0.5);
+        assert_eq!(theme.effects.simple_noise_fps, 30);
+        assert_eq!(theme.effects.simple_noise_min_brightness, 0.32);
+        assert_eq!(theme.effects.simple_noise_max_brightness, 0.68);
+        assert!(theme.effects.simple_noise_idle_enabled);
+        assert_eq!(theme.effects.simple_noise_idle_amount, 0.5);
+        assert_eq!(theme.effects.simple_noise_idle_delay_seconds, 45.0);
+        assert_eq!(theme.effects.simple_noise_idle_ramp_seconds, 8.0);
+        assert_eq!(
+            crate::plugins::effects::simple_noise::frame_plan(&theme.effects, 1, 2)
+                .repaint_after_ms,
+            None
+        );
     }
 
     #[test]

@@ -1,5 +1,21 @@
 # Reconstruction journal
 
+## 2026-09-29 — V02 simple noise and idle ramp
+
+Added native simple noise as a bounded pixelated grayscale mesh, with legacy
+theme settings for amount, resolution, FPS, brightness range, and optional
+activity-based idle ramp. The idle schedule reads the latest input/output time
+from the visible PTY sessions, wakes at the configured delay, animates through
+the ramp, and stops repainting once the target is reached. Master-off, calm
+mode, and focused-pane policy suppress it. Each pane is capped at 1,024 noise
+cells to keep work bounded. Access tier: free (`effectsMasterSwitch`).
+
+Tests cover legacy parameter mapping and theme export, activity timing, wake and
+settle behavior, master-off, deterministic noise generation, mesh bounds, and
+the per-pane cell cap. The native GUI, multi-pane frame cost, and screenshots
+remain unverified. The legacy `tvNoise*` fields have no runtime effect renderer
+in the inspected original source, so they remain unsupported preserved data.
+
 ## 2026-09-29 — V02 HSync decision and row banding
 
 Recorded a native-renderer no-go for pixel-faithful HSync: the original
@@ -14,8 +30,8 @@ original visual cadence. Access tier: free (`effectsMasterSwitch`).
 Automated coverage checks legacy parameter projection, master-off behavior,
 focused-pane suppression, alpha/color resolution, theme export, exact cell-pitch
 geometry, and clipping of a partial final row. Windows GUI screenshots and
-frame-cost checks at 1/4/10 panes remain open. TV noise, simple/idle noise, glow,
-and wallpaper are still unimplemented.
+frame-cost checks at 1/4/10 panes remain open. TV noise, glow, and wallpaper are
+still unimplemented.
 
 ## 2026-09-29 — V01 repeating gradients and focused effects
 

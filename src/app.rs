@@ -1002,6 +1002,20 @@ impl ButtonsApp {
             row_banding_enabled: effects.row_banding_enabled,
             row_banding_color: effects.row_banding_color,
             row_banding_opacity: effects.row_banding_opacity,
+            simple_noise_enabled: effects.simple_noise_enabled && !self.preferences.calm_mode,
+            simple_noise_amount: if self.preferences.calm_mode {
+                0.0
+            } else {
+                effects.simple_noise_amount
+            },
+            simple_noise_resolution: effects.simple_noise_resolution,
+            simple_noise_fps: effects.simple_noise_fps,
+            simple_noise_min_brightness: effects.simple_noise_min_brightness,
+            simple_noise_max_brightness: effects.simple_noise_max_brightness,
+            simple_noise_idle_enabled: effects.simple_noise_idle_enabled,
+            simple_noise_idle_amount: effects.simple_noise_idle_amount,
+            simple_noise_idle_delay_seconds: effects.simple_noise_idle_delay_seconds,
+            simple_noise_idle_ramp_seconds: effects.simple_noise_idle_ramp_seconds,
         };
         theme
     }
@@ -1015,6 +1029,7 @@ impl ButtonsApp {
                     theme.effects.gradient_animation = false;
                     theme.effects.static_opacity = 0.0;
                     theme.effects.scanlines_strength = 0.0;
+                    theme.effects.simple_noise_enabled = false;
                 }
                 return theme;
             }
@@ -1835,6 +1850,12 @@ impl ButtonsApp {
             .filter_map(|id| self.tabs.iter().position(|tab| tab.id == *id))
             .collect();
         self.rendered_panes = visible.clone();
+        let latest_activity_at_ms = visible
+            .iter()
+            .filter_map(|index| self.tabs.get(*index))
+            .map(|tab| tab.output.last_updated_at_ms())
+            .max()
+            .unwrap_or_default();
         let focused_effects_only =
             self.preferences.effects_focused_pane_only && effects_master_switch_available();
         let override_themes: std::collections::BTreeMap<_, _> = visible
@@ -1865,6 +1886,7 @@ impl ButtonsApp {
             override_themes: &override_themes,
             divider_style,
             clicked: &mut clicked,
+            latest_activity_at_ms,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
 
@@ -5054,6 +5076,112 @@ impl ButtonsApp {
                         ui,
                         &locale,
                         &mut document,
+                        "Simple noise",
+                        "/effects/simpleNoiseEnabled",
+                    );
+                    if document["effects"]["simpleNoiseEnabled"] == true {
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Simple noise amount",
+                            "/effects/simpleNoiseAmount",
+                            0.0,
+                            100.0,
+                            24.0,
+                            "%",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Noise resolution",
+                            "/effects/simpleNoiseResolution",
+                            8.0,
+                            100.0,
+                            50.0,
+                            "%",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Noise frame rate",
+                            "/effects/simpleNoiseFps",
+                            1.0,
+                            60.0,
+                            24.0,
+                            " FPS",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Minimum noise brightness",
+                            "/effects/simpleNoiseMinBrightness",
+                            0.0,
+                            100.0,
+                            32.0,
+                            "%",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Maximum noise brightness",
+                            "/effects/simpleNoiseMaxBrightness",
+                            0.0,
+                            100.0,
+                            68.0,
+                            "%",
+                        );
+                        theme_document_toggle(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Ramp noise while idle",
+                            "/effects/simpleNoiseIdleEnabled",
+                        );
+                        if document["effects"]["simpleNoiseIdleEnabled"] == true {
+                            theme_document_bounded_slider(
+                                ui,
+                                &locale,
+                                &mut document,
+                                "Idle noise amount",
+                                "/effects/simpleNoiseIdleAmount",
+                                0.0,
+                                100.0,
+                                50.0,
+                                "%",
+                            );
+                            theme_document_bounded_slider(
+                                ui,
+                                &locale,
+                                &mut document,
+                                "Idle delay",
+                                "/effects/simpleNoiseIdleDelaySeconds",
+                                0.0,
+                                300.0,
+                                60.0,
+                                " s",
+                            );
+                            theme_document_bounded_slider(
+                                ui,
+                                &locale,
+                                &mut document,
+                                "Idle ramp duration",
+                                "/effects/simpleNoiseIdleRampSeconds",
+                                1.0,
+                                60.0,
+                                6.0,
+                                " s",
+                            );
+                        }
+                    }
+                    theme_document_toggle(
+                        ui,
+                        &locale,
+                        &mut document,
                         "Row banding",
                         "/effects/rowBandingEnabled",
                     );
@@ -6986,6 +7114,7 @@ fn terminal_surface(
     terminal_bold_font_id: FontId,
     draw_bold_bright: bool,
     theme: &ThemeDefinition,
+    latest_activity_at_ms: u64,
 ) -> bool {
     let terminal_font = TerminalFont::new(FontSettings {
         font_type: terminal_font_id,
@@ -7058,7 +7187,14 @@ fn terminal_surface(
             available.y,
         ));
     let response = ui.add(terminal);
-    paint_terminal_effects(ui, response.rect, theme, tab.id, time);
+    paint_terminal_effects(
+        ui,
+        response.rect,
+        theme,
+        tab.id,
+        latest_activity_at_ms,
+        time,
+    );
     let scrollbar_clicked = if scrollbar_width > 0.0 {
         let track = egui::Rect::from_min_size(
             egui::pos2(response.rect.right(), response.rect.top()),
@@ -7134,6 +7270,7 @@ fn paint_terminal_effects(
     rect: egui::Rect,
     theme: &ThemeDefinition,
     terminal_id: u64,
+    latest_activity_at_ms: u64,
     time: f32,
 ) {
     let effects = &theme.effects;
@@ -7176,9 +7313,40 @@ fn paint_terminal_effects(
             );
         }
     }
-    if crate::dock::effects_need_repaint(theme.effects.gradient_animation, effects.static_opacity) {
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let noise_plan =
+        crate::plugins::effects::simple_noise::frame_plan(effects, latest_activity_at_ms, now_ms);
+    if noise_plan.opacity > 0.0 {
+        let frame_interval = if effects.simple_noise_fps == 0 {
+            (1000.0_f32 / 24.0).round() as u32
+        } else {
+            (1000.0_f32 / effects.simple_noise_fps.clamp(1, 60) as f32).round() as u32
+        };
+        let frame = now_ms / frame_interval.max(1) as u64;
+        let mesh = crate::plugins::effects::simple_noise::noise_mesh(
+            rect,
+            effects.simple_noise_resolution,
+            effects.simple_noise_min_brightness,
+            effects.simple_noise_max_brightness,
+            terminal_id ^ frame,
+            noise_plan.opacity,
+        );
+        ui.painter().add(egui::Shape::mesh(mesh));
+    }
+
+    let mut repaint_after_ms =
+        crate::dock::effects_need_repaint(theme.effects.gradient_animation, effects.static_opacity)
+            .then_some(80);
+    if let Some(noise_delay) = noise_plan.repaint_after_ms {
+        repaint_after_ms =
+            Some(repaint_after_ms.map_or(noise_delay, |delay| delay.min(noise_delay)));
+    }
+    if let Some(delay) = repaint_after_ms {
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(80));
+            .request_repaint_after(std::time::Duration::from_millis(delay));
     }
 }
 
@@ -7336,6 +7504,7 @@ struct PaneRenderState<'a> {
     override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
+    latest_activity_at_ms: u64,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -7364,6 +7533,7 @@ fn render_pane_tree(
                 state.terminal_bold_font.clone(),
                 state.draw_bold_bright,
                 state.override_themes.get(&tab.id).unwrap_or(state.theme),
+                state.latest_activity_at_ms,
             ) {
                 *state.clicked = Some(*index);
             }
@@ -7778,6 +7948,38 @@ fn theme_document_unit_slider(
         .unwrap_or(0.08) as f32;
     if ui
         .add(egui::Slider::new(&mut value, 0.0..=0.35).text(crate::i18n::literal(locale, label)))
+        .changed()
+    {
+        set_theme_document_value(document, pointer, json!(value));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_document_bounded_slider(
+    ui: &mut egui::Ui,
+    locale: &str,
+    document: &mut Value,
+    label: &str,
+    pointer: &str,
+    minimum: f32,
+    maximum: f32,
+    default: f32,
+    suffix: &str,
+) {
+    let mut value = document
+        .pointer(pointer)
+        .and_then(Value::as_f64)
+        .unwrap_or(default as f64) as f32;
+    if !value.is_finite() {
+        value = default;
+    }
+    value = value.clamp(minimum, maximum);
+    if ui
+        .add(
+            egui::Slider::new(&mut value, minimum..=maximum)
+                .text(crate::i18n::literal(locale, label))
+                .suffix(suffix),
+        )
         .changed()
     {
         set_theme_document_value(document, pointer, json!(value));
