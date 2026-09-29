@@ -11,8 +11,23 @@ compiled verifier fails closed with its empty trust list. Formatting, focused
 tests, and `cargo check --bin buttonscli` passed. `cargo clippy --lib --
 -D warnings` still fails on existing warnings in unrelated app, assistant,
 control, fonts, theme, and terminal code; it reported none in the new module.
-There is no production key, package builder, extraction/staging, rollback, or
-updater integration, so P06 remains partial.
+At this stage there was no production key, package builder, extraction/staging,
+rollback, or updater integration, so P06 remained partial.
+
+## 2026-09-29 — P06 archive preflight and versioned staging core
+
+Pinned `zip` 7.2.0 with the `deflate-flate2-zlib-rs` backend; its declared Rust
+1.83 MSRV fits the project's 1.85 minimum, and the optional Zopfli compressor
+is excluded. Signed package verification now parses the real ZIP, caps the entry
+count and expanded sizes, checks every stream/CRC before extraction, and rejects
+traversal, links, special files, Windows-invalid names, duplicates and
+file/directory collisions. The Windows target also requires a root-level
+`buttonscli.exe`; versioned stage paths are bounded, and staging roots reject
+symlinks/reparse points. A verified package can be extracted into a fresh
+version directory; it refuses overwrite and leaves the active-version record
+untouched. Fourteen focused tests pass. The production trust list remains empty;
+package creation, active-version switching, startup rollback and the launcher
+are still open. `cargo audit` is not installed in this checkout.
 
 ## 2026-09-29 — MCP control contract coverage
 

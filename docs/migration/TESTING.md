@@ -48,7 +48,7 @@ On Windows, run the commands below and `pwsh -NoProfile -File scripts/native-smo
 
 During implementation use `cargo test <focused_filter>` for fast model checks, then full tests at a milestone. Use `cargo clippy --all-targets -- -D warnings` for touched Rust surfaces; record baseline failures rather than silently changing unrelated code. For actual executable validation use `cargo build --release --bin buttonscli`; binary-only tests run zero current tests and are insufficient.
 
-For the P06 verifier core, run `cargo test --lib distribution::tests`. These tests use a deterministic throwaway signing key and do not create release keys or packages; the compiled trust allowlist intentionally remains empty until the production root is supplied.
+For the P06 verifier and staging core, run `cargo test --lib distribution::tests`. These tests use a deterministic throwaway signing key and in-memory ZIPs plus a temporary staging root; they cover the Windows root executable requirement, bounded version paths, and stage isolation. They do not create release keys or packages. The compiled trust allowlist intentionally remains empty until the production root is supplied.
 
 For shared code and dependency additions, use the existing WASM target recipe when installed:
 

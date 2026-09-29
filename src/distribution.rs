@@ -7,12 +7,22 @@
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::fs::{self, OpenOptions};
+use std::io::{Cursor, Read};
+use std::path::{Path, PathBuf};
+use zip::ZipArchive;
 
 const PRODUCT_ID: &str = "com.buttonscli.native";
 const MANIFEST_SCHEMA_VERSION: u32 = 1;
 const MAX_MANIFEST_BYTES: usize = 16 * 1024;
 const MAX_ARTIFACT_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_TRUSTED_KEYS: usize = 16;
+const MAX_ARCHIVE_ENTRIES: usize = 10_000;
+const MAX_ARCHIVE_FILE_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_ARCHIVE_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_ARCHIVE_PATH_BYTES: usize = 4096;
+const MAX_RELEASE_VERSION_BYTES: usize = 128;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TrustedSigningKey {
@@ -56,6 +66,7 @@ pub(crate) enum VerifyError {
     WrongProduct,
     WrongTarget,
     InvalidVersion,
+    MissingPackageExecutable,
     VersionNotNewer,
     InvalidChannel,
     InvalidArtifactName,
@@ -65,6 +76,13 @@ pub(crate) enum VerifyError {
     DigestMismatch,
     UpdaterTooOld,
     InvalidArchivePath,
+    InvalidArchive,
+    TooManyArchiveEntries,
+    ArchiveFileTooLarge,
+    ArchiveTooLarge,
+    UnsafeStageRoot,
+    VersionAlreadyStaged,
+    StageIo,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -148,7 +166,7 @@ pub(crate) fn verify_signed_manifest(
     Ok(manifest)
 }
 
-/// Verify the detached signature and package metadata as one ordered operation.
+/// Verify the detached signature, package metadata, and archive contents.
 pub(crate) fn verify_signed_package(
     manifest_bytes: &[u8],
     signature_bytes: &[u8],
@@ -166,7 +184,143 @@ pub(crate) fn verify_signed_package(
         updater_version,
         artifact,
     )?;
+    validate_package_archive(artifact)?;
+    validate_target_package(artifact, expected_target.os)?;
     Ok(manifest)
+}
+
+/// Verify and extract a package into a new, versioned directory without
+/// changing any active-version state. Callers must activate it separately
+/// after the running application has closed.
+pub(crate) fn verify_and_stage_package(
+    manifest_bytes: &[u8],
+    signature_bytes: &[u8],
+    trusted_keys: &[TrustedSigningKey],
+    expected_target: ReleaseTarget<'_>,
+    installed_version: &str,
+    updater_version: &str,
+    artifact: &[u8],
+    staging_root: &Path,
+) -> Result<PathBuf, VerifyError> {
+    let manifest = verify_signed_package(
+        manifest_bytes,
+        signature_bytes,
+        trusted_keys,
+        expected_target,
+        installed_version,
+        updater_version,
+        artifact,
+    )?;
+    stage_verified_archive(&manifest, artifact, staging_root)
+}
+
+fn stage_verified_archive(
+    manifest: &ReleaseManifest,
+    artifact: &[u8],
+    staging_root: &Path,
+) -> Result<PathBuf, VerifyError> {
+    ensure_real_directory(staging_root)?;
+    let root = fs::canonicalize(staging_root).map_err(|_| VerifyError::StageIo)?;
+    let versions_root = root.join("versions");
+    match fs::create_dir(&versions_root) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            ensure_real_directory(&versions_root)?;
+        }
+        Err(_) => return Err(VerifyError::StageIo),
+    }
+
+    let destination = versions_root.join(&manifest.version);
+    if fs::symlink_metadata(&destination).is_ok() {
+        return Err(VerifyError::VersionAlreadyStaged);
+    }
+
+    let temporary = (0..8)
+        .find_map(|_| {
+            let path = versions_root.join(format!(
+                ".staging-{}-{:016x}",
+                manifest.version,
+                fastrand::u64(..)
+            ));
+            if fs::create_dir(&path).is_ok() {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .ok_or(VerifyError::StageIo)?;
+
+    let extraction = extract_archive(artifact, &temporary);
+    if let Err(error) = extraction {
+        let _ = fs::remove_dir_all(&temporary);
+        return Err(error);
+    }
+    fs::rename(&temporary, &destination).map_err(|_| {
+        let _ = fs::remove_dir_all(&temporary);
+        VerifyError::StageIo
+    })?;
+    Ok(destination)
+}
+
+fn ensure_real_directory(path: &Path) -> Result<(), VerifyError> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| VerifyError::UnsafeStageRoot)?;
+    #[cfg(windows)]
+    use std::os::windows::fs::MetadataExt;
+    #[cfg(windows)]
+    let is_reparse_point = metadata.file_attributes() & 0x400 != 0;
+    #[cfg(not(windows))]
+    let is_reparse_point = false;
+    if metadata.file_type().is_symlink() || is_reparse_point || !metadata.is_dir() {
+        return Err(VerifyError::UnsafeStageRoot);
+    }
+    Ok(())
+}
+
+fn extract_archive(artifact: &[u8], destination: &Path) -> Result<(), VerifyError> {
+    let mut archive =
+        ZipArchive::new(Cursor::new(artifact)).map_err(|_| VerifyError::InvalidArchive)?;
+    for index in 0..archive.len() {
+        let file = archive
+            .by_index(index)
+            .map_err(|_| VerifyError::InvalidArchive)?;
+        let archive_name = file.name().to_owned();
+        validate_archive_entry(&archive_name)?;
+        let relative_name = archive_name.strip_suffix('/').unwrap_or(&archive_name);
+        let relative_path = relative_name
+            .split('/')
+            .fold(PathBuf::new(), |path, component| path.join(component));
+        let output_path = destination.join(relative_path);
+        if file.is_dir() {
+            fs::create_dir_all(&output_path).map_err(|_| VerifyError::StageIo)?;
+            continue;
+        }
+
+        let parent = output_path
+            .parent()
+            .ok_or(VerifyError::InvalidArchivePath)?;
+        fs::create_dir_all(parent).map_err(|_| VerifyError::StageIo)?;
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&output_path)
+            .map_err(|_| VerifyError::StageIo)?;
+        let declared_size = file.size();
+        #[cfg(unix)]
+        let mode = file.unix_mode();
+        let copied = std::io::copy(&mut file.take(declared_size.saturating_add(1)), &mut output)
+            .map_err(|_| VerifyError::InvalidArchive)?;
+        if copied != declared_size {
+            return Err(VerifyError::InvalidArchive);
+        }
+        output.sync_all().map_err(|_| VerifyError::StageIo)?;
+        #[cfg(unix)]
+        if let Some(mode) = mode {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&output_path, fs::Permissions::from_mode(mode & 0o755))
+                .map_err(|_| VerifyError::StageIo)?;
+        }
+    }
+    Ok(())
 }
 
 /// Validate signed package metadata and its downloaded bytes before extraction.
@@ -185,6 +339,9 @@ fn verify_package_bytes(
     }
     if manifest.target_os != expected_target.os || manifest.target_arch != expected_target.arch {
         return Err(VerifyError::WrongTarget);
+    }
+    if manifest.version.len() > MAX_RELEASE_VERSION_BYTES {
+        return Err(VerifyError::InvalidVersion);
     }
 
     let release_version =
@@ -233,6 +390,7 @@ fn verify_package_bytes(
 /// Reject archive entry names that could escape a portable package root.
 pub(crate) fn validate_archive_entry(name: &str) -> Result<(), VerifyError> {
     if name.is_empty()
+        || name.len() > MAX_ARCHIVE_PATH_BYTES
         || name.contains('\0')
         || name.contains('\\')
         || name.starts_with('/')
@@ -251,12 +409,122 @@ pub(crate) fn validate_archive_entry(name: &str) -> Result<(), VerifyError> {
             || component == ".."
             || component.ends_with('.')
             || component.ends_with(' ')
+            || component.encode_utf16().count() > 255
+            || component.chars().any(|character| {
+                character.is_control() || matches!(character, '<' | '>' | '"' | '|' | '?' | '*')
+            })
             || is_windows_reserved_name(component)
         {
             return Err(VerifyError::InvalidArchivePath);
         }
     }
     Ok(())
+}
+
+/// Preflight a portable ZIP before any updater is allowed to extract it.
+///
+/// This reads every entry to validate decompression and CRC data while keeping
+/// expanded sizes bounded. Extraction itself remains a separate staged step.
+fn validate_package_archive(artifact: &[u8]) -> Result<(), VerifyError> {
+    let mut archive =
+        ZipArchive::new(Cursor::new(artifact)).map_err(|_| VerifyError::InvalidArchive)?;
+    if archive.is_empty() {
+        return Err(VerifyError::InvalidArchive);
+    }
+    if archive.len() > MAX_ARCHIVE_ENTRIES {
+        return Err(VerifyError::TooManyArchiveEntries);
+    }
+
+    let mut paths = HashMap::<String, bool>::with_capacity(archive.len());
+    let mut implicit_directories = HashSet::<String>::with_capacity(archive.len());
+    let mut total_size = 0_u64;
+    for index in 0..archive.len() {
+        let file = archive
+            .by_index(index)
+            .map_err(|_| VerifyError::InvalidArchive)?;
+        let name = file.name();
+        validate_archive_entry(name)?;
+        if file.is_symlink() {
+            return Err(VerifyError::InvalidArchivePath);
+        }
+
+        let is_directory = file.is_dir();
+        if let Some(mode) = file.unix_mode() {
+            let kind = mode & 0o170000;
+            let expected_kind = if is_directory { 0o040000 } else { 0o100000 };
+            if kind != 0 && kind != expected_kind {
+                return Err(VerifyError::InvalidArchivePath);
+            }
+        }
+
+        let normalized = name.strip_suffix('/').unwrap_or(name).to_lowercase();
+        if paths.contains_key(&normalized) {
+            return Err(VerifyError::InvalidArchivePath);
+        }
+        let mut parent = normalized.as_str();
+        while let Some((ancestor, _)) = parent.rsplit_once('/') {
+            if paths.get(ancestor) == Some(&false) {
+                return Err(VerifyError::InvalidArchivePath);
+            }
+            implicit_directories.insert(ancestor.to_owned());
+            parent = ancestor;
+        }
+        if !is_directory && implicit_directories.contains(&normalized) {
+            return Err(VerifyError::InvalidArchivePath);
+        }
+        paths.insert(normalized, is_directory);
+
+        let declared_size = file.size();
+        if is_directory && declared_size != 0 {
+            return Err(VerifyError::InvalidArchive);
+        }
+        if declared_size > MAX_ARCHIVE_FILE_BYTES {
+            return Err(VerifyError::ArchiveFileTooLarge);
+        }
+        total_size = total_size
+            .checked_add(declared_size)
+            .ok_or(VerifyError::ArchiveTooLarge)?;
+        if total_size > MAX_ARCHIVE_TOTAL_BYTES {
+            return Err(VerifyError::ArchiveTooLarge);
+        }
+    }
+
+    // Check the complete metadata budget before decompressing any content,
+    // then read every entry to force CRC and stream validation.
+    for index in 0..archive.len() {
+        let file = archive
+            .by_index(index)
+            .map_err(|_| VerifyError::InvalidArchive)?;
+        let declared_size = file.size();
+        let bytes_read = std::io::copy(
+            &mut file.take(declared_size.saturating_add(1)),
+            &mut std::io::sink(),
+        )
+        .map_err(|_| VerifyError::InvalidArchive)?;
+        if bytes_read != declared_size {
+            return Err(VerifyError::InvalidArchive);
+        }
+    }
+    Ok(())
+}
+
+/// The first native release target is the Windows portable ZIP. Require its
+/// executable at the package root so a signed but inert ZIP cannot be staged.
+fn validate_target_package(artifact: &[u8], target_os: &str) -> Result<(), VerifyError> {
+    if target_os != "windows" {
+        return Ok(());
+    }
+    let mut archive =
+        ZipArchive::new(Cursor::new(artifact)).map_err(|_| VerifyError::InvalidArchive)?;
+    for index in 0..archive.len() {
+        let file = archive
+            .by_index(index)
+            .map_err(|_| VerifyError::InvalidArchive)?;
+        if file.name().eq_ignore_ascii_case("buttonscli.exe") && !file.is_dir() {
+            return Ok(());
+        }
+    }
+    Err(VerifyError::MissingPackageExecutable)
 }
 
 fn is_windows_reserved_name(component: &str) -> bool {
@@ -281,6 +549,8 @@ fn is_windows_reserved_name(component: &str) -> bool {
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
 
     const TEST_KEY_ID: &str = "throwaway-tests-only";
     const TARGET: ReleaseTarget<'static> = ReleaseTarget {
@@ -320,6 +590,38 @@ mod tests {
         let bytes = serde_json::to_vec(manifest).unwrap();
         let signature = key.sign(&bytes).to_bytes().to_vec();
         (bytes, signature)
+    }
+
+    fn test_archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let cursor = Cursor::new(Vec::new());
+        let mut archive = zip::ZipWriter::new(cursor);
+        for (name, contents) in entries {
+            archive
+                .start_file(
+                    *name,
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
+                )
+                .unwrap();
+            archive.write_all(contents).unwrap();
+        }
+        archive.finish().unwrap().into_inner()
+    }
+
+    fn manifest_for_artifact(artifact: &[u8]) -> ReleaseManifest {
+        let mut manifest = valid_manifest();
+        manifest.artifact_size = artifact.len() as u64;
+        manifest.sha256 = format!("{:x}", Sha256::digest(artifact));
+        manifest
+    }
+
+    fn temporary_stage_root() -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "buttonscli-distribution-test-{}-{:016x}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        fs::create_dir(&path).unwrap();
+        path
     }
 
     fn verify_valid_package() -> Result<(), VerifyError> {
@@ -448,6 +750,15 @@ mod tests {
                 "case {field}"
             );
         }
+
+        let mut manifest = valid_manifest();
+        manifest.version = format!("1.2.3+{}", "x".repeat(MAX_RELEASE_VERSION_BYTES));
+        let (bytes, signature) = sign(&manifest, &key);
+        let verified = verify_signed_manifest(&bytes, &signature, &[trusted_key(&key)]).unwrap();
+        assert_eq!(
+            verify_package_bytes(&verified, TARGET, "1.2.2", "1.0.0", ARTIFACT),
+            Err(VerifyError::InvalidVersion)
+        );
     }
 
     #[test]
@@ -535,6 +846,9 @@ mod tests {
             "folder/COM¹.txt",
             "trailing.",
             "trailing ",
+            "folder/unsafe?.txt",
+            "folder/unsafe|name.txt",
+            "folder/control\u{001f}.txt",
         ] {
             assert_eq!(
                 validate_archive_entry(path),
@@ -545,5 +859,236 @@ mod tests {
         for path in ["buttonscli.exe", "assets/", "assets/icon.png"] {
             assert_eq!(validate_archive_entry(path), Ok(()), "path {path:?}");
         }
+        let too_long_component = format!("{}.txt", "x".repeat(256));
+        assert_eq!(
+            validate_archive_entry(&too_long_component),
+            Err(VerifyError::InvalidArchivePath)
+        );
+        assert_eq!(
+            validate_archive_entry(&"x".repeat(MAX_ARCHIVE_PATH_BYTES + 1)),
+            Err(VerifyError::InvalidArchivePath)
+        );
+    }
+
+    #[test]
+    fn signed_package_preflights_real_zip_entries_before_accepting() {
+        let key = signing_key();
+        let valid = test_archive(&[
+            ("buttonscli.exe", b"test executable"),
+            ("assets/icon.png", b"icon"),
+        ]);
+        let (manifest_bytes, signature) = sign(&manifest_for_artifact(&valid), &key);
+        assert!(verify_signed_package(
+            &manifest_bytes,
+            &signature,
+            &[trusted_key(&key)],
+            TARGET,
+            "1.2.2",
+            "1.0.0",
+            &valid,
+        )
+        .is_ok());
+
+        let traversal = test_archive(&[("../escape.txt", b"outside")]);
+        let (manifest_bytes, signature) = sign(&manifest_for_artifact(&traversal), &key);
+        assert_eq!(
+            verify_signed_package(
+                &manifest_bytes,
+                &signature,
+                &[trusted_key(&key)],
+                TARGET,
+                "1.2.2",
+                "1.0.0",
+                &traversal,
+            ),
+            Err(VerifyError::InvalidArchivePath)
+        );
+
+        let missing_executable = test_archive(&[("assets/readme.txt", b"not an app")]);
+        let (manifest_bytes, signature) = sign(&manifest_for_artifact(&missing_executable), &key);
+        assert_eq!(
+            verify_signed_package(
+                &manifest_bytes,
+                &signature,
+                &[trusted_key(&key)],
+                TARGET,
+                "1.2.2",
+                "1.0.0",
+                &missing_executable,
+            ),
+            Err(VerifyError::MissingPackageExecutable)
+        );
+    }
+
+    #[test]
+    fn archive_preflight_rejects_corrupt_symlink_and_case_colliding_entries() {
+        assert_eq!(
+            validate_package_archive(b"not a zip"),
+            Err(VerifyError::InvalidArchive)
+        );
+
+        let mut bad_crc = test_archive(&[("buttonscli.exe", b"stored payload")]);
+        let file_name_size = u16::from_le_bytes([bad_crc[26], bad_crc[27]]) as usize;
+        let extra_size = u16::from_le_bytes([bad_crc[28], bad_crc[29]]) as usize;
+        let payload_start = 30 + file_name_size + extra_size;
+        bad_crc[payload_start] ^= 0x01;
+        assert_eq!(
+            validate_package_archive(&bad_crc),
+            Err(VerifyError::InvalidArchive)
+        );
+
+        let cursor = Cursor::new(Vec::new());
+        let mut symlink = zip::ZipWriter::new(cursor);
+        symlink
+            .add_symlink(
+                "linked-file",
+                "../outside.txt",
+                SimpleFileOptions::default(),
+            )
+            .unwrap();
+        let symlink = symlink.finish().unwrap().into_inner();
+        assert_eq!(
+            validate_package_archive(&symlink),
+            Err(VerifyError::InvalidArchivePath)
+        );
+
+        let colliding = test_archive(&[
+            ("bin/buttonscli.exe", b"one"),
+            ("BIN/BUTTONSCLI.EXE", b"two"),
+        ]);
+        assert_eq!(
+            validate_package_archive(&colliding),
+            Err(VerifyError::InvalidArchivePath)
+        );
+        let parent_collision = test_archive(&[("assets", b"file"), ("assets/icon.png", b"child")]);
+        assert_eq!(
+            validate_package_archive(&parent_collision),
+            Err(VerifyError::InvalidArchivePath)
+        );
+
+        let mut oversized_entry = test_archive(&[("buttonscli.exe", b"x")]);
+        let central_header = oversized_entry
+            .windows(4)
+            .position(|window| window == b"PK\x01\x02")
+            .unwrap();
+        let uncompressed_size_offset = central_header + 24;
+        oversized_entry[uncompressed_size_offset..uncompressed_size_offset + 4]
+            .copy_from_slice(&((MAX_ARCHIVE_FILE_BYTES + 1) as u32).to_le_bytes());
+        assert_eq!(
+            validate_package_archive(&oversized_entry),
+            Err(VerifyError::ArchiveFileTooLarge)
+        );
+
+        let mut oversized_total = test_archive(&[
+            ("one.bin", b"x"),
+            ("two.bin", b"x"),
+            ("three.bin", b"x"),
+            ("four.bin", b"x"),
+            ("five.bin", b"x"),
+        ]);
+        let central_headers = oversized_total
+            .windows(4)
+            .enumerate()
+            .filter_map(|(offset, window)| (window == b"PK\x01\x02").then_some(offset))
+            .collect::<Vec<_>>();
+        assert_eq!(central_headers.len(), 5);
+        for central_header in central_headers {
+            let offset = central_header + 24;
+            oversized_total[offset..offset + 4]
+                .copy_from_slice(&(MAX_ARCHIVE_FILE_BYTES as u32).to_le_bytes());
+        }
+        assert_eq!(
+            validate_package_archive(&oversized_total),
+            Err(VerifyError::ArchiveTooLarge)
+        );
+    }
+
+    #[test]
+    fn stages_verified_archive_without_switching_active_version_or_overwriting() {
+        let root = temporary_stage_root();
+        fs::write(root.join("active-version"), "1.2.2").unwrap();
+        let artifact = test_archive(&[
+            ("buttonscli.exe", b"new build"),
+            ("assets/help.md", b"help"),
+        ]);
+        let key = signing_key();
+        let manifest = manifest_for_artifact(&artifact);
+        let (manifest_bytes, signature) = sign(&manifest, &key);
+
+        let staged = verify_and_stage_package(
+            &manifest_bytes,
+            &signature,
+            &[trusted_key(&key)],
+            TARGET,
+            "1.2.2",
+            "1.0.0",
+            &artifact,
+            &root,
+        )
+        .unwrap();
+        assert_eq!(
+            staged,
+            fs::canonicalize(root.join("versions"))
+                .unwrap()
+                .join("1.2.3")
+        );
+        assert_eq!(
+            fs::read(staged.join("buttonscli.exe")).unwrap(),
+            b"new build"
+        );
+        assert_eq!(fs::read(staged.join("assets/help.md")).unwrap(), b"help");
+        assert_eq!(
+            fs::read_to_string(root.join("active-version")).unwrap(),
+            "1.2.2"
+        );
+        assert_eq!(
+            verify_and_stage_package(
+                &manifest_bytes,
+                &signature,
+                &[trusted_key(&key)],
+                TARGET,
+                "1.2.2",
+                "1.0.0",
+                &artifact,
+                &root,
+            ),
+            Err(VerifyError::VersionAlreadyStaged)
+        );
+        assert_eq!(
+            fs::read(staged.join("buttonscli.exe")).unwrap(),
+            b"new build"
+        );
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn invalid_package_cannot_create_a_staging_version() {
+        let root = temporary_stage_root();
+        fs::write(root.join("active-version"), "1.2.2").unwrap();
+        let artifact = test_archive(&[("../escape.txt", b"outside")]);
+        let key = signing_key();
+        let (manifest_bytes, signature) = sign(&manifest_for_artifact(&artifact), &key);
+
+        assert_eq!(
+            verify_and_stage_package(
+                &manifest_bytes,
+                &signature,
+                &[trusted_key(&key)],
+                TARGET,
+                "1.2.2",
+                "1.0.0",
+                &artifact,
+                &root,
+            ),
+            Err(VerifyError::InvalidArchivePath)
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("active-version")).unwrap(),
+            "1.2.2"
+        );
+        assert!(!root.join("versions").exists());
+
+        fs::remove_dir_all(root).unwrap();
     }
 }
