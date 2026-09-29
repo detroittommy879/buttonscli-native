@@ -1,5 +1,18 @@
 # Reconstruction journal
 
+## 2026-09-29 — P01 fail-closed runtime config client
+
+Added a bounded, redirect-free runtime-config request using the existing
+native HTTP transport. It runs in a background thread after the app starts,
+uses the hosted runtime-config URL, refreshes every five minutes, accepts only
+HTTPS remotely (loopback HTTP is reserved for tests), and defaults missing
+flags or all errors to closed. A failed refresh clears previously cached
+flags. Feature gates now read the current runtime flags instead of assuming
+Pro is enabled. The smoke harness disables the remote read. Account sign-in,
+secure session storage, entitlement refresh, and paid rollout verification
+remain open; no hosted service was changed. Access tier: internal rollout
+plumbing.
+
 ## 2026-09-29 — P01 server feature-grant groundwork
 
 Extended native entitlements to carry the server's explicit `activeFeatures`

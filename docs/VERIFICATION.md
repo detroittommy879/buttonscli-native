@@ -1,14 +1,37 @@
 # Verification record
 
-Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
+Last run: 2026-09-29 on Windows 11, Rust 1.97.1. Earlier Linux-only checks
+are labeled by date in the sections below.
 
 ## 2026-09-29 P01 feature grant resolution
 
 `cargo test --lib features::access::tests` passes four tests. New coverage
 verifies that a non-expired server grant unlocks only its named Pro feature
 and that expiry closes access. Kill switches, rollout state and development
-override precedence remain covered. Runtime config, account login, secure
-token storage and hosted service behavior are not yet integrated.
+override precedence remain covered. Account login, secure token storage and
+live hosted service behavior are not yet integrated.
+
+## 2026-09-29 P01 runtime-config client
+
+`cargo test --lib account::tests` passes two tests for missing-field defaults,
+accepted runtime flags, request URL, non-2xx and invalid JSON responses, and
+remote cleartext/credentialed URL rejection. Runtime config is fetched on a
+background thread every five minutes and cached only in process memory; any
+failed refresh clears the flags to their closed defaults. The native smoke
+harness sets `BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG=1` to keep startup
+verification offline. Account sign-in, secure session persistence, revocation,
+and live hosted runtime behavior remain unverified, so no Pro feature is
+enabled.
+
+The Windows pass also completed `cargo fmt --all -- --check`, `cargo test`
+(153 library tests and 2 fixture tests), `cargo check --bin buttonscli`,
+`cargo build --bin buttonscli`, and the isolated
+`pwsh -NoProfile -File scripts/native-smoke.ps1 -SkipBuild` run. The GUI opened
+at 1471x975 pixels; the smoke launch explicitly disabled remote config. The
+WASM library check passed with the existing 50 native-only warnings. WGPU
+reported the optional Vulkan validation layer missing during GUI startup; it
+was nonfatal. None of these checks verifies live service behavior or account
+sign-in.
 
 ## 2026-09-29 P05 isolated Windows GUI startup
 

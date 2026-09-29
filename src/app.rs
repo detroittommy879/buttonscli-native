@@ -62,14 +62,8 @@ use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_help_available() -> bool {
-    use crate::features::{
-        access::{self, RuntimeAccess},
-        catalog::FeatureKey,
-    };
-    let mut runtime = RuntimeAccess {
-        pro_enabled: true,
-        ..RuntimeAccess::default()
-    };
+    use crate::features::{access, catalog::FeatureKey};
+    let mut runtime = crate::account::current_runtime_config().access();
     if cfg!(debug_assertions)
         && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_HELP").is_ok_and(|value| value == "1")
     {
@@ -84,14 +78,8 @@ fn ai_help_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn theme_generation_available() -> bool {
-    use crate::features::{
-        access::{self, RuntimeAccess},
-        catalog::FeatureKey,
-    };
-    let mut runtime = RuntimeAccess {
-        pro_enabled: true,
-        ..RuntimeAccess::default()
-    };
+    use crate::features::{access, catalog::FeatureKey};
+    let mut runtime = crate::account::current_runtime_config().access();
     if cfg!(debug_assertions)
         && std::env::var("BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR").is_ok_and(|value| value == "1")
     {
@@ -108,14 +96,8 @@ fn theme_generation_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn remote_control_available() -> bool {
-    use crate::features::{
-        access::{self, RuntimeAccess},
-        catalog::FeatureKey,
-    };
-    let mut runtime = RuntimeAccess {
-        pro_enabled: true,
-        ..RuntimeAccess::default()
-    };
+    use crate::features::{access, catalog::FeatureKey};
+    let mut runtime = crate::account::current_runtime_config().access();
     if cfg!(debug_assertions)
         && std::env::var("BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL").is_ok_and(|value| value == "1")
     {
@@ -666,6 +648,8 @@ impl ButtonsApp {
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::account::refresh_runtime_config(cc.egui_ctx.clone());
         let stored_preferences: Option<Preferences> = cc
             .storage
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY));
