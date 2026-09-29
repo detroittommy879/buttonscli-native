@@ -54,7 +54,7 @@ For shared code and dependency additions, use the existing WASM target recipe wh
 cargo check --target wasm32-unknown-unknown --no-default-features
 ```
 
-Run `node scripts/test-mcp-smoke.mjs` for the optional MCP adapter's fake-API route/gate/disconnect contract. Run `pwsh -NoProfile -File scripts/test-control-live.ps1` for the installed Node CLI command matrix and visible/background PTY output against a debug app with a disposable home; add `-SkipBuild` to reuse the current debug binary. The live smoke covers stdin/file/base64 sends, a type-only preset, and grid layout, then closes the test app and verifies its test shell children exit. Neither test uses the user's existing app/control file. External MCP-client and direct GUI acceptance remain separate.
+Run `node scripts/test-mcp-smoke.mjs` for the optional MCP adapter's fake-API route/gate/disconnect contract. Run `pwsh -NoProfile -File scripts/test-control-live.ps1` for the installed Node CLI command matrix and visible/background PTY output against a debug app with a disposable home; add `-SkipBuild` to reuse the current debug binary. The live smoke covers stdin/file/base64/paced sends, a type-only preset, and grid layout, then closes the test app and verifies its test shell children exit. Neither test uses the user's existing app/control file. External MCP-client and direct GUI acceptance remain separate.
 
 ## Manual milestone acceptance
 

@@ -264,6 +264,16 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
+    $pacedMarker = "BUTTONSCLI_PACED_$([guid]::NewGuid().ToString('N'))"
+    $null = Invoke-NativeCli -Arguments @(
+        'send', '--tab', $visibleTabId, '--delivery', 'slow-typed', '--delay-ms', '1',
+        '--text', "Write-Output '$pacedMarker'", '--enter', '--json'
+    )
+    $null = Invoke-NativeCli -Arguments @(
+        'wait-for-text', '--tab', $visibleTabId, '--text', $pacedMarker,
+        '--timeout-ms', '5000', '--interval-ms', '50', '--json'
+    )
+
     $presets = Invoke-NativeCli -Arguments @('presets', '--json')
     $typeOnlyPreset = $presets.presets |
         Where-Object { $_.label -eq 'SSH Template' -and -not $_.sendEnter } |
@@ -315,7 +325,7 @@ try {
     $ownedShellIds = @($ownedShellProcesses | ForEach-Object { [uint32]$_.ProcessId })
 
     Write-Output "Control API status authenticated for instance $($descriptor.instanceId)."
-    Write-Output 'Installed Node CLI exercised status, tabs, create, rename, read, waits, run, send (base64/file/stdin), key, type-only preset, and grid layout.'
+    Write-Output 'Installed Node CLI exercised status, tabs, create, rename, read, waits, run, send (base64/file/stdin/paced), key, type-only preset, and grid layout.'
     Write-Output 'Visible and background PTYs both captured unique output markers.'
     Write-Output "Background run completion: $($hiddenRun.completionReason); timed out: $($hiddenRun.timedOut)."
 }

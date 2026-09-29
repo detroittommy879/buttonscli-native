@@ -154,7 +154,7 @@ These are early tasks because the user reports partially working layouts. Reprod
 ### C04 — Create/rename/layout/preset routes [M, C02, C03, S05]
 - Implement remaining existing routes through dispatcher/current native profile. Preserve existing selector and preset ambiguity behavior.
 - Execute the existing CLI command matrix against a test-owned native instance. Include stdin/file/base64, literal type-only presets, hidden tabs and layout mapping.
-- Done: `scripts/test-control-live.ps1` invokes the installed helper using the exact test descriptor and exercises status/tabs, create/rename/read, text waits/run, stdin/file/base64 sends, key, type-only preset, background-tab targeting, and a two-column grid mapping. Pro. External MCP launch remains separate.
+- Done: `scripts/test-control-live.ps1` invokes the installed helper using the exact test descriptor and exercises status/tabs, create/rename/read, text waits/run, stdin/file/base64/paced sends, key, type-only preset, background-tab targeting, and a two-column grid mapping. Pro. External MCP launch remains separate.
 
 ### C05 — Optional MCP adapter [S, C04]
 - Inspect and pin O `control_mcp_helper_template.mjs`; adapt native discovery without embedding tokens in setup. Add protocol smoke tests with fake API/explicit descriptor.

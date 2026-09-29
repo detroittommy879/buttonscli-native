@@ -109,6 +109,6 @@ evidence. `pwsh -NoProfile -File scripts/test-control-live.ps1` also confirms
 authenticated status/create/run/read against a test-owned Windows app, output
 capture for visible and background PTYs, and PTY shell cleanup at app shutdown.
 The installed Node CLI command matrix also passes there, including stdin/file/
-base64 payloads, the type-only preset, hidden-tab targeting, and grid layout.
+base64/paced payloads, the type-only preset, hidden-tab targeting, and grid layout.
 No external MCP-client launch, direct GUI handoff, provider request, or
 cross-platform runtime acceptance is claimed yet.
