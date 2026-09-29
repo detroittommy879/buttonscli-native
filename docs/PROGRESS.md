@@ -1,5 +1,15 @@
 # Reconstruction journal
 
+## 2026-09-29 — P06 native distribution design
+
+Recorded the native product/artifact IDs, existing `.buttonscli-native`
+settings boundary, exact-byte Ed25519 manifest signature, manual Windows ZIP
+first package, versioned staging, and last-known-good rollback behavior in
+`docs/migration/NATIVE-DISTRIBUTION-DECISION.md`. Native release files, keys,
+endpoint, and pointer stay separate from Tauri. No production key, package,
+updater, or release endpoint was created. P06 remains open pending verifier,
+tamper/rollback tests, and platform adapters.
+
 ## 2026-09-29 — P04 explicit feedback and privacy
 
 Added the free `userFeedback` feature under **Help → Send Feedback**. The

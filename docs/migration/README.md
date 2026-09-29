@@ -86,7 +86,7 @@ The supplied screenshot is visual context for the current native UI, not an inst
 | Accounts/entitlements | Missing; O auth/entitlement stores, services/auth-worker | P3 account contract and credential lifecycle; hosted paid validation required before paid shipping |
 | Cloud sync/sharing/JSON/vault | Catalog says planned, not shipped legacy parity | Deferred product work; do not recreate placeholders as “ported” features |
 | Feedback/privacy/analytics | Missing; O services and receiver contracts | P3 explicit policy, redaction, schema parity; no surprise telemetry |
-| Updater/releases | Missing; O release-cockpit and updateCheckService | P3 separate native signed-artifact pipeline; never replace Tauri artifacts/channels |
+| Updater/releases | Missing; see the [native distribution decision](NATIVE-DISTRIBUTION-DECISION.md) | P3 separate signed-artifact pipeline with verification and rollback tests; never replace Tauri artifacts/channels |
 | Accessibility/IME/emoji/DPI | Partial/uncertified; N renderer and O UI expectations | Continuous gates; focused P2 platform work |
 
 ## Architecture boundaries
