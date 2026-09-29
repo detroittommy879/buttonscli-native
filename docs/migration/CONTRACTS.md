@@ -135,4 +135,6 @@ A named explicit development/all-free mode may enable local testing; do not trea
 
 Externalize new native UI text immediately; reuse original message keys/locales where practical, with tested fallback/interpolation and font coverage. Do not promise RTL or IME correctness based only on translated labels.
 
+Font discovery and custom-font import stay offline and profile-scoped. Reject invalid or unsupported faces before adding them to egui, preserve a bundled fallback for missing fonts, and keep terminal cell measurement tied to the regular face while bold text uses its separately selected face. Online font downloads are a distinct opt-in task.
+
 Preserve analytics preferences but do not activate network telemetry merely by importing config. If telemetry is implemented, use original stable feature keys and update producer/receiver/schema/docs together. Avoid raw terminal output, commands, paths, provider prompts and secrets in analytics. Runtime failures must not destabilize the terminal.

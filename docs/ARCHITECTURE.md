@@ -70,17 +70,20 @@ silently replacing terminal colors (or vice versa). Calm apply uses the chosen
 gradient colors but disables gradient motion, static, and scanlines. Preferences
 from the earlier single-theme schema migrate that one ID into all five sources.
 
-All 26 legacy font binaries are embedded and registered once at startup. Named
-egui families point to real face files, the closest packaged weight is selected,
-and symbol plus broad Unicode faces form the fallback chain. Seven persisted
-typography zones mirror the legacy model. Online-only font names found in old
-themes are sanitized to a bundled equivalent while Google loading is disabled,
-matching the legacy application's offline behavior.
+The 26 scalable legacy font binaries and bundled emoji face are embedded and
+registered at startup. The native catalog also discovers local system folders
+and profile-imported TTF/OTF files with caps of 8,192 directory entries, 512
+font files, and 256 MiB of face data; invalid faces are skipped before egui
+parses them. Named egui families point to real face files, the
+closest available weight is selected, and symbol plus broad Unicode faces form
+the fallback chain. Seven persisted typography zones mirror the legacy model.
+Online-only font names found in old themes are sanitized to a bundled
+equivalent; native font loading makes no network requests.
 
 Terminal typography carries separate regular and bold `FontId`s into the cell
-renderer. Bold cells select the nearest packaged weight without changing cell
-metrics, and the legacy bright-ANSI toggle promotes the eight normal named/indexed
-colors to their exact bright palette entries.
+renderer. Bold cells select the nearest installed weight without changing cell
+metrics, and the legacy bright-ANSI toggle promotes the eight normal
+named/indexed colors to their exact bright palette entries.
 
 ## Dependency policy
 

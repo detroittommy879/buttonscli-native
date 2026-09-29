@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added offline system-font discovery and free profile-local `.ttf` / `.otf` import. Invalid fonts are rejected before registration, missing selections use bundled fallbacks, and terminal regular/bold faces remain distinct.
 - Added a free, non-AI personal theme library with a visual editor, scoped live preview, safe JSON import/export, save, and confirmed delete. Unknown theme fields are retained, and theme changes do not restart terminal sessions.
 - Expanded Windows shell discovery with WSL and individual installed WSL distributions. Custom shell command lines now preserve quoted executable paths, embedded quotes, empty arguments, and Windows backslashes; failed profile launches keep their actionable error instead of silently switching shells.
 - Added a first-run language chooser and Settings control to follow the system locale or select one of 21 bundled app languages, plus an offline Hangul font fallback. Original-profile imports preserve language mode and manual locale; unmatched native labels safely fall back to English.

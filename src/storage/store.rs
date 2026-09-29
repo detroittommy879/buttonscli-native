@@ -26,6 +26,7 @@ pub enum StoreError {
     StaleRevision,
     ImportCollision,
     ThemeCollision,
+    FontCollision,
     SourceChanged,
     Io(io::Error),
 }
@@ -50,6 +51,7 @@ impl std::fmt::Display for StoreError {
                 write!(f, "import destination already exists; refresh the preview")
             }
             Self::ThemeCollision => write!(f, "theme file already exists"),
+            Self::FontCollision => write!(f, "font file already exists"),
             Self::SourceChanged => write!(f, "original settings changed; refresh the preview"),
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
@@ -369,6 +371,29 @@ impl NativeStore {
         Ok(())
     }
 
+    pub(crate) fn profile_fonts_dir(&self) -> Result<PathBuf, StoreError> {
+        let _lock = self.acquire_root_lock()?;
+        self.ensure_profile_fonts_dir()
+    }
+
+    pub(crate) fn write_font_file(&self, file_name: &str, bytes: &[u8]) -> Result<(), StoreError> {
+        validate_font_file_name(file_name)?;
+        if bytes.len() as u64 > 32 * 1024 * 1024 {
+            return Err(StoreError::TooLarge);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let fonts = self.ensure_profile_fonts_dir()?;
+        let path = fonts.join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        match write_new(&path, bytes) {
+            Ok(()) => Ok(()),
+            Err(StoreError::Io(error)) if error.kind() == io::ErrorKind::AlreadyExists => {
+                Err(StoreError::FontCollision)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn acquire_root_lock(&self) -> Result<fs::File, StoreError> {
         guard_distinct_roots(&self.root.0, &self.legacy_root)?;
         fs::create_dir_all(&self.root.0)?;
@@ -406,6 +431,22 @@ impl NativeStore {
         ensure_native_path(&self.root.0, &themes)?;
         Ok(themes)
     }
+
+    fn ensure_profile_fonts_dir(&self) -> Result<PathBuf, StoreError> {
+        let profiles = self.root.0.join("profiles");
+        ensure_native_path(&self.root.0, &profiles)?;
+        fs::create_dir_all(&profiles)?;
+        ensure_native_path(&self.root.0, &profiles)?;
+        let profile = self.profile_dir();
+        ensure_native_path(&self.root.0, &profile)?;
+        fs::create_dir_all(&profile)?;
+        ensure_native_path(&self.root.0, &profile)?;
+        let fonts = profile.join("fonts");
+        ensure_native_path(&self.root.0, &fonts)?;
+        fs::create_dir_all(&fonts)?;
+        ensure_native_path(&self.root.0, &fonts)?;
+        Ok(fonts)
+    }
 }
 
 fn validate_theme_file_name(file_name: &str) -> Result<(), StoreError> {
@@ -416,6 +457,22 @@ fn validate_theme_file_name(file_name: &str) -> Result<(), StoreError> {
             .extension()
             .and_then(|extension| extension.to_str())
             .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+    {
+        return Err(StoreError::InvalidDocument);
+    }
+    Ok(())
+}
+
+fn validate_font_file_name(file_name: &str) -> Result<(), StoreError> {
+    let path = Path::new(file_name);
+    if path.components().count() != 1
+        || path.file_name().and_then(|name| name.to_str()) != Some(file_name)
+        || !path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("ttf") || extension.eq_ignore_ascii_case("otf")
+            })
     {
         return Err(StoreError::InvalidDocument);
     }

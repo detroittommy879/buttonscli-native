@@ -12,6 +12,15 @@ Linux/macOS runtime validation were not run for those changes. The detailed
 current boundary is in `docs/PROGRESS.md`, `docs/AI-HELP.md`, and
 `docs/CONTROL-API.md`.
 
+## 2026-09-28 U08 Windows fonts check
+
+`cargo fmt --all -- --check`, `cargo test --lib` (120 passed), `cargo check
+--bin buttonscli`, `cargo build --bin buttonscli`, and `git diff --check` passed
+after implementing offline system-font discovery and profile-local font
+imports. The discovery scan is bounded and import validates faces before
+registration. These checks do not replace a live Windows font selector review
+or startup-time measurement on machines with large font collections.
+
 ## Automated gates
 
 The following completed successfully:
@@ -28,8 +37,11 @@ cargo build --release
 
 The native tests prove that all 127 theme documents parse, the combined legacy
 catalog contains exactly 555 selections, representative ANSI values survive
-verbatim, all 26 scalable font files have catalog entries, legacy font aliases
-sanitize safely, and cross-platform shell-title extraction remains stable. The
+verbatim, all 26 scalable font files and the emoji face have catalog entries,
+legacy font aliases sanitize safely, and cross-platform shell-title extraction
+remains stable. Font tests also validate offline local discovery/import,
+collision handling, missing and invalid font behavior, regular/bold selection,
+and Hangul fallback. The
 shell-profile suite covers quoted command-line parsing, malformed input,
 discovery de-duplication, old-preference migration, custom launch resolution,
 missing executables/directories, and fallback after removing the selected

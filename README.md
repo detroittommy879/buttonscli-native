@@ -40,9 +40,9 @@ Current desktop features include:
   handoff, optional Node CLI, and optional stdio MCP server; it supports tab
   creation, rename, layouts, presets, bounded output reads, and raw, bracketed,
   or paced input, but is still Pro-gated and not enabled in release builds;
-- 26 bundled font faces grouped into 19 selectable families, with independent
-  typography for shell UI, tabs, dock, settings, assistant, status, and terminal,
-  including separate terminal regular/bold faces;
+- 26 bundled scalable font faces plus an emoji face across 20 families, offline system-font discovery
+  and local `.ttf` / `.otf` import; each UI area has its own typography, and the
+  terminal has separate regular and bold faces;
 - theme-driven linear, radial, and conic terminal gradients, animated color
   drift, static, and scanline overlays rendered natively;
 - per-terminal theme choices plus **Theme all**, **Random current**, and
@@ -120,13 +120,17 @@ The [feature migration plan](docs/migration/README.md) compares the original
 Tauri app with this native implementation, records source/build evidence for
 completed work, and tracks remaining platform and acceptance checks.
 
-The theme and font catalogs are embedded into the executable. They do not make
-network requests and remain available offline.
+The bundled theme and font catalogs are embedded into the executable. System
+fonts are discovered from local folders and custom fonts stay in the native
+profile; font discovery and selection do not make network requests.
 
 Choose a display language or follow the operating system in **Settings →
 Language & Region**. A first-run chooser appears only for a new install. See
 [`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for supported languages and
 current font and layout limits.
+
+See [`docs/FONTS.md`](docs/FONTS.md) for system-font discovery, local font
+import, missing-font fallback, and supported file formats.
 
 ## License
 

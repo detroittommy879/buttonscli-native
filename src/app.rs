@@ -139,6 +139,17 @@ fn personal_theme_editor_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn custom_fonts_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::CustomFonts,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 fn localization_settings_available() -> bool {
     crate::features::access::resolve(
         crate::features::catalog::FeatureKey::LocalizationSettings,
@@ -154,6 +165,7 @@ pub struct ButtonsApp {
     locale: String,
     show_localization_onboarding: bool,
     themes: ThemeCatalog,
+    font_catalog: fonts::FontCatalog,
     theme_search: String,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_document: Option<Value>,
@@ -173,6 +185,10 @@ pub struct ButtonsApp {
     theme_editor_preview_snapshot: Option<ThemePreviewSnapshot>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_confirm_delete: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    custom_font_import_path: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    custom_font_status: Option<String>,
     settings_tab: SettingsTab,
     settings_snapshot: Option<SettingsSnapshot>,
     shortcut_capture: Option<ShortcutAction>,
@@ -577,8 +593,23 @@ impl ButtonsApp {
                     log::warn!("personal theme: {warning}");
                 }
             }
+            let profile_fonts =
+                app.native_store
+                    .as_ref()
+                    .and_then(|store| match store.profile_fonts_dir() {
+                        Ok(path) => Some(path),
+                        Err(error) => {
+                            log::warn!("custom font folder unavailable: {error}");
+                            None
+                        }
+                    });
+            let (catalog, warnings) = fonts::FontCatalog::load(profile_fonts.as_deref());
+            app.font_catalog = catalog;
+            for warning in warnings {
+                log::warn!("font skipped: {warning}");
+            }
         }
-        fonts::install(&cc.egui_ctx);
+        fonts::install(&cc.egui_ctx, &app.font_catalog);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
         app.open_tab(cc.egui_ctx.clone());
@@ -628,6 +659,7 @@ impl ButtonsApp {
             locale,
             show_localization_onboarding,
             themes: ThemeCatalog::load(),
+            font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_document: None,
@@ -647,6 +679,10 @@ impl ButtonsApp {
             theme_editor_preview_snapshot: None,
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_confirm_delete: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            custom_font_import_path: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            custom_font_status: None,
             settings_tab: SettingsTab::Themes,
             settings_snapshot: None,
             shortcut_capture: None,
@@ -834,7 +870,10 @@ impl ButtonsApp {
         ] {
             style.text_styles.insert(
                 text_style,
-                FontId::new((shell.size * scale).max(8.0), fonts::font_family(shell)),
+                FontId::new(
+                    (shell.size * scale).max(8.0),
+                    self.font_catalog.font_family(shell, false),
+                ),
             );
         }
         ctx.set_style(style);
@@ -1653,10 +1692,12 @@ impl ButtonsApp {
         }
 
         let focused = self.focused;
-        let terminal_font = fonts::font_id(&self.preferences.typography.terminal);
+        let terminal_font = self
+            .font_catalog
+            .font_id(&self.preferences.typography.terminal, true);
         let mut bold_zone = self.preferences.typography.terminal.clone();
         bold_zone.weight = self.preferences.typography.terminal_bold_weight;
-        let terminal_bold_font = fonts::font_id(&bold_zone);
+        let terminal_bold_font = self.font_catalog.font_id(&bold_zone, true);
         let draw_bold_bright = self.preferences.typography.draw_bold_bright;
         let theme = self.terminal_presentation();
         let divider_style =
@@ -1793,7 +1834,10 @@ impl ButtonsApp {
             ui.label(RichText::new("$").monospace().color(colors.accent));
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.demo_input)
-                    .font(fonts::font_id(&self.preferences.typography.terminal))
+                    .font(
+                        self.font_catalog
+                            .font_id(&self.preferences.typography.terminal, true),
+                    )
                     .hint_text(crate::i18n::literal(&self.locale, "type help"))
                     .desired_width(f32::INFINITY),
             );
@@ -1979,7 +2023,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(8, 3)),
             )
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.shell);
+                apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.shell);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("B").strong().color(colors.accent).size(12.0));
                     ui.label(
@@ -2153,7 +2197,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(8, 5)),
             )
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.tabs);
+                apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.tabs);
                 let mut action = None;
                 let mut add = None;
                 let mut reopen = false;
@@ -2256,7 +2300,11 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(8, 4)),
             )
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.preset_dock);
+                apply_zone_style(
+                    ui,
+                    &self.font_catalog,
+                    &self.preferences.typography.preset_dock,
+                );
                 let presets = self.preferences.presets.clone();
                 let mut action = None;
                 let mut add = false;
@@ -2420,7 +2468,11 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn command_dock_contents(&mut self, ui: &mut egui::Ui, controls_available: bool) {
         let colors = self.colors();
-        apply_zone_style(ui, &self.preferences.typography.preset_dock);
+        apply_zone_style(
+            ui,
+            &self.font_catalog,
+            &self.preferences.typography.preset_dock,
+        );
         ui.horizontal(|ui| {
             ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -2541,7 +2593,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(9, 4)),
             )
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.status_bar);
+                apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
@@ -2829,7 +2881,11 @@ impl ButtonsApp {
         ctx: &egui::Context,
         close_action: &mut Option<SettingsCloseAction>,
     ) {
-        apply_zone_style(ui, &self.preferences.typography.settings);
+        apply_zone_style(
+            ui,
+            &self.font_catalog,
+            &self.preferences.typography.settings,
+        );
         egui::ScrollArea::horizontal()
             .max_height(34.0)
             .auto_shrink([false, false])
@@ -2888,7 +2944,7 @@ impl ButtonsApp {
         ui.separator();
         match self.settings_tab {
             SettingsTab::Themes => self.theme_settings(ui),
-            SettingsTab::Fonts => self.font_settings(ui),
+            SettingsTab::Fonts => self.font_settings(ui, ctx),
             SettingsTab::Commands => self.command_settings(ui),
             SettingsTab::Workspace => self.workspace_settings(ui),
             SettingsTab::Language if localization_settings_available() => {
@@ -5083,9 +5139,47 @@ impl ButtonsApp {
         }
     }
 
-    fn font_settings(&mut self, ui: &mut egui::Ui) {
+    fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.heading(crate::i18n::literal(&self.locale, "Fonts"));
-        ui.label(crate::i18n::literal(&self.locale, "Every bundled face is loaded locally. Each area can use its own family, real file weight, and size."));
+        #[cfg(not(target_arch = "wasm32"))]
+        ui.label(crate::i18n::literal(&self.locale, "Bundled and installed fonts are loaded locally. Each area can use its own family, real file weight, and size."));
+        #[cfg(target_arch = "wasm32")]
+        ui.label(crate::i18n::literal(&self.locale, "Bundled fonts are loaded locally. Each area can use its own family, real file weight, and size."));
+        #[cfg(not(target_arch = "wasm32"))]
+        ui.label(crate::i18n::literal(
+            &self.locale,
+            "System fonts are discovered offline. Import a .ttf or .otf file to add it to this native profile.",
+        ));
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut import_font = false;
+        #[cfg(not(target_arch = "wasm32"))]
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.custom_font_import_path)
+                    .hint_text(crate::i18n::literal(
+                        &self.locale,
+                        "Path to a .ttf or .otf font file",
+                    ))
+                    .desired_width(f32::INFINITY),
+            );
+            if ui
+                .add_enabled(
+                    custom_fonts_available(),
+                    egui::Button::new(crate::i18n::literal(&self.locale, "Import local font")),
+                )
+                .clicked()
+            {
+                import_font = true;
+            }
+        });
+        #[cfg(not(target_arch = "wasm32"))]
+        if import_font {
+            self.import_custom_font_file(ctx);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(status) = &self.custom_font_status {
+            ui.label(status);
+        }
         ui.horizontal_wrapped(|ui| {
             if ui
                 .button(crate::i18n::literal(
@@ -5117,40 +5211,61 @@ impl ButtonsApp {
             }
         });
         ui.separator();
+        let font_catalog = self.font_catalog.clone();
+        let locale = self.locale.clone();
         egui::ScrollArea::vertical().show(ui, |ui| {
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
                 "Shell / UI",
                 &mut self.preferences.typography.shell,
                 false,
             );
-            font_zone_editor(ui, "Tabs", &mut self.preferences.typography.tabs, false);
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
+                "Tabs",
+                &mut self.preferences.typography.tabs,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
                 "Command Dock",
                 &mut self.preferences.typography.preset_dock,
                 false,
             );
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
                 "Settings Dialog",
                 &mut self.preferences.typography.settings,
                 false,
             );
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
                 "AI Help Window",
                 &mut self.preferences.typography.assistant,
                 false,
             );
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
                 "Status Bar",
                 &mut self.preferences.typography.status_bar,
                 false,
             );
             font_zone_editor(
                 ui,
+                &locale,
+                &font_catalog,
                 "Terminal",
                 &mut self.preferences.typography.terminal,
                 true,
@@ -5165,7 +5280,7 @@ impl ButtonsApp {
                     ui.horizontal_wrapped(|ui| {
                         let family = self.preferences.typography.terminal.family.clone();
                         let requested = self.preferences.typography.terminal_bold_weight;
-                        let resolved = fonts::resolved_weight(&family, requested);
+                        let resolved = font_catalog.resolved_weight(&family, requested);
                         egui::ComboBox::from_id_salt("terminal-bold-weight")
                             .selected_text(if requested == resolved {
                                 format!("{requested} bold weight")
@@ -5173,7 +5288,7 @@ impl ButtonsApp {
                                 format!("{requested} requested → {resolved} file")
                             })
                             .show_ui(ui, |ui| {
-                                for weight in fonts::weights_for(&family) {
+                                for weight in font_catalog.weights_for(&family) {
                                     ui.selectable_value(
                                         &mut self.preferences.typography.terminal_bold_weight,
                                         weight,
@@ -5188,6 +5303,48 @@ impl ButtonsApp {
                     });
                 });
         });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn import_custom_font_file(&mut self, ctx: &egui::Context) {
+        if !custom_fonts_available() {
+            return;
+        }
+        let source = std::path::PathBuf::from(self.custom_font_import_path.trim());
+        let result = (|| {
+            let store = self
+                .native_store
+                .as_ref()
+                .ok_or_else(|| "native profile storage is unavailable".to_owned())?;
+            let file_name = fonts::import_custom_font_file(store, &source)?;
+            let directory = store
+                .profile_fonts_dir()
+                .map_err(|error| error.to_string())?;
+            Ok::<_, String>((file_name, directory))
+        })();
+        match result {
+            Ok((file_name, directory)) => {
+                let (catalog, warnings) = fonts::FontCatalog::load(Some(&directory));
+                self.font_catalog = catalog;
+                fonts::install(ctx, &self.font_catalog);
+                self.apply_style(ctx);
+                for warning in warnings {
+                    log::warn!("font skipped: {warning}");
+                }
+                self.custom_font_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Imported {file}; it is ready in the font selectors.",
+                    &[("file", &file_name)],
+                ));
+            }
+            Err(error) => {
+                self.custom_font_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Font import failed: {reason}",
+                    &[("reason", &error)],
+                ));
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -5922,7 +6079,11 @@ impl ButtonsApp {
             .resizable(false)
             .default_width(520.0)
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.settings);
+                apply_zone_style(
+                    ui,
+                    &self.font_catalog,
+                    &self.preferences.typography.settings,
+                );
                 ui.label(crate::i18n::literal(&self.locale, "Button label"));
                 ui.add(
                     egui::TextEdit::singleline(&mut self.preset_label_draft)
@@ -5990,7 +6151,11 @@ impl ButtonsApp {
             .resizable(false)
             .default_width(420.0)
             .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.settings);
+                apply_zone_style(
+                    ui,
+                    &self.font_catalog,
+                    &self.preferences.typography.settings,
+                );
                 ui.label(crate::i18n::literal(&self.locale, "Tab title"));
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut self.tab_title_draft)
@@ -6173,7 +6338,7 @@ fn sync_zone(source: &FontZone, target: &mut FontZone) {
     target.size = size;
 }
 
-fn apply_zone_style(ui: &mut egui::Ui, zone: &FontZone) {
+fn apply_zone_style(ui: &mut egui::Ui, catalog: &fonts::FontCatalog, zone: &FontZone) {
     for (text_style, scale) in [
         (TextStyle::Heading, 1.35),
         (TextStyle::Body, 1.0),
@@ -6182,12 +6347,22 @@ fn apply_zone_style(ui: &mut egui::Ui, zone: &FontZone) {
     ] {
         ui.style_mut().text_styles.insert(
             text_style,
-            FontId::new((zone.size * scale).max(8.0), fonts::font_family(zone)),
+            FontId::new(
+                (zone.size * scale).max(8.0),
+                catalog.font_family(zone, false),
+            ),
         );
     }
 }
 
-fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospace_only: bool) {
+fn font_zone_editor(
+    ui: &mut egui::Ui,
+    locale: &str,
+    catalog: &fonts::FontCatalog,
+    label: &str,
+    zone: &mut FontZone,
+    monospace_only: bool,
+) {
     egui::Frame::new()
         .fill(ui.visuals().faint_bg_color)
         .stroke(ui.visuals().widgets.inactive.bg_stroke)
@@ -6195,29 +6370,38 @@ fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospa
         .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_min_width((ui.available_width() - 24.0).max(420.0));
-            ui.label(RichText::new(label).strong().font(fonts::font_id(zone)));
+            ui.label(RichText::new(label).strong().font(catalog.font_id(zone, monospace_only)));
+            if !catalog.is_available(&zone.family) {
+                ui.label(crate::i18n::literal(
+                    locale,
+                    "This font is unavailable. A bundled fallback is active until you choose another font.",
+                ));
+            }
             ui.horizontal_wrapped(|ui| {
                 egui::ComboBox::from_id_salt(("font-family", label))
                     .selected_text(
                         RichText::new(&zone.family)
-                            .font(FontId::new(13.0, fonts::font_family(zone))),
+                            .font(FontId::new(13.0, catalog.font_family(zone, monospace_only))),
                     )
                     .width(270.0)
                     .show_ui(ui, |ui| {
-                        for family in fonts::family_names(monospace_only) {
+                        for family in catalog.family_names(monospace_only) {
                             let mut preview = zone.clone();
-                            preview.family = family.into();
+                            preview.family.clone_from(&family);
                             if ui
                                 .selectable_label(
                                     zone.family == family,
-                                    RichText::new(family)
-                                        .font(FontId::new(13.0, fonts::font_family(&preview))),
+                                    RichText::new(&family).font(FontId::new(
+                                        13.0,
+                                        catalog.font_family(&preview, monospace_only),
+                                    )),
                                 )
                                 .clicked()
                             {
-                                zone.family = family.into();
-                                if !fonts::weights_for(family).contains(&zone.weight) {
-                                    zone.weight = *fonts::weights_for(family)
+                                zone.family.clone_from(&family);
+                                let weights = catalog.weights_for(&family);
+                                if !weights.contains(&zone.weight) {
+                                    zone.weight = *weights
                                         .iter()
                                         .min_by_key(|weight| weight.abs_diff(400))
                                         .unwrap_or(&400);
@@ -6226,7 +6410,7 @@ fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospa
                         }
                     });
 
-                let weights = fonts::weights_for(&zone.family);
+                let weights = catalog.weights_for(&zone.family);
                 egui::ComboBox::from_id_salt(("font-weight", label))
                     .selected_text(format!("{} weight", zone.weight))
                     .show_ui(ui, |ui| {
@@ -6241,11 +6425,7 @@ fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospa
                     );
                 }
             });
-            let files: Vec<_> = fonts::FONT_FACES
-                .iter()
-                .filter(|face| face.family == zone.family)
-                .map(|face| face.file)
-                .collect();
+            let files = catalog.face_files(&zone.family);
             ui.label(
                 RichText::new(format!("Loaded from {}", files.join(", ")))
                     .small()
@@ -6253,7 +6433,7 @@ fn font_zone_editor(ui: &mut egui::Ui, label: &str, zone: &mut FontZone, monospa
             );
             ui.label(
                 RichText::new("The quick brown fox · 0123456789 · ~/project $ cargo run")
-                    .font(fonts::font_id(zone)),
+                    .font(catalog.font_id(zone, monospace_only)),
             );
         });
     ui.add_space(8.0);
@@ -7282,7 +7462,7 @@ mod tests {
         let mut app = ButtonsApp::empty(Preferences::default());
         app.show_settings = true;
         let ctx = egui::Context::default();
-        fonts::install(&ctx);
+        fonts::install(&ctx, &app.font_catalog);
         app.apply_style(&ctx);
         let _output = ctx.run(egui::RawInput::default(), |ctx| app.settings_window(ctx));
         assert!(app.show_settings);

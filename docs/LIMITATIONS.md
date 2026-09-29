@@ -60,10 +60,12 @@ not a backlog disguised as release notes.
   TV/simple noise variants, glow, wallpaper drawing, and the theme designer are
   not rendered yet. Their original fields remain in the embedded JSON migration
   assets.
-- The 20 bundled font families work offline. The legacy opt-in Google Fonts
-  catalog and arbitrary custom font-stack editor are not wired to a native font
-  downloader yet; online-only names in imported themes safely fall back to a
-  bundled family.
+- The 20 bundled font families work offline. Native Settings also discovers
+  local system fonts and imports profile-local `.ttf` / `.otf` files. Online
+  Google Font downloads are deferred; online-only names in imported themes
+  safely fall back to a bundled family. Discovery is bounded to 512 local files
+  and 256 MiB of face data. Directory traversal is also capped at 8,192
+  entries. Startup time still needs measurement across larger installations.
 - Shell settings discover installed executables and support persisted custom
   profiles, default/per-tab selection, arguments, and working directories. The
   Linux paths have been exercised manually; Windows and macOS discovery and

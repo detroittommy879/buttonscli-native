@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-09-28 — U08 offline system and custom fonts
+
+Added local system-font discovery for Windows, Linux, and macOS font folders,
+plus validated `.ttf` / `.otf` import into the active native profile. Imported
+files are size-bounded, checked by both the OpenType parser and egui's font
+parser, stored without overwriting existing files, and registered immediately.
+Missing selections fall back to bundled UI/mono families; Unicode uses the
+existing bundled symbol/Noto fallback chain. Terminal settings still select
+regular and bold faces independently, and cell sizing remains based on the
+regular face. No download or network path was added. See [`FONTS.md`](FONTS.md).
+
+The Windows library suite passes (120 tests), including invalid-file rejection,
+filename collisions, isolated offline loading, bounded directory traversal,
+missing-font fallback, separate regular/bold face selection, and Hangul glyph
+fallback. `cargo fmt --all -- --check`, `cargo check --bin buttonscli`, and
+`cargo build --bin buttonscli` pass. The binary build retains the existing
+Rust bin/lib PDB filename collision warning. Live selector review and startup
+time measurement on large font installations remain open. Access tier: free
+(`customFonts`).
+
 ## 2026-09-28 — U07 personal theme library and editor
 
 Added a free `personalThemeEditor` feature entry and a Settings editor for

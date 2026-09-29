@@ -457,6 +457,7 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 name = "buttonscli"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "anyhow",
  "axum",
  "base64 0.22.1",
@@ -476,6 +477,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "ttf-parser",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
