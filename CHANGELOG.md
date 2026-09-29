@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a Pro-gated AI theme generator to Themes settings. It sends a bounded style brief and selected color palette to the active configured provider, checks schema and text contrast, allows one correction attempt, and keeps results as reviewable drafts until selected. Existing fonts, effects and unknown theme fields are preserved; saving always creates a new collision-safe file.
 - Added free row banding to native terminal themes, with editable color and opacity; the overlay follows actual terminal cell height and respects master-off/focused-pane effect settings. Documented why faithful HSync needs a separate offscreen renderer spike.
 - Added configurable simple noise to native themes with bounded pixelated rendering, FPS and brightness controls, and an optional idle ramp based on visible terminal activity. The original TV-noise fields have no source runtime renderer and remain unsupported.
 - Added repeating linear, radial, and conic gradients to the native renderer and personal-theme editor. The effects master-off setting now also stops gradient animation, and an optional focused-pane policy suppresses background effects on other panes.

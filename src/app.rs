@@ -83,6 +83,30 @@ fn ai_help_available() -> bool {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn theme_generation_available() -> bool {
+    use crate::features::{
+        access::{self, RuntimeAccess},
+        catalog::FeatureKey,
+    };
+    let mut runtime = RuntimeAccess {
+        pro_enabled: true,
+        ..RuntimeAccess::default()
+    };
+    if cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR").is_ok_and(|value| value == "1")
+    {
+        runtime
+            .development_overrides
+            .insert(FeatureKey::VibeCodeThemes);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    access::resolve(FeatureKey::VibeCodeThemes, &runtime, &None, now).available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn remote_control_available() -> bool {
     use crate::features::{
         access::{self, RuntimeAccess},
@@ -219,6 +243,18 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_confirm_delete: bool,
     #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_prompt: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_id: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_cancel: Option<Arc<AtomicBool>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_candidate: Option<crate::theme_generation::ThemeCandidate>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
     custom_font_import_path: String,
     #[cfg(not(target_arch = "wasm32"))]
     custom_font_status: Option<String>,
@@ -316,6 +352,10 @@ pub struct ButtonsApp {
     provider_message: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     provider_models: Vec<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_tx: Sender<ThemeGenerationEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_generation_rx: Receiver<ThemeGenerationEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     control_server: Option<ControlServer>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -447,6 +487,12 @@ enum CredentialEvent {
 enum ProviderEvent {
     Tested(String, Result<(), String>),
     Models(String, Result<Vec<String>, String>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct ThemeGenerationEvent {
+    generation: u64,
+    result: Result<crate::theme_generation::ThemeCandidate, String>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -724,6 +770,8 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         let (provider_tx, provider_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
+        let (theme_generation_tx, theme_generation_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
         let (ai_help_tx, ai_help_rx) = mpsc::channel();
         Self {
             preferences,
@@ -750,6 +798,18 @@ impl ButtonsApp {
             theme_editor_preview_snapshot: None,
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_confirm_delete: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_prompt: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_id: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_cancel: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_candidate: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             custom_font_import_path: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -849,6 +909,10 @@ impl ButtonsApp {
             provider_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             provider_models: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_generation_rx,
             #[cfg(not(target_arch = "wasm32"))]
             control_server: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -3866,6 +3930,46 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn process_theme_generation_events(&mut self) {
+        while let Ok(event) = self.theme_generation_rx.try_recv() {
+            if event.generation != self.theme_generation_id {
+                continue;
+            }
+            let cancelled = self
+                .theme_generation_cancel
+                .as_ref()
+                .is_some_and(|cancel| cancel.load(Ordering::Relaxed));
+            self.theme_generation_busy = false;
+            self.theme_generation_cancel = None;
+            if cancelled {
+                self.theme_generation_candidate = None;
+                self.theme_generation_message = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Theme generation cancelled.",
+                ));
+                continue;
+            }
+            match event.result {
+                Ok(candidate) => {
+                    self.theme_generation_candidate = Some(candidate);
+                    self.theme_generation_message = Some(crate::i18n::literal(
+                        &self.locale,
+                        "Theme candidate ready. Review it before saving.",
+                    ));
+                }
+                Err(error) => {
+                    self.theme_generation_candidate = None;
+                    self.theme_generation_message = Some(crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Theme generation failed: {reason}",
+                        &[("reason", &error)],
+                    ));
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn ai_help_window(&self, ctx: &egui::Context) {
         let locale = self.locale.clone();
         let state_open = self.ai_help_state.lock().is_ok_and(|state| state.open);
@@ -4742,7 +4846,128 @@ impl ButtonsApp {
             self.set_theme_all(&id);
         }
         #[cfg(not(target_arch = "wasm32"))]
+        self.theme_generator(ui);
+        #[cfg(not(target_arch = "wasm32"))]
         self.personal_theme_editor(ui);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn theme_generator(&mut self, ui: &mut egui::Ui) {
+        let locale = self.locale.clone();
+        ui.separator();
+        ui.heading(crate::i18n::literal(&locale, "AI Theme Generator"));
+        ui.label(
+            RichText::new(crate::i18n::literal(
+                &locale,
+                "Describe a color direction. The active provider receives your brief and the selected theme's color palette; terminal contents and API keys are not included.",
+            ))
+            .small()
+            .color(self.colors().muted),
+        );
+        ui.add(
+            egui::TextEdit::multiline(&mut self.theme_generation_prompt)
+                .desired_rows(3)
+                .hint_text(crate::i18n::literal(
+                    &locale,
+                    "For example: deep ocean blues, warm amber highlights, readable ANSI colors",
+                )),
+        );
+        let available = theme_generation_available();
+        if !available {
+            ui.label(crate::i18n::literal(
+                &locale,
+                "Pro feature. Theme generation remains locked until entitlement integration is available.",
+            ));
+        } else if self.preferences.provider_settings.active().is_none() {
+            ui.label(crate::i18n::literal(
+                &locale,
+                "Choose an AI provider in the Providers settings first.",
+            ));
+        }
+        let mut generate = false;
+        let mut cancel = false;
+        ui.horizontal(|ui| {
+            if self.theme_generation_busy {
+                ui.label(crate::i18n::literal(&locale, "Generating theme…"));
+                cancel = ui
+                    .button(crate::i18n::literal(&locale, "Cancel generation"))
+                    .clicked();
+            } else {
+                generate = ui
+                    .add_enabled(
+                        available
+                            && !self.provider_busy
+                            && self.preferences.provider_settings.active().is_some()
+                            && !self.theme_generation_prompt.trim().is_empty(),
+                        egui::Button::new(crate::i18n::literal(&locale, "Generate theme")),
+                    )
+                    .clicked();
+            }
+        });
+        if cancel {
+            self.cancel_theme_generation();
+        } else if generate {
+            self.start_theme_generation(ui.ctx());
+        }
+        if let Some(message) = &self.theme_generation_message {
+            ui.label(message);
+        }
+        let details = self.theme_generation_candidate.as_ref().map(|candidate| {
+            (
+                candidate.document["metadata"]["name"]
+                    .as_str()
+                    .unwrap_or("Generated theme")
+                    .to_owned(),
+                candidate.document["metadata"]["description"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+                candidate.provider_name.clone(),
+                candidate.model_id.clone(),
+            )
+        });
+        if let Some((name, description, provider_name, model_id)) = details {
+            let mut preview = false;
+            let mut keep = false;
+            let mut discard = false;
+            ui.group(|ui| {
+                ui.strong(name);
+                if !description.is_empty() {
+                    ui.label(description);
+                }
+                ui.label(crate::i18n::formatted_literal(
+                    &locale,
+                    "Generated with {provider} · {model}",
+                    &[("provider", &provider_name), ("model", &model_id)],
+                ));
+                ui.label(crate::i18n::literal(
+                    &locale,
+                    "This candidate is not previewed or saved yet.",
+                ));
+                ui.horizontal_wrapped(|ui| {
+                    preview = ui
+                        .button(crate::i18n::literal(&locale, "Preview candidate"))
+                        .clicked();
+                    keep = ui
+                        .button(crate::i18n::literal(&locale, "Edit in theme library"))
+                        .clicked();
+                    discard = ui
+                        .button(crate::i18n::literal(&locale, "Discard candidate"))
+                        .clicked();
+                });
+            });
+            if preview {
+                self.load_generated_theme_candidate(true);
+            } else if keep {
+                self.load_generated_theme_candidate(false);
+            } else if discard {
+                self.theme_generation_candidate = None;
+                self.theme_generation_message = Some(crate::i18n::literal(
+                    &locale,
+                    "Generated candidate discarded.",
+                ));
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -5285,6 +5510,156 @@ impl ButtonsApp {
         });
         if let Some(status) = &self.theme_editor_status {
             ui.label(status);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_theme_generation(&mut self, ctx: &egui::Context) {
+        if !theme_generation_available() {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Theme generation is locked until Pro access is available.",
+            ));
+            return;
+        }
+        let request = self.theme_generation_prompt.trim().to_owned();
+        if request.is_empty() || request.chars().count() > 4_096 {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Enter a theme description up to 4,096 characters.",
+            ));
+            return;
+        }
+        let Some(provider) = self.preferences.provider_settings.active().cloned() else {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Choose an AI provider in the Providers settings first.",
+            ));
+            return;
+        };
+        if validate_endpoint(&provider.endpoint).is_err() || provider.model.trim().is_empty() {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Set a valid provider endpoint and model in Providers settings.",
+            ));
+            return;
+        }
+        let theme_id = self.theme_for_tab(self.focused).to_owned();
+        let source_theme = self.themes.get(&theme_id).clone();
+        let base_document = self
+            .themes
+            .personal_document(&theme_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                crate::theme_files::document_from_theme(
+                    &source_theme,
+                    &format!("{} Variant", source_theme.name),
+                )
+            });
+        let seed = crate::theme_generation::seed_palette(&base_document);
+        let profile = self
+            .native_store
+            .as_ref()
+            .map_or("default", NativeStore::profile_name)
+            .to_owned();
+        self.theme_generation_id = self.theme_generation_id.saturating_add(1);
+        let generation = self.theme_generation_id;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.theme_generation_cancel = Some(Arc::clone(&cancel));
+        self.theme_generation_busy = true;
+        self.theme_generation_candidate = None;
+        self.theme_generation_message = Some(crate::i18n::literal(
+            &self.locale,
+            "The candidate will stay a draft until you choose to preview or edit it.",
+        ));
+        let session = Arc::clone(&self.credential_session);
+        let expected_reference = credentials::reference(&profile, &provider.id);
+        let stored_reference = provider.credential_ref.clone();
+        let sender = self.theme_generation_tx.clone();
+        let context = ctx.clone();
+        std::thread::spawn(move || {
+            let result = provider_key(&session, &expected_reference, stored_reference.as_deref())
+                .map_err(|error| error.to_string())
+                .and_then(|key| {
+                    crate::theme_generation::generate_candidate(
+                        &crate::assistant::transport::ReqwestTransport,
+                        &provider,
+                        key,
+                        &request,
+                        &seed,
+                        &base_document,
+                        &cancel,
+                    )
+                });
+            let _ = sender.send(ThemeGenerationEvent { generation, result });
+            context.request_repaint();
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn cancel_theme_generation(&mut self) {
+        if let Some(cancel) = &self.theme_generation_cancel {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        self.theme_generation_message = Some(crate::i18n::literal(
+            &self.locale,
+            "Cancellation requested. Waiting for the provider request to stop.",
+        ));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn load_generated_theme_candidate(&mut self, preview: bool) {
+        if !theme_generation_available() {
+            return;
+        }
+        if self
+            .theme_editor_document
+            .as_ref()
+            .zip(self.theme_editor_original_document.as_ref())
+            .is_some_and(|(draft, original)| draft != original)
+        {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Finish or cancel the current theme edit before opening this candidate.",
+            ));
+            return;
+        }
+        let Some(candidate) = self.theme_generation_candidate.clone() else {
+            return;
+        };
+        let Some(themes_directory) = self
+            .native_store
+            .as_ref()
+            .map(|store| store.profile_dir().join("themes"))
+        else {
+            self.theme_generation_message = Some(crate::i18n::literal(
+                &self.locale,
+                "Native profile storage is unavailable.",
+            ));
+            return;
+        };
+        self.restore_personal_theme_preview();
+        let name = candidate.document["metadata"]["name"]
+            .as_str()
+            .unwrap_or("Generated theme")
+            .to_owned();
+        let file_name = crate::theme_files::unique_file_name(&themes_directory, &name);
+        self.theme_editor_document = Some(candidate.document.clone());
+        self.theme_editor_original_document = Some(candidate.document);
+        self.theme_editor_file_name = Some(file_name);
+        self.theme_editor_file_exists = false;
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = Some(crate::i18n::literal(
+            &self.locale,
+            "Generated theme loaded as a new draft. Saving creates a new file and will not replace an existing theme.",
+        ));
+        self.theme_generation_candidate = None;
+        self.theme_generation_message = Some(crate::i18n::literal(
+            &self.locale,
+            "Candidate opened in the custom theme editor. Use Save Current Theme to keep it.",
+        ));
+        if preview {
+            self.preview_personal_theme_draft();
         }
     }
 
@@ -8085,6 +8460,8 @@ impl eframe::App for ButtonsApp {
         self.process_credential_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_provider_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_theme_generation_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
         #[cfg(not(target_arch = "wasm32"))]

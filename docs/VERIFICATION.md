@@ -2,6 +2,19 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-29 V03 Windows source checks
+
+The native theme generator sends only a bounded user brief and selected theme
+palette through the configured provider transport. Mock-transport tests cover
+valid output, malformed palette rejection, unknown-field/effect preservation,
+palette-only provider context, contrast checks, cancellation, and exactly one
+correction request. `cargo test --lib` passes 148 tests; `cargo check --bin buttonscli`,
+`cargo build --bin buttonscli`, formatting, and the WASM library check pass.
+The WASM check reports 50 existing native-only warnings and the Windows build
+reports the existing bin/lib PDB filename collision. Live provider requests,
+candidate preview/save GUI flow, and Windows theme appearance remain
+unverified. The release feature remains locked pending entitlement integration.
+
 ## 2026-09-29 V02 Windows source checks
 
 Windows `cargo test` passes (142 library tests, 2 fixture tests),

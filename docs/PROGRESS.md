@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-09-29 — V03 AI theme generator
+
+Added a Pro-gated AI palette generator to native Themes settings. It uses the
+active configured provider and sends only the bounded style brief plus a small
+palette seed; it does not include terminal contents or API keys in the request
+body. Generated JSON is constrained to app/terminal colors, validates all
+required six-digit colors and minimum app/terminal text contrast, and receives
+at most one correction request. The resulting in-memory candidate records
+provider/model provenance, preserves fonts, effects and unknown theme data,
+and waits for the user to preview or open it in the editor. Saving uses a new
+collision-safe filename and never replaces a saved file. Access tier: Pro
+(`vibeCodeThemes`); release builds remain locked pending entitlement service,
+and debug builds require `BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR=1`.
+
+Six mock-transport tests cover accepted and rejected output, field retention,
+palette-only provider context, prompt bounds, cancellation, and the two-request
+maximum. The full Windows library suite now passes 148 tests and `cargo check --bin
+buttonscli` plus `cargo build --bin buttonscli` pass. Live provider and
+candidate GUI checks remain open.
+
 ## 2026-09-29 — V02 remaining effects audit
 
 Audited TV noise, glow, and wallpaper against the original source. TV noise has

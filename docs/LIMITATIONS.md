@@ -62,7 +62,9 @@ not a backlog disguised as release notes.
   Simple noise is a bounded pixelated grayscale overlay with a configurable
   frame rate and optional idle ramp. Its mesh is capped at 1,024 cells per pane;
   GUI frame-cost review remains open. HSync warp and standalone wallpaper
-  drawing are not rendered; the theme designer is still to be implemented.
+  drawing are not rendered. The AI theme generator has a review-first source
+  path but remains Pro-gated until entitlement integration is available; live
+  provider and GUI checks remain open.
   Glow math belongs to Shader Lab presets rather than a standalone effect.
   HSync needs an offscreen renderer path; see
   [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). The remaining

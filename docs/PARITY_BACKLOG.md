@@ -25,7 +25,7 @@ constraints.
 | Tabs and sessions | Partial | `termN` naming and multi-row tab strip are implemented; finish pane reflow and Fedora interaction checks |
 | Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Fedora |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
-| Themes and fonts | Partial | Personal-theme CRUD/editor and offline system/custom fonts are implemented; finish GUI acceptance, remaining effect rendering, sharing, and separately opted-in online fonts |
+| Themes and fonts | Partial | Personal-theme CRUD/editor, offline system/custom fonts, and the review-first V03 generator source path are implemented; finish GUI/provider acceptance, remaining effect rendering, sharing, and separately opted-in online fonts |
 | AI Help | Partial | Provider settings, secure key storage, connection test, model discovery, separate-window conversation, bounded context and reviewed actions exist in source; finish GUI/provider acceptance |
 | Local automation | Partial | Authenticated loopback API, CLI and stdio MCP helpers exist; finish full route and real-client acceptance |
 | Product/platform | Partial | Onboarding, localization, cross-platform CI, updater, releases |
@@ -61,7 +61,7 @@ constraints.
 | Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
 | Random/per-terminal/theme-all | Partial | native theme catalog and terminal palette | Stable-ID overrides, random current/all, persisted global default and theme-all are wired; verify 1/4/10 panes, imported themes and live PTY preservation on Fedora. |
 | Colored dividers/rounded chrome | Partial | native pane renderer and theme settings | Visible dividers inherit the app theme or saved native overrides; a 0–16 point tab/chrome radius persists. Verify GUI dragging, scale, contrast and focus; theme editor/export remains. |
-| Theme designer | Missing | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts` | Generate preview candidates, self-correct invalid output, selectively apply, keep/save, and expose provenance. |
+| Theme designer | Partial | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts`, native `src/theme_generation.rs` | V03 generates a constrained palette through the selected provider, validates text contrast, makes at most one correction attempt, preserves non-palette/unknown fields, and offers candidate preview or draft/save with provider/model provenance. Entitlement and live provider/GUI acceptance remain open. |
 | Shader Lab | Missing | `src/components/ShaderLabCard.tsx`, `src/services/shaderDesignerService.ts` | Edit/preview/save native GPU effects with a safe fallback and clear performance limits. |
 | Window appearance | Partial | feature `windowTransparency`, `docs/WINDOW-APPEARANCE.md` | Persisted native opacity works on Windows; Linux/macOS show an explicit unsupported state until their backends expose reliable support. |
 
@@ -78,7 +78,7 @@ preferences JSON.
 | Plain AI Help window | Partial | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window source path explains bounded terminal output and suggests reviewed commands; finish GUI/provider acceptance. |
 | Terminal context | Partial | `src/hooks/useAIAssistantChat.ts` | Optional bounded grid preview, explicit send and best-effort redaction are implemented; finish privacy/runtime review. |
 | Suggested actions | Partial | `src/services/assistantActions.ts` | Commands and allowlisted control keys are parsed and require explicit target-bound review; finish runtime regression and GUI checks. |
-| AI theme/shader generation | Deferred | theme and shader designer services | Start after provider storage and the non-AI theme/shader editors are stable. |
+| AI theme/shader generation | Partial | theme and shader designer services; native V03 theme generator | Theme generation has a source implementation; shader generation stays deferred until V04 defines a safe native shader editor/compiler path. |
 | Loopback control API | Partial | legacy Tauri control server, `src/services/controlSync.ts` | Native loopback/auth/instance discovery and tab/pane/preset/input routes exist in source; finish hostile-request and PTY runtime checks. |
 | CLI and MCP helper | Partial | `src/services/controlCliInstructions.ts` | Pinned native CLI and stdio MCP helpers use native descriptors without copying tokens into handoff text; a fake-API MCP protocol smoke passes. Verify the full route matrix and a real MCP client. |
 | Quick secret vault | Missing | `src/components/SecretVaultPanel.tsx`, `src/services/secretVaultService.ts` | Encrypt at rest with explicit unlock, never render secrets into logs, and paste only into the selected terminal after direct user intent. |

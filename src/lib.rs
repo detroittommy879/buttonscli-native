@@ -21,6 +21,8 @@ mod shortcuts;
 pub mod theme;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;
+#[cfg(not(target_arch = "wasm32"))]
+mod theme_generation;
 mod window_opacity;
 
 #[cfg(not(target_arch = "wasm32"))]
