@@ -25,6 +25,7 @@ pub enum StoreError {
     Busy,
     StaleRevision,
     ImportCollision,
+    ThemeCollision,
     SourceChanged,
     Io(io::Error),
 }
@@ -48,6 +49,7 @@ impl std::fmt::Display for StoreError {
             Self::ImportCollision => {
                 write!(f, "import destination already exists; refresh the preview")
             }
+            Self::ThemeCollision => write!(f, "theme file already exists"),
             Self::SourceChanged => write!(f, "original settings changed; refresh the preview"),
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
@@ -323,6 +325,101 @@ impl NativeStore {
     pub(crate) fn native_root(&self) -> &Path {
         &self.root.0
     }
+
+    pub(crate) fn write_theme_file(
+        &self,
+        file_name: &str,
+        bytes: &[u8],
+        replace: bool,
+    ) -> Result<(), StoreError> {
+        validate_theme_file_name(file_name)?;
+        if bytes.len() as u64 > 2 * 1024 * 1024 {
+            return Err(StoreError::TooLarge);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let themes = self.ensure_profile_themes_dir()?;
+        let path = themes.join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        if replace {
+            if !path.is_file() {
+                return Err(StoreError::InvalidDocument);
+            }
+            atomic_replace(&path, bytes)
+        } else {
+            match write_new(&path, bytes) {
+                Ok(()) => Ok(()),
+                Err(StoreError::Io(error)) if error.kind() == io::ErrorKind::AlreadyExists => {
+                    Err(StoreError::ThemeCollision)
+                }
+                Err(error) => Err(error),
+            }
+        }
+    }
+
+    pub(crate) fn delete_theme_file(&self, file_name: &str) -> Result<(), StoreError> {
+        validate_theme_file_name(file_name)?;
+        let _lock = self.acquire_root_lock()?;
+        let themes = self.ensure_profile_themes_dir()?;
+        let path = themes.join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        if !path.is_file() {
+            return Err(StoreError::InvalidDocument);
+        }
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    fn acquire_root_lock(&self) -> Result<fs::File, StoreError> {
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        fs::create_dir_all(&self.root.0)?;
+        guard_distinct_roots(&self.root.0, &self.legacy_root)?;
+        let lock_path = self.root.0.join(".native.lock");
+        ensure_native_path(&self.root.0, &lock_path)?;
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(lock_path)?;
+        lock.try_lock_exclusive().map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                StoreError::Busy
+            } else {
+                StoreError::Io(error)
+            }
+        })?;
+        Ok(lock)
+    }
+
+    fn ensure_profile_themes_dir(&self) -> Result<PathBuf, StoreError> {
+        let profiles = self.root.0.join("profiles");
+        ensure_native_path(&self.root.0, &profiles)?;
+        fs::create_dir_all(&profiles)?;
+        ensure_native_path(&self.root.0, &profiles)?;
+        let profile = self.profile_dir();
+        ensure_native_path(&self.root.0, &profile)?;
+        fs::create_dir_all(&profile)?;
+        ensure_native_path(&self.root.0, &profile)?;
+        let themes = profile.join("themes");
+        ensure_native_path(&self.root.0, &themes)?;
+        fs::create_dir_all(&themes)?;
+        ensure_native_path(&self.root.0, &themes)?;
+        Ok(themes)
+    }
+}
+
+fn validate_theme_file_name(file_name: &str) -> Result<(), StoreError> {
+    let path = Path::new(file_name);
+    if path.components().count() != 1
+        || path.file_name().and_then(|name| name.to_str()) != Some(file_name)
+        || !path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+    {
+        return Err(StoreError::InvalidDocument);
+    }
+    Ok(())
 }
 
 fn write_new(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
@@ -456,6 +553,37 @@ mod tests {
             Err(StoreError::InvalidDocument)
         ));
         assert_eq!(fs::read(store.native_path()).unwrap(), b"{broken");
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn personal_theme_files_are_profile_scoped_atomic_and_collision_safe() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        store
+            .write_theme_file("night.json", br#"{"version":1}"#, false)
+            .unwrap();
+        assert!(matches!(
+            store.write_theme_file("night.json", b"overwrite", false),
+            Err(StoreError::ThemeCollision)
+        ));
+        assert_eq!(
+            fs::read(store.profile_dir().join("themes/night.json")).unwrap(),
+            br#"{"version":1}"#
+        );
+        store
+            .write_theme_file("night.json", b"updated", true)
+            .unwrap();
+        assert_eq!(
+            fs::read(store.profile_dir().join("themes/night.json")).unwrap(),
+            b"updated"
+        );
+        assert!(matches!(
+            store.write_theme_file("../outside.json", b"bad", false),
+            Err(StoreError::InvalidDocument)
+        ));
+        store.delete_theme_file("night.json").unwrap();
+        assert!(!store.profile_dir().join("themes/night.json").exists());
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

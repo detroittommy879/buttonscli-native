@@ -1,5 +1,24 @@
 # Reconstruction journal
 
+## 2026-09-28 — U07 personal theme library and editor
+
+Added a free `personalThemeEditor` feature entry and a Settings editor for
+creating variants, changing supported colors/effects/dividers, previewing the
+current draft, saving, importing, exporting, and confirmed deletion. Theme
+documents remain scoped to the active native profile. Saves and exports are
+atomic/create-new respectively, filename collisions receive safe suffixes,
+and unknown JSON fields survive round trips. Preview follows the existing
+theme-apply scopes and cancellation restores the scoped preferences without
+restarting terminal sessions. See [`PERSONAL-THEMES.md`](PERSONAL-THEMES.md).
+
+The full Windows library suite passes (116 tests), including starter-document
+projection, unknown-field round-trip, import/export, filename collision races,
+storage isolation, preview/cancel and save/reload. `cargo fmt --all -- --check`,
+`cargo check --bin buttonscli`, `cargo build --bin buttonscli`, and
+`git diff --check` pass. The build still reports the existing bin/lib PDB
+filename collision. Windows GUI visual acceptance remains open. Access tier:
+free (`personalThemeEditor`).
+
 ## 2026-09-28 — U06 Windows shell discovery and profiles
 
 Expanded the free `shellProfiles` feature with Windows WSL detection. When WSL

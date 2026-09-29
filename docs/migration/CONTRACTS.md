@@ -115,7 +115,7 @@ AI Help is single-turn or ordinary follow-up chat. It may explain a bounded term
 
 ## 5. Access, localization, privacy
 
-Create a native catalog with stable keys, tier, default, owner, rollout and override metadata. Preserve original decisions for implemented features: `aiHelp`, `automationRemoteControl`, `vibeCodeThemes`, `vibeCodeShaders` are pro; `quickSecrets` and `profileManagement` internal. Do not register native agent/stall capabilities while out of scope. New local layout, scrollbars, random/per-terminal themes, dividers, rounded chrome and detached Settings are free. Distinguish local theme import (free) from hosted `themeSharing` (planned pro).
+Create a native catalog with stable keys, tier, default, owner, rollout and override metadata. Preserve original decisions for implemented features: `aiHelp`, `automationRemoteControl`, `vibeCodeThemes`, `vibeCodeShaders` are pro; `quickSecrets` and `profileManagement` internal. Do not register native agent/stall capabilities while out of scope. New local layout, scrollbars, random/per-terminal themes, dividers, rounded chrome, detached Settings, and local theme creation/editing/import/export (`personalThemeEditor`) are free. Hosted `themeSharing` is planned pro.
 
 ## 6. Tabs, pane layout and theme presentation
 

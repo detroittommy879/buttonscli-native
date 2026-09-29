@@ -33,6 +33,8 @@ use crate::theme::PaneDividerTheme;
 use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
+#[cfg(not(target_arch = "wasm32"))]
+use serde_json::{json, Value};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::scrollbar;
@@ -126,6 +128,17 @@ fn workspace_controls_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn personal_theme_editor_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::PersonalThemeEditor,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 fn localization_settings_available() -> bool {
     crate::features::access::resolve(
         crate::features::catalog::FeatureKey::LocalizationSettings,
@@ -142,6 +155,24 @@ pub struct ButtonsApp {
     show_localization_onboarding: bool,
     themes: ThemeCatalog,
     theme_search: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_document: Option<Value>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_original_document: Option<Value>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_file_name: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_file_exists: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_import_path: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_export_path: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_status: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_preview_snapshot: Option<ThemePreviewSnapshot>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_confirm_delete: bool,
     settings_tab: SettingsTab,
     settings_snapshot: Option<SettingsSnapshot>,
     shortcut_capture: Option<ShortcutAction>,
@@ -301,6 +332,12 @@ struct SettingsSnapshot {
     preferences: Preferences,
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct ThemePreviewSnapshot {
+    preferences: Preferences,
+    applied_preferences: Preferences,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -592,6 +629,24 @@ impl ButtonsApp {
             show_localization_onboarding,
             themes: ThemeCatalog::load(),
             theme_search: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_document: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_original_document: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_file_name: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_file_exists: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_import_path: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_export_path: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_preview_snapshot: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_confirm_delete: false,
             settings_tab: SettingsTab::Themes,
             settings_snapshot: None,
             shortcut_capture: None,
@@ -2748,6 +2803,10 @@ impl ButtonsApp {
             },
         );
         if let Some(action) = close_action {
+            #[cfg(not(target_arch = "wasm32"))]
+            if self.theme_editor_preview_snapshot.is_some() {
+                self.cancel_personal_theme_draft();
+            }
             if action == SettingsCloseAction::Revert {
                 if let Some(snapshot) = self.settings_snapshot.take() {
                     self.restore_settings_snapshot(snapshot);
@@ -4206,6 +4265,745 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(id) = all_theme {
             self.set_theme_all(&id);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.personal_theme_editor(ui);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn personal_theme_editor(&mut self, ui: &mut egui::Ui) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        let locale = self.locale.clone();
+        let mut selected_profile = None;
+        let personal_profiles: Vec<(String, String)> = self
+            .themes
+            .all()
+            .iter()
+            .filter(|theme| theme.source == crate::theme::ThemeSource::Personal)
+            .filter(|theme| self.themes.personal_document(&theme.id).is_some())
+            .map(|theme| (theme.id.clone(), theme.name.clone()))
+            .collect();
+
+        ui.separator();
+        ui.heading(crate::i18n::literal(&locale, "Custom Theme Library"));
+        ui.label(
+            RichText::new(crate::i18n::literal(
+                &locale,
+                "Create a theme by hand, preview it, then save it to this native profile.",
+            ))
+            .small()
+            .color(self.colors().muted),
+        );
+        let selected_label = self
+            .theme_editor_file_name
+            .as_deref()
+            .map(|file_name| file_name.trim_end_matches(".json").to_owned())
+            .unwrap_or_else(|| crate::i18n::literal(&locale, "Select a saved theme"));
+        egui::ComboBox::from_id_salt("personal-theme-editor-select")
+            .selected_text(selected_label)
+            .show_ui(ui, |ui| {
+                for (id, name) in &personal_profiles {
+                    if ui
+                        .selectable_label(
+                            self.theme_editor_file_name.as_deref()
+                                == id
+                                    .rsplit(':')
+                                    .next()
+                                    .map(|stem| format!("{stem}.json"))
+                                    .as_deref(),
+                            name,
+                        )
+                        .clicked()
+                    {
+                        selected_profile = Some(id.clone());
+                        ui.close_menu();
+                    }
+                }
+            });
+        if let Some(id) = selected_profile {
+            self.load_personal_theme_draft(&id);
+        }
+
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .button(crate::i18n::literal(&locale, "Save Variant"))
+                .clicked()
+            {
+                self.start_personal_theme_draft();
+            }
+            ui.label(
+                RichText::new(crate::i18n::literal(
+                    &locale,
+                    "New from the currently selected theme",
+                ))
+                .small()
+                .color(self.colors().muted),
+            );
+        });
+
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.theme_editor_import_path)
+                    .hint_text(crate::i18n::literal(&locale, "Path to a theme JSON file"))
+                    .desired_width(f32::INFINITY),
+            );
+            if ui
+                .button(crate::i18n::literal(&locale, "Import theme JSON"))
+                .clicked()
+            {
+                self.import_personal_theme_draft();
+            }
+        });
+
+        let Some(mut document) = self.theme_editor_document.clone() else {
+            if let Some(status) = &self.theme_editor_status {
+                ui.label(status);
+            }
+            return;
+        };
+
+        edit_theme_metadata(ui, &locale, &mut document);
+        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "App colors"))
+            .default_open(true)
+            .show(ui, |ui| {
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Background",
+                    "/theme/app/shell/background",
+                );
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Panel background",
+                    "/theme/app/shell/backgroundSecondary",
+                );
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Accent",
+                    "/theme/app/shell/accent",
+                );
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Main text",
+                    "/theme/app/shell/textMain",
+                );
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Dim text",
+                    "/theme/app/shell/textDim",
+                );
+            });
+        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "Terminal colors"))
+            .default_open(true)
+            .show(ui, |ui| {
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Background",
+                    "/theme/terminal/background",
+                );
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Foreground",
+                    "/theme/terminal/foreground",
+                );
+                egui::CollapsingHeader::new(crate::i18n::literal(&locale, "ANSI color palette"))
+                    .show(ui, |ui| {
+                        for (key, label) in [
+                            ("black", "Black"),
+                            ("red", "Red"),
+                            ("green", "Green"),
+                            ("yellow", "Yellow"),
+                            ("blue", "Blue"),
+                            ("magenta", "Magenta"),
+                            ("cyan", "Cyan"),
+                            ("white", "White"),
+                            ("brightBlack", "Bright black"),
+                            ("brightRed", "Bright red"),
+                            ("brightGreen", "Bright green"),
+                            ("brightYellow", "Bright yellow"),
+                            ("brightBlue", "Bright blue"),
+                            ("brightMagenta", "Bright magenta"),
+                            ("brightCyan", "Bright cyan"),
+                            ("brightWhite", "Bright white"),
+                        ] {
+                            theme_color_setting(
+                                ui,
+                                &locale,
+                                &mut document,
+                                label,
+                                &format!("/theme/terminal/ansiColors/{key}"),
+                            );
+                        }
+                    });
+            });
+        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "Effects and dividers")).show(
+            ui,
+            |ui| {
+                let mut theme_effects_enabled =
+                    document["effects"]["masterDisabled"] != Value::Bool(true);
+                if ui
+                    .checkbox(
+                        &mut theme_effects_enabled,
+                        crate::i18n::literal(&locale, "Enable noise and scanline effects"),
+                    )
+                    .changed()
+                {
+                    set_theme_document_value(
+                        &mut document,
+                        "/effects/masterDisabled",
+                        json!(!theme_effects_enabled),
+                    );
+                }
+                theme_color_setting(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Divider color",
+                    "/theme/app/shell/paneDivider/color",
+                );
+                let mut thickness = document["theme"]["app"]["shell"]["paneDivider"]["thickness"]
+                    .as_f64()
+                    .unwrap_or(2.0) as f32;
+                if ui
+                    .add(
+                        egui::Slider::new(&mut thickness, 1.0..=6.0)
+                            .text(crate::i18n::literal(&locale, "Divider thickness")),
+                    )
+                    .changed()
+                {
+                    set_theme_document_value(
+                        &mut document,
+                        "/theme/app/shell/paneDivider/thickness",
+                        json!(thickness),
+                    );
+                }
+                theme_document_toggle(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Use gradient",
+                    "/theme/terminal/useGradient",
+                );
+                if document["theme"]["terminal"]["useGradient"] == true {
+                    for (index, label) in [
+                        "Gradient color 1",
+                        "Gradient color 2",
+                        "Gradient color 3",
+                        "Gradient color 4",
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
+                        theme_color_setting(
+                            ui,
+                            &locale,
+                            &mut document,
+                            label,
+                            &format!("/theme/terminal/gradientColors/{index}"),
+                        );
+                    }
+                    theme_document_toggle(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Animate gradient",
+                        "/theme/terminal/gradientAnimation",
+                    );
+                }
+                theme_document_toggle(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Static effect",
+                    "/effects/staticEnabled",
+                );
+                if document["effects"]["staticEnabled"] == true {
+                    theme_document_unit_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Static intensity",
+                        "/effects/staticOpacity",
+                    );
+                }
+                theme_document_toggle(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Scanlines",
+                    "/effects/scanlinesEnabled",
+                );
+                if document["effects"]["scanlinesEnabled"] == true {
+                    theme_document_unit_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Scanline strength",
+                        "/effects/scanlinesStrength",
+                    );
+                }
+                ui.label(
+                    RichText::new(crate::i18n::literal(
+                        &locale,
+                        "Font choices and unrecognized fields are preserved when saving.",
+                    ))
+                    .small()
+                    .color(self.colors().muted),
+                );
+            },
+        );
+
+        self.theme_editor_document = Some(document);
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .button(crate::i18n::literal(&locale, "Preview"))
+                .clicked()
+            {
+                self.preview_personal_theme_draft();
+            }
+            if ui
+                .button(crate::i18n::literal(&locale, "Save Current Theme"))
+                .clicked()
+            {
+                self.save_personal_theme_draft();
+            }
+            if ui.button(crate::i18n::literal(&locale, "Cancel")).clicked() {
+                self.cancel_personal_theme_draft();
+            }
+            if self.theme_editor_file_exists {
+                if self.theme_editor_confirm_delete {
+                    if ui
+                        .button(crate::i18n::literal(&locale, "Confirm delete"))
+                        .clicked()
+                    {
+                        self.delete_personal_theme_draft();
+                    }
+                } else if ui
+                    .button(crate::i18n::literal(&locale, "Delete theme"))
+                    .clicked()
+                {
+                    self.theme_editor_confirm_delete = true;
+                }
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.theme_editor_export_path)
+                    .hint_text(crate::i18n::literal(
+                        &locale,
+                        "Export path (choose a new .json file)",
+                    ))
+                    .desired_width(f32::INFINITY),
+            );
+            if ui.button(crate::i18n::literal(&locale, "Export")).clicked() {
+                self.export_personal_theme_draft();
+            }
+        });
+        if let Some(status) = &self.theme_editor_status {
+            ui.label(status);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        self.restore_personal_theme_preview();
+        let Some(store) = self.native_store.as_ref() else {
+            self.theme_editor_status = Some(crate::i18n::literal(
+                &self.locale,
+                "Native profile storage is unavailable.",
+            ));
+            return;
+        };
+        let theme_id = self.theme_for_tab(self.focused).to_owned();
+        let theme = self.themes.get(&theme_id).clone();
+        let name = format!("{} Copy", theme.name);
+        let mut document = self
+            .themes
+            .personal_document(&theme_id)
+            .cloned()
+            .unwrap_or_else(|| crate::theme_files::document_from_theme(&theme, &name));
+        document["metadata"]["name"] = Value::String(name.clone());
+        document["metadata"]["id"] = Value::String(
+            crate::theme_files::suggested_file_name(&name)
+                .trim_end_matches(".json")
+                .to_owned(),
+        );
+        document["metadata"]["createdAt"] = Value::Null;
+        document["metadata"]["updatedAt"] = Value::Null;
+        let directory = store.profile_dir().join("themes");
+        let file_name = crate::theme_files::unique_file_name(&directory, &name);
+        self.theme_editor_document = Some(document.clone());
+        self.theme_editor_original_document = Some(document);
+        self.theme_editor_file_name = Some(file_name);
+        self.theme_editor_file_exists = false;
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = Some(crate::i18n::literal(
+            &self.locale,
+            "Edit the copy, preview it, then save to keep it.",
+        ));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn load_personal_theme_draft(&mut self, id: &str) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        self.restore_personal_theme_preview();
+        let Some(document) = self.themes.personal_document(id).cloned() else {
+            self.theme_editor_status = Some(crate::i18n::literal(
+                &self.locale,
+                "Saved theme document is unavailable.",
+            ));
+            return;
+        };
+        let Some(stem) = id.rsplit(':').next() else {
+            return;
+        };
+        self.theme_editor_document = Some(document.clone());
+        self.theme_editor_original_document = Some(document);
+        self.theme_editor_file_name = Some(format!("{stem}.json"));
+        self.theme_editor_file_exists = true;
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = None;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn reload_personal_themes(&mut self) {
+        let Some((profile, profile_dir)) = self
+            .native_store
+            .as_ref()
+            .map(|store| (store.profile_name().to_owned(), store.profile_dir()))
+        else {
+            return;
+        };
+        for warning in self.themes.load_personal(&profile, &profile_dir) {
+            log::warn!("personal theme: {warning}");
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn import_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        let Some(store) = self.native_store.as_ref() else {
+            self.theme_editor_status = Some(crate::i18n::literal(
+                &self.locale,
+                "Native profile storage is unavailable.",
+            ));
+            return;
+        };
+        let source = std::path::PathBuf::from(self.theme_editor_import_path.trim());
+        let result = crate::theme_files::import_theme_file(store, &source);
+        match result {
+            Ok((file_name, document)) => {
+                self.restore_personal_theme_preview();
+                self.reload_personal_themes();
+                self.theme_editor_document = Some(document.clone());
+                self.theme_editor_original_document = Some(document);
+                self.theme_editor_file_name = Some(file_name);
+                self.theme_editor_file_exists = true;
+                self.theme_editor_confirm_delete = false;
+                self.theme_editor_status = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Theme imported to the active native profile.",
+                ));
+            }
+            Err(error) => {
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme import failed: {reason}",
+                    &[("reason", &error)],
+                ));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn preview_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        let (Some(store), Some(document), Some(file_name)) = (
+            self.native_store.as_ref(),
+            self.theme_editor_document.clone(),
+            self.theme_editor_file_name.clone(),
+        ) else {
+            return;
+        };
+        let stem = file_name.trim_end_matches(".json");
+        match self
+            .themes
+            .preview_personal_document(store.profile_name(), stem, &document)
+        {
+            Ok(id) => {
+                self.theme_editor_preview_snapshot
+                    .get_or_insert_with(|| ThemePreviewSnapshot {
+                        preferences: self.preferences.clone(),
+                        applied_preferences: self.preferences.clone(),
+                    });
+                if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
+                    self.apply_theme(index, false);
+                    if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
+                        snapshot.applied_preferences = self.preferences.clone();
+                    }
+                    self.theme_editor_status = Some(crate::i18n::literal(
+                        &self.locale,
+                        "Preview is active. Save to keep it or cancel to restore.",
+                    ));
+                }
+            }
+            Err(error) => {
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme preview failed: {reason}",
+                    &[("reason", &error)],
+                ));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn restore_personal_theme_preview(&mut self) {
+        if let Some(snapshot) = self.theme_editor_preview_snapshot.take() {
+            if self.preferences.theme_id == snapshot.applied_preferences.theme_id {
+                self.preferences.theme_id = snapshot.preferences.theme_id;
+            }
+            if self.preferences.app_theme_id == snapshot.applied_preferences.app_theme_id {
+                self.preferences.app_theme_id = snapshot.preferences.app_theme_id;
+            }
+            if self.preferences.terminal_theme_id == snapshot.applied_preferences.terminal_theme_id
+            {
+                self.preferences.terminal_theme_id = snapshot.preferences.terminal_theme_id;
+            }
+            if self.preferences.gradient_theme_id == snapshot.applied_preferences.gradient_theme_id
+            {
+                self.preferences.gradient_theme_id = snapshot.preferences.gradient_theme_id;
+            }
+            if self.preferences.effects_theme_id == snapshot.applied_preferences.effects_theme_id {
+                self.preferences.effects_theme_id = snapshot.preferences.effects_theme_id;
+            }
+            if self.preferences.typography == snapshot.applied_preferences.typography {
+                self.preferences.typography = snapshot.preferences.typography;
+            }
+            if self.preferences.calm_mode == snapshot.applied_preferences.calm_mode {
+                self.preferences.calm_mode = snapshot.preferences.calm_mode;
+            }
+            self.reload_personal_themes();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        let (Some(store), Some(mut document)) = (
+            self.native_store.as_ref(),
+            self.theme_editor_document.clone(),
+        ) else {
+            return;
+        };
+        let name = document["metadata"]["name"]
+            .as_str()
+            .unwrap_or("Custom theme")
+            .to_owned();
+        let file_name = self.theme_editor_file_name.clone().unwrap_or_else(|| {
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name)
+        });
+        let profile_name = store.profile_name().to_owned();
+        let replace = self.theme_editor_file_exists;
+        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
+            crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, replace)
+        });
+        match result {
+            Ok(saved_file_name) => {
+                if saved_file_name != file_name {
+                    let old_id = format!(
+                        "personal:{profile_name}:{}",
+                        file_name.trim_end_matches(".json")
+                    );
+                    let new_id = format!(
+                        "personal:{profile_name}:{}",
+                        saved_file_name.trim_end_matches(".json")
+                    );
+                    for selected in [
+                        &mut self.preferences.theme_id,
+                        &mut self.preferences.app_theme_id,
+                        &mut self.preferences.terminal_theme_id,
+                        &mut self.preferences.gradient_theme_id,
+                        &mut self.preferences.effects_theme_id,
+                    ] {
+                        if selected == &old_id {
+                            selected.clone_from(&new_id);
+                        }
+                    }
+                    for theme_id in self.theme_overrides.values_mut() {
+                        if theme_id == &old_id {
+                            theme_id.clone_from(&new_id);
+                        }
+                    }
+                }
+                self.theme_editor_file_name = Some(saved_file_name);
+                self.theme_editor_file_exists = true;
+                self.theme_editor_document = Some(document.clone());
+                self.theme_editor_original_document = Some(document);
+                self.theme_editor_preview_snapshot = None;
+                self.theme_editor_confirm_delete = false;
+                self.reload_personal_themes();
+                self.theme_editor_status = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Theme saved to the active native profile.",
+                ));
+            }
+            Err(error) => {
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme save failed: {reason}",
+                    &[("reason", &error)],
+                ));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn cancel_personal_theme_draft(&mut self) {
+        self.restore_personal_theme_preview();
+        self.reload_personal_themes();
+        if self.theme_editor_file_exists {
+            let id = self
+                .theme_editor_file_name
+                .as_deref()
+                .and_then(|file_name| {
+                    self.native_store.as_ref().map(|store| {
+                        format!(
+                            "personal:{}:{}",
+                            store.profile_name(),
+                            file_name.trim_end_matches(".json")
+                        )
+                    })
+                });
+            if let Some(document) = id
+                .as_deref()
+                .and_then(|id| self.themes.personal_document(id))
+                .cloned()
+            {
+                self.theme_editor_document = Some(document.clone());
+                self.theme_editor_original_document = Some(document);
+            }
+        } else {
+            self.theme_editor_document = None;
+            self.theme_editor_original_document = None;
+            self.theme_editor_file_name = None;
+            self.theme_editor_file_exists = false;
+        }
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = Some(crate::i18n::literal(
+            &self.locale,
+            "Unsaved theme edits were canceled.",
+        ));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn export_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        let Some(mut document) = self.theme_editor_document.clone() else {
+            return;
+        };
+        let destination = std::path::PathBuf::from(self.theme_editor_export_path.trim());
+        match crate::theme_files::export_theme_file(&destination, &mut document) {
+            Ok(path) => {
+                self.theme_editor_document = Some(document);
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme exported to {path}",
+                    &[("path", &path.display().to_string())],
+                ));
+            }
+            Err(error) => {
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme export failed: {reason}",
+                    &[("reason", &error)],
+                ));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn delete_personal_theme_draft(&mut self) {
+        if !personal_theme_editor_available() {
+            return;
+        }
+        self.restore_personal_theme_preview();
+        let (Some(store), Some(file_name)) = (
+            self.native_store.as_ref(),
+            self.theme_editor_file_name.clone(),
+        ) else {
+            return;
+        };
+        if !self.theme_editor_file_exists {
+            return;
+        }
+        let id = format!(
+            "personal:{}:{}",
+            store.profile_name(),
+            file_name.trim_end_matches(".json")
+        );
+        match store.delete_theme_file(&file_name) {
+            Ok(()) => {
+                let fallback = "midnight";
+                for selected in [
+                    &mut self.preferences.theme_id,
+                    &mut self.preferences.app_theme_id,
+                    &mut self.preferences.terminal_theme_id,
+                    &mut self.preferences.gradient_theme_id,
+                    &mut self.preferences.effects_theme_id,
+                ] {
+                    if selected == &id {
+                        selected.clone_from(&fallback.to_owned());
+                    }
+                }
+                self.theme_overrides.retain(|_, theme_id| theme_id != &id);
+                self.theme_editor_document = None;
+                self.theme_editor_original_document = None;
+                self.theme_editor_file_name = None;
+                self.theme_editor_file_exists = false;
+                self.theme_editor_confirm_delete = false;
+                self.reload_personal_themes();
+                self.theme_editor_status = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Personal theme deleted.",
+                ));
+            }
+            Err(error) => {
+                self.theme_editor_confirm_delete = false;
+                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Theme delete failed: {reason}",
+                    &[("reason", &error.to_string())],
+                ));
+            }
         }
     }
 
@@ -6145,6 +6943,172 @@ fn preset_action_menu(
     });
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
+    let mut name = document["metadata"]["name"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    ui.horizontal(|ui| {
+        ui.label(crate::i18n::literal(locale, "Theme name"));
+        if ui
+            .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
+            .changed()
+        {
+            set_theme_document_value(document, "/metadata/name", Value::String(name.clone()));
+        }
+    });
+    let mut description = document["metadata"]["description"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    ui.label(crate::i18n::literal(locale, "Description"));
+    if ui
+        .add(
+            egui::TextEdit::multiline(&mut description)
+                .desired_rows(2)
+                .desired_width(f32::INFINITY),
+        )
+        .changed()
+    {
+        set_theme_document_value(
+            document,
+            "/metadata/description",
+            Value::String(description),
+        );
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_color_setting(
+    ui: &mut egui::Ui,
+    locale: &str,
+    document: &mut Value,
+    label: &str,
+    pointer: &str,
+) {
+    let mut color = document
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .and_then(crate::theme::parse_color)
+        .unwrap_or(Color32::from_rgb(100, 116, 139));
+    ui.horizontal(|ui| {
+        ui.label(crate::i18n::literal(locale, label));
+        if ui.color_edit_button_srgba(&mut color).changed() {
+            set_theme_document_value(
+                document,
+                pointer,
+                Value::String(crate::theme::to_hex(color)),
+            );
+        }
+        ui.monospace(crate::theme::to_hex(color));
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_document_toggle(
+    ui: &mut egui::Ui,
+    locale: &str,
+    document: &mut Value,
+    label: &str,
+    pointer: &str,
+) {
+    let mut enabled = document
+        .pointer(pointer)
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if ui
+        .checkbox(&mut enabled, crate::i18n::literal(locale, label))
+        .changed()
+    {
+        set_theme_document_value(document, pointer, Value::Bool(enabled));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_document_unit_slider(
+    ui: &mut egui::Ui,
+    locale: &str,
+    document: &mut Value,
+    label: &str,
+    pointer: &str,
+) {
+    let mut value = document
+        .pointer(pointer)
+        .and_then(Value::as_f64)
+        .unwrap_or(0.08) as f32;
+    if ui
+        .add(egui::Slider::new(&mut value, 0.0..=0.35).text(crate::i18n::literal(locale, label)))
+        .changed()
+    {
+        set_theme_document_value(document, pointer, json!(value));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
+    let parts: Vec<_> = pointer
+        .trim_start_matches('/')
+        .split('/')
+        .map(|part| part.replace("~1", "/").replace("~0", "~"))
+        .collect();
+    let Some((last, parents)) = parts.split_last() else {
+        return;
+    };
+    let mut current = document;
+    for (index, part) in parents.iter().enumerate() {
+        let next_is_index = parents
+            .get(index + 1)
+            .or(Some(last))
+            .is_some_and(|next| next.parse::<usize>().is_ok());
+        if current.is_array() {
+            let Ok(slot) = part.parse::<usize>() else {
+                return;
+            };
+            let Some(array) = current.as_array_mut() else {
+                return;
+            };
+            while array.len() <= slot {
+                array.push(Value::Null);
+            }
+            current = &mut array[slot];
+        } else {
+            if !current.is_object() {
+                *current = Value::Object(serde_json::Map::new());
+            }
+            let Some(object) = current.as_object_mut() else {
+                return;
+            };
+            current = object.entry(part.clone()).or_insert_with(|| {
+                if next_is_index {
+                    Value::Array(Vec::new())
+                } else {
+                    Value::Object(serde_json::Map::new())
+                }
+            });
+        }
+    }
+    if current.is_array() {
+        let Ok(slot) = last.parse::<usize>() else {
+            return;
+        };
+        let Some(array) = current.as_array_mut() else {
+            return;
+        };
+        while array.len() <= slot {
+            array.push(Value::Null);
+        }
+        array[slot] = value;
+    } else {
+        if !current.is_object() {
+            *current = Value::Object(serde_json::Map::new());
+        }
+        if let Some(object) = current.as_object_mut() {
+            object.insert(last.clone(), value);
+        }
+    }
+}
+
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         #[cfg(target_arch = "wasm32")]
@@ -6411,6 +7375,141 @@ mod tests {
             .notice
             .as_deref()
             .is_some_and(|message| message.contains("unmatched quote")));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn personal_theme_preview_cancel_restores_scopes_without_restarting_terminals() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-preview-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        let prior_theme = app.preferences.theme_id.clone();
+        let original_next_id = app.next_id;
+        let original_tab_count = app.tabs.len();
+
+        app.start_personal_theme_draft();
+        let file_name = app.theme_editor_file_name.clone().unwrap();
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(
+            &mut draft,
+            "/theme/terminal/background",
+            Value::String("#123456".into()),
+        );
+        app.theme_editor_document = Some(draft);
+        app.preview_personal_theme_draft();
+
+        let preview_id = format!("personal:default:{}", file_name.trim_end_matches(".json"));
+        assert_eq!(app.preferences.theme_id, preview_id);
+        assert_eq!(
+            app.themes.get(&preview_id).terminal_colors.background,
+            "#123456"
+        );
+        app.cancel_personal_theme_draft();
+        assert_eq!(app.preferences.theme_id, prior_theme);
+        assert!(!app.themes.all().iter().any(|theme| theme.id == preview_id));
+        assert_eq!(app.next_id, original_next_id);
+        assert_eq!(app.tabs.len(), original_tab_count);
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn personal_theme_save_survives_catalog_reload_without_respawning_shells() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-save-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let profile_dir = store.profile_dir();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        let original_next_id = app.next_id;
+        let original_tab_count = app.tabs.len();
+
+        app.start_personal_theme_draft();
+        let file_name = app.theme_editor_file_name.clone().unwrap();
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["futureRoot"] = serde_json::json!({"keep": "on restart"});
+        app.theme_editor_document = Some(draft);
+        app.save_personal_theme_draft();
+
+        assert!(profile_dir.join("themes").join(&file_name).is_file());
+        assert_eq!(app.next_id, original_next_id);
+        assert_eq!(app.tabs.len(), original_tab_count);
+        let mut catalog = ThemeCatalog::load();
+        assert!(catalog.load_personal("default", &profile_dir).is_empty());
+        let identity = format!("personal:default:{}", file_name.trim_end_matches(".json"));
+        assert_eq!(
+            catalog.personal_document(&identity).unwrap()["futureRoot"]["keep"],
+            "on restart"
+        );
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn personal_theme_save_collision_keeps_the_preview_selected() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-save-race-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        let requested = app.theme_editor_file_name.clone().unwrap();
+        app.preview_personal_theme_draft();
+        app.native_store
+            .as_ref()
+            .unwrap()
+            .write_theme_file(&requested, b"claimed by another writer", false)
+            .unwrap();
+
+        app.save_personal_theme_draft();
+
+        let saved = app.theme_editor_file_name.clone().unwrap();
+        assert_ne!(saved, requested);
+        let expected_id = format!("personal:default:{}", saved.trim_end_matches(".json"));
+        assert_eq!(app.preferences.theme_id, expected_id);
+        assert!(app.themes.all().iter().any(|theme| theme.id == expected_id));
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[cfg(not(target_arch = "wasm32"))]

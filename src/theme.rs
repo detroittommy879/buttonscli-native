@@ -167,14 +167,7 @@ impl ThemeCatalog {
                 }
                 let document: Value =
                     serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-                if document["version"] != 1
-                    || !document["metadata"]["id"].is_string()
-                    || !document["metadata"]["name"].is_string()
-                    || !document["theme"].is_object()
-                    || !document["effects"].is_object()
-                {
-                    return Err("not a version 1 saved theme document".into());
-                }
+                validate_personal_document(&document)?;
                 let mut theme = parse_legacy_value(stem, &document, ThemeSource::Personal)
                     .map_err(|error| error.to_string())?;
                 theme.id = identity.clone();
@@ -195,6 +188,43 @@ impl ThemeCatalog {
     pub fn personal_document(&self, id: &str) -> Option<&Value> {
         self.personal_documents.get(id)
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn preview_personal_document(
+        &mut self,
+        profile: &str,
+        file_stem: &str,
+        document: &Value,
+    ) -> Result<String, String> {
+        validate_personal_document(document)?;
+        let identity = format!("personal:{profile}:{file_stem}");
+        let mut theme = parse_legacy_value(file_stem, document, ThemeSource::Personal)
+            .map_err(|error| error.to_string())?;
+        theme.id.clone_from(&identity);
+        if let Some(existing) = self.themes.iter_mut().find(|theme| theme.id == identity) {
+            *existing = theme;
+        } else {
+            self.themes.push(theme);
+        }
+        Ok(identity)
+    }
+}
+
+pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
+    let valid_metadata = |key: &str| {
+        document["metadata"][key]
+            .as_str()
+            .is_some_and(|value| !value.trim().is_empty())
+    };
+    if document["version"] != 1
+        || !valid_metadata("id")
+        || !valid_metadata("name")
+        || !document["theme"].is_object()
+        || !document["effects"].is_object()
+    {
+        return Err("not a version 1 saved theme document".into());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug)]

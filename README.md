@@ -30,8 +30,8 @@ Current desktop features include:
 - detached Settings with live preview and a Revert & Close action, with an
   in-window fallback when the platform cannot create another viewport;
 - separate command and SSH docks, editable persisted presets with type/run
-  behavior, all 555 bundled legacy theme selections, and personal version 1
-  theme JSON files from the active native profile's `themes/` folder;
+  behavior, all 555 bundled legacy theme selections, and a free personal theme
+  library with a non-AI editor plus JSON import/export;
 - editable AI provider endpoints and model IDs, plus a separate AI Help window
   with streamed answers, previewed optional terminal context, and explicitly
   reviewed suggestions; the Pro gate is still closed in release builds until
@@ -96,6 +96,11 @@ Personal themes are read when the desktop app starts. A broken theme file is
 skipped without removing other themes. Imported files are copied only after
 confirmation; unsupported effect fields are retained for later export but are
 not rendered.
+
+Create, edit, preview, import, export, and delete personal theme files under
+**Settings → Themes → Custom Theme Library**. See
+[`docs/PERSONAL-THEMES.md`](docs/PERSONAL-THEMES.md) for save, preview, and file
+collision behavior.
 
 In Theme Settings, **This terminal** pins a theme to the focused session;
 **Use global** returns it to the saved default. **Theme all** changes that
