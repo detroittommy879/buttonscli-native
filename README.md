@@ -27,6 +27,8 @@ Current desktop features include:
   select-all and clear-screen actions that leave the shell running;
 - a resizable compact command dock with auto-hide and a status-bar terminal
   zoom readout, reset action, and quick calm-effects switch;
+- detached Settings with live preview and a Revert & Close action, with an
+  in-window fallback when the platform cannot create another viewport;
 - separate command and SSH docks, editable persisted presets with type/run
   behavior, all 555 bundled legacy theme selections, and personal version 1
   theme JSON files from the active native profile's `themes/` folder;
@@ -68,6 +70,9 @@ select-all, and clear-screen behavior.
 
 See [Workspace controls](docs/WORKSPACE-CONTROLS.md) for dock auto-hide,
 terminal zoom, and the calm-effects toggle.
+
+See [Settings preview](docs/SETTINGS-PREVIEW.md) for the detached window,
+rollback behavior, and current platform checks.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

@@ -140,10 +140,13 @@ pub enum MessageKey {
     TerminalZoomReset,
     CalmMode,
     CalmModeHelp,
+    SettingsTitle,
+    SettingsKeepClose,
+    SettingsRevertClose,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 133] = [
+    pub const ALL: [Self; 136] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -277,6 +280,9 @@ impl MessageKey {
         Self::TerminalZoomReset,
         Self::CalmMode,
         Self::CalmModeHelp,
+        Self::SettingsTitle,
+        Self::SettingsKeepClose,
+        Self::SettingsRevertClose,
     ];
 }
 
@@ -433,6 +439,9 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::TerminalZoomReset => "Reset terminal text size",
         MessageKey::CalmMode => "Calm effects",
         MessageKey::CalmModeHelp => "Pause animated terminal effects",
+        MessageKey::SettingsTitle => "ButtonsCLI Settings",
+        MessageKey::SettingsKeepClose => "Keep changes and close",
+        MessageKey::SettingsRevertClose => "Revert and close",
     }
 }
 

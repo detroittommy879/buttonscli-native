@@ -18,6 +18,24 @@ collision warning. Fake-time coverage checks reveal, delayed close, reopening,
 bounded delay and no repaint once closed. Windows GUI interaction and
 cross-platform checks remain pending.
 
+## 2026-09-28 — U04 detached Settings and preview rollback
+
+Moved the existing Settings surface into its own eframe viewport, with an
+embedded egui window when the backend does not support another native window.
+Theme, font, and per-terminal choices continue to apply to the live workspace.
+Added Keep Changes and Revert and Close; rollback restores the preference
+snapshot and per-terminal theme overrides without replacing or retargeting
+terminal sessions. A completed profile import establishes a fresh rollback
+point, while OS credential-store writes remain outside rollback.
+
+`cargo fmt --all`, Windows `cargo check --bin buttonscli` and
+`cargo build --bin buttonscli`, two focused app tests, three i18n tests, and
+`git diff --check` passed. The tests cover restoring preferences/theme
+overrides without changing focused session state and rendering the embedded
+viewport fallback. The build emits the existing bin/lib PDB filename collision
+warning. Monitor/DPI movement, focus, keyboard interaction, and live GUI/PTY
+behavior still require manual review.
+
 ## 2026-09-28 — U02 terminal search and buffer actions
 
 Added focused-terminal regex search against Alacritty's live grid, with wrapped

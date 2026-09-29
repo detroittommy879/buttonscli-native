@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Moved Settings into a separate native viewport with an in-window fallback, live theme/font preview, and explicit Keep Changes / Revert and Close actions. Reverting restores app preferences and per-terminal theme choices without touching live terminal sessions.
 - Added saved command-dock resizing and compact SSH buttons, optional auto-hide with a peek rail and overlay, terminal zoom/reset controls, and a status-bar calm-effects switch.
 - Original-profile import now projects the supported command-dock width, compact, auto-hide, delay, opacity, and peek settings into native preferences.
 - Added focused-terminal regex search across wrapped lines and scrollback, with next/previous navigation and visible match highlights. Added select-all and a native clear-screen action that keeps the shell running.

@@ -129,6 +129,7 @@ pub struct ButtonsApp {
     themes: ThemeCatalog,
     theme_search: String,
     settings_tab: SettingsTab,
+    settings_snapshot: Option<SettingsSnapshot>,
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
@@ -273,6 +274,18 @@ enum SettingsTab {
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
     Import,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SettingsCloseAction {
+    Keep,
+    Revert,
+}
+
+struct SettingsSnapshot {
+    preferences: Preferences,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_overrides: std::collections::BTreeMap<u64, String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -517,6 +530,7 @@ impl ButtonsApp {
             themes: ThemeCatalog::load(),
             theme_search: String::new(),
             settings_tab: SettingsTab::Themes,
+            settings_snapshot: None,
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
@@ -2538,73 +2552,169 @@ impl ButtonsApp {
             });
     }
 
+    fn capture_settings_snapshot(&self) -> SettingsSnapshot {
+        SettingsSnapshot {
+            preferences: self.preferences.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_overrides: self.theme_overrides.clone(),
+        }
+    }
+
+    fn restore_settings_snapshot(&mut self, snapshot: SettingsSnapshot) {
+        self.preferences = snapshot.preferences;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.theme_overrides = snapshot.theme_overrides;
+        }
+    }
+
     fn settings_window(&mut self, ctx: &egui::Context) {
         if !self.show_settings {
             return;
         }
+        if self.settings_snapshot.is_none() {
+            self.settings_snapshot = Some(self.capture_settings_snapshot());
+        }
         let old_app_theme = self.preferences.app_theme_id.clone();
         let old_typography = self.preferences.typography.clone();
-        let mut open = self.show_settings;
-        let settings_colors = self.colors();
-        egui::Window::new("ButtonsCLI Settings")
-            .open(&mut open)
-            .default_size([980.0, 760.0])
-            .min_width(720.0)
-            .resizable(true)
-            .collapsible(false)
-            .frame(
-                egui::Frame::window(&ctx.style())
-                    .fill(settings_colors.settings_background)
-                    .stroke(Stroke::new(1.0_f32, settings_colors.accent_alt)),
-            )
-            .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.settings);
-                ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Themes, "Themes");
-                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Fonts, "Fonts");
-                    ui.selectable_value(&mut self.settings_tab, SettingsTab::Commands, "Commands");
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Workspace,
-                        "Workspace",
-                    );
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Shortcuts,
-                        crate::i18n::text("en", crate::i18n::MessageKey::Shortcuts, &[]),
-                    );
-                    #[cfg(not(target_arch = "wasm32"))]
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Providers,
-                        crate::i18n::text("en", crate::i18n::MessageKey::Providers, &[]),
-                    );
-                    #[cfg(not(target_arch = "wasm32"))]
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Import,
-                        crate::i18n::text("en", crate::i18n::MessageKey::ImportFromOriginal, &[]),
-                    );
-                });
-                ui.separator();
-                match self.settings_tab {
-                    SettingsTab::Themes => self.theme_settings(ui),
-                    SettingsTab::Fonts => self.font_settings(ui),
-                    SettingsTab::Commands => self.command_settings(ui),
-                    SettingsTab::Workspace => self.workspace_settings(ui),
-                    SettingsTab::Shortcuts => self.shortcut_settings(ui),
-                    #[cfg(not(target_arch = "wasm32"))]
-                    SettingsTab::Providers => self.provider_settings(ui, ctx),
-                    #[cfg(not(target_arch = "wasm32"))]
-                    SettingsTab::Import => self.import_settings(ui, ctx),
+        let title = crate::i18n::text("en", crate::i18n::MessageKey::SettingsTitle, &[]);
+        let mut close_action = None;
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("buttonscli-settings"),
+            egui::ViewportBuilder::default()
+                .with_title(title.clone())
+                .with_inner_size([980.0, 760.0])
+                .with_min_inner_size([720.0, 520.0]),
+            |child_ctx, class| {
+                if child_ctx.input(|input| input.viewport().close_requested()) {
+                    close_action = Some(SettingsCloseAction::Keep);
+                    child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    return;
                 }
-            });
-        self.show_settings = open;
+                if class != egui::ViewportClass::Embedded {
+                    self.shortcuts(child_ctx);
+                }
+                let settings_colors = self.colors();
+                if class == egui::ViewportClass::Embedded {
+                    let mut window_open = true;
+                    egui::Window::new(title.clone())
+                        .open(&mut window_open)
+                        .default_size([980.0, 760.0])
+                        .min_width(720.0)
+                        .resizable(true)
+                        .collapsible(false)
+                        .frame(
+                            egui::Frame::window(&child_ctx.style())
+                                .fill(settings_colors.settings_background)
+                                .stroke(Stroke::new(1.0_f32, settings_colors.accent_alt)),
+                        )
+                        .show(child_ctx, |ui| {
+                            self.settings_contents(ui, child_ctx, &mut close_action);
+                        });
+                    if close_action.is_some() {
+                        window_open = false;
+                    }
+                    if !window_open && close_action.is_none() {
+                        close_action = Some(SettingsCloseAction::Keep);
+                    }
+                } else {
+                    egui::CentralPanel::default()
+                        .frame(
+                            egui::Frame::new()
+                                .fill(settings_colors.settings_background)
+                                .stroke(Stroke::new(1.0_f32, settings_colors.accent_alt)),
+                        )
+                        .show(child_ctx, |ui| {
+                            self.settings_contents(ui, child_ctx, &mut close_action);
+                        });
+                }
+                if close_action.is_some() && class != egui::ViewportClass::Embedded {
+                    child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            },
+        );
+        if let Some(action) = close_action {
+            if action == SettingsCloseAction::Revert {
+                if let Some(snapshot) = self.settings_snapshot.take() {
+                    self.restore_settings_snapshot(snapshot);
+                }
+            } else {
+                self.settings_snapshot = None;
+            }
+            self.show_settings = false;
+        }
         if old_app_theme != self.preferences.app_theme_id
             || old_typography != self.preferences.typography
         {
             self.apply_style(ctx);
         }
+    }
+
+    fn settings_contents(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        close_action: &mut Option<SettingsCloseAction>,
+    ) {
+        apply_zone_style(ui, &self.preferences.typography.settings);
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.settings_tab, SettingsTab::Themes, "Themes");
+            ui.selectable_value(&mut self.settings_tab, SettingsTab::Fonts, "Fonts");
+            ui.selectable_value(&mut self.settings_tab, SettingsTab::Commands, "Commands");
+            ui.selectable_value(&mut self.settings_tab, SettingsTab::Workspace, "Workspace");
+            ui.selectable_value(
+                &mut self.settings_tab,
+                SettingsTab::Shortcuts,
+                crate::i18n::text("en", crate::i18n::MessageKey::Shortcuts, &[]),
+            );
+            #[cfg(not(target_arch = "wasm32"))]
+            ui.selectable_value(
+                &mut self.settings_tab,
+                SettingsTab::Providers,
+                crate::i18n::text("en", crate::i18n::MessageKey::Providers, &[]),
+            );
+            #[cfg(not(target_arch = "wasm32"))]
+            ui.selectable_value(
+                &mut self.settings_tab,
+                SettingsTab::Import,
+                crate::i18n::text("en", crate::i18n::MessageKey::ImportFromOriginal, &[]),
+            );
+        });
+        ui.separator();
+        match self.settings_tab {
+            SettingsTab::Themes => self.theme_settings(ui),
+            SettingsTab::Fonts => self.font_settings(ui),
+            SettingsTab::Commands => self.command_settings(ui),
+            SettingsTab::Workspace => self.workspace_settings(ui),
+            SettingsTab::Shortcuts => self.shortcut_settings(ui),
+            #[cfg(not(target_arch = "wasm32"))]
+            SettingsTab::Providers => self.provider_settings(ui, ctx),
+            #[cfg(not(target_arch = "wasm32"))]
+            SettingsTab::Import => self.import_settings(ui, ctx),
+        }
+        ui.separator();
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if ui
+                .button(crate::i18n::text(
+                    "en",
+                    crate::i18n::MessageKey::SettingsKeepClose,
+                    &[],
+                ))
+                .clicked()
+            {
+                *close_action = Some(SettingsCloseAction::Keep);
+            }
+            if ui
+                .button(crate::i18n::text(
+                    "en",
+                    crate::i18n::MessageKey::SettingsRevertClose,
+                    &[],
+                ))
+                .clicked()
+            {
+                *close_action = Some(SettingsCloseAction::Revert);
+            }
+        });
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -4238,6 +4348,9 @@ impl ButtonsApp {
                             self.native_save_blocked = false;
                             self.import_offer = false;
                             self.apply_style(ctx);
+                            if self.settings_snapshot.is_some() {
+                                self.settings_snapshot = Some(self.capture_settings_snapshot());
+                            }
                             self.import_message = Some(match transfer {
                                 Some(Ok(result)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysResult, &[("saved", &result.imported.to_string()), ("failed", &result.failed.to_string())]),
                                 Some(Err(error)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysFailed, &[("reason", &error)]),
@@ -5775,6 +5888,43 @@ mod tests {
         assert_eq!(preferences.terminal_theme_id, "aurora");
         assert_eq!(preferences.gradient_theme_id, "aurora");
         assert_eq!(preferences.effects_theme_id, "aurora");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn settings_revert_restores_preferences_and_theme_overrides_without_touching_sessions() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.preferences.theme_id = "aurora".into();
+        app.theme_overrides.insert(42, "aurora".into());
+        app.focused = 3;
+        let snapshot = app.capture_settings_snapshot();
+
+        app.preferences.theme_id = "basic2".into();
+        app.preferences.dock_width = 300.0;
+        app.theme_overrides.clear();
+        app.restore_settings_snapshot(snapshot);
+
+        assert_eq!(app.preferences.theme_id, "aurora");
+        assert_eq!(app.preferences.dock_width, 176.0);
+        assert_eq!(
+            app.theme_overrides.get(&42).map(String::as_str),
+            Some("aurora")
+        );
+        assert_eq!(app.focused, 3);
+        assert!(app.tabs.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn settings_viewport_renders_the_embedded_fallback() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.show_settings = true;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx);
+        app.apply_style(&ctx);
+        let _output = ctx.run(egui::RawInput::default(), |ctx| app.settings_window(ctx));
+        assert!(app.show_settings);
+        assert!(app.settings_snapshot.is_some());
     }
 
     #[test]

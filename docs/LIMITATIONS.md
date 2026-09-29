@@ -43,11 +43,17 @@ not a backlog disguised as release notes.
   in place during clear. The Windows GUI controls and Fedora interactions still
   need manual review.
 - Workspace controls now save dock width, compact layout, auto-hide timing,
-  overlay opacity and peek distance. Auto-hide reserves a narrow rail and draws
+  peek-rail opacity and distance. Auto-hide reserves a narrow rail and draws
   the dock over the workspace; status controls zoom terminal text and pause
   animated effects. Fake-time tests cover opening, delay, closing and idle
   repaint behavior. Windows GUI focus, overlay hit-testing and narrow-window
   interaction still need manual review.
+- Settings now uses a separate immediate viewport with an embedded-window
+  fallback. Theme and font changes preview in the running workspace; Revert and
+  Close restores app preferences and per-terminal theme choices without
+  changing terminal sessions. Source/build checks pass, but monitor movement,
+  DPI scaling, focus, keyboard interaction, and live PTY continuity still need
+  manual desktop review.
 - All 555 legacy theme selections are present. Linear, radial, and conic
   multi-stop terminal gradients preserve their angle/position; animated drift,
   static, and scanlines also render natively. Repeating gradients, hsync warp,
