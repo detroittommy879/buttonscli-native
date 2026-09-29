@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
+    [switch]$WithMcpSdk,
     [ValidateRange(10, 120)]
     [int]$StartupTimeoutSeconds = 30
 )
@@ -167,6 +168,14 @@ try {
         throw 'Installed Node CLI did not connect to the selected test instance.'
     }
     $null = Invoke-NativeCli -Arguments @('tabs', '--json')
+    if ($WithMcpSdk) {
+        $sdkSmokePath = Join-Path $PSScriptRoot 'test-mcp-sdk.mjs'
+        $sdkSmokeOutput = & $script:nodePath $sdkSmokePath --descriptor $descriptorPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Official MCP SDK client failed against the live app: $(($sdkSmokeOutput | Out-String).Trim())"
+        }
+        Write-Output ($sdkSmokeOutput | Out-String).Trim()
+    }
 
     $visible = Invoke-NativeCli -Arguments @(
         'create-tab', '--name', 'Control Live Visible', '--shell', $shellCommand,

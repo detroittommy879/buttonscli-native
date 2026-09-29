@@ -25,6 +25,17 @@ pass succeeded. This remains protocol evidence only: no live ButtonsCLI API,
 PTY, external MCP client, or GUI handoff was exercised. C05's fake-API test
 criterion is complete; its live M3 workflow is still open.
 
+## 2026-09-29 — Official MCP client interoperability
+
+Added `scripts/test-mcp-sdk.mjs`, an optional integration smoke that installs
+the official TypeScript MCP client SDK into a temporary directory, launches the
+native MCP helper over stdio, lists all 14 tools, and calls status/tabs against
+a fake authenticated API. It passed with SDK 2.2.0; no runtime or repository
+dependency was added. `scripts/test-control-live.ps1 -SkipBuild -WithMcpSdk`
+also passed against its isolated live ButtonsCLI app with the exact published
+descriptor. This closes external-client protocol acceptance; direct GUI M3
+interaction remains open.
+
 ## 2026-09-29 — Windows live PTY observer smoke
 
 Added `scripts/test-control-live.ps1`. It builds or launches the debug app with
