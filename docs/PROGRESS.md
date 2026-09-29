@@ -107,7 +107,10 @@ profile, provider, or terminal command was used. WGPU reported that the
 optional Vulkan validation layer is unavailable; this was nonfatal. This
 confirms startup and first-frame rendering only, not layout interaction, PTY
 behavior, detached windows, or Windows platform parity. Linux and macOS
-acceptance remain separate follow-up checks.
+acceptance remain separate follow-up checks. A follow-up attempt to automate
+shortcuts from this tool session could not focus the GUI; posted window
+messages did not change the tab UI and were discarded. Do not treat the startup
+screenshot as keyboard, pointer, or PTY interaction evidence.
 
 ## 2026-09-29 — V04 Shader Lab renderer decision
 
