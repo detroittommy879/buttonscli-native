@@ -1,5 +1,19 @@
 # Reconstruction journal
 
+## 2026-09-29 — P06 signed-manifest verifier core
+
+Added `src/distribution.rs` with exact-byte Ed25519 strict signature checking,
+canonical compact JSON validation, manifest/product/target/version/channel and
+updater gates, bounded artifact length plus SHA-256 validation, and Windows
+archive-path checks. Ten focused tests use a deterministic throwaway signing
+key, reject manifest/signature/package tampering and traversal, and prove the
+compiled verifier fails closed with its empty trust list. Formatting, focused
+tests, and `cargo check --bin buttonscli` passed. `cargo clippy --lib --
+-D warnings` still fails on existing warnings in unrelated app, assistant,
+control, fonts, theme, and terminal code; it reported none in the new module.
+There is no production key, package builder, extraction/staging, rollback, or
+updater integration, so P06 remains partial.
+
 ## 2026-09-29 — MCP control contract coverage
 
 Expanded `scripts/test-mcp-smoke.mjs` from initialize/list/status into a

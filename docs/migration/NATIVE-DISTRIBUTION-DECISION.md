@@ -1,8 +1,9 @@
 # Native distribution and update decision
 
-Status: design recorded; no installer, updater, key, or release endpoint has
-been created. This is a source and architecture decision for P06, not a claim
-that ButtonsCLI Native is distributable today.
+Status: the strict verifier core and isolated tests are implemented on Windows;
+no installer, updater, production key, or release endpoint has been created.
+This is still a source and architecture decision for P06, not a claim that
+ButtonsCLI Native is distributable today.
 
 ## Product identity and release boundary
 
@@ -75,8 +76,11 @@ remain unchanged.
 
 ## Current limits
 
-The product/settings namespace is already distinct. P06 remains open: there
-is no signed manifest verifier, production trust key, package builder,
-launcher, update UI, rollback implementation, or native release endpoint.
-This choice avoids generating an unbacked release key or routing native
-artifacts through the existing Tauri release system.
+The product/settings namespace is already distinct. The verifier core checks
+strict Ed25519 signatures, canonical manifest bytes, metadata, artifact size
+and digest, and portable archive entry names. Its compiled allowlist is
+intentionally empty; throwaway keys exist only in tests. P06 remains open:
+there is no production trust key, package builder/extractor, launcher, update
+UI, staging/rollback implementation, or native release endpoint. This avoids
+generating an unbacked release key or routing native artifacts through the
+existing Tauri release system.

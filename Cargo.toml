@@ -35,12 +35,14 @@ ttf-parser = "=0.25.1"
 anyhow = "1.0"
 aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+ed25519-dalek = "=2.2.0"
 fastrand = "2.5"
 zeroize = "1.8"
 reqwest = { version = "0.12.25", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 axum = "0.8.9"
 base64 = "0.22.1"
 getrandom = "0.4.3"
+semver = "1.0"
 tokio = { version = "1.53.1", features = ["rt", "net", "time", "sync"] }
 fs2 = "0.4.3"
 sha2 = "0.10"

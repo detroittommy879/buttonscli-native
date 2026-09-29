@@ -10,6 +10,9 @@ mod control;
 mod cool_stuff;
 #[cfg(not(target_arch = "wasm32"))]
 mod display;
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+mod distribution;
 mod dock;
 pub mod features;
 #[cfg(not(target_arch = "wasm32"))]
