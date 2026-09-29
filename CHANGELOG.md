@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a first-run language chooser and Settings control to follow the system locale or select one of 21 bundled app languages, plus an offline Hangul font fallback. Original-profile imports preserve language mode and manual locale; unmatched native labels safely fall back to English.
 - Moved Settings into a separate native viewport with an in-window fallback, live theme/font preview, and explicit Keep Changes / Revert and Close actions. Reverting restores app preferences and per-terminal theme choices without touching live terminal sessions.
 - Added saved command-dock resizing and compact SSH buttons, optional auto-hide with a peek rail and overlay, terminal zoom/reset controls, and a status-bar calm-effects switch.
 - Original-profile import now projects the supported command-dock width, compact, auto-hide, delay, opacity, and peek settings into native preferences.

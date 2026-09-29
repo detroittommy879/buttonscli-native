@@ -60,7 +60,7 @@ not a backlog disguised as release notes.
   TV/simple noise variants, glow, wallpaper drawing, and the theme designer are
   not rendered yet. Their original fields remain in the embedded JSON migration
   assets.
-- The 19 bundled font families work offline. The legacy opt-in Google Fonts
+- The 20 bundled font families work offline. The legacy opt-in Google Fonts
   catalog and arbitrary custom font-stack editor are not wired to a native font
   downloader yet; online-only names in imported themes safely fall back to a
   bundled family.
@@ -68,8 +68,13 @@ not a backlog disguised as release notes.
   profiles, default/per-tab selection, arguments, and working directories. The
   Linux paths have been exercised manually; Windows and macOS discovery and
   launch behavior still need their platform verification passes.
-- Profile switching, detached Settings, full UI localization, accounts, and
-  updater/release infrastructure are not part of this lean core yet.
+- Profile switching, accounts, and updater/release infrastructure are not part
+  of this lean core yet.
+- The source localization catalog and native Settings/onboarding flow include 21
+  locales. Labels without a matching source string fall back to English.
+  The bundled fallback includes every modern Hangul syllable, though actual
+  glyph rendering still needs review. RTL layout, keyboard focus, and IME
+  behavior need hands-on Windows review; see [`LOCALIZATION.md`](LOCALIZATION.md).
 - Settings has a keyboard-only recorder for seven native app shortcuts, with
   duplicate detection and terminal Ctrl+C protection. The GUI recorder has not
   had manual desktop acceptance. Original custom shortcut settings remain

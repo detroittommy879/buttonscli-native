@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 use crate::assistant::provider::ProviderSettings;
 use crate::fonts::{self, FontZone};
 use crate::i18n;
-use crate::settings::{CommandPreset, Preferences, ShellProfile};
+use crate::settings::{CommandPreset, LocalizationMode, Preferences, ShellProfile};
 
 use super::document::LegacyDocument;
 
@@ -96,17 +96,28 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
         project_dock_preferences(layout, &mut preferences, &mut warnings);
     }
     if let Some(localization) = document.get("localization") {
-        if localization["mode"] == "manual" {
+        if localization["mode"] == "system" {
+            preferences.localization.mode = LocalizationMode::System;
+        } else if localization["mode"] == "manual" {
+            preferences.localization.mode = LocalizationMode::Manual;
+            preferences.localization.manual_locale = "en".into();
             if let Some(requested) = localization["manualLocale"].as_str() {
                 let resolved = i18n::resolve_locale(requested);
                 if resolved == "en" && !requested.eq_ignore_ascii_case("en") {
                     warnings.push("manual locale is unsupported; English fallback selected".into());
                 }
                 selected_locale = Some(resolved.to_owned());
+                preferences.localization.manual_locale = resolved.to_owned();
             } else {
                 warnings.push("manual locale is missing".into());
             }
+        } else {
+            warnings.push("localization mode is unsupported; manual English selected".into());
         }
+        preferences.localization.first_run_language_confirmed = localization
+            .get("firstRunLanguageConfirmed")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
     }
     if let Some(theme) = document.get("theme") {
         project_typography(theme, &mut preferences, &mut warnings);
@@ -422,6 +433,40 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("top-level")));
+    }
+
+    #[test]
+    fn legacy_locale_mode_and_onboarding_confirmation_are_projected() {
+        let manual = LegacyDocument::parse(
+            br#"{"localization":{"mode":"manual","manualLocale":"pt-BR","firstRunLanguageConfirmed":false}}"#,
+        )
+        .unwrap();
+        let projection = project(&manual);
+        assert_eq!(
+            projection.preferences.localization.mode,
+            LocalizationMode::Manual
+        );
+        assert_eq!(projection.preferences.localization.manual_locale, "pt-BR");
+        assert!(
+            !projection
+                .preferences
+                .localization
+                .first_run_language_confirmed
+        );
+        assert_eq!(projection.selected_locale.as_deref(), Some("pt-BR"));
+
+        let system = LegacyDocument::parse(br#"{"localization":{"mode":"system"}}"#).unwrap();
+        let projection = project(&system);
+        assert_eq!(
+            projection.preferences.localization.mode,
+            LocalizationMode::System
+        );
+        assert!(
+            projection
+                .preferences
+                .localization
+                .first_run_language_confirmed
+        );
     }
 
     #[test]

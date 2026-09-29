@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-09-28 — U05 language selector and catalog
+
+Bundled the original 21-locale catalog (776 unique English source strings) and
+routed existing native message keys and static app labels through it with
+English fallback for unmatched strings. Added a first-run system/manual
+language chooser, a scrollable Settings → Language & Region page, Windows user
+locale detection, import projection for legacy language settings, and a free
+`localizationSettings` catalog entry. Existing native settings default to
+confirmed English, so an upgrade does not show the chooser again. See
+[`LOCALIZATION.md`](LOCALIZATION.md).
+
+Added an OFL-licensed, offline Noto Sans KR fallback subset with all 11,172
+modern Hangul syllables; attribution and the license are in `assets/fonts/`.
+`cargo fmt --all`, Windows `cargo check --bin buttonscli` and build, five
+focused locale, font-catalog, settings, import-projection and onboarding tests,
+and `git diff --check` passed.
+The test build reports the existing bin/lib PDB filename collision. Static font
+cmap inspection confirms the intended glyph ranges; actual rendering,
+long-label focus, RTL/IME behavior, and live Windows UI remain unverified.
+
 ## 2026-09-28 — U03 dock and status controls
 
 Added persistent dock width, compact SSH buttons, an auto-hide rail/overlay,

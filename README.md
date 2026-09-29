@@ -118,6 +118,11 @@ completed work, and tracks remaining platform and acceptance checks.
 The theme and font catalogs are embedded into the executable. They do not make
 network requests and remain available offline.
 
+Choose a display language or follow the operating system in **Settings →
+Language & Region**. A first-run chooser appears only for a new install. See
+[`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for supported languages and
+current font and layout limits.
+
 ## License
 
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your

@@ -15,7 +15,9 @@ use crate::session::actions::{
 };
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
-use crate::settings::{default_presets, CommandPreset, Preferences, ShellProfile};
+use crate::settings::{
+    default_presets, CommandPreset, LocalizationMode, Preferences, ShellProfile,
+};
 use crate::shortcuts::{ShortcutAction, ShortcutAssignError, ShortcutChord};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage::import::{self, ImportCommit, ImportPreview};
@@ -124,8 +126,20 @@ fn workspace_controls_available() -> bool {
     .available
 }
 
+fn localization_settings_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::LocalizationSettings,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
+    locale: String,
+    show_localization_onboarding: bool,
     themes: ThemeCatalog,
     theme_search: String,
     settings_tab: SettingsTab,
@@ -269,6 +283,7 @@ enum SettingsTab {
     Fonts,
     Commands,
     Workspace,
+    Language,
     Shortcuts,
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
@@ -377,6 +392,35 @@ enum PresetCollection {
     Ssh,
 }
 
+fn preferred_locale(preferences: &Preferences) -> &'static str {
+    match preferences.localization.mode {
+        LocalizationMode::System => crate::i18n::system_locale(),
+        LocalizationMode::Manual => {
+            crate::i18n::resolve_locale(&preferences.localization.manual_locale)
+        }
+    }
+}
+
+fn prepare_fresh_install_language(preferences: &mut Preferences) {
+    preferences.localization.mode = LocalizationMode::System;
+    preferences.localization.first_run_language_confirmed = false;
+}
+
+fn locale_selector(ui: &mut egui::Ui, id: &'static str, locale: &mut String) {
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(crate::i18n::locale_info(locale).native_name.to_owned())
+        .show_ui(ui, |ui| {
+            for info in crate::i18n::LOCALE_INFO {
+                let label = if info.native_name == info.english_name {
+                    info.native_name.to_owned()
+                } else {
+                    format!("{} ({})", info.native_name, info.english_name)
+                };
+                ui.selectable_value(locale, info.code.to_owned(), label);
+            }
+        });
+}
+
 impl PresetCollection {
     fn label(self) -> &'static str {
         match self {
@@ -443,26 +487,41 @@ enum PaneTree {
 }
 
 impl ButtonsApp {
+    fn localized_arg(&self, english: &str, name: &str, value: &str) -> String {
+        crate::i18n::formatted_literal(&self.locale, english, &[(name, value)])
+    }
+
+    fn refresh_locale(&mut self) {
+        self.locale = preferred_locale(&self.preferences).to_owned();
+    }
+
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let mut preferences: Preferences = cc
+        let stored_preferences: Option<Preferences> = cc
             .storage
-            .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
-            .unwrap_or_default();
+            .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY));
+        let has_eframe_preferences = stored_preferences.is_some();
+        let mut preferences = stored_preferences.unwrap_or_default();
         #[cfg(not(target_arch = "wasm32"))]
-        let (native_store, native_revision, storage_error) = match production_roots() {
-            Ok((root, legacy)) => match NativeStore::open(root, legacy.0) {
-                Ok(store) => match store.load() {
-                    Ok(Some(loaded)) => {
-                        preferences = loaded.preferences;
-                        (Some(store), Some(loaded.revision), None)
-                    }
-                    Ok(None) => (Some(store), None, None),
-                    Err(error) => (Some(store), None, Some(error.to_string())),
+        let (native_store, native_revision, storage_error, first_run_language_setup) =
+            match production_roots() {
+                Ok((root, legacy)) => match NativeStore::open(root, legacy.0) {
+                    Ok(store) => match store.load() {
+                        Ok(Some(loaded)) => {
+                            preferences = loaded.preferences;
+                            (Some(store), Some(loaded.revision), None, false)
+                        }
+                        Ok(None) => (Some(store), None, None, !has_eframe_preferences),
+                        Err(error) => (Some(store), None, Some(error.to_string()), false),
+                    },
+                    Err(error) => (None, None, Some(error.to_string()), false),
                 },
-                Err(error) => (None, None, Some(error.to_string())),
-            },
-            Err(error) => (None, None, Some(error.to_string())),
-        };
+                Err(error) => (None, None, Some(error.to_string()), false),
+            };
+        #[cfg(target_arch = "wasm32")]
+        let first_run_language_setup = cc.storage.is_some() && !has_eframe_preferences;
+        if first_run_language_setup {
+            prepare_fresh_install_language(&mut preferences);
+        }
         preferences.normalize_theme_sources();
         #[allow(unused_mut)]
         let mut app = Self::empty(preferences);
@@ -513,6 +572,8 @@ impl ButtonsApp {
     }
 
     fn empty(preferences: Preferences) -> Self {
+        let locale = preferred_locale(&preferences).to_owned();
+        let show_localization_onboarding = !preferences.localization.first_run_language_confirmed;
         #[cfg(not(target_arch = "wasm32"))]
         let (events_tx, events_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
@@ -527,6 +588,8 @@ impl ButtonsApp {
         let (ai_help_tx, ai_help_rx) = mpsc::channel();
         Self {
             preferences,
+            locale,
+            show_localization_onboarding,
             themes: ThemeCatalog::load(),
             theme_search: String::new(),
             settings_tab: SettingsTab::Themes,
@@ -1517,7 +1580,10 @@ impl ButtonsApp {
     fn terminal_workspace(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
         if self.tabs.is_empty() {
             ui.centered_and_justified(|ui| {
-                if ui.button("Open a terminal").clicked() {
+                if ui
+                    .button(crate::i18n::literal(&self.locale, "Open a terminal"))
+                    .clicked()
+                {
                     self.dispatch_ui_or_notice(
                         None,
                         Action::Create {
@@ -1542,7 +1608,8 @@ impl ButtonsApp {
         let modal_open = self.show_settings
             || self.show_about
             || self.show_preset_editor
-            || self.show_tab_rename;
+            || self.show_tab_rename
+            || self.show_localization_onboarding;
         let mut clicked = None;
         let mut visible = self.visible_panes.clone();
         visible.retain(|index| *index < self.tabs.len());
@@ -1671,12 +1738,16 @@ impl ButtonsApp {
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.demo_input)
                     .font(fonts::font_id(&self.preferences.typography.terminal))
-                    .hint_text("type help")
+                    .hint_text(crate::i18n::literal(&self.locale, "type help"))
                     .desired_width(f32::INFINITY),
             );
             let submit =
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-            if submit || ui.button("Run").clicked() {
+            if submit
+                || ui
+                    .button(crate::i18n::literal(&self.locale, "Run"))
+                    .clicked()
+            {
                 let command = std::mem::take(&mut self.demo_input);
                 self.run_demo_command(&command);
                 response.request_focus();
@@ -1692,7 +1763,7 @@ impl ButtonsApp {
         let query = self.terminal_search_query.clone();
         let Some(tab) = self.tabs.get_mut(self.focused) else {
             self.terminal_search_status = Some(crate::i18n::text(
-                "en",
+                &self.locale,
                 crate::i18n::MessageKey::TerminalSearchNoMatches,
                 &[],
             ));
@@ -1705,18 +1776,20 @@ impl ButtonsApp {
         };
         self.terminal_search_status = Some(match result {
             Ok(Some((current, count))) => crate::i18n::text(
-                "en",
+                &self.locale,
                 crate::i18n::MessageKey::TerminalSearchStatus,
                 &[
                     ("current", &current.to_string()),
                     ("count", &count.to_string()),
                 ],
             ),
-            Ok(None) => {
-                crate::i18n::text("en", crate::i18n::MessageKey::TerminalSearchNoMatches, &[])
-            }
+            Ok(None) => crate::i18n::text(
+                &self.locale,
+                crate::i18n::MessageKey::TerminalSearchNoMatches,
+                &[],
+            ),
             Err(_) => crate::i18n::text(
-                "en",
+                &self.locale,
                 crate::i18n::MessageKey::TerminalSearchInvalidPattern,
                 &[],
             ),
@@ -1775,7 +1848,7 @@ impl ButtonsApp {
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut self.terminal_search_query)
                             .hint_text(crate::i18n::text(
-                                "en",
+                                &self.locale,
                                 crate::i18n::MessageKey::TerminalSearchHint,
                                 &[],
                             ))
@@ -1790,7 +1863,7 @@ impl ButtonsApp {
                     }
                     if ui
                         .button(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::TerminalSearchPrevious,
                             &[],
                         ))
@@ -1800,7 +1873,7 @@ impl ButtonsApp {
                     }
                     if ui
                         .button(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::TerminalSearchNext,
                             &[],
                         ))
@@ -1810,7 +1883,7 @@ impl ButtonsApp {
                     }
                     if ui
                         .button(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::TerminalSearchClear,
                             &[],
                         ))
@@ -1821,7 +1894,10 @@ impl ButtonsApp {
                     if let Some(status) = &self.terminal_search_status {
                         ui.label(RichText::new(status).small().color(colors.muted));
                     }
-                    if ui.small_button("×").clicked() {
+                    if ui
+                        .small_button(crate::i18n::literal(&self.locale, "×"))
+                        .clicked()
+                    {
                         close = true;
                     }
                 });
@@ -1856,9 +1932,15 @@ impl ButtonsApp {
                             .extra_letter_spacing(1.5),
                     );
                     ui.separator();
-                    ui.menu_button("File", |ui| {
+                    ui.menu_button(crate::i18n::literal(&self.locale, "File"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
-                        if ui.button("New terminal  Ctrl+Shift+T").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(
+                                &self.locale,
+                                "New terminal  Ctrl+Shift+T",
+                            ))
+                            .clicked()
+                        {
                             self.dispatch_ui_or_notice(
                                 None,
                                 Action::Create {
@@ -1872,14 +1954,17 @@ impl ButtonsApp {
                         {
                             let options = self.shell_menu_options();
                             let mut launch = None;
-                            ui.menu_button("New terminal with…", |ui| {
-                                for (id, label, detail) in options {
-                                    if ui.button(label).on_hover_text(detail).clicked() {
-                                        launch = Some(id);
-                                        ui.close_menu();
+                            ui.menu_button(
+                                crate::i18n::literal(&self.locale, "New terminal with…"),
+                                |ui| {
+                                    for (id, label, detail) in options {
+                                        if ui.button(label).on_hover_text(detail).clicked() {
+                                            launch = Some(id);
+                                            ui.close_menu();
+                                        }
                                     }
-                                }
-                            });
+                                },
+                            );
                             if let Some(profile_id) = launch {
                                 self.dispatch_ui_or_notice(
                                     None,
@@ -1893,7 +1978,10 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 !self.recently_closed.is_empty(),
-                                egui::Button::new("Reopen closed terminal  Ctrl+Shift+U"),
+                                egui::Button::new(crate::i18n::literal(
+                                    &self.locale,
+                                    "Reopen closed terminal  Ctrl+Shift+U",
+                                )),
                             )
                             .clicked()
                         {
@@ -1901,21 +1989,24 @@ impl ButtonsApp {
                             ui.close_menu();
                         }
                         ui.separator();
-                        if ui.button("Quit  Ctrl+Shift+Q").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
+                            .clicked()
+                        {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
-                    ui.menu_button("View", |ui| {
+                    ui.menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
                         ui.checkbox(&mut self.preferences.show_sidebar, "Command dock");
                         ui.checkbox(&mut self.preferences.show_presets, "Preset bar");
                     });
-                    ui.menu_button("Terminal", |ui| {
+                    ui.menu_button(crate::i18n::literal(&self.locale, "Terminal"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
                                 egui::Button::new(crate::i18n::text(
-                                    "en",
+                                    &self.locale,
                                     crate::i18n::MessageKey::TerminalFind,
                                     &[],
                                 )),
@@ -1930,7 +2021,7 @@ impl ButtonsApp {
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
                                 egui::Button::new(crate::i18n::text(
-                                    "en",
+                                    &self.locale,
                                     crate::i18n::MessageKey::TerminalSelectAll,
                                     &[],
                                 )),
@@ -1945,7 +2036,7 @@ impl ButtonsApp {
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
                                 egui::Button::new(crate::i18n::text(
-                                    "en",
+                                    &self.locale,
                                     crate::i18n::MessageKey::TerminalClearScreen,
                                     &[],
                                 )),
@@ -1955,15 +2046,18 @@ impl ButtonsApp {
                             self.clear_active_terminal_screen();
                             ui.close_menu();
                         }
-                        if ui.button("Settings").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "Settings"))
+                            .clicked()
+                        {
                             self.show_settings = true;
                             ui.close_menu();
                         }
                     });
-                    ui.menu_button("Help", |ui| {
+                    ui.menu_button(crate::i18n::literal(&self.locale, "Help"), |ui| {
                         if ui
                             .button(crate::i18n::text(
-                                "en",
+                                &self.locale,
                                 crate::i18n::MessageKey::AiHelp,
                                 &[],
                             ))
@@ -1978,7 +2072,10 @@ impl ButtonsApp {
                             }
                             ui.close_menu();
                         }
-                        if ui.button("About ButtonsCLI").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
+                            .clicked()
+                        {
                             self.show_about = true;
                             ui.close_menu();
                         }
@@ -2040,7 +2137,7 @@ impl ButtonsApp {
                         let response =
                             ui.add_sized([150.0, 28.0], button)
                                 .on_hover_text(crate::i18n::text(
-                                    "en",
+                                    &self.locale,
                                     crate::i18n::MessageKey::TabThemeTooltip,
                                     &[("name", &self.themes.get(self.theme_for_tab(index)).name)],
                                 ));
@@ -2049,7 +2146,7 @@ impl ButtonsApp {
                         } else if response.clicked() {
                             action = Some(TabAction::Activate(index));
                         }
-                        tab_action_menu(ui, index, self.tabs.len(), &mut action);
+                        tab_action_menu(ui, &self.locale, index, self.tabs.len(), &mut action);
                     }
                     let options = self.shell_menu_options();
                     ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
@@ -2061,11 +2158,17 @@ impl ButtonsApp {
                         }
                     })
                     .response
-                    .on_hover_text("New terminal with a shell profile");
+                    .on_hover_text(crate::i18n::literal(
+                        &self.locale,
+                        "New terminal with a shell profile",
+                    ));
                     if !self.recently_closed.is_empty()
                         && ui
                             .button("↶")
-                            .on_hover_text("Reopen the most recently closed terminal")
+                            .on_hover_text(crate::i18n::literal(
+                                &self.locale,
+                                "Reopen the most recently closed terminal",
+                            ))
                             .clicked()
                     {
                         reopen = true;
@@ -2106,14 +2209,24 @@ impl ButtonsApp {
                         for (index, preset) in presets.iter().enumerate() {
                             if ui
                                 .button(&preset.label)
-                                .on_hover_text(preset_hover_text(preset))
+                                .on_hover_text(preset_hover_text(&self.locale, preset))
                                 .clicked()
                             {
                                 action = Some(PresetAction::Run(PresetCollection::Commands, index));
                             }
-                            preset_action_menu(ui, PresetCollection::Commands, index, &mut action);
+                            preset_action_menu(
+                                ui,
+                                &self.locale,
+                                PresetCollection::Commands,
+                                index,
+                                &mut action,
+                            );
                         }
-                        if ui.button("+").on_hover_text("Add a preset").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "+"))
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Add a preset"))
+                            .clicked()
+                        {
                             add = true;
                         }
                     });
@@ -2170,10 +2283,10 @@ impl ButtonsApp {
                 if ui
                     .add_sized(
                         [ui.available_width().max(1.0), 30.0],
-                        egui::Button::new("›"),
+                        egui::Button::new(crate::i18n::literal(&self.locale, "›")),
                     )
                     .on_hover_text(crate::i18n::text(
-                        "en",
+                        &self.locale,
                         crate::i18n::MessageKey::WorkspaceDockShow,
                         &[],
                     ))
@@ -2255,13 +2368,20 @@ impl ButtonsApp {
         ui.horizontal(|ui| {
             ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.small_button("‹").clicked() {
+                if ui
+                    .small_button(crate::i18n::literal(&self.locale, "‹"))
+                    .clicked()
+                {
                     self.preferences.show_sidebar = false;
                 }
                 if controls_available {
                     ui.checkbox(
                         &mut self.preferences.dock_compact,
-                        crate::i18n::text("en", crate::i18n::MessageKey::WorkspaceDockCompact, &[]),
+                        crate::i18n::text(
+                            &self.locale,
+                            crate::i18n::MessageKey::WorkspaceDockCompact,
+                            &[],
+                        ),
                     );
                 }
             });
@@ -2290,12 +2410,12 @@ impl ButtonsApp {
                 for (index, preset) in presets.iter().enumerate() {
                     if ui
                         .button(&preset.label)
-                        .on_hover_text(preset_hover_text(preset))
+                        .on_hover_text(preset_hover_text(&self.locale, preset))
                         .clicked()
                     {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
                     }
-                    preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
+                    preset_action_menu(ui, &self.locale, PresetCollection::Ssh, index, &mut action);
                 }
             });
         } else {
@@ -2305,19 +2425,19 @@ impl ButtonsApp {
                     let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
                     if ui
                         .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
-                        .on_hover_text(preset_hover_text(preset))
+                        .on_hover_text(preset_hover_text(&self.locale, preset))
                         .clicked()
                     {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
                     }
-                    preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
+                    preset_action_menu(ui, &self.locale, PresetCollection::Ssh, index, &mut action);
                 });
             }
         }
         if ui
             .add_sized(
                 [ui.available_width(), 28.0],
-                egui::Button::new("+ Add SSH preset"),
+                egui::Button::new(crate::i18n::literal(&self.locale, "+ Add SSH preset")),
             )
             .clicked()
         {
@@ -2336,14 +2456,14 @@ impl ButtonsApp {
         );
         let response = ui.add(
             egui::TextEdit::singleline(&mut self.command)
-                .hint_text("command…")
+                .hint_text(crate::i18n::literal(&self.locale, "command…"))
                 .desired_width(f32::INFINITY),
         );
         let run = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
         if (ui
             .add_sized(
                 [ui.available_width(), 30.0],
-                egui::Button::new("Run in terminal"),
+                egui::Button::new(crate::i18n::literal(&self.locale, "Run in terminal")),
             )
             .clicked()
             || run)
@@ -2394,28 +2514,28 @@ impl ButtonsApp {
                         let pane_count = self.visible_panes.len().max(1);
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Single, "1")
-                            .on_hover_text("Single pane")
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Single pane"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Single }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Columns, "COL")
-                            .on_hover_text("Arrange visible terminals in columns")
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Arrange visible terminals in columns"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Columns }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Rows, "ROW")
-                            .on_hover_text("Arrange visible terminals in rows")
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Arrange visible terminals in rows"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Rows }, ctx);
                         }
                         if ui
                             .selectable_label(self.pane_layout == PaneLayout::Grid, "GRID")
-                            .on_hover_text("Tile visible terminals in a balanced grid")
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Tile visible terminals in a balanced grid"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Grid }, ctx);
@@ -2423,16 +2543,16 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 pane_count > 1 && !self.preferences.pane_split_ratios.is_empty(),
-                                egui::Button::new("↺"),
+                                egui::Button::new(crate::i18n::literal(&self.locale, "↺")),
                             )
-                            .on_hover_text("Reset draggable pane dividers")
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Reset draggable pane dividers"))
                             .clicked()
                         {
                             self.preferences.pane_split_ratios.clear();
                         }
                         if ui
-                            .add_enabled(pane_count > 1, egui::Button::new("−"))
-                            .on_hover_text("Show one fewer terminal")
+                            .add_enabled(pane_count > 1, egui::Button::new(crate::i18n::literal(&self.locale, "−")))
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Show one fewer terminal"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count - 1 }, ctx);
@@ -2441,10 +2561,10 @@ impl ButtonsApp {
                             RichText::new(if !self.rendered_panes.is_empty() && self.rendered_panes.len() < pane_count { format!("{}/{pane_count}", self.rendered_panes.len()) } else { pane_count.to_string() })
                                 .small()
                                 .color(colors.status_text),
-                        ).on_hover_text("Visible / requested panes. Use the tab strip to reach panes hidden by window size.");
+                        ).on_hover_text(crate::i18n::literal(&self.locale, "Visible / requested panes. Use the tab strip to reach panes hidden by window size."));
                         if ui
-                            .add_enabled(pane_count < 10, egui::Button::new("+"))
-                            .on_hover_text("Show one more terminal")
+                            .add_enabled(pane_count < 10, egui::Button::new(crate::i18n::literal(&self.locale, "+")))
+                            .on_hover_text(crate::i18n::literal(&self.locale, "Show one more terminal"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count + 1 }, ctx);
@@ -2454,8 +2574,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.control_server.is_some()
                             && ui
-                                .small_button(crate::i18n::text(
-                                    "en",
+                                .small_button(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::AgentInst,
                                     &[],
                                 ))
@@ -2467,21 +2586,19 @@ impl ButtonsApp {
                                 .map(ControlServer::agent_instructions);
                             if let Some(instructions) = instructions {
                                 ctx.copy_text(instructions);
-                                self.notice = Some(crate::i18n::text(
-                                    "en",
+                                self.notice = Some(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::AgentInstructionsCopied,
                                     &[],
                                 ));
                             }
                         }
-                        if ui.small_button("Settings").clicked() {
+                        if ui.small_button(crate::i18n::literal(&self.locale, "Settings")).clicked() {
                             self.show_settings = true;
                         }
                         #[cfg(not(target_arch = "wasm32"))]
                         {
                             let controls_enabled = workspace_controls_available();
-                            let calm_label = crate::i18n::text(
-                                "en",
+                            let calm_label = crate::i18n::text(&self.locale,
                                 crate::i18n::MessageKey::CalmMode,
                                 &[],
                             );
@@ -2490,8 +2607,7 @@ impl ButtonsApp {
                             } else {
                                 ui.label(calm_label)
                             }
-                                .on_hover_text(crate::i18n::text(
-                                    "en",
+                                .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::CalmModeHelp,
                                     &[],
                                 ));
@@ -2499,9 +2615,8 @@ impl ButtonsApp {
                                 self.preferences.calm_mode = !self.preferences.calm_mode;
                             }
                             let zoom_in = ui
-                                .add_enabled(controls_enabled, egui::Button::new("+"))
-                                .on_hover_text(crate::i18n::text(
-                                    "en",
+                                .add_enabled(controls_enabled, egui::Button::new(crate::i18n::literal(&self.locale, "+")))
+                                .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomIn,
                                     &[],
                                 ));
@@ -2513,9 +2628,8 @@ impl ButtonsApp {
                                     );
                             }
                             let zoom_out = ui
-                                .add_enabled(controls_enabled, egui::Button::new("−"))
-                                .on_hover_text(crate::i18n::text(
-                                    "en",
+                                .add_enabled(controls_enabled, egui::Button::new(crate::i18n::literal(&self.locale, "−")))
+                                .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomOut,
                                     &[],
                                 ));
@@ -2534,8 +2648,7 @@ impl ButtonsApp {
                             } else {
                                 ui.label(format!("{zoom}%"))
                             }
-                                .on_hover_text(crate::i18n::text(
-                                    "en",
+                                .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomReset,
                                     &[],
                                 ));
@@ -2577,7 +2690,7 @@ impl ButtonsApp {
         }
         let old_app_theme = self.preferences.app_theme_id.clone();
         let old_typography = self.preferences.typography.clone();
-        let title = crate::i18n::text("en", crate::i18n::MessageKey::SettingsTitle, &[]);
+        let title = crate::i18n::text(&self.locale, crate::i18n::MessageKey::SettingsTitle, &[]);
         let mut close_action = None;
         ctx.show_viewport_immediate(
             egui::ViewportId::from_hash_of("buttonscli-settings"),
@@ -2657,35 +2770,71 @@ impl ButtonsApp {
         close_action: &mut Option<SettingsCloseAction>,
     ) {
         apply_zone_style(ui, &self.preferences.typography.settings);
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut self.settings_tab, SettingsTab::Themes, "Themes");
-            ui.selectable_value(&mut self.settings_tab, SettingsTab::Fonts, "Fonts");
-            ui.selectable_value(&mut self.settings_tab, SettingsTab::Commands, "Commands");
-            ui.selectable_value(&mut self.settings_tab, SettingsTab::Workspace, "Workspace");
-            ui.selectable_value(
-                &mut self.settings_tab,
-                SettingsTab::Shortcuts,
-                crate::i18n::text("en", crate::i18n::MessageKey::Shortcuts, &[]),
-            );
-            #[cfg(not(target_arch = "wasm32"))]
-            ui.selectable_value(
-                &mut self.settings_tab,
-                SettingsTab::Providers,
-                crate::i18n::text("en", crate::i18n::MessageKey::Providers, &[]),
-            );
-            #[cfg(not(target_arch = "wasm32"))]
-            ui.selectable_value(
-                &mut self.settings_tab,
-                SettingsTab::Import,
-                crate::i18n::text("en", crate::i18n::MessageKey::ImportFromOriginal, &[]),
-            );
-        });
+        egui::ScrollArea::horizontal()
+            .max_height(34.0)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Themes,
+                        crate::i18n::literal(&self.locale, "Themes"),
+                    );
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Fonts,
+                        crate::i18n::literal(&self.locale, "Fonts"),
+                    );
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Commands,
+                        crate::i18n::literal(&self.locale, "Commands"),
+                    );
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Workspace,
+                        crate::i18n::literal(&self.locale, "Workspace"),
+                    );
+                    if localization_settings_available() {
+                        ui.selectable_value(
+                            &mut self.settings_tab,
+                            SettingsTab::Language,
+                            crate::i18n::literal(&self.locale, "Language & Region"),
+                        );
+                    }
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Shortcuts,
+                        crate::i18n::text(&self.locale, crate::i18n::MessageKey::Shortcuts, &[]),
+                    );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Providers,
+                        crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
+                    );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    ui.selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Import,
+                        crate::i18n::text(
+                            &self.locale,
+                            crate::i18n::MessageKey::ImportFromOriginal,
+                            &[],
+                        ),
+                    );
+                });
+            });
         ui.separator();
         match self.settings_tab {
             SettingsTab::Themes => self.theme_settings(ui),
             SettingsTab::Fonts => self.font_settings(ui),
             SettingsTab::Commands => self.command_settings(ui),
             SettingsTab::Workspace => self.workspace_settings(ui),
+            SettingsTab::Language if localization_settings_available() => {
+                self.language_settings(ui)
+            }
+            SettingsTab::Language => self.theme_settings(ui),
             SettingsTab::Shortcuts => self.shortcut_settings(ui),
             #[cfg(not(target_arch = "wasm32"))]
             SettingsTab::Providers => self.provider_settings(ui, ctx),
@@ -2696,7 +2845,7 @@ impl ButtonsApp {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if ui
                 .button(crate::i18n::text(
-                    "en",
+                    &self.locale,
                     crate::i18n::MessageKey::SettingsKeepClose,
                     &[],
                 ))
@@ -2706,7 +2855,7 @@ impl ButtonsApp {
             }
             if ui
                 .button(crate::i18n::text(
-                    "en",
+                    &self.locale,
                     crate::i18n::MessageKey::SettingsRevertClose,
                     &[],
                 ))
@@ -2717,19 +2866,113 @@ impl ButtonsApp {
         });
     }
 
+    fn language_settings(&mut self, ui: &mut egui::Ui) {
+        ui.heading(crate::i18n::literal(&self.locale, "Language & Region"));
+        ui.label(crate::i18n::literal(
+            &self.locale,
+            "Choose how ButtonsCLI resolves its display language. Existing installs keep their current behavior until you change it here.",
+        ));
+        ui.add_space(8.0);
+        ui.label(crate::i18n::literal(&self.locale, "Display language"));
+
+        let mut mode = self.preferences.localization.mode;
+        let mut locale = self.preferences.localization.manual_locale.clone();
+        ui.radio_value(
+            &mut mode,
+            LocalizationMode::System,
+            crate::i18n::literal(&self.locale, "Use system language"),
+        );
+        ui.radio_value(
+            &mut mode,
+            LocalizationMode::Manual,
+            crate::i18n::literal(&self.locale, "Choose a specific language"),
+        );
+        if mode == LocalizationMode::Manual {
+            locale_selector(ui, "settings-locale-selector", &mut locale);
+        }
+
+        self.preferences.localization.mode = mode;
+        self.preferences.localization.manual_locale = locale;
+        self.preferences.localization.first_run_language_confirmed = true;
+        self.refresh_locale();
+
+        let current = crate::i18n::locale_info(&self.locale).native_name;
+        ui.label(self.localized_arg("Current app language: {language}", "language", current));
+        if mode == LocalizationMode::System {
+            let detected = crate::i18n::locale_info(crate::i18n::system_locale()).native_name;
+            ui.label(self.localized_arg(
+                "Detected system language: {language}",
+                "language",
+                detected,
+            ));
+        }
+        ui.small(crate::i18n::literal(
+            &self.locale,
+            "Changes apply immediately in the main window, detached windows, and native menus.",
+        ));
+    }
+
+    fn localization_onboarding(&mut self, ctx: &egui::Context) {
+        if !self.show_localization_onboarding {
+            return;
+        }
+        let mut mode = self.preferences.localization.mode;
+        let mut locale = self.preferences.localization.manual_locale.clone();
+        let mut confirmed = false;
+        egui::Modal::new(egui::Id::new("localization-first-run"))
+            .show(ctx, |ui| {
+                ui.set_max_width(440.0);
+                ui.heading(crate::i18n::literal(&self.locale, "Choose your app language"));
+                ui.add_space(6.0);
+                ui.label(crate::i18n::literal(
+                    &self.locale,
+                    "ButtonsCLI can follow your system language or stay pinned to a specific language. You can change this later in Settings.",
+                ));
+                let detected = crate::i18n::locale_info(crate::i18n::system_locale()).native_name;
+                ui.small(self.localized_arg(
+                    "Detected from your system: {language}",
+                    "language",
+                    detected,
+                ));
+                ui.add_space(6.0);
+                ui.radio_value(
+                    &mut mode,
+                    LocalizationMode::System,
+                    crate::i18n::literal(&self.locale, "Keep following the system language"),
+                );
+                ui.radio_value(
+                    &mut mode,
+                    LocalizationMode::Manual,
+                    crate::i18n::literal(&self.locale, "Use a specific language instead"),
+                );
+                if mode == LocalizationMode::Manual {
+                    locale_selector(ui, "onboarding-locale-selector", &mut locale);
+                }
+                ui.add_space(8.0);
+                confirmed = ui.button(crate::i18n::literal(&self.locale, "Continue")).clicked();
+            });
+        self.preferences.localization.mode = mode;
+        self.preferences.localization.manual_locale = locale;
+        if confirmed {
+            self.preferences.localization.first_run_language_confirmed = true;
+            self.show_localization_onboarding = false;
+        }
+        self.refresh_locale();
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn provider_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey as M};
         let warning_color = self.colors().warning;
-        ui.heading(text("en", M::Providers, &[]));
-        ui.label(text("en", M::ProviderHelp, &[]));
+        ui.heading(text(&self.locale, M::Providers, &[]));
+        ui.label(text(&self.locale, M::ProviderHelp, &[]));
         let ai_unlocked = ai_help_available();
         if !ai_unlocked {
-            ui.label(text("en", M::AiHelpLockedProvider, &[]));
+            ui.label(text(&self.locale, M::AiHelpLockedProvider, &[]));
         }
         let settings = &mut self.preferences.provider_settings;
         let prior = settings.active_provider_id.clone();
-        egui::ComboBox::from_label(text("en", M::ActiveProvider, &[]))
+        egui::ComboBox::from_label(text(&self.locale, M::ActiveProvider, &[]))
             .selected_text(
                 settings
                     .active()
@@ -2749,7 +2992,7 @@ impl ButtonsApp {
             self.credential_draft.zeroize();
             self.credential_message = None;
         }
-        if ui.button(text("en", M::AddProvider, &[])).clicked() {
+        if ui.button(text(&self.locale, M::AddProvider, &[])).clicked() {
             let unique = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|duration| duration.as_nanos())
@@ -2773,19 +3016,22 @@ impl ButtonsApp {
         };
         let provider = &mut settings.providers[index];
         ui.horizontal(|ui| {
-            ui.label(text("en", M::ProviderName, &[]));
+            ui.label(text(&self.locale, M::ProviderName, &[]));
             ui.text_edit_singleline(&mut provider.name);
         });
         ui.horizontal(|ui| {
-            ui.label(text("en", M::ProviderEndpoint, &[]));
+            ui.label(text(&self.locale, M::ProviderEndpoint, &[]));
             ui.text_edit_singleline(&mut provider.endpoint);
         });
         ui.horizontal(|ui| {
-            ui.label(text("en", M::ProviderModel, &[]));
+            ui.label(text(&self.locale, M::ProviderModel, &[]));
             ui.text_edit_singleline(&mut provider.model);
         });
         if validate_endpoint(&provider.endpoint).is_err() {
-            ui.colored_label(warning_color, text("en", M::ProviderEndpointInvalid, &[]));
+            ui.colored_label(
+                warning_color,
+                text(&self.locale, M::ProviderEndpointInvalid, &[]),
+            );
         }
         let profile_name = self
             .native_store
@@ -2795,7 +3041,7 @@ impl ButtonsApp {
         let has_session_key = self.credential_session.get(&reference).is_ok();
         let has_saved_key = provider.credential_ref.as_deref() == Some(reference.as_str());
         let key_status = text(
-            "en",
+            &self.locale,
             if has_session_key {
                 M::ProviderSessionStatus
             } else if has_saved_key {
@@ -2805,32 +3051,36 @@ impl ButtonsApp {
             },
             &[],
         );
-        ui.label(text("en", M::ProviderKeyStatus, &[("status", &key_status)]));
+        ui.label(text(
+            &self.locale,
+            M::ProviderKeyStatus,
+            &[("status", &key_status)],
+        ));
         ui.horizontal(|ui| {
-            ui.label(text("en", M::ApiKey, &[]));
+            ui.label(text(&self.locale, M::ApiKey, &[]));
             ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
         });
         ui.checkbox(
             &mut self.credential_session_only,
-            text("en", M::SessionOnlyKey, &[]),
+            text(&self.locale, M::SessionOnlyKey, &[]),
         );
         let provider_id = provider.id.clone();
         let save = ui
             .add_enabled(
                 !self.credential_busy && !self.credential_draft.trim().is_empty(),
-                egui::Button::new(text("en", M::SaveKey, &[])),
+                egui::Button::new(text(&self.locale, M::SaveKey, &[])),
             )
             .clicked();
         let delete = ui
             .add_enabled(
                 !self.credential_busy && (has_session_key || has_saved_key),
-                egui::Button::new(text("en", M::RemoveKey, &[])),
+                egui::Button::new(text(&self.locale, M::RemoveKey, &[])),
             )
             .clicked();
         let remove = ui
             .add_enabled(
                 !self.credential_busy && !has_session_key && !has_saved_key,
-                egui::Button::new(text("en", M::RemoveProvider, &[])),
+                egui::Button::new(text(&self.locale, M::RemoveProvider, &[])),
             )
             .clicked();
         let mut test_connection = false;
@@ -2842,7 +3092,7 @@ impl ButtonsApp {
                         && !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok()
                         && !provider.model.trim().is_empty(),
-                    egui::Button::new(text("en", M::TestConnection, &[])),
+                    egui::Button::new(text(&self.locale, M::TestConnection, &[])),
                 )
                 .clicked();
             discover_models = ui
@@ -2850,12 +3100,12 @@ impl ButtonsApp {
                     ai_unlocked
                         && !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok(),
-                    egui::Button::new(text("en", M::DiscoverModels, &[])),
+                    egui::Button::new(text(&self.locale, M::DiscoverModels, &[])),
                 )
                 .clicked();
         });
         if !self.provider_models.is_empty() {
-            egui::ComboBox::from_label(text("en", M::ProviderModel, &[]))
+            egui::ComboBox::from_label(text(&self.locale, M::ProviderModel, &[]))
                 .selected_text(&provider.model)
                 .show_ui(ui, |ui| {
                     for model in &self.provider_models {
@@ -2991,7 +3241,7 @@ impl ButtonsApp {
                             let _ = self.credential_session.delete(&reference);
                         }
                         self.credential_message = Some(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             if session_only {
                                 crate::i18n::MessageKey::KeySavedSession
                             } else {
@@ -3002,7 +3252,7 @@ impl ButtonsApp {
                     }
                     Err(error) => {
                         self.credential_message = Some(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::KeySaveFailed,
                             &[("reason", &error.to_string())],
                         ));
@@ -3026,14 +3276,14 @@ impl ButtonsApp {
                             }
                         }
                         self.credential_message = Some(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::KeyRemoved,
                             &[],
                         ));
                     }
                     Err(error) => {
                         self.credential_message = Some(crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::KeyRemoveFailed,
                             &[("reason", &error.to_string())],
                         ));
@@ -3053,7 +3303,7 @@ impl ButtonsApp {
                 {
                     self.provider_message = Some(match result {
                         Ok(()) => crate::i18n::text(
-                            "en",
+                            &self.locale,
                             crate::i18n::MessageKey::ConnectionSucceeded,
                             &[],
                         ),
@@ -3066,7 +3316,7 @@ impl ButtonsApp {
                     match result {
                         Ok(models) => {
                             self.provider_message = Some(crate::i18n::text(
-                                "en",
+                                &self.locale,
                                 crate::i18n::MessageKey::ModelsFound,
                                 &[("count", &models.len().to_string())],
                             ));
@@ -3082,13 +3332,14 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn ai_help_window(&self, ctx: &egui::Context) {
+        let locale = self.locale.clone();
         let state_open = self.ai_help_state.lock().is_ok_and(|state| state.open);
         if !state_open {
             return;
         }
         let state = Arc::clone(&self.ai_help_state);
         let actions = self.ai_help_tx.clone();
-        let title = crate::i18n::text("en", crate::i18n::MessageKey::AiHelp, &[]);
+        let title = crate::i18n::text(&locale, crate::i18n::MessageKey::AiHelp, &[]);
         ctx.show_viewport_deferred(
             egui::ViewportId::from_hash_of("buttonscli-ai-help"),
             egui::ViewportBuilder::default()
@@ -3105,13 +3356,13 @@ impl ButtonsApp {
                 }
                 let body = |ui: &mut egui::Ui, state: &mut AiHelpWindowState| {
                     use crate::i18n::{text, MessageKey};
-                    ui.heading(text("en", MessageKey::AiHelp, &[]));
-                    ui.label(text("en", MessageKey::AiHelpDescription, &[]));
+                    ui.heading(text(&locale, MessageKey::AiHelp, &[]));
+                    ui.label(text(&locale, MessageKey::AiHelpDescription, &[]));
                     if !ai_help_available() {
                         ui.separator();
-                        ui.label(text("en", MessageKey::AiHelpLockedProvider, &[]));
+                        ui.label(text(&locale, MessageKey::AiHelpLockedProvider, &[]));
                         if ui
-                            .button(text("en", MessageKey::AiHelpProviderSettings, &[]))
+                            .button(text(&locale, MessageKey::AiHelpProviderSettings, &[]))
                             .clicked()
                         {
                             let _ = actions.send(AiHelpCommand::OpenSettings);
@@ -3124,9 +3375,9 @@ impl ButtonsApp {
                                 ui.group(|ui| {
                                     ui.label(
                                         RichText::new(if *assistant {
-                                            text("en", MessageKey::AiHelp, &[])
+                                            text(&locale, MessageKey::AiHelp, &[])
                                         } else {
-                                            text("en", MessageKey::AiHelpYou, &[])
+                                            text(&locale, MessageKey::AiHelpYou, &[])
                                         })
                                         .strong(),
                                     );
@@ -3134,12 +3385,12 @@ impl ButtonsApp {
                                 });
                             }
                             if state.messages.is_empty() {
-                                ui.label(text("en", MessageKey::AiHelpConversationSession, &[]));
+                                ui.label(text(&locale, MessageKey::AiHelpConversationSession, &[]));
                             }
                             for action in &state.reviewed_actions {
                                 let target_id = state.target.as_ref().map(|target| target.0);
                                 let target_title = state.target.as_ref().map_or_else(
-                                    || text("en", MessageKey::AiHelpNoTarget, &[]),
+                                    || text(&locale, MessageKey::AiHelpNoTarget, &[]),
                                     |target| target.1.clone(),
                                 );
                                 ui.group(|ui| match action {
@@ -3150,19 +3401,19 @@ impl ButtonsApp {
                                         send_enter,
                                     } => {
                                         ui.strong(text(
-                                            "en",
+                                            &locale,
                                             MessageKey::AiHelpReviewCommand,
                                             &[("label", label)],
                                         ));
                                         ui.label(text(
-                                            "en",
+                                            &locale,
                                             MessageKey::AiHelpTarget,
                                             &[("target", &target_title)],
                                         ));
                                         ui.label(description);
                                         ui.monospace(command);
                                         ui.label(text(
-                                            "en",
+                                            &locale,
                                             if *send_enter {
                                                 MessageKey::AiHelpWouldEnter
                                             } else {
@@ -3175,7 +3426,7 @@ impl ButtonsApp {
                                                 .add_enabled(
                                                     target_id.is_some(),
                                                     egui::Button::new(text(
-                                                        "en",
+                                                        &locale,
                                                         MessageKey::AiHelpInsert,
                                                         &[],
                                                     )),
@@ -3192,7 +3443,7 @@ impl ButtonsApp {
                                                 .add_enabled(
                                                     target_id.is_some(),
                                                     egui::Button::new(text(
-                                                        "en",
+                                                        &locale,
                                                         MessageKey::AiHelpInsertEnter,
                                                         &[],
                                                     )),
@@ -3213,18 +3464,18 @@ impl ButtonsApp {
                                         key,
                                     } => {
                                         ui.strong(text(
-                                            "en",
+                                            &locale,
                                             MessageKey::AiHelpReviewControl,
                                             &[("label", label)],
                                         ));
                                         ui.label(text(
-                                            "en",
+                                            &locale,
                                             MessageKey::AiHelpTarget,
                                             &[("target", &target_title)],
                                         ));
                                         ui.label(description);
                                         ui.label(text(
-                                            "en",
+                                            &locale,
                                             MessageKey::AiHelpTerminalKey,
                                             &[("key", &format!("{key:?}"))],
                                         ));
@@ -3232,7 +3483,7 @@ impl ButtonsApp {
                                             .add_enabled(
                                                 target_id.is_some(),
                                                 egui::Button::new(text(
-                                                    "en",
+                                                    &locale,
                                                     MessageKey::AiHelpSendReviewedKey,
                                                     &[],
                                                 )),
@@ -3258,8 +3509,8 @@ impl ButtonsApp {
                     if state.busy {
                         ui.horizontal(|ui| {
                             ui.spinner();
-                            ui.label(text("en", MessageKey::AiHelpWaitingProvider, &[]));
-                            if ui.button(text("en", MessageKey::Cancel, &[])).clicked() {
+                            ui.label(text(&locale, MessageKey::AiHelpWaitingProvider, &[]));
+                            if ui.button(text(&locale, MessageKey::Cancel, &[])).clicked() {
                                 if let Some(cancel) = &state.cancel {
                                     cancel.store(true, Ordering::Relaxed);
                                 }
@@ -3269,7 +3520,7 @@ impl ButtonsApp {
                     if state.error.is_some() && !state.busy {
                         if let Some((question, context, target)) = state.last_request.clone() {
                             if ui
-                                .button(text("en", MessageKey::AiHelpRetry, &[]))
+                                .button(text(&locale, MessageKey::AiHelpRetry, &[]))
                                 .clicked()
                             {
                                 let _ =
@@ -3282,7 +3533,7 @@ impl ButtonsApp {
                         let changed = ui
                             .checkbox(
                                 &mut state.include_context,
-                                text("en", MessageKey::AiHelpIncludeContext, &[]),
+                                text(&locale, MessageKey::AiHelpIncludeContext, &[]),
                             )
                             .changed();
                         if changed {
@@ -3293,7 +3544,7 @@ impl ButtonsApp {
                                 .add_enabled(
                                     !state.context_busy,
                                     egui::Button::new(text(
-                                        "en",
+                                        &locale,
                                         MessageKey::AiHelpPreviewContext,
                                         &[],
                                     )),
@@ -3306,11 +3557,11 @@ impl ButtonsApp {
                             }
                             if state.context_busy {
                                 ui.spinner();
-                                ui.label(text("en", MessageKey::AiHelpPreparingContext, &[]));
+                                ui.label(text(&locale, MessageKey::AiHelpPreparingContext, &[]));
                             }
                             if let Some(preview) = &state.context_preview {
                                 ui.label(text(
-                                    "en",
+                                    &locale,
                                     MessageKey::AiHelpIncludedTerminal,
                                     &[
                                         ("title", &preview.title),
@@ -3323,20 +3574,20 @@ impl ButtonsApp {
                                     .show(ui, |ui| {
                                         ui.monospace(&preview.output);
                                     });
-                                ui.small(text("en", MessageKey::AiHelpContextSentPrivacy, &[]));
+                                ui.small(text(&locale, MessageKey::AiHelpContextSentPrivacy, &[]));
                             }
                         }
                         ui.add(
                             egui::TextEdit::multiline(&mut state.input)
                                 .desired_rows(3)
-                                .hint_text(text("en", MessageKey::AiHelpQuestionHint, &[])),
+                                .hint_text(text(&locale, MessageKey::AiHelpQuestionHint, &[])),
                         );
                         let context_ready =
                             !state.include_context || state.context_preview.is_some();
                         if ui
                             .add_enabled(
                                 context_ready,
-                                egui::Button::new(text("en", MessageKey::AiHelpSend, &[])),
+                                egui::Button::new(text(&locale, MessageKey::AiHelpSend, &[])),
                             )
                             .clicked()
                         {
@@ -3370,6 +3621,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn process_ai_help_commands(&mut self, ctx: &egui::Context) {
+        let locale = self.locale.clone();
         while let Ok(command) = self.ai_help_rx.try_recv() {
             match command {
                 AiHelpCommand::OpenSettings => {
@@ -3384,7 +3636,7 @@ impl ButtonsApp {
                     if !ai_help_available() {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpRequiresPro,
                                 &[],
                             ));
@@ -3394,7 +3646,7 @@ impl ButtonsApp {
                     let Some(target_id) = target_id else {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpNoTarget,
                                 &[],
                             ));
@@ -3456,7 +3708,7 @@ impl ButtonsApp {
                             Ok(()) => {
                                 state.error = None;
                                 state.status = Some(crate::i18n::text(
-                                    "en",
+                                    &locale,
                                     crate::i18n::MessageKey::AiHelpInputSent,
                                     &[("id", &target_id.to_string())],
                                 ));
@@ -3464,7 +3716,7 @@ impl ButtonsApp {
                             Err(error) => {
                                 state.status = None;
                                 state.error = Some(crate::i18n::text(
-                                    "en",
+                                    &locale,
                                     crate::i18n::MessageKey::AiHelpDeliveryFailed,
                                     &[("reason", &error.to_string())],
                                 ));
@@ -3476,7 +3728,7 @@ impl ButtonsApp {
                     let Some(tab) = self.tabs.get(self.focused) else {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpContextTerminalMissing,
                                 &[],
                             ));
@@ -3504,6 +3756,7 @@ impl ButtonsApp {
                     let session = Arc::clone(&self.credential_session);
                     let shared = Arc::clone(&self.ai_help_state);
                     let ctx = ctx.clone();
+                    let redaction_locale = locale.clone();
                     std::thread::spawn(move || {
                         let redaction_key = provider.map_or(Ok(None), |provider| {
                             let reference = credentials::reference(&profile, &provider.id);
@@ -3514,7 +3767,7 @@ impl ButtonsApp {
                             Err(error) => {
                                 if let Ok(mut state) = shared.lock() {
                                     state.error = Some(crate::i18n::text(
-                                        "en",
+                                        &redaction_locale,
                                         crate::i18n::MessageKey::AiHelpCredentialRedactionFailed,
                                         &[("reason", &error.to_string())],
                                     ));
@@ -3540,7 +3793,7 @@ impl ButtonsApp {
                     if !ai_help_available() {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpRequiresPro,
                                 &[],
                             ));
@@ -3551,7 +3804,7 @@ impl ButtonsApp {
                     else {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpProviderMissing,
                                 &[],
                             ));
@@ -3563,7 +3816,7 @@ impl ButtonsApp {
                     {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpEndpointMissing,
                                 &[],
                             ));
@@ -3573,7 +3826,7 @@ impl ButtonsApp {
                     if question.chars().count() > 16_384 {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
-                                "en",
+                                &locale,
                                 crate::i18n::MessageKey::AiHelpQuestionTooLong,
                                 &[],
                             ));
@@ -3636,6 +3889,7 @@ impl ButtonsApp {
                         crate::session::context::build_user_prompt(&question, context.as_ref());
                     let system_prompt = crate::session::context::build_system_prompt();
                     let request_question = question.clone();
+                    let request_locale = locale.clone();
                     std::thread::spawn(move || {
                         let result = provider_key(
                             &session,
@@ -3684,14 +3938,14 @@ impl ButtonsApp {
                                 }
                                 Err(_error) if cancel.load(Ordering::Relaxed) => {
                                     state.error = Some(crate::i18n::text(
-                                        "en",
+                                        &request_locale,
                                         crate::i18n::MessageKey::AiHelpRequestCancelled,
                                         &[],
                                     ))
                                 }
                                 Err(error) => {
                                     state.error = Some(crate::i18n::text(
-                                        "en",
+                                        &request_locale,
                                         crate::i18n::MessageKey::AiHelpRequestFailed,
                                         &[("reason", &error)],
                                     ))
@@ -3707,7 +3961,7 @@ impl ButtonsApp {
 
     fn theme_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.heading("Theme Library");
+        ui.heading(crate::i18n::literal(&self.locale, "Theme Library"));
         ui.label(
             RichText::new(format!(
                 "{} themes available · {} legacy selections · {} original theme files loaded",
@@ -3718,7 +3972,7 @@ impl ButtonsApp {
             .color(colors.muted),
         );
         ui.horizontal_wrapped(|ui| {
-            ui.label("Apply:");
+            ui.label(crate::i18n::literal(&self.locale, "Apply:"));
             ui.checkbox(&mut self.preferences.theme_apply.app, "App chrome");
             ui.checkbox(
                 &mut self.preferences.theme_apply.terminal,
@@ -3734,7 +3988,7 @@ impl ButtonsApp {
             let current_id = self.theme_for_tab(self.focused).to_owned();
             ui.label(format!(
                 "{}: {}",
-                text("en", MessageKey::CurrentTerminalTheme, &[]),
+                text(&self.locale, MessageKey::CurrentTerminalTheme, &[]),
                 self.themes.get(&current_id).name
             ));
             let mut random_current = false;
@@ -3744,13 +3998,13 @@ impl ButtonsApp {
                 random_current = ui
                     .add_enabled(
                         !self.tabs.is_empty(),
-                        egui::Button::new(text("en", MessageKey::RandomCurrent, &[])),
+                        egui::Button::new(text(&self.locale, MessageKey::RandomCurrent, &[])),
                     )
                     .clicked();
                 random_all = ui
                     .add_enabled(
                         !self.tabs.is_empty(),
-                        egui::Button::new(text("en", MessageKey::RandomAll, &[])),
+                        egui::Button::new(text(&self.locale, MessageKey::RandomAll, &[])),
                     )
                     .clicked();
                 use_global = ui
@@ -3758,7 +4012,7 @@ impl ButtonsApp {
                         self.tabs
                             .get(self.focused)
                             .is_some_and(|tab| self.theme_overrides.contains_key(&tab.id)),
-                        egui::Button::new(text("en", MessageKey::UseGlobalTheme, &[])),
+                        egui::Button::new(text(&self.locale, MessageKey::UseGlobalTheme, &[])),
                     )
                     .clicked();
             });
@@ -3778,20 +4032,23 @@ impl ButtonsApp {
         self.divider_settings(ui);
         ui.separator();
         ui.label(crate::i18n::text(
-            "en",
+            &self.locale,
             crate::i18n::MessageKey::ChromeCornerRadius,
             &[],
         ));
         ui.add(egui::Slider::new(&mut self.preferences.chrome_corner_radius, 0..=16).text("pt"))
             .on_hover_text(crate::i18n::text(
-                "en",
+                &self.locale,
                 crate::i18n::MessageKey::ChromeCornerRadiusHelp,
                 &[],
             ));
         ui.add_space(6.0);
         ui.add(
             egui::TextEdit::singleline(&mut self.theme_search)
-                .hint_text("Search name, id, or description…")
+                .hint_text(crate::i18n::literal(
+                    &self.locale,
+                    "Search name, id, or description…",
+                ))
                 .desired_width(f32::INFINITY),
         );
 
@@ -3895,7 +4152,7 @@ impl ButtonsApp {
                                             if ui
                                                 .add_sized(
                                                     [78.0, 26.0],
-                                                    egui::Button::new("Calm"),
+                                                    egui::Button::new(crate::i18n::literal(&self.locale, "Calm")),
                                                 )
                                                 .on_hover_text(
                                                     "Apply selected sections without animation or noise",
@@ -3911,7 +4168,7 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     !self.tabs.is_empty(),
-                                                    egui::Button::new(text("en", MessageKey::ThisTerminal, &[])),
+                                                    egui::Button::new(text(&self.locale, MessageKey::ThisTerminal, &[])),
                                                 )
                                                 .clicked()
                                             {
@@ -3920,9 +4177,9 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     !self.tabs.is_empty(),
-                                                    egui::Button::new(text("en", MessageKey::ThemeAll, &[])),
+                                                    egui::Button::new(text(&self.locale, MessageKey::ThemeAll, &[])),
                                                 )
-                                                .on_hover_text(text("en", MessageKey::ThemeAllHelp, &[]))
+                                                .on_hover_text(text(&self.locale, MessageKey::ThemeAllHelp, &[]))
                                                 .clicked()
                                             {
                                                 all_theme = Some(theme.id.clone());
@@ -4020,15 +4277,24 @@ impl ButtonsApp {
                 self.preferences.pane_divider.thickness_override = Some(thickness);
             }
         } else {
-            ui.label("Using the active app theme's divider style.");
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "Using the active app theme's divider style.",
+            ));
         }
     }
 
     fn font_settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Fonts");
-        ui.label("Every bundled face is loaded locally. Each area can use its own family, real file weight, and size.");
+        ui.heading(crate::i18n::literal(&self.locale, "Fonts"));
+        ui.label(crate::i18n::literal(&self.locale, "Every bundled face is loaded locally. Each area can use its own family, real file weight, and size."));
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Use Shell UI font across the app").clicked() {
+            if ui
+                .button(crate::i18n::literal(
+                    &self.locale,
+                    "Use Shell UI font across the app",
+                ))
+                .clicked()
+            {
                 let source = self.preferences.typography.shell.clone();
                 sync_zone(&source, &mut self.preferences.typography.tabs);
                 sync_zone(&source, &mut self.preferences.typography.preset_dock);
@@ -4036,7 +4302,13 @@ impl ButtonsApp {
                 sync_zone(&source, &mut self.preferences.typography.assistant);
                 sync_zone(&source, &mut self.preferences.typography.status_bar);
             }
-            if ui.button("Use AI Help font across the app").clicked() {
+            if ui
+                .button(crate::i18n::literal(
+                    &self.locale,
+                    "Use AI Help font across the app",
+                ))
+                .clicked()
+            {
                 let source = self.preferences.typography.assistant.clone();
                 sync_zone(&source, &mut self.preferences.typography.shell);
                 sync_zone(&source, &mut self.preferences.typography.tabs);
@@ -4122,8 +4394,8 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn import_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey};
-        ui.heading(text("en", MessageKey::ImportFromOriginal, &[]));
-        ui.label("Select an original profile and inspect a snapshot before importing. The original files are never changed.");
+        ui.heading(text(&self.locale, MessageKey::ImportFromOriginal, &[]));
+        ui.label(crate::i18n::literal(&self.locale, "Select an original profile and inspect a snapshot before importing. The original files are never changed."));
         ui.add_space(8.0);
         let previous_choice = self.import_source_choice.clone();
         egui::ComboBox::from_id_salt("import-source-profile")
@@ -4144,7 +4416,7 @@ impl ButtonsApp {
         }
         if !self.import_busy
             && ui
-                .button(text("en", MessageKey::ImportPreview, &[]))
+                .button(text(&self.locale, MessageKey::ImportPreview, &[]))
                 .clicked()
         {
             self.import_generation = self.import_generation.wrapping_add(1);
@@ -4180,7 +4452,10 @@ impl ButtonsApp {
         }
         if self.import_busy {
             ui.spinner();
-            ui.label("Reading or saving the import snapshot…");
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "Reading or saving the import snapshot…",
+            ));
         }
         if let Some(message) = &self.import_message {
             ui.label(message);
@@ -4206,16 +4481,19 @@ impl ButtonsApp {
             "{} command presets · {} SSH presets · {} personal themes",
             preview.command_presets, preview.ssh_presets, preview.themes
         ));
-        ui.label("Settings, shell profiles, fonts, theme choices and supported visual data are included. Commands are saved as presets; import does not run them.");
+        ui.label(crate::i18n::literal(&self.locale, "Settings, shell profiles, fonts, theme choices and supported visual data are included. Commands are saved as presets; import does not run them."));
         if !preview.provider_metadata.is_empty() {
-            ui.label("Provider names, endpoints and models:");
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "Provider names, endpoints and models:",
+            ));
             for provider in &preview.provider_metadata {
                 ui.label(provider);
             }
         }
-        ui.label(text("en", MessageKey::ImportExcludedKeys, &[]));
+        ui.label(text(&self.locale, MessageKey::ImportExcludedKeys, &[]));
         ui.label(text(
-            "en",
+            &self.locale,
             MessageKey::ImportKeyCount,
             &[("count", &preview.credential_count.to_string())],
         ));
@@ -4224,21 +4502,27 @@ impl ButtonsApp {
             |ui| {
                 ui.checkbox(
                     &mut self.import_keys,
-                    text("en", MessageKey::ImportKeysChoice, &[]),
+                    text(&self.locale, MessageKey::ImportKeysChoice, &[]),
                 );
             },
         );
-        ui.label(text("en", MessageKey::ImportOtherExclusions, &[]));
+        ui.label(text(&self.locale, MessageKey::ImportOtherExclusions, &[]));
         for warning in &preview.warnings {
             ui.colored_label(self.colors().warning, warning);
         }
         if preview.already_imported {
-            ui.label("This source snapshot was already imported. Native edits are preserved.");
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "This source snapshot was already imported. Native edits are preserved.",
+            ));
         }
         let already_imported = preview.already_imported;
         let destination_profile = preview.destination_profile.clone();
         ui.horizontal(|ui| {
-            if ui.button(text("en", MessageKey::Cancel, &[])).clicked() {
+            if ui
+                .button(text(&self.locale, MessageKey::Cancel, &[]))
+                .clicked()
+            {
                 self.import_generation = self.import_generation.wrapping_add(1);
                 self.import_preview = None;
             }
@@ -4246,7 +4530,7 @@ impl ButtonsApp {
                 && !self.import_busy
                 && ui
                     .button(text(
-                        "en",
+                        &self.locale,
                         MessageKey::ImportConfirm,
                         &[("profile", &destination_profile)],
                     ))
@@ -4337,6 +4621,7 @@ impl ButtonsApp {
                                 log::warn!("personal theme: {warning}");
                             }
                             self.preferences = preferences;
+                            self.refresh_locale();
                             self.theme_overrides.clear();
                             self.native_store = Some(store);
                             self.native_revision = Some(
@@ -4352,8 +4637,8 @@ impl ButtonsApp {
                                 self.settings_snapshot = Some(self.capture_settings_snapshot());
                             }
                             self.import_message = Some(match transfer {
-                                Some(Ok(result)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysResult, &[("saved", &result.imported.to_string()), ("failed", &result.failed.to_string())]),
-                                Some(Err(error)) => crate::i18n::text("en", crate::i18n::MessageKey::ImportKeysFailed, &[("reason", &error)]),
+                                Some(Ok(result)) => crate::i18n::text(&self.locale, crate::i18n::MessageKey::ImportKeysResult, &[("saved", &result.imported.to_string()), ("failed", &result.failed.to_string())]),
+                                Some(Err(error)) => crate::i18n::text(&self.locale, crate::i18n::MessageKey::ImportKeysFailed, &[("reason", &error)]),
                                 None => "Import complete. New terminals and settings now use the imported profile.".into(),
                             });
                         }
@@ -4368,8 +4653,8 @@ impl ButtonsApp {
     fn shortcut_settings(&mut self, ui: &mut egui::Ui) {
         use crate::i18n::{text, MessageKey as M};
 
-        ui.heading(text("en", M::Shortcuts, &[]));
-        ui.label(text("en", M::ShortcutHelp, &[]));
+        ui.heading(text(&self.locale, M::Shortcuts, &[]));
+        ui.label(text(&self.locale, M::ShortcutHelp, &[]));
         ui.add_space(8.0);
         egui::Grid::new("native-shortcut-settings")
             .striped(true)
@@ -4382,13 +4667,19 @@ impl ButtonsApp {
                         .binding(action)
                         .map(ShortcutChord::label)
                         .unwrap_or_else(|| "—".into());
-                    ui.label(text("en", action.message_key(), &[]));
+                    ui.label(text(&self.locale, action.message_key(), &[]));
                     ui.monospace(current);
-                    if ui.button(text("en", M::ShortcutRecord, &[])).clicked() {
+                    if ui
+                        .button(text(&self.locale, M::ShortcutRecord, &[]))
+                        .clicked()
+                    {
                         self.shortcut_capture = Some(action);
                         self.shortcut_feedback = None;
                     }
-                    if ui.button(text("en", M::ShortcutClear, &[])).clicked() {
+                    if ui
+                        .button(text(&self.locale, M::ShortcutClear, &[]))
+                        .clicked()
+                    {
                         self.preferences.shortcuts.clear(action);
                         self.shortcut_feedback = Some(ShortcutFeedback::Cleared);
                         if self.shortcut_capture == Some(action) {
@@ -4400,7 +4691,7 @@ impl ButtonsApp {
             });
 
         if ui
-            .button(text("en", M::ShortcutResetDefaults, &[]))
+            .button(text(&self.locale, M::ShortcutResetDefaults, &[]))
             .clicked()
         {
             self.preferences.shortcuts.reset();
@@ -4410,22 +4701,28 @@ impl ButtonsApp {
 
         if self.shortcut_capture.is_some() {
             ui.add_space(6.0);
-            ui.label(text("en", M::ShortcutRecordPrompt, &[]));
+            ui.label(text(&self.locale, M::ShortcutRecordPrompt, &[]));
         }
         if let Some(feedback) = self.shortcut_feedback {
             let feedback = match feedback {
-                ShortcutFeedback::Saved => text("en", M::ShortcutSaved, &[]),
-                ShortcutFeedback::Cleared => text("en", M::ShortcutCleared, &[]),
-                ShortcutFeedback::Reset => text("en", M::ShortcutResetComplete, &[]),
-                ShortcutFeedback::Cancelled => text("en", M::Cancel, &[]),
+                ShortcutFeedback::Saved => text(&self.locale, M::ShortcutSaved, &[]),
+                ShortcutFeedback::Cleared => text(&self.locale, M::ShortcutCleared, &[]),
+                ShortcutFeedback::Reset => text(&self.locale, M::ShortcutResetComplete, &[]),
+                ShortcutFeedback::Cancelled => text(&self.locale, M::Cancel, &[]),
                 ShortcutFeedback::Conflict(action) => {
-                    let action = text("en", action.message_key(), &[]);
-                    text("en", M::ShortcutConflict, &[("action", &action)])
+                    let action = text(&self.locale, action.message_key(), &[]);
+                    text(&self.locale, M::ShortcutConflict, &[("action", &action)])
                 }
-                ShortcutFeedback::UnknownConflict => text("en", M::ShortcutConflictUnknown, &[]),
-                ShortcutFeedback::UnsafeInterrupt => text("en", M::ShortcutUnsafeInterrupt, &[]),
-                ShortcutFeedback::ModifierRequired => text("en", M::ShortcutModifierRequired, &[]),
-                ShortcutFeedback::Invalid => text("en", M::ShortcutInvalid, &[]),
+                ShortcutFeedback::UnknownConflict => {
+                    text(&self.locale, M::ShortcutConflictUnknown, &[])
+                }
+                ShortcutFeedback::UnsafeInterrupt => {
+                    text(&self.locale, M::ShortcutUnsafeInterrupt, &[])
+                }
+                ShortcutFeedback::ModifierRequired => {
+                    text(&self.locale, M::ShortcutModifierRequired, &[])
+                }
+                ShortcutFeedback::Invalid => text(&self.locale, M::ShortcutInvalid, &[]),
             };
             ui.add_space(6.0);
             ui.colored_label(self.colors().warning, feedback);
@@ -4434,7 +4731,7 @@ impl ButtonsApp {
 
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
         use crate::i18n::{text, MessageKey as M};
-        ui.heading("Workspace");
+        ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -4446,7 +4743,7 @@ impl ButtonsApp {
                     let width_changed = ui
                         .add(
                             egui::Slider::new(&mut self.preferences.dock_width, 124.0..=360.0)
-                                .text(text("en", M::WorkspaceDockWidth, &[])),
+                                .text(text(&self.locale, M::WorkspaceDockWidth, &[])),
                         )
                         .changed();
                     if width_changed {
@@ -4463,11 +4760,11 @@ impl ButtonsApp {
                     }
                     ui.checkbox(
                         &mut self.preferences.dock_compact,
-                        text("en", M::WorkspaceDockCompact, &[]),
+                        text(&self.locale, M::WorkspaceDockCompact, &[]),
                     );
                     ui.checkbox(
                         &mut self.preferences.dock_auto_hide,
-                        text("en", M::WorkspaceDockAutoHide, &[]),
+                        text(&self.locale, M::WorkspaceDockAutoHide, &[]),
                     );
                     if self.preferences.dock_auto_hide {
                         ui.add(
@@ -4476,18 +4773,18 @@ impl ButtonsApp {
                                 250..=30_000,
                             )
                             .text(text(
-                                "en",
+                                &self.locale,
                                 M::WorkspaceDockAutoHideDelay,
                                 &[],
                             )),
                         );
                         ui.add(
                             egui::Slider::new(&mut self.preferences.dock_opacity, 0.2..=1.0)
-                                .text(text("en", M::WorkspaceDockOpacity, &[])),
+                                .text(text(&self.locale, M::WorkspaceDockOpacity, &[])),
                         );
                         ui.add(
                             egui::Slider::new(&mut self.preferences.dock_peek_radius, 0..=24)
-                                .text(text("en", M::WorkspaceDockPeekRadius, &[])),
+                                .text(text(&self.locale, M::WorkspaceDockPeekRadius, &[])),
                         );
                     }
                 }
@@ -4496,10 +4793,16 @@ impl ButtonsApp {
                 #[cfg(target_arch = "wasm32")]
                 {
                     ui.add_space(12.0);
-                    ui.label("Shell profiles are available in the native desktop app.");
+                    ui.label(crate::i18n::literal(
+                        &self.locale,
+                        "Shell profiles are available in the native desktop app.",
+                    ));
                 }
                 ui.add_space(12.0);
-                ui.label("Preferences are saved locally and restored on the next launch.");
+                ui.label(crate::i18n::literal(
+                    &self.locale,
+                    "Preferences are saved locally and restored on the next launch.",
+                ));
             });
     }
 
@@ -4508,7 +4811,7 @@ impl ButtonsApp {
         let colors = self.colors();
         ui.add_space(14.0);
         ui.separator();
-        ui.heading("Shell Profiles");
+        ui.heading(crate::i18n::literal(&self.locale, "Shell Profiles"));
         ui.label(
             RichText::new(
                 "Choose the default for new terminals or select a different profile from the + menu. Commands launch directly—no extra shell interpolation.",
@@ -4524,7 +4827,7 @@ impl ButtonsApp {
             .map(|(_, label, _)| label.clone())
             .unwrap_or_else(|| "Unavailable saved profile".into());
         ui.horizontal(|ui| {
-            ui.label("Default shell");
+            ui.label(crate::i18n::literal(&self.locale, "Default shell"));
             egui::ComboBox::from_id_salt("default-shell-profile")
                 .selected_text(selected_label)
                 .show_ui(ui, |ui| {
@@ -4538,10 +4841,16 @@ impl ButtonsApp {
                     }
                 });
         });
-        ui.label("Default working directory");
+        ui.label(crate::i18n::literal(
+            &self.locale,
+            "Default working directory",
+        ));
         ui.add(
             egui::TextEdit::singleline(&mut self.preferences.default_working_directory)
-                .hint_text("Current app directory (leave empty)")
+                .hint_text(crate::i18n::literal(
+                    &self.locale,
+                    "Current app directory (leave empty)",
+                ))
                 .desired_width(f32::INFINITY),
         );
         ui.label(
@@ -4567,7 +4876,10 @@ impl ButtonsApp {
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             ui.label(RichText::new("Custom shells").strong());
-            if ui.button("+ Add custom shell").clicked() {
+            if ui
+                .button(crate::i18n::literal(&self.locale, "+ Add custom shell"))
+                .clicked()
+            {
                 self.add_custom_shell_profile();
             }
         });
@@ -4588,36 +4900,48 @@ impl ButtonsApp {
                     egui::Grid::new(("custom-shell-profile", &profile.id))
                         .num_columns(2)
                         .show(ui, |ui| {
-                            ui.label("Label");
+                            ui.label(crate::i18n::literal(&self.locale, "Label"));
                             ui.add(
                                 egui::TextEdit::singleline(&mut profile.label)
-                                    .hint_text("MSYS2 UCRT64")
+                                    .hint_text(crate::i18n::literal(&self.locale, "MSYS2 UCRT64"))
                                     .desired_width(f32::INFINITY),
                             );
                             ui.end_row();
-                            ui.label("Command line");
+                            ui.label(crate::i18n::literal(&self.locale, "Command line"));
                             ui.add(
                                 egui::TextEdit::singleline(&mut profile.command)
-                                    .hint_text("/usr/bin/fish or pwsh.exe -NoLogo")
+                                    .hint_text(crate::i18n::literal(
+                                        &self.locale,
+                                        "/usr/bin/fish or pwsh.exe -NoLogo",
+                                    ))
                                     .desired_width(f32::INFINITY),
                             );
                             ui.end_row();
-                            ui.label("Working directory override");
+                            ui.label(crate::i18n::literal(
+                                &self.locale,
+                                "Working directory override",
+                            ));
                             ui.add(
                                 egui::TextEdit::singleline(&mut profile.working_directory)
-                                    .hint_text("Use workspace default")
+                                    .hint_text(crate::i18n::literal(
+                                        &self.locale,
+                                        "Use workspace default",
+                                    ))
                                     .desired_width(f32::INFINITY),
                             );
                             ui.end_row();
                         });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.button("Remove").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "Remove"))
+                            .clicked()
+                        {
                             remove = Some(index);
                         }
                         if ui
                             .add_enabled(
                                 !profile.command.trim().is_empty(),
-                                egui::Button::new("Open"),
+                                egui::Button::new(crate::i18n::literal(&self.locale, "Open")),
                             )
                             .clicked()
                         {
@@ -4642,7 +4966,7 @@ impl ButtonsApp {
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.heading("Saved Presets");
+        ui.heading(crate::i18n::literal(&self.locale, "Saved Presets"));
         ui.label(
             RichText::new(
                 "Command and SSH buttons are stored separately. Both target the focused terminal and can either type text or also press Enter.",
@@ -4673,7 +4997,12 @@ impl ButtonsApp {
                 self.open_add_preset_editor(collection);
             }
             if collection == PresetCollection::Commands
-                && ui.button("Restore starter presets").clicked()
+                && ui
+                    .button(crate::i18n::literal(
+                        &self.locale,
+                        "Restore starter presets",
+                    ))
+                    .clicked()
             {
                 self.confirm_preset_reset = true;
             }
@@ -4692,13 +5021,22 @@ impl ButtonsApp {
                 .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(8.0)
                 .show(ui, |ui| {
-                    ui.label("Replace every saved preset with the platform starter set?");
+                    ui.label(crate::i18n::literal(
+                        &self.locale,
+                        "Replace every saved preset with the platform starter set?",
+                    ));
                     ui.horizontal(|ui| {
-                        if ui.button("Confirm reset").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "Confirm reset"))
+                            .clicked()
+                        {
                             self.preferences.presets = default_presets();
                             self.confirm_preset_reset = false;
                         }
-                        if ui.button("Cancel").clicked() {
+                        if ui
+                            .button(crate::i18n::literal(&self.locale, "Cancel"))
+                            .clicked()
+                        {
                             self.confirm_preset_reset = false;
                         }
                     });
@@ -4738,13 +5076,22 @@ impl ButtonsApp {
                                     );
                                 });
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui.button("Delete").clicked() {
+                                    if ui
+                                        .button(crate::i18n::literal(&self.locale, "Delete"))
+                                        .clicked()
+                                    {
                                         action = Some(PresetAction::Delete(collection, index));
                                     }
-                                    if ui.button("Edit").clicked() {
+                                    if ui
+                                        .button(crate::i18n::literal(&self.locale, "Edit"))
+                                        .clicked()
+                                    {
                                         action = Some(PresetAction::Edit(collection, index));
                                     }
-                                    if ui.button("Run").clicked() {
+                                    if ui
+                                        .button(crate::i18n::literal(&self.locale, "Run"))
+                                        .clicked()
+                                    {
                                         action = Some(PresetAction::Run(collection, index));
                                     }
                                 });
@@ -4777,17 +5124,17 @@ impl ButtonsApp {
             .default_width(520.0)
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.settings);
-                ui.label("Button label");
+                ui.label(crate::i18n::literal(&self.locale, "Button label"));
                 ui.add(
                     egui::TextEdit::singleline(&mut self.preset_label_draft)
-                        .hint_text("Git status")
+                        .hint_text(crate::i18n::literal(&self.locale, "Git status"))
                         .desired_width(f32::INFINITY),
                 );
                 ui.add_space(8.0);
-                ui.label("Command or text");
+                ui.label(crate::i18n::literal(&self.locale, "Command or text"));
                 ui.add(
                     egui::TextEdit::multiline(&mut self.preset_command_draft)
-                        .hint_text("git status")
+                        .hint_text(crate::i18n::literal(&self.locale, "git status"))
                         .desired_rows(4)
                         .desired_width(f32::INFINITY),
                 );
@@ -4807,10 +5154,16 @@ impl ButtonsApp {
                 }
                 ui.add_space(10.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::literal(&self.locale, "Cancel"))
+                        .clicked()
+                    {
                         cancel = true;
                     }
-                    if ui.button("Save preset").clicked() {
+                    if ui
+                        .button(crate::i18n::literal(&self.locale, "Save preset"))
+                        .clicked()
+                    {
                         save = true;
                     }
                 });
@@ -4832,14 +5185,14 @@ impl ButtonsApp {
         let mut open = self.show_tab_rename;
         let mut save = false;
         let mut cancel = false;
-        egui::Window::new("Rename terminal")
+        egui::Window::new(crate::i18n::literal(&self.locale, "Rename terminal"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
             .default_width(420.0)
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.preferences.typography.settings);
-                ui.label("Tab title");
+                ui.label(crate::i18n::literal(&self.locale, "Tab title"));
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut self.tab_title_draft)
                         .desired_width(f32::INFINITY),
@@ -4851,10 +5204,17 @@ impl ButtonsApp {
                 }
                 ui.add_space(8.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button(crate::i18n::literal(&self.locale, "Cancel"))
+                        .clicked()
+                    {
                         cancel = true;
                     }
-                    if ui.button("Rename").clicked() || submitted {
+                    if ui
+                        .button(crate::i18n::literal(&self.locale, "Rename"))
+                        .clicked()
+                        || submitted
+                    {
                         save = true;
                     }
                 });
@@ -4869,19 +5229,28 @@ impl ButtonsApp {
     }
 
     fn about_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("About ButtonsCLI")
+        egui::Window::new(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
             .open(&mut self.show_about)
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.heading("ButtonsCLI Native");
-                ui.label("A fast terminal workspace built with Rust, egui, and Alacritty.");
+                ui.heading(crate::i18n::literal(&self.locale, "ButtonsCLI Native"));
+                ui.label(crate::i18n::literal(
+                    &self.locale,
+                    "A fast terminal workspace built with Rust, egui, and Alacritty.",
+                ));
                 ui.add_space(8.0);
-                ui.label("No webview. No browser runtime. Your shell stays local.");
+                ui.label(crate::i18n::literal(
+                    &self.locale,
+                    "No webview. No browser runtime. Your shell stays local.",
+                ));
             });
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
+        if self.show_localization_onboarding {
+            return;
+        }
         let pressed = ctx.input(|input| {
             input.events.iter().find_map(|event| match event {
                 egui::Event::Key {
@@ -5668,31 +6037,41 @@ fn pane_state_after_close(
 #[cfg(not(target_arch = "wasm32"))]
 fn tab_action_menu(
     ui: &mut egui::Ui,
+    locale: &str,
     index: usize,
     tab_count: usize,
     action: &mut Option<TabAction>,
 ) {
     ui.menu_button("⋮", |ui| {
-        if ui.button("Rename").clicked() {
+        if ui.button(crate::i18n::literal(locale, "Rename")).clicked() {
             *action = Some(TabAction::Rename(index));
             ui.close_menu();
         }
         if ui
-            .add_enabled(index > 0, egui::Button::new("Move left"))
+            .add_enabled(
+                index > 0,
+                egui::Button::new(crate::i18n::literal(locale, "Move left")),
+            )
             .clicked()
         {
             *action = Some(TabAction::MoveLeft(index));
             ui.close_menu();
         }
         if ui
-            .add_enabled(index + 1 < tab_count, egui::Button::new("Move right"))
+            .add_enabled(
+                index + 1 < tab_count,
+                egui::Button::new(crate::i18n::literal(locale, "Move right")),
+            )
             .clicked()
         {
             *action = Some(TabAction::MoveRight(index));
             ui.close_menu();
         }
         ui.separator();
-        if ui.button("Close terminal").clicked() {
+        if ui
+            .button(crate::i18n::literal(locale, "Close terminal"))
+            .clicked()
+        {
             *action = Some(TabAction::Close(index));
             ui.close_menu();
         }
@@ -5700,11 +6079,19 @@ fn tab_action_menu(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn preset_hover_text(preset: &CommandPreset) -> String {
+fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
     if preset.send_enter {
-        format!("{}\nExecutes immediately", preset.command)
+        format!(
+            "{}\n{}",
+            preset.command,
+            crate::i18n::literal(locale, "Executes immediately")
+        )
     } else {
-        format!("{}\nTypes without pressing Enter", preset.command)
+        format!(
+            "{}\n{}",
+            preset.command,
+            crate::i18n::literal(locale, "Types without pressing Enter")
+        )
     }
 }
 
@@ -5735,21 +6122,22 @@ fn provider_key(
 #[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(
     ui: &mut egui::Ui,
+    locale: &str,
     collection: PresetCollection,
     index: usize,
     action: &mut Option<PresetAction>,
 ) {
     ui.menu_button("⋮", |ui| {
-        if ui.button("Run").clicked() {
+        if ui.button(crate::i18n::literal(locale, "Run")).clicked() {
             *action = Some(PresetAction::Run(collection, index));
             ui.close_menu();
         }
-        if ui.button("Edit").clicked() {
+        if ui.button(crate::i18n::literal(locale, "Edit")).clicked() {
             *action = Some(PresetAction::Edit(collection, index));
             ui.close_menu();
         }
         ui.separator();
-        if ui.button("Delete").clicked() {
+        if ui.button(crate::i18n::literal(locale, "Delete")).clicked() {
             *action = Some(PresetAction::Delete(collection, index));
             ui.close_menu();
         }
@@ -5778,6 +6166,7 @@ impl eframe::App for ButtonsApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.refresh_locale();
         #[cfg(not(target_arch = "wasm32"))]
         self.publish_control_snapshot();
         #[cfg(not(target_arch = "wasm32"))]
@@ -5815,10 +6204,13 @@ impl eframe::App for ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 if self.import_offer {
                     ui.horizontal(|ui| {
-                        ui.label("Original ButtonsCLI settings are available to preview.");
+                        ui.label(crate::i18n::literal(
+                            &self.locale,
+                            "Original ButtonsCLI settings are available to preview.",
+                        ));
                         if ui
                             .button(crate::i18n::text(
-                                "en",
+                                &self.locale,
                                 crate::i18n::MessageKey::ImportFromOriginal,
                                 &[],
                             ))
@@ -5827,7 +6219,10 @@ impl eframe::App for ButtonsApp {
                             self.show_settings = true;
                             self.settings_tab = SettingsTab::Import;
                         }
-                        if ui.small_button("Dismiss").clicked() {
+                        if ui
+                            .small_button(crate::i18n::literal(&self.locale, "Dismiss"))
+                            .clicked()
+                        {
                             self.import_offer = false;
                         }
                     });
@@ -5846,6 +6241,8 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_rename_window(ctx);
         self.about_window(ctx);
+        self.localization_onboarding(ctx);
+        self.refresh_locale();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -6264,5 +6661,16 @@ mod tests {
         app.remove_custom_shell_profile(0);
         assert_eq!(app.preferences.default_shell_id, "system");
         assert!(app.preferences.custom_shell_profiles.is_empty());
+    }
+
+    #[test]
+    fn only_a_detected_fresh_install_gets_the_language_chooser() {
+        let mut existing: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(existing.localization.first_run_language_confirmed);
+        assert_eq!(existing.localization.mode, LocalizationMode::Manual);
+
+        prepare_fresh_install_language(&mut existing);
+        assert!(!existing.localization.first_run_language_confirmed);
+        assert_eq!(existing.localization.mode, LocalizationMode::System);
     }
 }

@@ -1,9 +1,205 @@
-//! Native migration strings. Full translation of the existing UI is U05.
+//! Native UI localization backed by the imported source catalog, with English fallback.
+
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
+use serde::Deserialize;
 
 pub const SUPPORTED_LOCALES: [&str; 21] = [
     "en", "es", "zh-CN", "fr", "ja", "hi", "de", "pt-BR", "it", "ru", "uk", "ko", "ar", "tr", "pl",
     "nl", "sv", "da", "fi", "no", "zh-TW",
 ];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LocaleInfo {
+    pub code: &'static str,
+    pub english_name: &'static str,
+    pub native_name: &'static str,
+    pub right_to_left: bool,
+}
+
+pub const LOCALE_INFO: [LocaleInfo; 21] = [
+    LocaleInfo {
+        code: "en",
+        english_name: "English",
+        native_name: "English",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "es",
+        english_name: "Spanish",
+        native_name: "Español",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "zh-CN",
+        english_name: "Chinese (Simplified)",
+        native_name: "简体中文",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "fr",
+        english_name: "French",
+        native_name: "Français",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "ja",
+        english_name: "Japanese",
+        native_name: "日本語",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "hi",
+        english_name: "Hindi",
+        native_name: "हिन्दी",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "de",
+        english_name: "German",
+        native_name: "Deutsch",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "pt-BR",
+        english_name: "Portuguese (Brazil)",
+        native_name: "Português (Brasil)",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "it",
+        english_name: "Italian",
+        native_name: "Italiano",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "ru",
+        english_name: "Russian",
+        native_name: "Русский",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "uk",
+        english_name: "Ukrainian",
+        native_name: "Українська",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "ko",
+        english_name: "Korean",
+        native_name: "한국어",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "ar",
+        english_name: "Arabic",
+        native_name: "العربية",
+        right_to_left: true,
+    },
+    LocaleInfo {
+        code: "tr",
+        english_name: "Turkish",
+        native_name: "Türkçe",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "pl",
+        english_name: "Polish",
+        native_name: "Polski",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "nl",
+        english_name: "Dutch",
+        native_name: "Nederlands",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "sv",
+        english_name: "Swedish",
+        native_name: "Svenska",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "da",
+        english_name: "Danish",
+        native_name: "Dansk",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "fi",
+        english_name: "Finnish",
+        native_name: "Suomi",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "no",
+        english_name: "Norwegian",
+        native_name: "Norsk",
+        right_to_left: false,
+    },
+    LocaleInfo {
+        code: "zh-TW",
+        english_name: "Chinese (Traditional)",
+        native_name: "繁體中文",
+        right_to_left: false,
+    },
+];
+
+#[derive(Deserialize)]
+struct LiteralCatalog {
+    messages: HashMap<String, HashMap<String, String>>,
+}
+
+static LITERAL_CATALOG: OnceLock<LiteralCatalog> = OnceLock::new();
+
+fn literal_catalog() -> &'static LiteralCatalog {
+    LITERAL_CATALOG.get_or_init(|| {
+        serde_json::from_str(include_str!("i18n/literals.json"))
+            .expect("bundled native literal catalog is valid JSON")
+    })
+}
+
+pub fn literal(locale: &str, english: &str) -> String {
+    let locale = resolve_locale(locale);
+    if locale == "en" {
+        return english.to_owned();
+    }
+    let source_key = catalog_alias(english);
+    let translations = literal_catalog().messages.get(source_key).or_else(|| {
+        let mut matches = literal_catalog()
+            .messages
+            .iter()
+            .filter(|(source, _)| source.eq_ignore_ascii_case(source_key));
+        let first = matches.next()?.1;
+        matches.next().is_none().then_some(first)
+    });
+    translations
+        .and_then(|translations| translations.get(locale))
+        .cloned()
+        .unwrap_or_else(|| english.to_owned())
+}
+
+fn catalog_alias(english: &str) -> &str {
+    match english {
+        "Commands" => "Command",
+        "Theme Library" => "Themes",
+        "Apply:" => "Apply",
+        "Shell Profiles" => "Custom Shell Profiles",
+        "Open a terminal" | "New terminal with…" => "New terminal",
+        "Run" | "Run in terminal" => "Run preset",
+        "Add a preset" => "Add new preset",
+        "+ Add SSH preset" => "Add Preset",
+        "Delete" => "Delete preset",
+        "Tab title" => "Tab title (optional)",
+        _ => english,
+    }
+}
+
+pub fn formatted_literal(locale: &str, english: &str, args: &[(&str, &str)]) -> String {
+    interpolate(literal(locale, english), args)
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MessageKey {
@@ -302,6 +498,37 @@ pub fn resolve_locale(requested: &str) -> &'static str {
         .unwrap_or("en")
 }
 
+pub fn locale_info(requested: &str) -> &'static LocaleInfo {
+    let locale = resolve_locale(requested);
+    LOCALE_INFO
+        .iter()
+        .find(|info| info.code == locale)
+        .unwrap_or(&LOCALE_INFO[0])
+}
+
+pub fn system_locale() -> &'static str {
+    #[cfg(target_os = "windows")]
+    let detected = windows_system_locale();
+    #[cfg(not(target_os = "windows"))]
+    let detected = ["LC_ALL", "LC_MESSAGES", "LANG"]
+        .into_iter()
+        .find_map(|key| std::env::var(key).ok().filter(|value| !value.is_empty()));
+
+    detected
+        .as_deref()
+        .map(|value| value.split(['.', '@']).next().unwrap_or(value))
+        .map(resolve_locale)
+        .unwrap_or("en")
+}
+
+#[cfg(target_os = "windows")]
+fn windows_system_locale() -> Option<String> {
+    use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
+    let mut buffer = [0_u16; 85];
+    let length = unsafe { GetUserDefaultLocaleName(buffer.as_mut_ptr(), buffer.len() as i32) };
+    (length > 1).then(|| String::from_utf16_lossy(&buffer[..length as usize - 1]))
+}
+
 fn english(key: MessageKey) -> &'static str {
     match key {
         MessageKey::ImportFromOriginal => "Import from original ButtonsCLI",
@@ -463,9 +690,13 @@ fn override_text(locale: &str, key: MessageKey) -> Option<&'static str> {
 /// Interpolates named values without treating the translated string as a format program.
 pub fn text(locale: &str, key: MessageKey, args: &[(&str, &str)]) -> String {
     let locale = resolve_locale(locale);
-    let mut result = override_text(locale, key)
-        .unwrap_or_else(|| english(key))
-        .to_owned();
+    let result = override_text(locale, key)
+        .map(str::to_owned)
+        .unwrap_or_else(|| literal(locale, english(key)));
+    interpolate(result, args)
+}
+
+fn interpolate(mut result: String, args: &[(&str, &str)]) -> String {
     for (name, value) in args {
         result = result.replace(&format!("{{{name}}}"), value);
     }
@@ -484,13 +715,38 @@ mod tests {
     }
 
     #[test]
-    fn partial_catalog_falls_back_and_interpolates() {
+    fn literal_catalog_covers_every_locale_and_interpolates_placeholders() {
         assert_eq!(text("fr", MessageKey::AiHelp, &[]), "Aide IA");
         assert_eq!(
             text("fr", MessageKey::ImportConfirm, &[("profile", "Work")]),
             "Import into Work"
         );
         assert_eq!(text("xx", MessageKey::Cancel, &[]), "Cancel");
+        assert_eq!(literal("es", "Cancel"), "Cancelar");
+        assert_eq!(literal("es", "Commands"), literal("es", "Command"));
+        assert_eq!(
+            formatted_literal(
+                "fr",
+                "Current app language: {language}",
+                &[("language", "Français")],
+            ),
+            "Langue actuelle de l'application : Français"
+        );
+        assert_eq!(
+            LOCALE_INFO.iter().map(|info| info.code).collect::<Vec<_>>(),
+            SUPPORTED_LOCALES
+        );
+        assert!(locale_info("ar").right_to_left);
+        for (english, translations) in &literal_catalog().messages {
+            assert_eq!(translations.len(), SUPPORTED_LOCALES.len(), "{english}");
+            assert_eq!(
+                translations.get("en").map(String::as_str),
+                Some(english.as_str())
+            );
+            for locale in SUPPORTED_LOCALES {
+                assert!(translations.contains_key(locale), "{locale}: {english}");
+            }
+        }
     }
 
     #[test]

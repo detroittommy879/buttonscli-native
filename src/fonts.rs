@@ -64,6 +64,13 @@ pub static FONT_FACES: &[FontFace] = &[
         Ui
     ),
     face!(
+        "noto-sans-kr",
+        "Noto Sans KR Bundled",
+        "NotoSansKR-Subset.ttf",
+        400,
+        Ui
+    ),
+    face!(
         "jetbrains-mono-200",
         "JetBrains Mono Bundled",
         "JetBrainsMono-ExtraLight.ttf",
@@ -295,6 +302,9 @@ pub fn install(ctx: &egui::Context) {
         if family != "Go Noto Current Bundled" {
             fallback.push("go-noto-current".into());
         }
+        if family != "Noto Sans KR Bundled" {
+            fallback.push("noto-sans-kr".into());
+        }
         definitions
             .families
             .insert(FontFamily::Name(family.into()), fallback);
@@ -306,6 +316,7 @@ pub fn install(ctx: &egui::Context) {
                 face.id.into(),
                 "symbols-nerd".into(),
                 "go-noto-current".into(),
+                "noto-sans-kr".into(),
             ],
         );
     }
@@ -314,7 +325,14 @@ pub fn install(ctx: &egui::Context) {
         .families
         .entry(FontFamily::Proportional)
         .or_default()
-        .splice(0..0, ["go-noto-current".into(), "symbols-nerd".into()]);
+        .splice(
+            0..0,
+            [
+                "go-noto-current".into(),
+                "symbols-nerd".into(),
+                "noto-sans-kr".into(),
+            ],
+        );
     definitions
         .families
         .entry(FontFamily::Monospace)
@@ -325,6 +343,7 @@ pub fn install(ctx: &egui::Context) {
                 "recursive-mono-casual".into(),
                 "symbols-nerd".into(),
                 "go-noto-current".into(),
+                "noto-sans-kr".into(),
             ],
         );
     ctx.set_fonts(definitions);
@@ -406,10 +425,12 @@ mod tests {
 
     #[test]
     fn catalog_has_every_packaged_scalable_face() {
-        assert_eq!(FONT_FACES.len(), 26);
-        assert_eq!(family_names(false).len(), 19);
+        assert_eq!(FONT_FACES.len(), 27);
+        assert_eq!(family_names(false).len(), 20);
         assert_eq!(family_names(true).len(), 12);
         assert!(family_names(false).contains(&"Roboto Bundled"));
+        assert!(family_names(false).contains(&"Noto Sans KR Bundled"));
+        assert!(!family_names(true).contains(&"Noto Sans KR Bundled"));
     }
 
     #[test]

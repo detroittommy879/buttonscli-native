@@ -97,6 +97,7 @@ impl Default for ShellProfile {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Preferences {
+    pub(crate) localization: LocalizationPreferences,
     pub(crate) theme_id: String,
     pub(crate) app_theme_id: String,
     pub(crate) terminal_theme_id: String,
@@ -128,6 +129,7 @@ pub(crate) struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            localization: LocalizationPreferences::default(),
             theme_id: "basic2".into(),
             app_theme_id: String::new(),
             terminal_theme_id: String::new(),
@@ -158,6 +160,34 @@ impl Default for Preferences {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum LocalizationMode {
+    System,
+    #[default]
+    Manual,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct LocalizationPreferences {
+    pub(crate) mode: LocalizationMode,
+    pub(crate) manual_locale: String,
+    /// Existing settings deserialize as confirmed; only an explicitly detected new install
+    /// should be shown the first-run chooser.
+    pub(crate) first_run_language_confirmed: bool,
+}
+
+impl Default for LocalizationPreferences {
+    fn default() -> Self {
+        Self {
+            mode: LocalizationMode::Manual,
+            manual_locale: "en".into(),
+            first_run_language_confirmed: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub(crate) struct PaneDividerAppearance {
@@ -169,6 +199,8 @@ pub(crate) struct PaneDividerAppearance {
 
 impl Preferences {
     pub(crate) fn normalize_theme_sources(&mut self) {
+        self.localization.manual_locale =
+            crate::i18n::resolve_locale(&self.localization.manual_locale).to_owned();
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
         self.dock_width = if self.dock_width.is_finite() {
             self.dock_width.clamp(124.0, 360.0)
@@ -287,5 +319,21 @@ mod tests {
         assert_eq!(preferences.dock_opacity, 0.2);
         assert_eq!(preferences.dock_peek_radius, 24);
         assert!(preferences.dock_compact && preferences.dock_auto_hide);
+    }
+
+    #[test]
+    fn language_preferences_preserve_existing_behavior_and_normalize_locale() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.localization.mode, LocalizationMode::Manual);
+        assert_eq!(old.localization.manual_locale, "en");
+        assert!(old.localization.first_run_language_confirmed);
+
+        let mut imported: Preferences = serde_json::from_str(
+            r#"{"localization":{"mode":"manual","manual_locale":"pt_BR","first_run_language_confirmed":false}}"#,
+        )
+        .unwrap();
+        imported.normalize_theme_sources();
+        assert_eq!(imported.localization.manual_locale, "pt-BR");
+        assert!(!imported.localization.first_run_language_confirmed);
     }
 }
