@@ -21,7 +21,7 @@ Current desktop features include:
 - new tabs named `term1`, `term2`, and so on, with rename, reorder, and
   recent-close recovery with pane-safe index updates;
 - detected and custom shell profiles with persisted default/per-tab selection,
-  arguments, and working directories;
+  quoted arguments, working directories, and Windows WSL distribution choices;
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - focused-terminal regex search across wrapped text and scrollback, plus
   select-all and clear-screen actions that leave the shell running;

@@ -10,6 +10,7 @@ pub enum FeatureKey {
     TerminalSearch,
     WorkspaceControls,
     LocalizationSettings,
+    ShellProfiles,
     SettingsAppearance,
     OriginalSettingsImport,
     GuidedOnboarding,
@@ -26,7 +27,7 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 24] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -37,6 +38,7 @@ impl FeatureKey {
         Self::TerminalSearch,
         Self::WorkspaceControls,
         Self::LocalizationSettings,
+        Self::ShellProfiles,
         Self::SettingsAppearance,
         Self::OriginalSettingsImport,
         Self::GuidedOnboarding,
@@ -64,6 +66,7 @@ impl FeatureKey {
             Self::TerminalSearch => "terminalSearch",
             Self::WorkspaceControls => "workspaceControls",
             Self::LocalizationSettings => "localizationSettings",
+            Self::ShellProfiles => "shellProfiles",
             Self::SettingsAppearance => "settingsAppearance",
             Self::OriginalSettingsImport => "originalSettingsImport",
             Self::GuidedOnboarding => "guidedOnboarding",
@@ -94,6 +97,7 @@ impl FeatureKey {
             K::TerminalSearch => (T::Free, true, R::Active, "terminal"),
             K::WorkspaceControls => (T::Free, true, R::Active, "workspace"),
             K::LocalizationSettings => (T::Free, true, R::Active, "localization"),
+            K::ShellProfiles => (T::Free, true, R::Active, "terminal"),
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
             K::SettingsAppearance | K::OriginalSettingsImport => {
                 (T::Free, true, R::Active, "settings")

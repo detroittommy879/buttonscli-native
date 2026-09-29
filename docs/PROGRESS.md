@@ -1,5 +1,23 @@
 # Reconstruction journal
 
+## 2026-09-28 — U06 Windows shell discovery and profiles
+
+Expanded the free `shellProfiles` feature with Windows WSL detection. When WSL
+is present, the shell menu keeps the generic launcher and adds one profile per
+installed distribution, passing each distribution name as a distinct argument.
+The WSL list parser accepts UTF-8 and UTF-16 output, removes duplicate names,
+and handles names with spaces. Windows shell discovery now checks System32 as
+well as `PATH`; existing detected-profile IDs stay stable.
+
+Improved custom command-line parsing for quoted paths, escaped embedded quotes,
+empty arguments, and Windows backslashes. Shell launches continue to report the
+underlying error rather than falling back to another profile. Updated the
+Windows user guide, README, migration tracker and changelog. Focused tests and
+The full Windows library suite passes (107 tests), as do `cargo check --bin buttonscli`
+and `cargo build --bin buttonscli`, `cargo fmt --all`, and `git diff --check`.
+The build retains the existing bin/lib PDB filename collision warning. Linux,
+macOS, and live Windows GUI/PTY behavior remain unverified; Fedora is not a gate.
+
 ## 2026-09-28 — U05 language selector and catalog
 
 Bundled the original 21-locale catalog (776 unique English source strings) and

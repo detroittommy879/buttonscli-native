@@ -1193,9 +1193,10 @@ impl ButtonsApp {
             .iter()
             .find(|shell| shell.id == profile_id)
         {
-            return Ok(ShellLaunch::for_executable(
+            return Ok(ShellLaunch::for_executable_with_args(
                 shell.id.clone(),
                 shell.command.clone(),
+                shell.args.clone(),
                 working_directory,
             ));
         }
@@ -6389,6 +6390,27 @@ mod tests {
             .notice
             .as_deref()
             .is_some_and(|message| message.contains("missing-profile")));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn invalid_custom_shell_reports_the_parse_error_without_falling_back() {
+        let mut preferences = Preferences::default();
+        preferences.custom_shell_profiles.push(ShellProfile {
+            id: "broken-profile".into(),
+            label: "Broken profile".into(),
+            command: r#""C:\Program Files\missing shell.exe --login"#.into(),
+            working_directory: String::new(),
+        });
+        let mut app = ButtonsApp::empty(preferences);
+
+        app.open_tab_with_profile(egui::Context::default(), "broken-profile");
+
+        assert!(app.tabs.is_empty());
+        assert!(app
+            .notice
+            .as_deref()
+            .is_some_and(|message| message.contains("unmatched quote")));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

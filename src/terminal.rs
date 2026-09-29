@@ -33,6 +33,7 @@ pub struct DetectedShell {
     pub id: String,
     pub label: String,
     pub command: String,
+    pub args: Vec<String>,
 }
 
 impl ShellLaunch {
@@ -66,9 +67,20 @@ impl ShellLaunch {
         working_directory: Option<PathBuf>,
     ) -> Self {
         let command = command.into();
+        let args = default_args_for_shell(&command);
+        Self::for_executable_with_args(profile_id, command, args, working_directory)
+    }
+
+    pub fn for_executable_with_args(
+        profile_id: impl Into<String>,
+        command: impl Into<String>,
+        args: Vec<String>,
+        working_directory: Option<PathBuf>,
+    ) -> Self {
+        let command = command.into();
         Self {
             profile_id: profile_id.into(),
-            args: default_args_for_shell(&command),
+            args,
             command,
             working_directory,
         }
@@ -148,6 +160,15 @@ pub fn detected_shells() -> Vec<DetectedShell> {
     let (system, _) = default_shell();
     commands.push(system);
 
+    #[cfg(windows)]
+    let wsl_available = executable_on_path("wsl.exe");
+    #[cfg(windows)]
+    let wsl_distributions = if wsl_available {
+        detect_wsl_distributions()
+    } else {
+        Vec::new()
+    };
+
     #[cfg(unix)]
     {
         if let Ok(contents) = std::fs::read_to_string("/etc/shells") {
@@ -190,34 +211,166 @@ pub fn detected_shells() -> Vec<DetectedShell> {
                 .filter(|command| executable_on_path(command))
                 .map(str::to_owned),
         );
+        if wsl_available {
+            commands.push("wsl.exe".into());
+        }
     }
 
     let mut seen = HashSet::new();
-    commands
+    let mut shells: Vec<_> = commands
         .into_iter()
-        .filter(|command| {
-            let key = if cfg!(windows) {
-                command.to_ascii_lowercase()
-            } else {
-                command.clone()
-            };
-            seen.insert(key)
-        })
+        .filter(|command| seen.insert(shell_command_key(command)))
         .map(|command| DetectedShell {
+            // Preserve IDs already saved by earlier native builds. Arguments are
+            // added only for the new WSL distribution-specific profiles below.
             id: format!("detected:{command}"),
             label: shell_title(&command),
+            args: default_args_for_shell(&command),
             command,
+        })
+        .collect();
+
+    #[cfg(windows)]
+    shells.extend(wsl_distribution_shells(wsl_distributions));
+
+    shells
+}
+
+fn shell_command_key(command: &str) -> String {
+    #[cfg(windows)]
+    {
+        let file_name = Path::new(command)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(command);
+        return file_name.to_ascii_lowercase();
+    }
+    #[cfg(not(windows))]
+    {
+        command.to_owned()
+    }
+}
+
+fn detected_shell_id(command: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        format!("detected:{command}")
+    } else {
+        let encoded_args = serde_json::to_string(args).expect("shell arguments serialize");
+        format!("detected:{command}:{encoded_args}")
+    }
+}
+
+#[cfg(windows)]
+fn wsl_distribution_shells(distributions: Vec<String>) -> Vec<DetectedShell> {
+    let mut seen = HashSet::new();
+    distributions
+        .into_iter()
+        .map(|distribution| distribution.trim().to_owned())
+        .filter(|distribution| !distribution.is_empty())
+        .filter(|distribution| seen.insert(distribution.to_ascii_lowercase()))
+        .map(|distribution| {
+            let args = vec!["--distribution".into(), distribution.clone()];
+            DetectedShell {
+                id: detected_shell_id("wsl.exe", &args),
+                label: format!("{distribution} (WSL)"),
+                command: "wsl.exe".into(),
+                args,
+            }
         })
         .collect()
 }
 
 #[cfg(windows)]
+fn detect_wsl_distributions() -> Vec<String> {
+    let command = executable_path_on_path("wsl.exe").unwrap_or_else(|| "wsl.exe".into());
+    let Ok(output) = std::process::Command::new(command)
+        .args(["--list", "--quiet"])
+        .output()
+    else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    parse_wsl_distribution_output(&output.stdout)
+}
+
+fn parse_wsl_distribution_output(bytes: &[u8]) -> Vec<String> {
+    let decoded = decode_wsl_output(bytes);
+    let mut seen = HashSet::new();
+    decoded
+        .lines()
+        .map(|line| {
+            line.replace('\0', "")
+                .trim()
+                .trim_start_matches('\u{feff}')
+                .trim()
+                .to_owned()
+        })
+        .filter(|line| !line.is_empty())
+        .filter(|line| seen.insert(line.to_ascii_lowercase()))
+        .collect()
+}
+
+fn decode_wsl_output(bytes: &[u8]) -> String {
+    let (encoding, payload) = if bytes.starts_with(&[0xff, 0xfe]) {
+        (Some(false), &bytes[2..])
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (Some(true), &bytes[2..])
+    } else if bytes.len() >= 4
+        && bytes.len().is_multiple_of(2)
+        && bytes
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .filter(|byte| **byte == 0)
+            .count()
+            * 2
+            >= bytes.len() / 2
+    {
+        (Some(false), bytes)
+    } else {
+        (None, bytes)
+    };
+
+    match encoding {
+        Some(big_endian) => {
+            let units = payload
+                .chunks_exact(2)
+                .map(|pair| {
+                    if big_endian {
+                        u16::from_be_bytes([pair[0], pair[1]])
+                    } else {
+                        u16::from_le_bytes([pair[0], pair[1]])
+                    }
+                })
+                .collect::<Vec<_>>();
+            String::from_utf16_lossy(&units)
+        }
+        None => String::from_utf8_lossy(payload).into_owned(),
+    }
+}
+
+#[cfg(windows)]
 fn executable_on_path(command: &str) -> bool {
+    executable_path_on_path(command).is_some()
+}
+
+#[cfg(windows)]
+fn executable_path_on_path(command: &str) -> Option<PathBuf> {
     std::env::var_os("PATH")
         .map(|paths| {
-            std::env::split_paths(&paths).any(|directory| directory.join(command).is_file())
+            std::env::split_paths(&paths)
+                .map(|directory| directory.join(command))
+                .find(|candidate| candidate.is_file())
         })
-        .unwrap_or(false)
+        .flatten()
+        .or_else(|| {
+            std::env::var_os("SystemRoot")
+                .map(PathBuf::from)
+                .map(|root| root.join("System32").join(command))
+                .filter(|candidate| candidate.is_file())
+        })
 }
 
 fn split_command_line(input: &str) -> anyhow::Result<(String, Vec<String>)> {
@@ -227,23 +380,64 @@ fn split_command_line(input: &str) -> anyhow::Result<(String, Vec<String>)> {
         return Ok((input.to_owned(), Vec::new()));
     }
 
+    let characters: Vec<char> = input.chars().collect();
     let mut parts = Vec::new();
     let mut current = String::new();
     let mut quote = None;
-    for character in input.chars() {
+    let mut token_started = false;
+    let mut index = 0;
+    while index < characters.len() {
+        let character = characters[index];
+        if character == '\\' {
+            let start = index;
+            while index < characters.len() && characters[index] == '\\' {
+                index += 1;
+            }
+            let slash_count = index - start;
+            if index < characters.len()
+                && matches!(characters[index], '\'' | '"')
+                && (quote.is_none() || quote == Some(characters[index]))
+            {
+                current.extend(std::iter::repeat_n('\\', slash_count / 2));
+                token_started = true;
+                if slash_count % 2 == 1 {
+                    current.push(characters[index]);
+                } else if quote == Some(characters[index]) {
+                    quote = None;
+                } else {
+                    quote = Some(characters[index]);
+                }
+                index += 1;
+            } else {
+                current.extend(std::iter::repeat_n('\\', slash_count));
+                token_started = true;
+            }
+            continue;
+        }
         match character {
-            '\'' | '"' if quote == Some(character) => quote = None,
-            '\'' | '"' if quote.is_none() => quote = Some(character),
+            '\'' | '"' if quote == Some(character) => {
+                quote = None;
+                token_started = true;
+            }
+            '\'' | '"' if quote.is_none() => {
+                quote = Some(character);
+                token_started = true;
+            }
             character if character.is_whitespace() && quote.is_none() => {
-                if !current.is_empty() {
+                if token_started {
                     parts.push(std::mem::take(&mut current));
+                    token_started = false;
                 }
             }
-            character => current.push(character),
+            character => {
+                current.push(character);
+                token_started = true;
+            }
         }
+        index += 1;
     }
     anyhow::ensure!(quote.is_none(), "shell command has an unmatched quote");
-    if !current.is_empty() {
+    if token_started {
         parts.push(current);
     }
     let mut parts = parts.into_iter();
@@ -295,7 +489,10 @@ fn default_shell() -> (String, Vec<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{detected_shells, next_available_title, shell_title, split_command_line};
+    use super::{
+        detected_shell_id, detected_shells, next_available_title, parse_wsl_distribution_output,
+        shell_title, split_command_line,
+    };
 
     #[test]
     fn default_titles_increase_and_skip_existing_custom_names() {
@@ -318,6 +515,24 @@ mod tests {
         let (command, args) = split_command_line("'my shell' --login --name 'Work Shell'").unwrap();
         assert_eq!(command, "my shell");
         assert_eq!(args, ["--login", "--name", "Work Shell"]);
+
+        let (command, args) = split_command_line(
+            r#""C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Command "Write-Output \"hello world\"""#,
+        )
+        .unwrap();
+        assert_eq!(command, r"C:\Program Files\PowerShell\7\pwsh.exe");
+        assert_eq!(
+            args,
+            ["-NoLogo", "-Command", "Write-Output \"hello world\""]
+        );
+    }
+
+    #[test]
+    fn command_line_parser_keeps_empty_arguments_and_backslashes() {
+        let (command, args) =
+            split_command_line(r#"pwsh.exe "" "two words" C:\Tools\pwsh.exe"#).unwrap();
+        assert_eq!(command, "pwsh.exe");
+        assert_eq!(args, ["", "two words", r"C:\Tools\pwsh.exe"]);
     }
 
     #[test]
@@ -330,10 +545,43 @@ mod tests {
     fn detected_shells_are_nonempty_and_unique() {
         let shells = detected_shells();
         assert!(!shells.is_empty());
-        let mut commands: Vec<&str> = shells.iter().map(|shell| shell.command.as_str()).collect();
-        commands.sort_unstable();
-        commands.dedup();
-        assert_eq!(commands.len(), shells.len());
+        let mut ids: Vec<&str> = shells.iter().map(|shell| shell.id.as_str()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), shells.len());
+    }
+
+    #[test]
+    fn wsl_output_handles_utf8_utf16_and_duplicate_distribution_names() {
+        assert_eq!(
+            parse_wsl_distribution_output(b"Ubuntu\0\nDebian\0\nubuntu\0\n"),
+            ["Ubuntu", "Debian"]
+        );
+        assert_eq!(
+            parse_wsl_distribution_output(b"Ubuntu\0\r\0\nDebian\0\n"),
+            ["Ubuntu", "Debian"]
+        );
+
+        let mut utf16 = vec![0xff, 0xfe];
+        for unit in "Ubuntu\r\nFedora\r\n".encode_utf16() {
+            utf16.extend(unit.to_le_bytes());
+        }
+        assert_eq!(parse_wsl_distribution_output(&utf16), ["Ubuntu", "Fedora"]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn wsl_distribution_profiles_keep_names_with_spaces_as_one_argument() {
+        let profiles =
+            super::wsl_distribution_shells(vec!["Ubuntu Work".into(), "Ubuntu Work".into()]);
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].label, "Ubuntu Work (WSL)");
+        assert_eq!(profiles[0].command, "wsl.exe");
+        assert_eq!(profiles[0].args, ["--distribution", "Ubuntu Work"]);
+        assert_eq!(
+            profiles[0].id,
+            detected_shell_id("wsl.exe", &["--distribution".into(), "Ubuntu Work".into()])
+        );
     }
 }
 
