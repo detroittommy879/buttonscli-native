@@ -1,5 +1,21 @@
 # Reconstruction journal
 
+## 2026-09-29 — R02 output transcript fixture and microbenchmark
+
+Added `tests/fixtures/output-transcript.json` for raw ANSI/cursor controls,
+blank lines, carriage-return redraw, alternate-screen markers, and split
+UTF-8 chunks. Focused tests confirm chunk-wise replacement behavior,
+repeated-output activity, and the Unicode-safe 200,000-character tail. An
+ignored release probe ran five 32 MiB trials with 4 KiB chunks on Windows 11
+Pro/i5-12600K/Rust 1.96: throughput median 686.29 MiB/s, per-write p95 5–7
+μs, worst observed write 125 μs, and saturated-tail read median 179 μs. These
+times include the whole capture/read path; no allocation count, isolated mutex
+timing, contention, or live PTY was measured. Visible/hidden PTY behavior and
+close/cancel races remain open; see `docs/migration/OUTPUT-CAPTURE-DECISION.md`.
+`cargo fmt --all -- --check` passed. The full `cargo test --release` suite
+passed 191 library tests and 2 synthetic fixture tests; the manual benchmark
+remains ignored in ordinary test runs.
+
 ## 2026-09-29 — P06 native distribution design
 
 Recorded the native product/artifact IDs, existing `.buttonscli-native`

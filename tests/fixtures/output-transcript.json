@@ -1,0 +1,31 @@
+{
+  "sourceRevision": "032c9f2",
+  "contract": "Original output forwarding converted each PTY read chunk with Buffer.toString('utf8'); native keeps that chunk-wise lossy behavior.",
+  "cases": [
+    {
+      "name": "ansi-color-and-blank-line",
+      "chunksHex": ["677265656e0d0a0a1b5b33326d72656164791b5b306d"],
+      "expected": "green\r\n\n\u001b[32mready\u001b[0m"
+    },
+    {
+      "name": "cursor-clear-and-home",
+      "chunksHex": ["1b5b324a1b5b481b5b313b3348"],
+      "expected": "\u001b[2J\u001b[H\u001b[1;3H"
+    },
+    {
+      "name": "carriage-return-redraw",
+      "chunksHex": ["310d31300d3130300d"],
+      "expected": "1\r10\r100\r"
+    },
+    {
+      "name": "alternate-screen-markers",
+      "chunksHex": ["1b5b3f31303439685455491b5b3f313034396c"],
+      "expected": "\u001b[?1049hTUI\u001b[?1049l"
+    },
+    {
+      "name": "split-utf8-euro-sign",
+      "chunksHex": ["e282", "ac"],
+      "expected": "\ufffd\ufffd"
+    }
+  ]
+}

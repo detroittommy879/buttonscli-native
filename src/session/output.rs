@@ -192,6 +192,24 @@ impl OutputCapture {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
+    use std::time::Instant;
+
+    fn decode_hex(value: &str) -> Vec<u8> {
+        value
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                let digit = |byte: u8| match byte {
+                    b'0'..=b'9' => byte - b'0',
+                    b'a'..=b'f' => byte - b'a' + 10,
+                    b'A'..=b'F' => byte - b'A' + 10,
+                    _ => panic!("invalid hex digit"),
+                };
+                (digit(pair[0]) << 4) | digit(pair[1])
+            })
+            .collect()
+    }
 
     #[test]
     fn activity_timestamp_tracks_input_and_output_without_a_snapshot_lock() {
@@ -216,6 +234,95 @@ mod tests {
         let snapshot = capture.snapshot();
         assert!(snapshot.last_input.is_empty());
         assert!(snapshot.last_input_at_ms.is_some());
+    }
+
+    #[test]
+    fn output_transcript_fixture_preserves_raw_controls_and_chunkwise_utf8() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/output-transcript.json"))
+                .unwrap();
+        assert_eq!(fixture["sourceRevision"], "032c9f2");
+
+        for case in fixture["cases"].as_array().unwrap() {
+            let capture = OutputCapture::default();
+            let chunks = case["chunksHex"].as_array().unwrap();
+            for chunk in chunks {
+                capture.record_output_bytes(&decode_hex(chunk.as_str().unwrap()));
+            }
+            let expected = case["expected"].as_str().unwrap();
+            assert_eq!(
+                capture.read_chars(MAX_OUTPUT_CHARS, true),
+                expected,
+                "{}",
+                case["name"]
+            );
+            assert_eq!(capture.snapshot().output_sequence, chunks.len() as u64);
+            assert!(!capture.snapshot().output_truncated);
+        }
+    }
+
+    #[test]
+    fn identical_redraw_chunks_are_activity_even_when_text_repeats() {
+        let capture = OutputCapture::default();
+        capture.record_output_bytes(b"building 20%\r");
+        capture.record_output_bytes(b"building 20%\r");
+
+        assert_eq!(
+            capture.read_chars(MAX_OUTPUT_CHARS, true),
+            "building 20%\rbuilding 20%\r"
+        );
+        assert_eq!(capture.snapshot().output_sequence, 2);
+        assert!(capture.snapshot().last_output_at_ms.is_some());
+    }
+
+    #[test]
+    fn output_tail_clamps_by_unicode_scalar_without_partial_utf8() {
+        let capture = OutputCapture::default();
+        let output = "🧪".repeat(MAX_OUTPUT_CHARS + 1);
+        capture.record_output_bytes(output.as_bytes());
+
+        assert_eq!(capture.snapshot().stored_output_chars, MAX_OUTPUT_CHARS);
+        assert!(capture.snapshot().output_truncated);
+        assert_eq!(capture.read_chars(2, false), "🧪🧪");
+        assert_eq!(capture.read_chars(2, true), "🧪🧪");
+    }
+
+    #[test]
+    #[ignore = "manual output observer throughput and lock/allocation probe"]
+    fn manual_output_capture_throughput_probe() {
+        const TRIALS: usize = 5;
+        const TOTAL_BYTES: usize = 32 * 1024 * 1024;
+        const CHUNK_BYTES: usize = 4 * 1024;
+        let chunk = vec![b'x'; CHUNK_BYTES];
+        for trial in 1..=TRIALS {
+            let capture = OutputCapture::default();
+            let mut durations = Vec::with_capacity(TOTAL_BYTES / CHUNK_BYTES);
+            let started = Instant::now();
+            for _ in 0..(TOTAL_BYTES / CHUNK_BYTES) {
+                let chunk_started = Instant::now();
+                capture.record_output_bytes(&chunk);
+                durations.push(chunk_started.elapsed());
+            }
+            let elapsed = started.elapsed();
+            durations.sort_unstable();
+            let p95 = durations[durations.len() * 95 / 100];
+            let max = durations.last().copied().unwrap_or_default();
+            let tail_read_started = Instant::now();
+            let tail = capture.read_chars(MAX_OUTPUT_CHARS, false);
+            let tail_read_elapsed = tail_read_started.elapsed();
+            let snapshot = capture.snapshot();
+            let mib_per_second = TOTAL_BYTES as f64 / (1024.0 * 1024.0) / elapsed.as_secs_f64();
+
+            assert_eq!(snapshot.stored_output_chars, MAX_OUTPUT_CHARS);
+            assert_eq!(tail.chars().count(), MAX_OUTPUT_CHARS);
+            println!(
+                "trial={trial} bytes={TOTAL_BYTES} chunk_bytes={CHUNK_BYTES} elapsed_ms={} mib_per_second={mib_per_second:.2} record_chunk_p95_us={} record_chunk_max_us={} saturated_tail_read_us={}",
+                elapsed.as_millis(),
+                p95.as_micros(),
+                max.as_micros(),
+                tail_read_elapsed.as_micros(),
+            );
+        }
     }
 }
 

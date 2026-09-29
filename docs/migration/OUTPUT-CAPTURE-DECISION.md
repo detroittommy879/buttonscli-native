@@ -1,7 +1,8 @@
 # Output capture seam and decision
 
-Date: 2026-09-28  
-Scope: R02 seam decision and R03 bounded CLI-compatible raw output source implementation. This does not claim runtime acceptance or sustained-output performance.
+Date: 2026-09-28; evidence update: 2026-09-29
+
+Scope: R02 seam decision and R03 bounded CLI-compatible raw output source implementation. Synthetic transcript and microbenchmark coverage are included; live PTY behavior remains unverified.
 
 ## Decision
 
@@ -20,8 +21,30 @@ AI Help continues to use the distinct `TerminalBackend::last_content.grid` snaps
 - A repaint or wakeup event is not output data.
 - The observer adds chunk conversion and bounded-tail work to the existing reader. No allocation, lock-time, or sustained-throughput benchmark has been run.
 
-## Evidence and remaining acceptance
+## Fixture and performance evidence
+
+`tests/fixtures/output-transcript.json` snapshots ANSI color, cursor movement,
+blank lines, carriage-return redraw, alternate-screen markers, and a UTF-8
+code point split across reads. The tests confirm raw controls stay intact and
+split invalid chunks follow the original chunk-wise lossy conversion (two
+replacement characters for the split euro sign). Other focused tests cover
+repeated redraw activity and the Unicode-safe 200,000-character tail.
+
+The ignored manual probe
+`cargo test --release session::output::tests::manual_output_capture_throughput_probe -- --ignored --nocapture`
+ran five 32 MiB trials using 4 KiB chunks on Windows 11 Pro, 12th Gen Intel
+Core i5-12600K, Rust 1.96.0. Throughput ranged from 655.22 to 689.49 MiB/s
+(median 686.29 MiB/s). Per-chunk `record_output_bytes` p95 was 5–7 μs, the
+largest observed call was 125 μs, and a saturated 200,000-character tail read
+took 141–187 μs (median 179 μs). These are aggregate in-process timings that
+include conversion, locking and copies; the probe does not count allocations,
+isolate mutex hold time, create concurrent readers, or exercise a live PTY.
+They are host-specific observations, not a throughput guarantee.
+
+## Remaining acceptance
 
 Windows `cargo fmt --all` and `cargo check --bin buttonscli` passed after the implementation. Source inspection confirms the observer is called inside the existing single PTY `Read` loop and before parsing. The native API reads the per-session capture and uses output sequence plus text for quiet/match waits.
 
-The planned transcript fixture still needs ANSI color, cursor movement, carriage-return redraw, split UTF-8 chunks, blank lines and alternate-screen transitions. No tests were run in this implementation pass; split-byte equivalence with the original chunk-wise lossy conversion, hidden-session behavior, close/cancel races and output performance remain unverified at runtime. The AI grid preview and CLI raw transcript must continue to be validated as separate contracts.
+The fixture and unit tests do not certify visible/hidden PTY output, close/cancel
+races, alternate-screen renderer behavior, or AI-grid-to-raw-transcript
+separation in a live application. Those OS/runtime checks remain open.
