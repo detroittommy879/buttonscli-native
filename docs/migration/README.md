@@ -12,8 +12,9 @@ and compatibility boundary are in [the Shader Lab decision](SHADER-LAB-DECISION.
 Imported enabled shader flags remain inert, are preserved, and show a localized
 warning. This work proceeds on Windows without a Fedora/VM dependency; other
 platform acceptance can follow separately. P05 now has an isolated Windows GUI
-startup smoke at `scripts/native-smoke.ps1`; it checks window creation only and
-does not replace interactive layout, PTY, provider, or visual acceptance.
+startup smoke at `scripts/native-smoke.ps1`; it checks visible window bounds and
+can capture a first frame, but does not replace interactive layout, PTY,
+provider, or visual acceptance.
 
 1. This file: priorities, current gaps, architecture, and milestones.
 2. [Compatibility contracts](CONTRACTS.md): imported data, control API, AI, and access rules.

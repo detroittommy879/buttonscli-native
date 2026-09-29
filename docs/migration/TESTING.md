@@ -44,7 +44,7 @@ cargo test --release
 cargo fmt --all -- --check
 ```
 
-On Windows, run the commands below and `pwsh -NoProfile -File scripts/native-smoke.ps1` for an isolated local GUI startup check. Linux builds, X11/Wayland smoke tests and macOS checks are separate follow-up platform validation; they do not block Windows implementation work.
+On Windows, run the commands below and `pwsh -NoProfile -File scripts/native-smoke.ps1` for an isolated local GUI startup check. Add `-CapturePath <temp-png-path>` to capture the test-owned window through Appsnap. Linux builds, X11/Wayland smoke tests and macOS checks are separate follow-up platform validation; they do not block Windows implementation work.
 
 During implementation use `cargo test <focused_filter>` for fast model checks, then full tests at a milestone. Use `cargo clippy --all-targets -- -D warnings` for touched Rust surfaces; record baseline failures rather than silently changing unrelated code. For actual executable validation use `cargo build --release --bin buttonscli`; binary-only tests run zero current tests and are insufficient.
 

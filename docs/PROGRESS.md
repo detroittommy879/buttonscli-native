@@ -4,12 +4,15 @@
 
 Added `scripts/native-smoke.ps1`. It builds the native executable, launches
 only the test-owned process with `USERPROFILE`, `HOME`, `APPDATA`, and
-`LOCALAPPDATA` redirected to a unique temporary profile, verifies a main window
-appears and stays alive, then closes the app. The smoke passed on Windows. No
-original ButtonsCLI process, user profile, provider, or terminal command was
-used. WGPU reported that the optional Vulkan validation layer is unavailable;
-this was nonfatal. This confirms GUI startup only, not visual layout, PTY
-interaction, detached windows, or Windows platform parity. Linux and macOS
+`LOCALAPPDATA` redirected to a unique temporary profile and its working
+directory set to that profile. It locates the `ButtonsCLI` window by the
+test-owned PID, verifies that the window is visible and large enough, then
+closes the app. The smoke passed on Windows; an optional Appsnap capture also
+confirmed a full-size first-run screen. No original ButtonsCLI process, user
+profile, provider, or terminal command was used. WGPU reported that the
+optional Vulkan validation layer is unavailable; this was nonfatal. This
+confirms startup and first-frame rendering only, not layout interaction, PTY
+behavior, detached windows, or Windows platform parity. Linux and macOS
 acceptance remain separate follow-up checks.
 
 ## 2026-09-29 — V04 Shader Lab renderer decision

@@ -5,11 +5,13 @@ Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 ## 2026-09-29 P05 isolated Windows GUI startup
 
 `pwsh -NoProfile -File scripts/native-smoke.ps1` built and opened the native
-GUI using a unique temporary home/AppData root. The process created a main
-window, stayed alive for the smoke interval, and closed; it did not use the
-original app process or the user's native profile. This is a startup check,
-not an interaction or visual acceptance pass. WGPU logged the missing optional
-Vulkan validation layer but continued successfully.
+GUI using a unique temporary home/AppData root and working directory. The
+test locates the app window by the child PID, verifies it is visible and at
+least 500x350 pixels, then closes only that test-owned process. Optional
+Appsnap capture passed and showed the full-size first-run language chooser on
+the dark native UI. It did not exercise layout or PTY interaction. The
+original app process and user profile were not used. WGPU logged the missing
+optional Vulkan validation layer but continued successfully.
 
 ## 2026-09-29 V04 Shader Lab compatibility warning
 
