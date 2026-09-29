@@ -315,6 +315,44 @@ try {
         }
     }
 
+    $exitingShellCommand = '"{0}" -NoLogo -NoProfile -Command "Start-Sleep -Seconds 2; exit"' -f $shell.Source
+    $exitingTab = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body @{
+        name = 'Control Live Exiting PTY'
+        shell = $exitingShellCommand
+        cwd = $smokeHome
+    }
+    $exitingTabId = $exitingTab.tab.tabId
+    Wait-ControlTabReady $exitingTabId | Out-Null
+    $slowPayload = 'x' * 80
+    $slowJob = Start-Job -ArgumentList @(
+        $script:nodePath, $script:cliHelperPath, $script:descriptorPath,
+        $exitingTabId, $slowPayload
+    ) -ScriptBlock {
+        param($NodePath, $HelperPath, $InfoPath, $TabId, $Payload)
+        $env:BUTTONSCLI_CONTROL_INFO_PATH = $InfoPath
+        $result = & $NodePath $HelperPath send --tab $TabId --delivery slow-typed `
+            --delay-ms 250 --text $Payload --json 2>&1
+        [pscustomobject]@{
+            exitCode = $LASTEXITCODE
+            output = ($result | Out-String).Trim()
+        }
+    }
+    try {
+        $slowCompleted = Wait-Job -Job $slowJob -Timeout 10
+        if ($null -eq $slowCompleted) {
+            throw 'Slow-typed input did not stop after its PTY process exited.'
+        }
+        $slowResult = Receive-Job -Job $slowJob
+        if ($slowResult.exitCode -eq 0 -or
+            $slowResult.output -notmatch 'terminal process has exited|terminal closed before') {
+            throw "Expected paced input to stop on PTY exit; got exit=$($slowResult.exitCode), output=$($slowResult.output)."
+        }
+    }
+    finally {
+        Stop-Job -Job $slowJob -ErrorAction SilentlyContinue
+        Remove-Job -Job $slowJob -Force -ErrorAction SilentlyContinue
+    }
+
     $ownedShellProcesses = @(
         Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" |
             Where-Object { $_.Name -in @('pwsh.exe', 'powershell.exe') }
@@ -326,6 +364,7 @@ try {
 
     Write-Output "Control API status authenticated for instance $($descriptor.instanceId)."
     Write-Output 'Installed Node CLI exercised status, tabs, create, rename, read, waits, run, send (base64/file/stdin/paced), key, type-only preset, and grid layout.'
+    Write-Output 'Paced delivery stopped with a clear error after its test PTY exited.'
     Write-Output 'Visible and background PTYs both captured unique output markers.'
     Write-Output "Background run completion: $($hiddenRun.completionReason); timed out: $($hiddenRun.timedOut)."
 }

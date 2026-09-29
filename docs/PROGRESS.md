@@ -38,8 +38,9 @@ from base64/file/stdin and slow-typed modes, key, type-only preset, and a
 two-pane grid. The full
 build-and-run and `-SkipBuild` run passed. WGPU emitted validation-layer and
 registry warnings, but both app/test runs completed successfully. This verifies
-the live Windows CLI matrix and visible/background capture; cancellation during
-paced input, external MCP-client launch, direct GUI focus/typing, and
+the live Windows CLI matrix, visible/background capture, and a slow-typed send
+stopping with a clear error after its target PTY exits. Closing a still-running
+tab during paste, external MCP-client launch, direct GUI focus/typing, and
 Linux/macOS runtime checks remain open.
 
 ## 2026-09-29 — R02 output transcript fixture and microbenchmark

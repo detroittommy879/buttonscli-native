@@ -49,7 +49,8 @@ Windows `cargo fmt --all` and `cargo check --bin buttonscli` passed after the im
 with a disposable home, authenticated using its exact control descriptor, and
 captured unique markers from both a visible and a background PowerShell PTY via
 `run` and `read`. It also confirmed both test shell processes exited when the
-app closed. This validates the live observer path on Windows for these cases.
-Cancellation during paced input, alternate-screen renderer behavior,
-AI-grid-to-raw-transcript separation, and Linux/macOS runtime behavior remain
-open.
+app closed. A separate slow-typed request also stopped with a clear error after
+its target PTY exited. This validates the live observer path on Windows for
+these cases. Closing a still-running tab during paste, alternate-screen
+renderer behavior, AI-grid-to-raw-transcript separation, and Linux/macOS
+runtime behavior remain open.
