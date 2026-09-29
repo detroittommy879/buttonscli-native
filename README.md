@@ -38,6 +38,9 @@ Current desktop features include:
   native entitlement integration exists;
 - a read-only Guides window with bundled offline Quick Start and AI Help
   guides, plus an opt-in bounded fetch from the trusted ButtonsCLI guide path;
+- a free, explicit Send Feedback form with best-effort masking and no attached
+  terminal data or routine product analytics; see
+  [Privacy and feedback](docs/PRIVACY-AND-FEEDBACK.md);
 - an authenticated, loopback-only agent control API with an **Agent Inst.**
   handoff, optional Node CLI, and optional stdio MCP server; it supports tab
   creation, rename, layouts, presets, bounded output reads, and raw, bracketed,
@@ -86,6 +89,9 @@ copy/type behavior, and external provider links.
 
 See [Read-only guides](docs/READ-ONLY-GUIDES.md) for the offline guide window,
 online fetch limits, and browser-opening rules.
+
+See [Privacy and feedback](docs/PRIVACY-AND-FEEDBACK.md) for what a feedback
+submission contains and how the native app handles failures.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

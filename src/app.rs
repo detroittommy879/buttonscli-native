@@ -9,6 +9,8 @@ use crate::assistant::provider::{validate_endpoint, ProviderProfile};
 use crate::control::ControlServer;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::display::{self, GuideTab};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::feedback::{self, FeedbackCategory};
 use crate::fonts::{self, FontZone};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::layout::{self, Bounds, LayoutMode};
@@ -265,6 +267,17 @@ fn read_only_guides_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn user_feedback_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::UserFeedback,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
     locale: String,
@@ -331,6 +344,24 @@ pub struct ButtonsApp {
     guide_tx: Sender<display::GuideEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     guide_rx: Receiver<display::GuideEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    show_feedback: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_category: FeedbackCategory,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_message: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_contact: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_busy: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_status: Option<FeedbackStatus>,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_tx: Sender<feedback::FeedbackEvent>,
+    #[cfg(not(target_arch = "wasm32"))]
+    feedback_rx: Receiver<feedback::FeedbackEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     show_terminal_search: bool,
     #[cfg(not(target_arch = "wasm32"))]
@@ -572,6 +603,13 @@ enum ShortcutFeedback {
     UnsafeInterrupt,
     ModifierRequired,
     Invalid,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FeedbackStatus {
+    Sent,
+    Failed,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -902,6 +940,8 @@ impl ButtonsApp {
         let (quick_secrets_tx, quick_secrets_rx) = mpsc::channel();
         #[cfg(not(target_arch = "wasm32"))]
         let (guide_tx, guide_rx) = mpsc::channel();
+        #[cfg(not(target_arch = "wasm32"))]
+        let (feedback_tx, feedback_rx) = mpsc::channel();
         Self {
             preferences,
             locale,
@@ -968,6 +1008,24 @@ impl ButtonsApp {
             guide_tx,
             #[cfg(not(target_arch = "wasm32"))]
             guide_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            show_feedback: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_category: FeedbackCategory::FeatureRequest,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_message: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_contact: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_generation: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_tx,
+            #[cfg(not(target_arch = "wasm32"))]
+            feedback_rx,
             #[cfg(not(target_arch = "wasm32"))]
             show_terminal_search: false,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2602,6 +2660,16 @@ impl ButtonsApp {
                                 .clicked()
                         {
                             self.show_guides = true;
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if user_feedback_available()
+                            && ui
+                                .button(crate::i18n::literal(&self.locale, "Send Feedback"))
+                                .clicked()
+                        {
+                            self.show_feedback = true;
+                            self.feedback_status = None;
                             ui.close_menu();
                         }
                         #[cfg(not(target_arch = "wasm32"))]
@@ -8560,6 +8628,195 @@ impl ButtonsApp {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_feedback_events(&mut self, ctx: &egui::Context) {
+        while let Ok(event) = self.feedback_rx.try_recv() {
+            if event.generation != self.feedback_generation {
+                continue;
+            }
+            self.feedback_busy = false;
+            match event.result {
+                Ok(_receipt) => {
+                    self.feedback_message.clear();
+                    self.feedback_contact.clear();
+                    self.feedback_category = FeedbackCategory::FeatureRequest;
+                    self.feedback_status = Some(FeedbackStatus::Sent);
+                }
+                Err(_) => self.feedback_status = Some(FeedbackStatus::Failed),
+            }
+            ctx.request_repaint();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn submit_feedback(&mut self, ctx: &egui::Context) {
+        if !user_feedback_available() || self.feedback_busy {
+            return;
+        }
+        self.feedback_generation = self.feedback_generation.wrapping_add(1).max(1);
+        let generation = self.feedback_generation;
+        let submission = feedback::FeedbackSubmission {
+            category: self.feedback_category,
+            message: self.feedback_message.clone(),
+            contact: self.feedback_contact.clone(),
+            locale: self.locale.clone(),
+        };
+        let sender = self.feedback_tx.clone();
+        let request_context = ctx.clone();
+        self.feedback_busy = true;
+        self.feedback_status = None;
+        let spawned = std::thread::Builder::new()
+            .name("buttonscli-feedback-submit".into())
+            .spawn(move || {
+                let result = feedback::submit_feedback(&submission);
+                let _ = sender.send(feedback::FeedbackEvent { generation, result });
+                request_context.request_repaint();
+            });
+        if spawned.is_err() {
+            self.feedback_busy = false;
+            self.feedback_status = Some(FeedbackStatus::Failed);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn feedback_window(&mut self, ctx: &egui::Context) {
+        if !user_feedback_available() || !self.show_feedback {
+            return;
+        }
+        let locale = self.locale.clone();
+        let mut open = self.show_feedback;
+        let mut submit = false;
+        let mut cancel = false;
+        let mut message_changed = false;
+        let busy = self.feedback_busy;
+        let preview = feedback::redacted_message(&self.feedback_message);
+        egui::Window::new(crate::i18n::literal(&locale, "Feedback"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(true)
+            .default_width(620.0)
+            .show(ctx, |ui| {
+                ui.label(crate::i18n::literal(
+                    &locale,
+                    "Sending includes this message after best-effort masking, its category, optional email, app version, OS, language, and random IDs used once for this submission. Terminal output, commands, clipboard, files, and diagnostics are never attached.",
+                ));
+                ui.add_space(6.0);
+                ui.label(crate::i18n::literal(
+                    &locale,
+                    "Keep API keys private. Do not paste them into terminal output, screenshots, feedback, chat messages, or public files. You can revoke a key from the provider if it is ever exposed.",
+                ));
+                ui.add_space(10.0);
+                ui.label(crate::i18n::literal(&locale, "Category"));
+                egui::ComboBox::from_id_salt("native-feedback-category")
+                    .selected_text(crate::i18n::literal(
+                        &locale,
+                        self.feedback_category.label(),
+                    ))
+                    .show_ui(ui, |ui| {
+                        for category in FeedbackCategory::ALL {
+                            ui.selectable_value(
+                                &mut self.feedback_category,
+                                category,
+                                crate::i18n::literal(&locale, category.label()),
+                            );
+                        }
+                    });
+                ui.add_space(8.0);
+                ui.label(crate::i18n::literal(&locale, "Message"));
+                let message = ui.add(
+                    egui::TextEdit::multiline(&mut self.feedback_message)
+                        .desired_rows(7)
+                        .char_limit(2_000)
+                        .desired_width(f32::INFINITY),
+                );
+                message_changed = message.changed();
+                ui.add_space(6.0);
+                ui.label(crate::i18n::literal(
+                    &locale,
+                    "Preview after best-effort secret masking:",
+                ));
+                egui::ScrollArea::vertical()
+                    .max_height(120.0)
+                    .show(ui, |ui| {
+                        ui.group(|ui| {
+                            ui.label(if preview.is_empty() {
+                                crate::i18n::literal(&locale, "Message")
+                            } else {
+                                preview.clone()
+                            });
+                        });
+                    });
+                ui.add_space(6.0);
+                ui.label(crate::i18n::literal(&locale, "Optional reply email"));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.feedback_contact)
+                        .char_limit(160)
+                        .desired_width(f32::INFINITY),
+                );
+                if let Some(status) = self.feedback_status {
+                    ui.add_space(6.0);
+                    let message = match status {
+                        FeedbackStatus::Sent => crate::i18n::literal(
+                            &locale,
+                            "Feedback sent. Thanks for the report or idea.",
+                        ),
+                        FeedbackStatus::Failed => crate::i18n::literal(
+                            &locale,
+                            "Could not send feedback right now.",
+                        ),
+                    };
+                    match status {
+                        FeedbackStatus::Sent => {
+                            ui.colored_label(ui.visuals().hyperlink_color, message);
+                        }
+                        FeedbackStatus::Failed => {
+                            ui.colored_label(ui.visuals().error_fg_color, message);
+                        }
+                    }
+                }
+                ui.add_space(10.0);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui
+                        .add_enabled(
+                            !busy && !preview.trim().is_empty(),
+                            egui::Button::new(crate::i18n::literal(&locale, "Send")),
+                        )
+                        .clicked()
+                    {
+                        submit = true;
+                    }
+                    if busy {
+                        ui.label(crate::i18n::literal(&locale, "Loading..."));
+                    }
+                    if ui
+                        .add_enabled(
+                            !busy,
+                            egui::Button::new(crate::i18n::literal(&locale, "Cancel")),
+                        )
+                        .clicked()
+                    {
+                        cancel = true;
+                    }
+                });
+            });
+        self.show_feedback = open;
+        if message_changed {
+            self.feedback_status = None;
+        }
+        if cancel || !open {
+            self.show_feedback = false;
+            if !self.feedback_busy {
+                self.feedback_message.clear();
+                self.feedback_contact.clear();
+                self.feedback_category = FeedbackCategory::FeatureRequest;
+                self.feedback_status = None;
+            }
+        }
+        if submit {
+            self.submit_feedback(ctx);
+        }
+    }
+
     fn about_window(&mut self, ctx: &egui::Context) {
         egui::Window::new(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
             .open(&mut self.show_about)
@@ -9812,6 +10069,8 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.process_guide_events(ctx);
         #[cfg(not(target_arch = "wasm32"))]
+        self.process_feedback_events(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.maintain_quick_secrets(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
@@ -9875,6 +10134,8 @@ impl eframe::App for ButtonsApp {
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.read_only_guides_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.feedback_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.ai_help_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -10508,6 +10769,46 @@ mod tests {
         });
         assert!(app.show_guides);
         assert!(app.tabs.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn opening_feedback_never_submits_or_reads_terminal_context() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.show_feedback = true;
+        app.feedback_message = "A local interface issue".into();
+        app.feedback_contact = "person@example.test".into();
+        let ctx = egui::Context::default();
+        let _ = ctx.run(egui::RawInput::default(), |ctx| app.feedback_window(ctx));
+
+        assert!(app.show_feedback);
+        assert!(!app.feedback_busy);
+        assert!(app.feedback_rx.try_recv().is_err());
+        assert!(app.tabs.is_empty());
+        assert_eq!(app.feedback_message, "A local interface issue");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn feedback_failure_preserves_the_draft_and_does_not_claim_success() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.feedback_generation = 5;
+        app.feedback_busy = true;
+        app.feedback_message = "Please fix the layout".into();
+        app.feedback_contact = "person@example.test".into();
+        app.feedback_tx
+            .send(feedback::FeedbackEvent {
+                generation: 5,
+                result: Err(feedback::FeedbackError::Http(429)),
+            })
+            .unwrap();
+
+        app.process_feedback_events(&egui::Context::default());
+
+        assert!(!app.feedback_busy);
+        assert_eq!(app.feedback_status, Some(FeedbackStatus::Failed));
+        assert_eq!(app.feedback_message, "Please fix the layout");
+        assert_eq!(app.feedback_contact, "person@example.test");
     }
 
     #[test]

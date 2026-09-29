@@ -29,9 +29,16 @@ pub(crate) fn redact_obvious_secrets(input: &str, known_key: Option<&str>) -> St
     let mut redact_next = false;
     for segment in text.split_inclusive(char::is_whitespace) {
         if redact_next {
+            if segment.trim().is_empty() {
+                result.push_str(segment);
+                continue;
+            }
             let leading = segment.len() - segment.trim_start().len();
+            let trailing = segment.len() - segment.trim_end().len();
+            let content_end = segment.len().saturating_sub(trailing).max(leading);
             result.push_str(&segment[..leading]);
             result.push_str("[REDACTED]");
+            result.push_str(&segment[content_end..]);
             redact_next = false;
             continue;
         }
@@ -57,10 +64,16 @@ pub(crate) fn redact_obvious_secrets(input: &str, known_key: Option<&str>) -> St
                 let leading =
                     segment[value_start..].len() - segment[value_start..].trim_start().len();
                 let value_start = value_start + leading;
+                let trailing = segment.len() - segment.trim_end().len();
+                let content_end = segment.len().saturating_sub(trailing).max(value_start);
                 result.push_str(&segment[..value_start]);
-                result.push_str("[REDACTED]");
+                if value_start < content_end {
+                    result.push_str("[REDACTED]");
+                }
+                result.push_str(&segment[content_end..]);
             } else {
                 result.push_str(&segment[..after]);
+                result.push_str(&segment[after..]);
                 redact_next = true;
             }
         } else {
@@ -76,6 +89,31 @@ pub(crate) fn redact_obvious_secrets(input: &str, known_key: Option<&str>) -> St
         .into_iter()
         .rev()
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_obvious_secrets;
+
+    #[test]
+    fn best_effort_redaction_preserves_line_breaks_and_following_text() {
+        assert_eq!(
+            redact_obvious_secrets("Bearer private-token\nnext line", None),
+            "Bearer [REDACTED]\nnext line"
+        );
+        assert_eq!(
+            redact_obvious_secrets("token\nprivate-token\nnext", None),
+            "token\n[REDACTED]\nnext"
+        );
+    }
+
+    #[test]
+    fn explicit_known_key_is_masked_verbatim() {
+        assert_eq!(
+            redact_obvious_secrets("provider response: key-value", Some("key-value")),
+            "provider response: [REDACTED]"
+        );
+    }
 }
 
 pub(crate) fn build_system_prompt() -> String {

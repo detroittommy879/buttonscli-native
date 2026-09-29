@@ -1,5 +1,24 @@
 # Reconstruction journal
 
+## 2026-09-29 — P04 explicit feedback and privacy
+
+Added the free `userFeedback` feature under **Help → Send Feedback**. The
+dialog shows a best-effort redacted message preview and sends only after an
+explicit click. Each request uses fresh, non-persistent random IDs and includes
+the message, category, optional reply address, app version, OS, and locale. It
+never attaches terminal output, commands, clipboard data, files, or
+diagnostics. Failed HTTP responses preserve the draft and never report success.
+Native currently has no routine product analytics sender or queue; see
+`docs/PRIVACY-AND-FEEDBACK.md` and `docs/migration/FEEDBACK-CONTRACT.md`.
+
+Validation passed on Windows: `cargo fmt --all -- --check`, all 188 library
+tests plus 2 fixture tests, `cargo check --bin buttonscli`, `cargo build --bin
+buttonscli`, and isolated `scripts/native-smoke.ps1` startup at 1471×975. Mock
+tests cover the source-snapshotted feedback contract and 400/429/500 failures;
+no production request was made. The smoke proves startup only. Clicking the
+feedback menu/dialog, live receiver behavior, and Linux/macOS acceptance remain
+unverified. The optional Vulkan validation-layer warning was nonfatal.
+
 ## 2026-09-29 — P03 read-only guide tabs
 
 Added a free Help → Read-only guides window with bundled Quick Start and AI

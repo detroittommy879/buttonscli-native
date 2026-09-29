@@ -4,6 +4,12 @@ Open **Help → Read-only guides** to view the bundled Quick start and AI Help
 guides. The viewer uses separate display tabs and has no connection to the
 terminal input actions, so reading a guide cannot type into a shell.
 
+Use **Help → Send Feedback** to submit a report or idea. Sending happens only
+after you press **Send**. The window shows the message after best-effort secret
+masking; check the preview because masking can miss secrets. The request does
+not include terminal output, commands, clipboard, files, or diagnostics. See
+[Privacy and feedback](PRIVACY-AND-FEEDBACK.md) for the fields and limits.
+
 The AI Help guide covers **Settings → AI providers**, where you can add named
 providers, configure compatible endpoint URLs and model IDs, and save a key in
 the operating system credential store or for the current app session. AI Help

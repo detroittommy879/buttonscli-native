@@ -1538,6 +1538,23 @@ mod tests {
     }
 
     #[test]
+    fn feedback_safety_copy_is_localized_for_every_supported_locale() {
+        let strings = [
+            "Sending includes this message after best-effort masking, its category, optional email, app version, OS, language, and random IDs used once for this submission. Terminal output, commands, clipboard, files, and diagnostics are never attached.",
+            "Preview after best-effort secret masking:",
+        ];
+        for locale in SUPPORTED_LOCALES {
+            for english in strings {
+                let translated = literal(locale, english);
+                assert!(!translated.is_empty(), "missing {english} in {locale}");
+                if locale != "en" {
+                    assert_ne!(translated, english, "untranslated {english} in {locale}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn account_sign_in_copy_is_localized_in_every_shipped_locale() {
         let strings = [
             "ButtonsCLI account",

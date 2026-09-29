@@ -29,10 +29,11 @@ pub enum FeatureKey {
     ProfileManagement,
     AccountSignIn,
     ReadOnlyGuides,
+    UserFeedback,
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 30] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -62,6 +63,7 @@ impl FeatureKey {
         Self::ProfileManagement,
         Self::AccountSignIn,
         Self::ReadOnlyGuides,
+        Self::UserFeedback,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -95,6 +97,7 @@ impl FeatureKey {
             Self::ProfileManagement => "profileManagement",
             Self::AccountSignIn => "accountSignIn",
             Self::ReadOnlyGuides => "readOnlyGuides",
+            Self::UserFeedback => "userFeedback",
         }
     }
 
@@ -132,6 +135,7 @@ impl FeatureKey {
             K::ProfileManagement => (T::Internal, false, R::Disabled, "settings"),
             K::AccountSignIn => (T::Free, true, R::Active, "account"),
             K::ReadOnlyGuides => (T::Free, true, R::Active, "help"),
+            K::UserFeedback => (T::Free, true, R::Active, "privacy"),
         };
         FeatureDefinition {
             key: self,
@@ -180,6 +184,16 @@ mod tests {
         assert!(FeatureKey::ALL.contains(&FeatureKey::ReadOnlyGuides));
         let definition = FeatureKey::ReadOnlyGuides.definition();
         assert_eq!(definition.key.as_str(), "readOnlyGuides");
+        assert_eq!(definition.tier, FeatureTier::Free);
+        assert_eq!(definition.rollout, Rollout::Active);
+        assert!(!definition.runtime_flag);
+    }
+
+    #[test]
+    fn explicit_user_feedback_is_registered_as_active_free_access() {
+        assert!(FeatureKey::ALL.contains(&FeatureKey::UserFeedback));
+        let definition = FeatureKey::UserFeedback.definition();
+        assert_eq!(definition.key.as_str(), "userFeedback");
         assert_eq!(definition.tier, FeatureTier::Free);
         assert_eq!(definition.rollout, Rollout::Active);
         assert!(!definition.runtime_flag);

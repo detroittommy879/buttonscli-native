@@ -1,0 +1,17 @@
+{
+  "sourceRevision": "032c9f2",
+  "sourcePath": "w111erd-insights/openapi/insights-v1.yaml",
+  "path": "/api/v1/feedback",
+  "requiredRequestFields": ["installId", "sessionId", "category", "message", "appVersion"],
+  "optionalRequestFields": ["contact", "meta"],
+  "categoryValues": ["waitlist", "feature-request", "bug-report", "ui-idea", "ai-help", "performance", "pricing", "other"],
+  "maximumLengths": {
+    "installId": 80,
+    "sessionId": 80,
+    "category": 40,
+    "message": 2000,
+    "contact": 160,
+    "appVersion": 40
+  },
+  "requiredResponseFields": ["ok", "id"]
+}
