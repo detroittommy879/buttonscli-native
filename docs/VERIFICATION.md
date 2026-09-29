@@ -21,6 +21,17 @@ imports. The discovery scan is bounded and import validates faces before
 registration. These checks do not replace a live Windows font selector review
 or startup-time measurement on machines with large font collections.
 
+## 2026-09-28 U09/U10 Windows check
+
+`cargo fmt --all -- --check`, `cargo test --lib` (128 passed),
+`cargo check --bin buttonscli`, `cargo build --bin buttonscli`, and
+`git diff --check` passed after adding Windows opacity and Cool Stuff. Tests
+cover persisted/imported opacity bounds, source-matched installer selection,
+shell selection, path quoting, profile-safe extraction, external links, and
+typing without Enter. The build still reports the existing bin/lib PDB filename
+collision. Live desktop, opacity, clipboard, and terminal interaction remain
+unverified.
+
 ## Automated gates
 
 The following completed successfully:

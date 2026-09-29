@@ -113,6 +113,7 @@ pub(crate) struct Preferences {
     pub(crate) dock_auto_hide: bool,
     pub(crate) dock_auto_hide_ms: u64,
     pub(crate) dock_opacity: f32,
+    pub(crate) window_opacity: f32,
     pub(crate) dock_peek_radius: u8,
     pub(crate) presets: Vec<CommandPreset>,
     pub(crate) ssh_presets: Vec<CommandPreset>,
@@ -145,6 +146,7 @@ impl Default for Preferences {
             dock_auto_hide: false,
             dock_auto_hide_ms: 4_000,
             dock_opacity: 0.35,
+            window_opacity: 1.0,
             dock_peek_radius: 10,
             presets: default_presets(),
             ssh_presets: Vec::new(),
@@ -213,6 +215,7 @@ impl Preferences {
         } else {
             0.35
         };
+        self.window_opacity = crate::window_opacity::clamp(self.window_opacity);
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.provider_settings.normalize(&mut Vec::new());
         self.shortcuts.normalize();
@@ -319,6 +322,23 @@ mod tests {
         assert_eq!(preferences.dock_opacity, 0.2);
         assert_eq!(preferences.dock_peek_radius, 24);
         assert!(preferences.dock_compact && preferences.dock_auto_hide);
+    }
+
+    #[test]
+    fn window_opacity_defaults_to_opaque_and_clamps_to_supported_range() {
+        let mut preferences = Preferences::default();
+        assert_eq!(preferences.window_opacity, 1.0);
+
+        preferences.window_opacity = 0.1;
+        preferences.normalize_theme_sources();
+        assert_eq!(
+            preferences.window_opacity,
+            crate::window_opacity::MIN_OPACITY
+        );
+
+        preferences.window_opacity = f32::NAN;
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.window_opacity, 1.0);
     }
 
     #[test]

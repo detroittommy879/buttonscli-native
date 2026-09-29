@@ -2,6 +2,8 @@ pub mod app;
 mod assistant;
 #[cfg(not(target_arch = "wasm32"))]
 mod control;
+#[cfg(not(target_arch = "wasm32"))]
+mod cool_stuff;
 mod dock;
 pub mod features;
 pub mod fonts;
@@ -17,6 +19,7 @@ mod shortcuts;
 pub mod theme;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;
+mod window_opacity;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod terminal;

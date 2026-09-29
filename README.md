@@ -43,6 +43,8 @@ Current desktop features include:
 - 26 bundled scalable font faces plus an emoji face across 20 families, offline system-font discovery
   and local `.ttf` / `.otf` import; each UI area has its own typography, and the
   terminal has separate regular and bold faces;
+- Windows main-window opacity control with platform capability reporting;
+- bundled Cool Stuff installers with copy/type-only setup commands and provider links;
 - theme-driven linear, radial, and conic terminal gradients, animated color
   drift, static, and scanline overlays rendered natively;
 - per-terminal theme choices plus **Theme all**, **Random current**, and
@@ -73,6 +75,12 @@ terminal zoom, and the calm-effects toggle.
 
 See [Settings preview](docs/SETTINGS-PREVIEW.md) for the detached window,
 rollback behavior, and current platform checks.
+
+See [Window appearance](docs/WINDOW-APPEARANCE.md) for opacity controls and
+platform support.
+
+See [Cool Stuff](docs/COOL-STUFF.md) for the bundled installer preview,
+copy/type behavior, and external provider links.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added saved Windows main-window opacity control with explicit capability information on other platforms. Imported legacy opacity values are mapped into the native preference and clamped to 25–100%.
+- Added the Cool Stuff installer preview, bundled Windows/Ubuntu/macOS scripts, safe copy/type-only commands, and the five source-matched provider links. Typing never presses Enter.
+
 - Added offline system-font discovery and free profile-local `.ttf` / `.otf` import. Invalid fonts are rejected before registration, missing selections use bundled fallbacks, and terminal regular/bold faces remain distinct.
 - Added a free, non-AI personal theme library with a visual editor, scoped live preview, safe JSON import/export, save, and confirmed delete. Unknown theme fields are retained, and theme changes do not restart terminal sessions.
 - Expanded Windows shell discovery with WSL and individual installed WSL distributions. Custom shell command lines now preserve quoted executable paths, embedded quotes, empty arguments, and Windows backslashes; failed profile launches keep their actionable error instead of silently switching shells.

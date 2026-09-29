@@ -54,6 +54,7 @@ constraints.
 | Scoped and calm theme apply | Done | `src/services/themeDesignerService.ts` | App, terminal, fonts, gradients, and effects have independent persisted sources; calm mode suppresses motion/noise. |
 | Bundled fonts and typography zones | Done | `src/services/fontLoader.ts`, `src/data/fontCatalog.ts` | 26 scalable font faces plus the emoji face form 20 bundled families with real weights across seven independently persisted zones. |
 | Offline system/custom fonts | Done | `src/fonts.rs`, `docs/FONTS.md` | Discover bounded local system/user folders and import validated profile-local TTF/OTF files; missing/invalid fallback and offline behavior are tested. |
+| Cool Stuff installers and links | Partial | `src/cool_stuff.rs`, `docs/COOL-STUFF.md` | Exact source scripts and five provider links are bundled; verify copy/type in a live Windows terminal without sending Enter. |
 | Online fonts | Deferred | `src/data/fontCatalog.ts`, `src/services/fontLoader.ts` | Any future online download/caching requires a separate explicit opt-in task and offline-safe fallback. |
 | Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear, radial, and conic rendering preserve legacy type, angle, and named position; add repeating geometry, editable controls, and full animation parity. |
 | Terminal effects | Partial | `src/types/config.ts`, `src/components/HsyncDebugPanel.tsx` | Preserve current static/scanlines and add hsync warp, TV/simple/idle noise, row banding, glow, wallpaper, master switch, and focused-pane behavior. |
@@ -62,7 +63,7 @@ constraints.
 | Colored dividers/rounded chrome | Partial | native pane renderer and theme settings | Visible dividers inherit the app theme or saved native overrides; a 0–16 point tab/chrome radius persists. Verify GUI dragging, scale, contrast and focus; theme editor/export remains. |
 | Theme designer | Missing | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts` | Generate preview candidates, self-correct invalid output, selectively apply, keep/save, and expose provenance. |
 | Shader Lab | Missing | `src/components/ShaderLabCard.tsx`, `src/services/shaderDesignerService.ts` | Edit/preview/save native GPU effects with a safe fallback and clear performance limits. |
-| Window appearance | Missing | feature `windowTransparency` | Persist opacity/transparency where supported and degrade clearly on unsupported compositors. |
+| Window appearance | Partial | feature `windowTransparency`, `docs/WINDOW-APPEARANCE.md` | Persisted native opacity works on Windows; Linux/macOS show an explicit unsupported state until their backends expose reliable support. |
 
 ## P1 — AI Help and automation
 

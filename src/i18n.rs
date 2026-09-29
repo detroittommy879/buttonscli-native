@@ -190,6 +190,7 @@ fn catalog_alias(english: &str) -> &str {
         "Open a terminal" | "New terminal with…" => "New terminal",
         "Run" | "Run in terminal" => "Run preset",
         "Add a preset" => "Add new preset",
+        "Install AI coding tools" => "Open vibe install guide",
         "+ Add SSH preset" => "Add Preset",
         "Delete" => "Delete preset",
         "Tab title" => "Tab title (optional)",
@@ -331,6 +332,10 @@ pub enum MessageKey {
     WorkspaceDockOpacity,
     WorkspaceDockPeekRadius,
     WorkspaceDockShow,
+    WindowOpacity,
+    WindowOpacitySupported,
+    WindowOpacityUnsupported,
+    WindowOpacityFailed,
     TerminalZoomIn,
     TerminalZoomOut,
     TerminalZoomReset,
@@ -342,7 +347,7 @@ pub enum MessageKey {
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 136] = [
+    pub const ALL: [Self; 140] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -471,6 +476,10 @@ impl MessageKey {
         Self::WorkspaceDockOpacity,
         Self::WorkspaceDockPeekRadius,
         Self::WorkspaceDockShow,
+        Self::WindowOpacity,
+        Self::WindowOpacitySupported,
+        Self::WindowOpacityUnsupported,
+        Self::WindowOpacityFailed,
         Self::TerminalZoomIn,
         Self::TerminalZoomOut,
         Self::TerminalZoomReset,
@@ -661,6 +670,10 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::WorkspaceDockOpacity => "Auto-hide rail opacity",
         MessageKey::WorkspaceDockPeekRadius => "Peek area",
         MessageKey::WorkspaceDockShow => "Show command dock",
+        MessageKey::WindowOpacity => "Adjust main window opacity",
+        MessageKey::WindowOpacitySupported => "Window opacity is supported on Windows.",
+        MessageKey::WindowOpacityUnsupported => "Window opacity is not supported on this platform.",
+        MessageKey::WindowOpacityFailed => "Window opacity could not be changed: {error}",
         MessageKey::TerminalZoomIn => "Increase terminal text size",
         MessageKey::TerminalZoomOut => "Decrease terminal text size",
         MessageKey::TerminalZoomReset => "Reset terminal text size",
@@ -683,6 +696,160 @@ fn override_text(locale: &str, key: MessageKey) -> Option<&'static str> {
         ("fr", MessageKey::Cancel) => Some("Annuler"),
         ("ja", MessageKey::AiHelp) => Some("AI ヘルプ"),
         ("de", MessageKey::AiHelp) => Some("KI-Hilfe"),
+        ("es", MessageKey::WindowOpacitySupported) => {
+            Some("La opacidad de la ventana es compatible con Windows.")
+        }
+        ("es", MessageKey::WindowOpacityUnsupported) => {
+            Some("La opacidad de la ventana no es compatible con esta plataforma.")
+        }
+        ("es", MessageKey::WindowOpacityFailed) => {
+            Some("No se pudo cambiar la opacidad de la ventana: {error}")
+        }
+        ("zh-CN", MessageKey::WindowOpacitySupported) => Some("Windows 支持窗口透明度。"),
+        ("zh-CN", MessageKey::WindowOpacityUnsupported) => Some("此平台不支持窗口透明度。"),
+        ("zh-CN", MessageKey::WindowOpacityFailed) => Some("无法更改窗口透明度：{error}"),
+        ("fr", MessageKey::WindowOpacitySupported) => {
+            Some("L’opacité de la fenêtre est prise en charge sous Windows.")
+        }
+        ("fr", MessageKey::WindowOpacityUnsupported) => {
+            Some("L’opacité de la fenêtre n’est pas prise en charge sur cette plateforme.")
+        }
+        ("fr", MessageKey::WindowOpacityFailed) => {
+            Some("Impossible de modifier l’opacité de la fenêtre : {error}")
+        }
+        ("hi", MessageKey::WindowOpacitySupported) => {
+            Some("Windows पर विंडो की पारदर्शिता समर्थित है।")
+        }
+        ("hi", MessageKey::WindowOpacityUnsupported) => {
+            Some("इस प्लेटफ़ॉर्म पर विंडो पारदर्शिता समर्थित नहीं है।")
+        }
+        ("hi", MessageKey::WindowOpacityFailed) => Some("विंडो पारदर्शिता बदली नहीं जा सकी: {error}"),
+        ("ja", MessageKey::WindowOpacitySupported) => {
+            Some("ウィンドウの不透明度は Windows で利用できます。")
+        }
+        ("ja", MessageKey::WindowOpacityUnsupported) => {
+            Some("このプラットフォームではウィンドウの不透明度を変更できません。")
+        }
+        ("ja", MessageKey::WindowOpacityFailed) => {
+            Some("ウィンドウの不透明度を変更できませんでした: {error}")
+        }
+        ("de", MessageKey::WindowOpacitySupported) => {
+            Some("Fenstertransparenz wird unter Windows unterstützt.")
+        }
+        ("de", MessageKey::WindowOpacityUnsupported) => {
+            Some("Fenstertransparenz wird auf dieser Plattform nicht unterstützt.")
+        }
+        ("de", MessageKey::WindowOpacityFailed) => {
+            Some("Fenstertransparenz konnte nicht geändert werden: {error}")
+        }
+        ("pt-BR", MessageKey::WindowOpacitySupported) => {
+            Some("A opacidade da janela é compatível com o Windows.")
+        }
+        ("pt-BR", MessageKey::WindowOpacityUnsupported) => {
+            Some("A opacidade da janela não é compatível com esta plataforma.")
+        }
+        ("pt-BR", MessageKey::WindowOpacityFailed) => {
+            Some("Não foi possível alterar a opacidade da janela: {error}")
+        }
+        ("it", MessageKey::WindowOpacitySupported) => {
+            Some("L’opacità della finestra è supportata su Windows.")
+        }
+        ("it", MessageKey::WindowOpacityUnsupported) => {
+            Some("L’opacità della finestra non è supportata su questa piattaforma.")
+        }
+        ("it", MessageKey::WindowOpacityFailed) => {
+            Some("Impossibile modificare l’opacità della finestra: {error}")
+        }
+        ("ru", MessageKey::WindowOpacitySupported) => {
+            Some("Настройка прозрачности окна поддерживается в Windows.")
+        }
+        ("ru", MessageKey::WindowOpacityUnsupported) => {
+            Some("Настройка прозрачности окна не поддерживается на этой платформе.")
+        }
+        ("ru", MessageKey::WindowOpacityFailed) => {
+            Some("Не удалось изменить прозрачность окна: {error}")
+        }
+        ("uk", MessageKey::WindowOpacitySupported) => {
+            Some("Налаштування прозорості вікна підтримується у Windows.")
+        }
+        ("uk", MessageKey::WindowOpacityUnsupported) => {
+            Some("Налаштування прозорості вікна не підтримується на цій платформі.")
+        }
+        ("uk", MessageKey::WindowOpacityFailed) => {
+            Some("Не вдалося змінити прозорість вікна: {error}")
+        }
+        ("ko", MessageKey::WindowOpacitySupported) => Some("Windows에서는 창 투명도를 지원합니다."),
+        ("ko", MessageKey::WindowOpacityUnsupported) => {
+            Some("이 플랫폼에서는 창 투명도를 지원하지 않습니다.")
+        }
+        ("ko", MessageKey::WindowOpacityFailed) => Some("창 투명도를 변경하지 못했습니다: {error}"),
+        ("ar", MessageKey::WindowOpacitySupported) => Some("شفافية النافذة مدعومة على Windows."),
+        ("ar", MessageKey::WindowOpacityUnsupported) => {
+            Some("شفافية النافذة غير مدعومة على هذه المنصة.")
+        }
+        ("ar", MessageKey::WindowOpacityFailed) => Some("تعذر تغيير شفافية النافذة: {error}"),
+        ("tr", MessageKey::WindowOpacitySupported) => {
+            Some("Pencere saydamlığı Windows'ta desteklenir.")
+        }
+        ("tr", MessageKey::WindowOpacityUnsupported) => {
+            Some("Pencere saydamlığı bu platformda desteklenmiyor.")
+        }
+        ("tr", MessageKey::WindowOpacityFailed) => {
+            Some("Pencere saydamlığı değiştirilemedi: {error}")
+        }
+        ("pl", MessageKey::WindowOpacitySupported) => {
+            Some("Przezroczystość okna jest obsługiwana w systemie Windows.")
+        }
+        ("pl", MessageKey::WindowOpacityUnsupported) => {
+            Some("Przezroczystość okna nie jest obsługiwana na tej platformie.")
+        }
+        ("pl", MessageKey::WindowOpacityFailed) => {
+            Some("Nie udało się zmienić przezroczystości okna: {error}")
+        }
+        ("nl", MessageKey::WindowOpacitySupported) => {
+            Some("Vensterdoorzichtigheid wordt ondersteund in Windows.")
+        }
+        ("nl", MessageKey::WindowOpacityUnsupported) => {
+            Some("Vensterdoorzichtigheid wordt niet ondersteund op dit platform.")
+        }
+        ("nl", MessageKey::WindowOpacityFailed) => {
+            Some("De vensterdoorzichtigheid kon niet worden gewijzigd: {error}")
+        }
+        ("sv", MessageKey::WindowOpacitySupported) => Some("Fönsteropacitet stöds i Windows."),
+        ("sv", MessageKey::WindowOpacityUnsupported) => {
+            Some("Fönsteropacitet stöds inte på den här plattformen.")
+        }
+        ("sv", MessageKey::WindowOpacityFailed) => {
+            Some("Det gick inte att ändra fönsteropaciteten: {error}")
+        }
+        ("da", MessageKey::WindowOpacitySupported) => {
+            Some("Vinduesgennemsigtighed understøttes i Windows.")
+        }
+        ("da", MessageKey::WindowOpacityUnsupported) => {
+            Some("Vinduesgennemsigtighed understøttes ikke på denne platform.")
+        }
+        ("da", MessageKey::WindowOpacityFailed) => {
+            Some("Vinduesgennemsigtighed kunne ikke ændres: {error}")
+        }
+        ("fi", MessageKey::WindowOpacitySupported) => {
+            Some("Ikkunan läpinäkyvyyttä tuetaan Windowsissa.")
+        }
+        ("fi", MessageKey::WindowOpacityUnsupported) => {
+            Some("Ikkunan läpinäkyvyyttä ei tueta tällä alustalla.")
+        }
+        ("fi", MessageKey::WindowOpacityFailed) => {
+            Some("Ikkunan läpinäkyvyyden muuttaminen epäonnistui: {error}")
+        }
+        ("no", MessageKey::WindowOpacitySupported) => Some("Vindusopasitet støttes i Windows."),
+        ("no", MessageKey::WindowOpacityUnsupported) => {
+            Some("Vindusopasitet støttes ikke på denne plattformen.")
+        }
+        ("no", MessageKey::WindowOpacityFailed) => {
+            Some("Kunne ikke endre vindusopasiteten: {error}")
+        }
+        ("zh-TW", MessageKey::WindowOpacitySupported) => Some("Windows 支援視窗透明度。"),
+        ("zh-TW", MessageKey::WindowOpacityUnsupported) => Some("此平台不支援視窗透明度。"),
+        ("zh-TW", MessageKey::WindowOpacityFailed) => Some("無法變更視窗透明度：{error}"),
         _ => None,
     }
 }
@@ -724,6 +891,10 @@ mod tests {
         assert_eq!(text("xx", MessageKey::Cancel, &[]), "Cancel");
         assert_eq!(literal("es", "Cancel"), "Cancelar");
         assert_eq!(literal("es", "Commands"), literal("es", "Command"));
+        assert_eq!(
+            literal("es", "Install AI coding tools"),
+            literal("es", "Open vibe install guide")
+        );
         assert_eq!(
             formatted_literal(
                 "fr",

@@ -13,6 +13,7 @@ pub enum FeatureKey {
     ShellProfiles,
     PersonalThemeEditor,
     CustomFonts,
+    CoolStuffInstallers,
     SettingsAppearance,
     OriginalSettingsImport,
     GuidedOnboarding,
@@ -29,7 +30,7 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 27] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::TabWrapping,
@@ -43,6 +44,7 @@ impl FeatureKey {
         Self::ShellProfiles,
         Self::PersonalThemeEditor,
         Self::CustomFonts,
+        Self::CoolStuffInstallers,
         Self::SettingsAppearance,
         Self::OriginalSettingsImport,
         Self::GuidedOnboarding,
@@ -73,6 +75,7 @@ impl FeatureKey {
             Self::ShellProfiles => "shellProfiles",
             Self::PersonalThemeEditor => "personalThemeEditor",
             Self::CustomFonts => "customFonts",
+            Self::CoolStuffInstallers => "coolStuffInstallers",
             Self::SettingsAppearance => "settingsAppearance",
             Self::OriginalSettingsImport => "originalSettingsImport",
             Self::GuidedOnboarding => "guidedOnboarding",
@@ -106,13 +109,14 @@ impl FeatureKey {
             K::ShellProfiles => (T::Free, true, R::Active, "terminal"),
             K::PersonalThemeEditor => (T::Free, true, R::Active, "themes"),
             K::CustomFonts => (T::Free, true, R::Active, "fonts"),
+            K::CoolStuffInstallers => (T::Free, true, R::Active, "onboarding"),
             K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
             K::SettingsAppearance | K::OriginalSettingsImport => {
                 (T::Free, true, R::Active, "settings")
             }
             K::GuidedOnboarding => (T::Free, false, R::Planned, "activation"),
             K::EffectsMasterSwitch => (T::Free, true, R::Active, "effects"),
-            K::WindowTransparency => (T::Free, false, R::Planned, "appearance"),
+            K::WindowTransparency => (T::Free, true, R::Active, "appearance"),
             K::ShaderLab => (T::Free, false, R::Planned, "effects"),
             K::AiHelp => (T::Pro, false, R::Planned, "assistant"),
             K::AutomationRemoteControl => (T::Pro, false, R::Planned, "automation"),

@@ -1,5 +1,40 @@
 # Reconstruction journal
 
+## 2026-09-28 — U10 Cool Stuff installer and provider links
+
+Copied the exact source Windows, Ubuntu, and macOS installer scripts into the
+native assets and embedded them in the application. The Cool Stuff menu shows
+the platform-specific summary, install list, recommended shell, script name,
+command, notes, and next steps. It extracts a content-hash-named copy into the
+active native profile, supports clipboard copy, and types the quoted command
+into a new focused terminal through the stable-ID dispatcher without Enter.
+The Windows path prefers PowerShell 7, then Windows PowerShell. Wrong-platform
+choices disable actions. The original OpenRouter, OpenAI sharing, NVIDIA Build,
+Groq, and Mistral links open the system browser. Nothing downloads or executes
+until the user reviews the terminal and presses Enter. See
+[`COOL-STUFF.md`](COOL-STUFF.md).
+
+The Windows library suite passes (128 tests), including platform mapping,
+command quoting, no-Enter output, PowerShell preference, wrong-host refusal,
+external HTTPS links, and safe profile-scoped extraction. Formatting,
+`cargo check --bin buttonscli`, and `cargo build --bin buttonscli` pass. Live
+terminal/UI review remains open; the build prints the existing Rust bin/lib
+PDB filename collision warning. Access tier: free (`coolStuffInstallers`).
+
+## 2026-09-28 — U09 Windows window opacity
+
+Added a central-registry free feature gate and persisted main-window opacity
+from 25% to 100%. Windows applies the setting to the native window handle;
+Linux and macOS show an explicit unsupported-capability message. The original
+`window.opacity` preference now imports through the same bounds. The UI lives
+under Settings → Workspace. See [`WINDOW-APPEARANCE.md`](WINDOW-APPEARANCE.md).
+
+The Windows library suite passes (123 tests), including finite/range
+normalization, imported-value projection, and feature access. `cargo check` and
+`cargo build --bin buttonscli` pass; live opacity behavior and manual
+monitor/DPI/compositor review remain open. Access tier: free
+(`windowTransparency`).
+
 ## 2026-09-28 — U08 offline system and custom fonts
 
 Added local system-font discovery for Windows, Linux, and macOS font folders,

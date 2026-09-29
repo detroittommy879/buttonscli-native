@@ -80,6 +80,11 @@ the fallback chain. Seven persisted typography zones mirror the legacy model.
 Online-only font names found in old themes are sanitized to a bundled
 equivalent; native font loading makes no network requests.
 
+Cool Stuff installer scripts are embedded in the binary and copied into the
+active native profile's `installers/` directory with a content hash in the
+filename. The feature creates a command for the matching host platform and
+uses the stable-ID session dispatcher to type it without an Enter byte.
+
 Terminal typography carries separate regular and bold `FontId`s into the cell
 renderer. Bold cells select the nearest installed weight without changing cell
 metrics, and the legacy bright-ANSI toggle promotes the eight normal

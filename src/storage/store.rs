@@ -27,6 +27,7 @@ pub enum StoreError {
     ImportCollision,
     ThemeCollision,
     FontCollision,
+    InstallerCollision,
     SourceChanged,
     Io(io::Error),
 }
@@ -52,6 +53,9 @@ impl std::fmt::Display for StoreError {
             }
             Self::ThemeCollision => write!(f, "theme file already exists"),
             Self::FontCollision => write!(f, "font file already exists"),
+            Self::InstallerCollision => {
+                write!(f, "a different bundled installer file already exists")
+            }
             Self::SourceChanged => write!(f, "original settings changed; refresh the preview"),
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
@@ -394,6 +398,32 @@ impl NativeStore {
         }
     }
 
+    pub(crate) fn prepare_bundled_installer(
+        &self,
+        file_name: &str,
+        bytes: &[u8],
+    ) -> Result<PathBuf, StoreError> {
+        validate_installer_file_name(file_name)?;
+        if bytes.len() > 2 * 1024 * 1024 {
+            return Err(StoreError::TooLarge);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let directory = self.ensure_profile_installers_dir()?;
+        let path = directory.join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        match write_new(&path, bytes) {
+            Ok(()) => Ok(path),
+            Err(StoreError::Io(error)) if error.kind() == io::ErrorKind::AlreadyExists => {
+                if fs::read(&path)? == bytes {
+                    Ok(path)
+                } else {
+                    Err(StoreError::InstallerCollision)
+                }
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn acquire_root_lock(&self) -> Result<fs::File, StoreError> {
         guard_distinct_roots(&self.root.0, &self.legacy_root)?;
         fs::create_dir_all(&self.root.0)?;
@@ -447,6 +477,22 @@ impl NativeStore {
         ensure_native_path(&self.root.0, &fonts)?;
         Ok(fonts)
     }
+
+    fn ensure_profile_installers_dir(&self) -> Result<PathBuf, StoreError> {
+        let profiles = self.root.0.join("profiles");
+        ensure_native_path(&self.root.0, &profiles)?;
+        fs::create_dir_all(&profiles)?;
+        ensure_native_path(&self.root.0, &profiles)?;
+        let profile = self.profile_dir();
+        ensure_native_path(&self.root.0, &profile)?;
+        fs::create_dir_all(&profile)?;
+        ensure_native_path(&self.root.0, &profile)?;
+        let installers = profile.join("installers");
+        ensure_native_path(&self.root.0, &installers)?;
+        fs::create_dir_all(&installers)?;
+        ensure_native_path(&self.root.0, &installers)?;
+        Ok(installers)
+    }
 }
 
 fn validate_theme_file_name(file_name: &str) -> Result<(), StoreError> {
@@ -473,6 +519,25 @@ fn validate_font_file_name(file_name: &str) -> Result<(), StoreError> {
             .is_some_and(|extension| {
                 extension.eq_ignore_ascii_case("ttf") || extension.eq_ignore_ascii_case("otf")
             })
+    {
+        return Err(StoreError::InvalidDocument);
+    }
+    Ok(())
+}
+
+fn validate_installer_file_name(file_name: &str) -> Result<(), StoreError> {
+    let path = Path::new(file_name);
+    if path.components().count() != 1
+        || path.file_name().and_then(|name| name.to_str()) != Some(file_name)
+        || !path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("ps1") || extension.eq_ignore_ascii_case("sh")
+            })
+        || !file_name.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_')
+        })
     {
         return Err(StoreError::InvalidDocument);
     }
@@ -641,6 +706,30 @@ mod tests {
         ));
         store.delete_theme_file("night.json").unwrap();
         assert!(!store.profile_dir().join("themes/night.json").exists());
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn bundled_installer_files_are_profile_scoped_and_never_overwritten() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        let first = store
+            .prepare_bundled_installer("vibes-abc123.ps1", b"Write-Output 'ready'")
+            .unwrap();
+        let repeated = store
+            .prepare_bundled_installer("vibes-abc123.ps1", b"Write-Output 'ready'")
+            .unwrap();
+        assert_eq!(first, repeated);
+        assert_eq!(fs::read(&first).unwrap(), b"Write-Output 'ready'");
+        assert!(matches!(
+            store.prepare_bundled_installer("vibes-abc123.ps1", b"different script"),
+            Err(StoreError::InstallerCollision)
+        ));
+        assert!(matches!(
+            store.prepare_bundled_installer("../outside.ps1", b"bad"),
+            Err(StoreError::InvalidDocument)
+        ));
+        assert!(first.starts_with(store.profile_dir().join("installers")));
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

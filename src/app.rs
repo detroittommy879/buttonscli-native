@@ -150,6 +150,28 @@ fn custom_fonts_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn cool_stuff_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::CoolStuffInstallers,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn window_transparency_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::WindowTransparency,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 fn localization_settings_available() -> bool {
     crate::features::access::resolve(
         crate::features::catalog::FeatureKey::LocalizationSettings,
@@ -189,6 +211,10 @@ pub struct ButtonsApp {
     custom_font_import_path: String,
     #[cfg(not(target_arch = "wasm32"))]
     custom_font_status: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    window_opacity_last_applied: Option<f32>,
+    #[cfg(not(target_arch = "wasm32"))]
+    window_opacity_error: Option<String>,
     settings_tab: SettingsTab,
     settings_snapshot: Option<SettingsSnapshot>,
     shortcut_capture: Option<ShortcutAction>,
@@ -204,6 +230,18 @@ pub struct ButtonsApp {
     dock_auto_hide_state: crate::dock::AutoHideState,
     #[cfg(not(target_arch = "wasm32"))]
     dock_overlay_rect: Option<egui::Rect>,
+    #[cfg(not(target_arch = "wasm32"))]
+    show_cool_stuff: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    cool_stuff_platform: crate::cool_stuff::InstallerPlatform,
+    #[cfg(not(target_arch = "wasm32"))]
+    cool_stuff_command: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    cool_stuff_shell_profile: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    cool_stuff_type_reason: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    cool_stuff_error: Option<String>,
     show_about: bool,
     show_preset_editor: bool,
     preset_editor_collection: PresetCollection,
@@ -548,6 +586,28 @@ impl ButtonsApp {
         self.locale = preferred_locale(&self.preferences).to_owned();
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn apply_window_opacity(&mut self, frame: &eframe::Frame) {
+        if !window_transparency_available() || !crate::window_opacity::is_supported() {
+            return;
+        }
+        let requested = crate::window_opacity::clamp(self.preferences.window_opacity);
+        if self.window_opacity_last_applied == Some(requested) {
+            return;
+        }
+        match crate::window_opacity::apply(frame, requested) {
+            Ok(applied) => {
+                self.preferences.window_opacity = applied;
+                self.window_opacity_last_applied = Some(applied);
+                self.window_opacity_error = None;
+            }
+            Err(error) => {
+                self.window_opacity_last_applied = Some(requested);
+                self.window_opacity_error = Some(error);
+            }
+        }
+    }
+
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let stored_preferences: Option<Preferences> = cc
             .storage
@@ -683,6 +743,10 @@ impl ButtonsApp {
             custom_font_import_path: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             custom_font_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            window_opacity_last_applied: Some(1.0),
+            #[cfg(not(target_arch = "wasm32"))]
+            window_opacity_error: None,
             settings_tab: SettingsTab::Themes,
             settings_snapshot: None,
             shortcut_capture: None,
@@ -698,6 +762,19 @@ impl ButtonsApp {
             dock_auto_hide_state: crate::dock::AutoHideState::default(),
             #[cfg(not(target_arch = "wasm32"))]
             dock_overlay_rect: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            show_cool_stuff: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            cool_stuff_platform: crate::cool_stuff::InstallerPlatform::host()
+                .unwrap_or(crate::cool_stuff::InstallerPlatform::Windows),
+            #[cfg(not(target_arch = "wasm32"))]
+            cool_stuff_command: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            cool_stuff_shell_profile: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            cool_stuff_type_reason: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            cool_stuff_error: None,
             show_about: false,
             show_preset_editor: false,
             preset_editor_collection: PresetCollection::Commands,
@@ -2100,6 +2177,35 @@ impl ButtonsApp {
                         ui.checkbox(&mut self.preferences.show_sidebar, "Command dock");
                         ui.checkbox(&mut self.preferences.show_presets, "Preset bar");
                     });
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if cool_stuff_available() {
+                        ui.menu_button(crate::i18n::literal(&self.locale, "Cool Stuff"), |ui| {
+                            if ui
+                                .button(crate::i18n::literal(
+                                    &self.locale,
+                                    "Install AI coding tools",
+                                ))
+                                .clicked()
+                            {
+                                self.show_cool_stuff = true;
+                                self.cool_stuff_command = None;
+                                self.cool_stuff_shell_profile = None;
+                                self.cool_stuff_type_reason = None;
+                                self.cool_stuff_error = None;
+                                ui.close_menu();
+                            }
+                            ui.separator();
+                            for (label, url) in crate::cool_stuff::PROVIDER_LINKS {
+                                if ui
+                                    .button(crate::i18n::literal(&self.locale, label))
+                                    .clicked()
+                                {
+                                    ctx.open_url(egui::OpenUrl::new_tab(url));
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                    }
                     ui.menu_button(crate::i18n::literal(&self.locale, "Terminal"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
@@ -2185,6 +2291,266 @@ impl ButtonsApp {
                     });
                 });
             });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn prepare_cool_stuff_command(&mut self) {
+        use sha2::Digest;
+
+        self.cool_stuff_command = None;
+        self.cool_stuff_shell_profile = None;
+        self.cool_stuff_type_reason = None;
+        self.cool_stuff_error = None;
+        if !cool_stuff_available() {
+            return;
+        }
+        let platform = self.cool_stuff_platform;
+        let Some(host) = crate::cool_stuff::InstallerPlatform::host() else {
+            self.cool_stuff_error =
+                Some("Installer scripts are not supported on this platform.".into());
+            return;
+        };
+        if platform != host {
+            self.cool_stuff_error = Some(match platform {
+                crate::cool_stuff::InstallerPlatform::Windows => "The bundled Windows installer can only be launched from a Windows build of ButtonsCLI.",
+                crate::cool_stuff::InstallerPlatform::Ubuntu => "The bundled Ubuntu installer is meant for Linux builds of ButtonsCLI.",
+                crate::cool_stuff::InstallerPlatform::Macos => "The bundled macOS installer is meant for macOS builds of ButtonsCLI.",
+            }.into());
+            return;
+        }
+        let Some(store) = &self.native_store else {
+            self.cool_stuff_error = Some("Native profile storage is not available.".into());
+            return;
+        };
+        let bytes = platform.script_bytes();
+        let digest = sha2::Sha256::digest(bytes);
+        let suffix = digest[..6]
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let file = std::path::Path::new(platform.script_file_name());
+        let Some(extension) = file.extension().and_then(|extension| extension.to_str()) else {
+            self.cool_stuff_error = Some("Bundled installer filename is invalid.".into());
+            return;
+        };
+        let stem = file
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("installer");
+        let file_name = format!("{stem}-{suffix}.{extension}");
+        let path = match store.prepare_bundled_installer(&file_name, bytes) {
+            Ok(path) => path,
+            Err(error) => {
+                self.cool_stuff_error = Some(error.to_string());
+                return;
+            }
+        };
+        let shells = self
+            .detected_shells
+            .iter()
+            .map(|shell| (shell.id.clone(), shell.command.clone()))
+            .collect::<Vec<_>>();
+        match crate::cool_stuff::build_plan(platform, host, &path, &shells) {
+            Ok(plan) => {
+                self.cool_stuff_command = Some(plan.command);
+                self.cool_stuff_shell_profile = plan.shell_profile_id;
+                self.cool_stuff_type_reason = plan.type_reason;
+            }
+            Err(error) => self.cool_stuff_error = Some(error),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn type_cool_stuff_command(&mut self, ctx: &egui::Context) {
+        if !cool_stuff_available() {
+            return;
+        }
+        let Some(command) = self.cool_stuff_command.clone() else {
+            return;
+        };
+        let Some(shell_profile) = self.cool_stuff_shell_profile.clone() else {
+            self.notice = self.cool_stuff_type_reason.clone();
+            return;
+        };
+        let old_len = self.tabs.len();
+        self.open_tab_with_profile(ctx.clone(), &shell_profile);
+        if self.tabs.len() == old_len {
+            return;
+        }
+        let tab = self.tabs.last().expect("a new terminal was just created");
+        let target = Target::Id(tab.id);
+        match self.dispatch_ui_action(Some(target), Action::Send(command.into_bytes()), ctx) {
+            Ok(_) => {
+                self.notice = Some(crate::i18n::literal(
+                    &self.locale,
+                    "Opened a fresh tab and typed the installer command so you can review it before running.",
+                ));
+                self.show_cool_stuff = false;
+            }
+            Err(error) => {
+                self.notice = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Could not prepare the installer tab: {error}",
+                    &[("error", &error.to_string())],
+                ));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn cool_stuff_window(&mut self, ctx: &egui::Context) {
+        if !cool_stuff_available() {
+            self.show_cool_stuff = false;
+            return;
+        }
+        if !self.show_cool_stuff {
+            return;
+        }
+        if self.cool_stuff_command.is_none() && self.cool_stuff_error.is_none() {
+            self.prepare_cool_stuff_command();
+        }
+
+        #[derive(Clone, Copy)]
+        enum DialogAction {
+            Copy,
+            Type,
+        }
+
+        let locale = self.locale.clone();
+        let mut open = self.show_cool_stuff;
+        let mut selected_platform = self.cool_stuff_platform;
+        let mut action = None;
+        let mut request_close = false;
+        let details = selected_platform.details();
+        let command = self.cool_stuff_command.clone();
+        let error = self.cool_stuff_error.clone();
+        let type_reason = self.cool_stuff_type_reason.clone();
+        let shell_profile = self.cool_stuff_shell_profile.clone();
+        let colors = self.colors();
+        let mut command_display = command.clone().unwrap_or_else(|| {
+            error.clone().unwrap_or_else(|| {
+                crate::i18n::literal(&locale, "Loading bundled installer details...")
+            })
+        });
+
+        egui::Window::new(crate::i18n::literal(&locale, "Cool Stuff"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(true)
+            .default_size([600.0, 620.0])
+            .show(ctx, |ui| {
+                ui.label(crate::i18n::literal(
+                    &locale,
+                    "This opens a bundled installer script for a fast AI-coding setup: common dev tools, VS Code, and the most approachable AI CLIs in one place.",
+                ));
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(crate::i18n::literal(&locale, "Platform"));
+                    for platform in [
+                        crate::cool_stuff::InstallerPlatform::Windows,
+                        crate::cool_stuff::InstallerPlatform::Ubuntu,
+                        crate::cool_stuff::InstallerPlatform::Macos,
+                    ] {
+                        ui.selectable_value(
+                            &mut selected_platform,
+                            platform,
+                            crate::i18n::literal(&locale, platform.label()),
+                        );
+                    }
+                    if let Some(host) = crate::cool_stuff::InstallerPlatform::host() {
+                        ui.label(crate::i18n::literal(&locale, "Auto-detected target:"));
+                        ui.label(crate::i18n::literal(&locale, host.label()));
+                    }
+                });
+                ui.separator();
+
+                egui::ScrollArea::vertical()
+                    .max_height(470.0)
+                    .show(ui, |ui| {
+                        ui.heading(details.headline);
+                        ui.label(details.summary);
+                        ui.add_space(8.0);
+                        ui.label(crate::i18n::literal(&locale, "Bundled script"));
+                        ui.monospace(selected_platform.script_file_name());
+                        ui.label(crate::i18n::literal(&locale, "Recommended shell"));
+                        ui.monospace(details.recommended_shell);
+                        ui.add_space(8.0);
+                        ui.strong(crate::i18n::literal(&locale, "What it installs"));
+                        for item in details.what_it_installs {
+                            ui.label(format!("• {item}"));
+                        }
+                        ui.add_space(8.0);
+                        ui.strong(crate::i18n::literal(&locale, "Command that will be typed"));
+                        ui.add(
+                            egui::TextEdit::multiline(&mut command_display)
+                            .desired_rows(2)
+                            .code_editor()
+                            .interactive(false),
+                        );
+                        ui.label(crate::i18n::literal(&locale, "Types for review"));
+                        if let Some(reason) = &type_reason {
+                            ui.colored_label(colors.warning, reason);
+                        }
+                        ui.add_space(8.0);
+                        ui.strong(crate::i18n::literal(&locale, "After install"));
+                        for step in details.after_install {
+                            ui.label(format!("• {step}"));
+                        }
+                        ui.add_space(8.0);
+                        ui.strong(crate::i18n::literal(&locale, "Notes"));
+                        ui.label(details.note);
+                    });
+
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(
+                            command.is_some(),
+                            egui::Button::new(crate::i18n::literal(&locale, "Copy command")),
+                        )
+                        .clicked()
+                    {
+                        action = Some(DialogAction::Copy);
+                    }
+                    if ui
+                        .add_enabled(
+                            command.is_some() && shell_profile.is_some(),
+                            egui::Button::new(crate::i18n::literal(&locale, "Type in new tab")),
+                        )
+                        .clicked()
+                    {
+                        action = Some(DialogAction::Type);
+                    }
+                    if ui
+                        .button(crate::i18n::literal(&locale, "Close"))
+                        .clicked()
+                    {
+                        request_close = true;
+                    }
+                });
+            });
+
+        self.show_cool_stuff = open && !request_close;
+        if selected_platform != self.cool_stuff_platform {
+            self.cool_stuff_platform = selected_platform;
+            self.cool_stuff_command = None;
+            self.cool_stuff_shell_profile = None;
+            self.cool_stuff_type_reason = None;
+            self.cool_stuff_error = None;
+        }
+        match action {
+            Some(DialogAction::Copy) => {
+                if let Some(command) = command {
+                    ctx.copy_text(command);
+                    self.notice = Some(crate::i18n::literal(
+                        &self.locale,
+                        "Installer command copied to the clipboard.",
+                    ));
+                }
+            }
+            Some(DialogAction::Type) => self.type_cool_stuff_command(ctx),
+            None => {}
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -5694,6 +6060,33 @@ impl ButtonsApp {
                 ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
                 ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
                 #[cfg(not(target_arch = "wasm32"))]
+                if window_transparency_available() {
+                    ui.add_space(8.0);
+                    if crate::window_opacity::is_supported() {
+                        ui.add(
+                            egui::Slider::new(
+                                &mut self.preferences.window_opacity,
+                                crate::window_opacity::MIN_OPACITY
+                                    ..=crate::window_opacity::MAX_OPACITY,
+                            )
+                            .text(text(
+                                &self.locale,
+                                M::WindowOpacity,
+                                &[],
+                            )),
+                        );
+                        ui.label(text(&self.locale, M::WindowOpacitySupported, &[]));
+                        if let Some(error) = &self.window_opacity_error {
+                            ui.colored_label(
+                                self.colors().warning,
+                                text(&self.locale, M::WindowOpacityFailed, &[("error", error)]),
+                            );
+                        }
+                    } else {
+                        ui.label(text(&self.locale, M::WindowOpacityUnsupported, &[]));
+                    }
+                }
+                #[cfg(not(target_arch = "wasm32"))]
                 if workspace_controls_available() {
                     ui.add_space(8.0);
                     let width_changed = ui
@@ -7310,8 +7703,10 @@ impl eframe::App for ButtonsApp {
         }
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.refresh_locale();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.apply_window_opacity(frame);
         #[cfg(not(target_arch = "wasm32"))]
         self.publish_control_snapshot();
         #[cfg(not(target_arch = "wasm32"))]
@@ -7328,6 +7723,8 @@ impl eframe::App for ButtonsApp {
         self.process_session_actions(ctx);
         self.shortcuts(ctx);
         self.top_menu(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.cool_stuff_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]

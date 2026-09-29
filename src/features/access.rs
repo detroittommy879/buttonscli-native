@@ -151,6 +151,8 @@ mod tests {
         assert!(resolve(FeatureKey::ShellProfiles, &runtime, &None, 100).available);
         assert!(resolve(FeatureKey::PersonalThemeEditor, &runtime, &None, 100).available);
         assert!(resolve(FeatureKey::CustomFonts, &runtime, &None, 100).available);
+        assert!(resolve(FeatureKey::CoolStuffInstallers, &runtime, &None, 100).available);
+        assert!(resolve(FeatureKey::WindowTransparency, &runtime, &None, 100).available);
         assert_eq!(
             resolve(FeatureKey::QuickSecrets, &runtime, &None, 100).discoverability,
             Discoverability::Hidden

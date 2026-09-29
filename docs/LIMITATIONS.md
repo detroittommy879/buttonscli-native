@@ -72,6 +72,12 @@ not a backlog disguised as release notes.
   launch behavior still need their platform verification passes.
 - Profile switching, accounts, and updater/release infrastructure are not part
   of this lean core yet.
+- Window opacity is currently supported on Windows only. Linux and macOS show
+  the unsupported capability state; monitor, DPI and live desktop-compositor
+  behavior still need manual review.
+- Cool Stuff types a bundled installer invocation for explicit review. The
+  Windows script requires an elevated PowerShell session, and the Linux script
+  targets Ubuntu; live copy/type and script execution have not been certified.
 - The source localization catalog and native Settings/onboarding flow include 21
   locales. Labels without a matching source string fall back to English.
   The bundled fallback includes every modern Hangul syllable, though actual

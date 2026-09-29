@@ -52,6 +52,17 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
                     window_safe.insert(key.to_owned(), scrub_secrets(value));
                 }
             }
+            if let Some(value) = fields.get("opacity") {
+                if let Some(opacity) = value.as_f64().filter(|opacity| opacity.is_finite()) {
+                    let normalized = (opacity as f32).clamp(0.25, 1.0);
+                    if normalized as f64 != opacity {
+                        warnings.push("window.opacity was clamped to native limits".into());
+                    }
+                    preferences.window_opacity = normalized;
+                } else {
+                    warnings.push("window.opacity is invalid".into());
+                }
+            }
             safe.insert("window".into(), Value::Object(window_safe));
             if let Some(profiles) = fields.get("customShellProfiles") {
                 if let Some(profiles) = profiles.as_array() {
@@ -532,5 +543,17 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("leftPresetDockAutoHideMs")));
+    }
+
+    #[test]
+    fn legacy_window_opacity_projects_and_is_clamped() {
+        let document = LegacyDocument::parse(br#"{"window":{"opacity":0.1}}"#).unwrap();
+        let projection = project(&document);
+
+        assert_eq!(projection.preferences.window_opacity, 0.25);
+        assert!(projection
+            .warnings
+            .iter()
+            .any(|warning| warning == "window.opacity was clamped to native limits"));
     }
 }
