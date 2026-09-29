@@ -1,5 +1,15 @@
 # Reconstruction journal
 
+## 2026-09-29 — P01 server feature-grant groundwork
+
+Extended native entitlements to carry the server's explicit `activeFeatures`
+list. The central access resolver now honors a grant only for its named,
+active feature, after the existing kill-switch, rollout and expiry checks. A
+free-plan grant test confirms that AI Help can be granted without unlocking
+remote control, and that the grant expires closed. This does not activate any
+Pro feature: the native auth/runtime-config adapter, secure session lifecycle,
+and verified hosted rollout are still required.
+
 ## 2026-09-29 — P05 Windows isolated GUI startup smoke
 
 Added `scripts/native-smoke.ps1`. It builds the native executable, launches

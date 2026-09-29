@@ -15,11 +15,12 @@ pub enum GrantSource {
     OfflineCache,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Entitlement {
     pub plan: Plan,
     pub source: GrantSource,
     pub expires_at_unix: u64,
+    pub active_features: Vec<FeatureKey>,
 }
 
 pub trait EntitlementSource {
@@ -28,7 +29,7 @@ pub trait EntitlementSource {
 
 impl EntitlementSource for Option<Entitlement> {
     fn entitlement(&self) -> Option<Entitlement> {
-        *self
+        self.clone()
     }
 }
 
@@ -124,6 +125,9 @@ fn resolve_feature(
                 Some(grant) if grant.expires_at_unix <= now_unix => {
                     denied(AccessReason::ExpiredGrant, Discoverability::Locked)
                 }
+                Some(grant) if grant.active_features.contains(&feature.key) => {
+                    allowed(AccessReason::Available)
+                }
                 Some(grant)
                     if grant.plan == Plan::Enterprise
                         || (feature.tier == FeatureTier::Pro && grant.plan == Plan::Pro) =>
@@ -169,6 +173,7 @@ mod tests {
             plan: Plan::Pro,
             source: GrantSource::OfflineCache,
             expires_at_unix: 110,
+            active_features: Vec::new(),
         });
         assert_eq!(
             resolve(FeatureKey::AiHelp, &runtime, &grant, 100).reason,
@@ -204,6 +209,7 @@ mod tests {
                 plan,
                 source: GrantSource::OfflineCache,
                 expires_at_unix,
+                active_features: Vec::new(),
             })
         };
         assert_eq!(
@@ -219,5 +225,45 @@ mod tests {
             AccessReason::ExpiredGrant
         );
         assert!(resolve_feature(feature, &runtime, &grant(Plan::Pro, 110), 100).available);
+    }
+
+    #[test]
+    fn explicit_server_feature_grant_unlocks_only_its_active_feature() {
+        let runtime = RuntimeAccess {
+            pro_enabled: true,
+            ..Default::default()
+        };
+        let feature = FeatureDefinition {
+            enabled: true,
+            rollout: Rollout::Active,
+            ..FeatureKey::AiHelp.definition()
+        };
+        let grant = Some(Entitlement {
+            plan: Plan::Free,
+            source: GrantSource::Server,
+            expires_at_unix: 110,
+            active_features: vec![FeatureKey::AiHelp],
+        });
+        assert_eq!(
+            resolve_feature(feature, &runtime, &grant, 100).reason,
+            AccessReason::Available
+        );
+        assert_eq!(
+            resolve_feature(
+                FeatureDefinition {
+                    key: FeatureKey::AutomationRemoteControl,
+                    ..feature
+                },
+                &runtime,
+                &grant,
+                100,
+            )
+            .reason,
+            AccessReason::UpgradeRequired
+        );
+        assert_eq!(
+            resolve_feature(feature, &runtime, &grant, 110).reason,
+            AccessReason::ExpiredGrant
+        );
     }
 }

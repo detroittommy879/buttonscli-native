@@ -2,6 +2,14 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-29 P01 feature grant resolution
+
+`cargo test --lib features::access::tests` passes four tests. New coverage
+verifies that a non-expired server grant unlocks only its named Pro feature
+and that expiry closes access. Kill switches, rollout state and development
+override precedence remain covered. Runtime config, account login, secure
+token storage and hosted service behavior are not yet integrated.
+
 ## 2026-09-29 P05 isolated Windows GUI startup
 
 `pwsh -NoProfile -File scripts/native-smoke.ps1` built and opened the native
