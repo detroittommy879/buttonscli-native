@@ -107,6 +107,12 @@ pub(crate) struct Preferences {
     pub(crate) typography: Typography,
     pub(crate) show_sidebar: bool,
     pub(crate) show_presets: bool,
+    pub(crate) dock_width: f32,
+    pub(crate) dock_compact: bool,
+    pub(crate) dock_auto_hide: bool,
+    pub(crate) dock_auto_hide_ms: u64,
+    pub(crate) dock_opacity: f32,
+    pub(crate) dock_peek_radius: u8,
     pub(crate) presets: Vec<CommandPreset>,
     pub(crate) ssh_presets: Vec<CommandPreset>,
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
@@ -132,6 +138,12 @@ impl Default for Preferences {
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
+            dock_width: 176.0,
+            dock_compact: false,
+            dock_auto_hide: false,
+            dock_auto_hide_ms: 4_000,
+            dock_opacity: 0.35,
+            dock_peek_radius: 10,
             presets: default_presets(),
             ssh_presets: Vec::new(),
             pane_split_ratios: std::collections::BTreeMap::new(),
@@ -158,6 +170,18 @@ pub(crate) struct PaneDividerAppearance {
 impl Preferences {
     pub(crate) fn normalize_theme_sources(&mut self) {
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
+        self.dock_width = if self.dock_width.is_finite() {
+            self.dock_width.clamp(124.0, 360.0)
+        } else {
+            176.0
+        };
+        self.dock_auto_hide_ms = self.dock_auto_hide_ms.clamp(250, 30_000);
+        self.dock_opacity = if self.dock_opacity.is_finite() {
+            self.dock_opacity.clamp(0.2, 1.0)
+        } else {
+            0.35
+        };
+        self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.provider_settings.normalize(&mut Vec::new());
         self.shortcuts.normalize();
         for source in [
@@ -243,5 +267,25 @@ mod tests {
             serde_json::from_str(r#"{"chrome_corner_radius":255}"#).unwrap();
         oversized.normalize_theme_sources();
         assert_eq!(oversized.chrome_corner_radius, 16);
+    }
+
+    #[test]
+    fn dock_preferences_default_persist_and_normalize() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.dock_width, 176.0);
+        assert_eq!(old.dock_auto_hide_ms, 4_000);
+        assert_eq!(old.dock_opacity, 0.35);
+        assert_eq!(old.dock_peek_radius, 10);
+
+        let mut preferences: Preferences = serde_json::from_str(
+            r#"{"dock_width":800.0,"dock_auto_hide_ms":10,"dock_opacity":0.0,"dock_peek_radius":255,"dock_compact":true,"dock_auto_hide":true}"#,
+        )
+        .unwrap();
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.dock_width, 360.0);
+        assert_eq!(preferences.dock_auto_hide_ms, 250);
+        assert_eq!(preferences.dock_opacity, 0.2);
+        assert_eq!(preferences.dock_peek_radius, 24);
+        assert!(preferences.dock_compact && preferences.dock_auto_hide);
     }
 }

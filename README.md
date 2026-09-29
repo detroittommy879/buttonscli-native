@@ -25,6 +25,8 @@ Current desktop features include:
 - keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
 - focused-terminal regex search across wrapped text and scrollback, plus
   select-all and clear-screen actions that leave the shell running;
+- a resizable compact command dock with auto-hide and a status-bar terminal
+  zoom readout, reset action, and quick calm-effects switch;
 - separate command and SSH docks, editable persisted presets with type/run
   behavior, all 555 bundled legacy theme selections, and personal version 1
   theme JSON files from the active native profile's `themes/` folder;
@@ -63,6 +65,9 @@ on Windows/Linux and Command on macOS. Edit or clear these under
 
 See [Terminal search and buffer actions](docs/TERMINAL-SEARCH.md) for search,
 select-all, and clear-screen behavior.
+
+See [Workspace controls](docs/WORKSPACE-CONTROLS.md) for dock auto-hide,
+terminal zoom, and the calm-effects toggle.
 
 New tab numbers increase within each app run. Closing or reopening a tab does
 not reuse its number; restarting begins at `term1` because sessions are not

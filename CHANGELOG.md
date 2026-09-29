@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added saved command-dock resizing and compact SSH buttons, optional auto-hide with a peek rail and overlay, terminal zoom/reset controls, and a status-bar calm-effects switch.
+- Original-profile import now projects the supported command-dock width, compact, auto-hide, delay, opacity, and peek settings into native preferences.
 - Added focused-terminal regex search across wrapped lines and scrollback, with next/previous navigation and visible match highlights. Added select-all and a native clear-screen action that keeps the shell running.
 - Added a previewed, read-only import from the original ButtonsCLI settings folder. Import creates a separate native profile with compatible settings, command and SSH presets, and valid personal themes. An identical repeat is skipped; changed source content gets a new destination.
 - Added a first-run import offer and selection of another original profile in Settings. Provider names, endpoints and models import with the profile. An unchecked option can transfer matching API keys to the OS credential store; runtime/auth files remain excluded.

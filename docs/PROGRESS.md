@@ -1,5 +1,23 @@
 # Reconstruction journal
 
+## 2026-09-28 — U03 dock and status controls
+
+Added persistent dock width, compact SSH buttons, an auto-hide rail/overlay,
+and workspace settings for delay, opacity and peek distance. The overlay does
+not resize the central terminal area when opening or closing and does not
+change the focused session. Added status-bar terminal zoom with a percentage
+reset and a quick calm-effects toggle. Original-profile import now maps the
+supported dock settings with native bounds and warnings. The free
+`workspaceControls` feature entry gates discovery and actions.
+
+`cargo fmt --all`, Windows `cargo check --bin buttonscli` and
+`cargo build --bin buttonscli`, 5 dock tests, 1 settings normalization test,
+1 import projection test, 1 feature-access test, 3 i18n tests, and
+`git diff --check` passed. The build emits the existing bin/lib PDB filename
+collision warning. Fake-time coverage checks reveal, delayed close, reopening,
+bounded delay and no repaint once closed. Windows GUI interaction and
+cross-platform checks remain pending.
+
 ## 2026-09-28 — U02 terminal search and buffer actions
 
 Added focused-terminal regex search against Alacritty's live grid, with wrapped

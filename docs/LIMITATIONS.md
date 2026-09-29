@@ -42,6 +42,12 @@ not a backlog disguised as release notes.
   tests cover wrapped wide Unicode, scrollback, and keeping the terminal state
   in place during clear. The Windows GUI controls and Fedora interactions still
   need manual review.
+- Workspace controls now save dock width, compact layout, auto-hide timing,
+  overlay opacity and peek distance. Auto-hide reserves a narrow rail and draws
+  the dock over the workspace; status controls zoom terminal text and pause
+  animated effects. Fake-time tests cover opening, delay, closing and idle
+  repaint behavior. Windows GUI focus, overlay hit-testing and narrow-window
+  interaction still need manual review.
 - All 555 legacy theme selections are present. Linear, radial, and conic
   multi-stop terminal gradients preserve their angle/position; animated drift,
   static, and scanlines also render natively. Repeating gradients, hsync warp,

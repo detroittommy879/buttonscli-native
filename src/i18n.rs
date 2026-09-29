@@ -128,10 +128,22 @@ pub enum MessageKey {
     TerminalSearchStatus,
     TerminalSearchNoMatches,
     TerminalSearchInvalidPattern,
+    WorkspaceDockWidth,
+    WorkspaceDockCompact,
+    WorkspaceDockAutoHide,
+    WorkspaceDockAutoHideDelay,
+    WorkspaceDockOpacity,
+    WorkspaceDockPeekRadius,
+    WorkspaceDockShow,
+    TerminalZoomIn,
+    TerminalZoomOut,
+    TerminalZoomReset,
+    CalmMode,
+    CalmModeHelp,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 121] = [
+    pub const ALL: [Self; 133] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -253,6 +265,18 @@ impl MessageKey {
         Self::TerminalSearchStatus,
         Self::TerminalSearchNoMatches,
         Self::TerminalSearchInvalidPattern,
+        Self::WorkspaceDockWidth,
+        Self::WorkspaceDockCompact,
+        Self::WorkspaceDockAutoHide,
+        Self::WorkspaceDockAutoHideDelay,
+        Self::WorkspaceDockOpacity,
+        Self::WorkspaceDockPeekRadius,
+        Self::WorkspaceDockShow,
+        Self::TerminalZoomIn,
+        Self::TerminalZoomOut,
+        Self::TerminalZoomReset,
+        Self::CalmMode,
+        Self::CalmModeHelp,
     ];
 }
 
@@ -397,6 +421,18 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::TerminalSearchStatus => "{current} of {count}",
         MessageKey::TerminalSearchNoMatches => "No matches",
         MessageKey::TerminalSearchInvalidPattern => "Invalid search pattern",
+        MessageKey::WorkspaceDockWidth => "Command dock width",
+        MessageKey::WorkspaceDockCompact => "Compact command dock",
+        MessageKey::WorkspaceDockAutoHide => "Auto-hide command dock",
+        MessageKey::WorkspaceDockAutoHideDelay => "Auto-hide delay",
+        MessageKey::WorkspaceDockOpacity => "Auto-hide rail opacity",
+        MessageKey::WorkspaceDockPeekRadius => "Peek area",
+        MessageKey::WorkspaceDockShow => "Show command dock",
+        MessageKey::TerminalZoomIn => "Increase terminal text size",
+        MessageKey::TerminalZoomOut => "Decrease terminal text size",
+        MessageKey::TerminalZoomReset => "Reset terminal text size",
+        MessageKey::CalmMode => "Calm effects",
+        MessageKey::CalmModeHelp => "Pause animated terminal effects",
     }
 }
 

@@ -146,6 +146,7 @@ mod tests {
         assert!(resolve(FeatureKey::PaneLayout, &runtime, &None, 100).available);
         assert!(resolve(FeatureKey::KeyboardShortcuts, &runtime, &None, 100).available);
         assert!(resolve(FeatureKey::TerminalSearch, &runtime, &None, 100).available);
+        assert!(resolve(FeatureKey::WorkspaceControls, &runtime, &None, 100).available);
         assert_eq!(
             resolve(FeatureKey::QuickSecrets, &runtime, &None, 100).discoverability,
             Discoverability::Hidden

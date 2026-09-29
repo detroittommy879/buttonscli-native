@@ -92,6 +92,9 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
             }
         }
     }
+    if let Some(layout) = document.get("layout").and_then(Value::as_object) {
+        project_dock_preferences(layout, &mut preferences, &mut warnings);
+    }
     if let Some(localization) = document.get("localization") {
         if localization["mode"] == "manual" {
             if let Some(requested) = localization["manualLocale"].as_str() {
@@ -129,6 +132,71 @@ pub(crate) fn project(document: &LegacyDocument) -> Projection {
         safe_config: Value::Object(safe),
         selected_locale,
         warnings,
+    }
+}
+
+fn project_dock_preferences(
+    layout: &Map<String, Value>,
+    preferences: &mut Preferences,
+    warnings: &mut Vec<String>,
+) {
+    if let Some(value) = layout.get("leftPresetDockWidth") {
+        if let Some(width) = value.as_f64().filter(|width| width.is_finite()) {
+            let normalized = (width as f32).clamp(124.0, 360.0);
+            if normalized as f64 != width {
+                warnings.push("layout.leftPresetDockWidth was clamped to native limits".into());
+            }
+            preferences.dock_width = normalized;
+        } else {
+            warnings.push("layout.leftPresetDockWidth is invalid".into());
+        }
+    }
+    for (key, target) in [
+        ("leftPresetDockCompact", &mut preferences.dock_compact),
+        ("leftPresetDockAutoHide", &mut preferences.dock_auto_hide),
+    ] {
+        if let Some(value) = layout.get(key) {
+            if let Some(enabled) = value.as_bool() {
+                *target = enabled;
+            } else {
+                warnings.push(format!("layout.{key} is invalid"));
+            }
+        }
+    }
+    if let Some(value) = layout.get("leftPresetDockAutoHideMs") {
+        if let Some(delay) = value.as_u64() {
+            let normalized = delay.clamp(250, 30_000);
+            if normalized != delay {
+                warnings
+                    .push("layout.leftPresetDockAutoHideMs was clamped to native limits".into());
+            }
+            preferences.dock_auto_hide_ms = normalized;
+        } else {
+            warnings.push("layout.leftPresetDockAutoHideMs is invalid".into());
+        }
+    }
+    if let Some(value) = layout.get("leftPresetDockOpacity") {
+        if let Some(opacity) = value.as_f64().filter(|opacity| opacity.is_finite()) {
+            let normalized = (opacity as f32).clamp(0.2, 1.0);
+            if normalized as f64 != opacity {
+                warnings.push("layout.leftPresetDockOpacity was clamped to native limits".into());
+            }
+            preferences.dock_opacity = normalized;
+        } else {
+            warnings.push("layout.leftPresetDockOpacity is invalid".into());
+        }
+    }
+    if let Some(value) = layout.get("leftPresetDockPeekRadius") {
+        if let Some(radius) = value.as_u64() {
+            let normalized = radius.min(24) as u8;
+            if normalized as u64 != radius {
+                warnings
+                    .push("layout.leftPresetDockPeekRadius was clamped to native limits".into());
+            }
+            preferences.dock_peek_radius = normalized;
+        } else {
+            warnings.push("layout.leftPresetDockPeekRadius is invalid".into());
+        }
     }
 }
 
@@ -396,5 +464,28 @@ mod tests {
         let safe = serde_json::to_string(&project(&document).safe_config).unwrap();
         assert!(!safe.contains("FAKE-KEY"));
         assert!(safe.contains("https://example.test/v1"));
+    }
+
+    #[test]
+    fn legacy_dock_preferences_project_with_native_bounds() {
+        let document = LegacyDocument::parse(
+            br#"{"layout":{"leftPresetDockWidth":500,"leftPresetDockCompact":true,"leftPresetDockAutoHide":true,"leftPresetDockAutoHideMs":100,"leftPresetDockOpacity":0.35,"leftPresetDockPeekRadius":12}}"#,
+        )
+        .unwrap();
+        let projection = project(&document);
+        assert_eq!(projection.preferences.dock_width, 360.0);
+        assert!(projection.preferences.dock_compact);
+        assert!(projection.preferences.dock_auto_hide);
+        assert_eq!(projection.preferences.dock_auto_hide_ms, 250);
+        assert_eq!(projection.preferences.dock_opacity, 0.35);
+        assert_eq!(projection.preferences.dock_peek_radius, 12);
+        assert!(projection
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("leftPresetDockWidth")));
+        assert!(projection
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("leftPresetDockAutoHideMs")));
     }
 }

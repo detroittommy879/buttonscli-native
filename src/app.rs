@@ -113,6 +113,17 @@ fn terminal_search_available() -> bool {
     .available
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn workspace_controls_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::WorkspaceControls,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 pub struct ButtonsApp {
     preferences: Preferences,
     themes: ThemeCatalog,
@@ -127,6 +138,10 @@ pub struct ButtonsApp {
     terminal_search_query: String,
     #[cfg(not(target_arch = "wasm32"))]
     terminal_search_status: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    dock_auto_hide_state: crate::dock::AutoHideState,
+    #[cfg(not(target_arch = "wasm32"))]
+    dock_overlay_rect: Option<egui::Rect>,
     show_about: bool,
     show_preset_editor: bool,
     preset_editor_collection: PresetCollection,
@@ -511,6 +526,10 @@ impl ButtonsApp {
             terminal_search_query: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             terminal_search_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            dock_auto_hide_state: crate::dock::AutoHideState::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            dock_overlay_rect: None,
             show_about: false,
             show_preset_editor: false,
             preset_editor_collection: PresetCollection::Commands,
@@ -2100,96 +2119,225 @@ impl ButtonsApp {
             return;
         }
         let colors = self.colors();
-        egui::SidePanel::left("command_dock")
-            .default_width(220.0)
-            .width_range(160.0..=340.0)
-            .resizable(true)
+        let controls_available = workspace_controls_available();
+        let auto_hide = controls_available && self.preferences.dock_auto_hide;
+        let width = self.preferences.dock_width.clamp(124.0, 360.0);
+        let panel_id = if auto_hide {
+            "command_dock_rail"
+        } else {
+            "command_dock"
+        };
+        let panel = egui::SidePanel::left(panel_id)
+            .default_width(if auto_hide {
+                crate::dock::AUTO_HIDE_RAIL_WIDTH
+            } else {
+                width
+            })
+            .width_range(if auto_hide {
+                crate::dock::AUTO_HIDE_RAIL_WIDTH..=crate::dock::AUTO_HIDE_RAIL_WIDTH
+            } else {
+                124.0..=360.0
+            })
+            .resizable(!auto_hide)
             .frame(
                 egui::Frame::new()
-                    .fill(colors.dock_background)
-                    .inner_margin(10.0),
-            )
-            .show(ctx, |ui| {
-                apply_zone_style(ui, &self.preferences.typography.preset_dock);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.small_button("‹").clicked() {
-                            self.preferences.show_sidebar = false;
-                        }
-                    });
-                });
-                ui.add_space(4.0);
-                ui.label(
-                    RichText::new("Saved remote connections for the focused terminal")
-                        .small()
-                        .color(colors.muted),
-                );
-                ui.add_space(8.0);
-                let presets = self.preferences.ssh_presets.clone();
-                let mut action = None;
-                if presets.is_empty() {
-                    ui.label(
-                        RichText::new("No SSH presets yet")
-                            .small()
-                            .color(colors.muted),
-                    );
-                    ui.add_space(4.0);
-                }
-                for (index, preset) in presets.iter().enumerate() {
-                    ui.horizontal(|ui| {
-                        let action_width = 24.0;
-                        let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
-                        if ui
-                            .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
-                            .on_hover_text(preset_hover_text(preset))
-                            .clicked()
-                        {
-                            action = Some(PresetAction::Run(PresetCollection::Ssh, index));
-                        }
-                        preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
-                    });
-                }
+                    .fill(if auto_hide && !self.dock_auto_hide_state.is_open() {
+                        crate::dock::with_opacity(
+                            colors.dock_background,
+                            self.preferences.dock_opacity,
+                        )
+                    } else {
+                        colors.dock_background
+                    })
+                    .inner_margin(if auto_hide { 1.0 } else { 10.0 }),
+            );
+        let panel_output = panel.show(ctx, |ui| {
+            if auto_hide {
                 if ui
                     .add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new("+ Add SSH preset"),
+                        [ui.available_width().max(1.0), 30.0],
+                        egui::Button::new("›"),
                     )
+                    .on_hover_text(crate::i18n::text(
+                        "en",
+                        crate::i18n::MessageKey::WorkspaceDockShow,
+                        &[],
+                    ))
                     .clicked()
                 {
-                    self.open_add_preset_editor(PresetCollection::Ssh);
+                    self.dock_auto_hide_state.reveal();
                 }
-                if let Some(action) = action {
-                    self.perform_preset_action(action);
+            } else {
+                self.command_dock_contents(ui, controls_available);
+            }
+        });
+        let rail_rect = panel_output.response.rect;
+        if !self.preferences.show_sidebar {
+            self.dock_overlay_rect = None;
+            return;
+        }
+        if !auto_hide {
+            self.preferences.dock_width = rail_rect.width().clamp(124.0, 360.0);
+            self.dock_overlay_rect = None;
+            return;
+        }
+
+        let pointer = ctx.input(|input| input.pointer.hover_pos());
+        let peek_radius = self.preferences.dock_peek_radius as f32;
+        let pointer_inside = pointer.is_some_and(|position| {
+            rail_rect
+                .expand2(Vec2::new(peek_radius, 0.0))
+                .contains(position)
+                || self
+                    .dock_overlay_rect
+                    .is_some_and(|rect| rect.contains(position))
+        });
+        let now = ctx.input(|input| input.time);
+        let frame = self.dock_auto_hide_state.update(
+            true,
+            pointer_inside,
+            now,
+            self.preferences.dock_auto_hide_ms,
+        );
+        if let Some(delay) = frame.repaint_after {
+            ctx.request_repaint_after(delay);
+        }
+        if frame.open {
+            let screen = ctx.screen_rect();
+            let overlay_width = crate::dock::auto_hide_overlay_width(
+                true,
+                width,
+                screen.right() - rail_rect.left(),
+            )
+            .unwrap_or(1.0);
+            let response = egui::Area::new(egui::Id::new("command_dock_overlay"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(rail_rect.left_top())
+                .show(ctx, |ui| {
+                    ui.set_min_width(overlay_width);
+                    ui.set_max_width(overlay_width);
+                    egui::Frame::new()
+                        .fill(colors.dock_background)
+                        .stroke(Stroke::new(1.0, colors.border))
+                        .inner_margin(10.0)
+                        .show(ui, |ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height((screen.height() - 24.0).max(80.0))
+                                .show(ui, |ui| {
+                                    self.command_dock_contents(ui, controls_available);
+                                });
+                        });
+                });
+            self.dock_overlay_rect = Some(response.response.rect);
+        } else {
+            self.dock_overlay_rect = None;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn command_dock_contents(&mut self, ui: &mut egui::Ui, controls_available: bool) {
+        let colors = self.colors();
+        apply_zone_style(ui, &self.preferences.typography.preset_dock);
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if ui.small_button("‹").clicked() {
+                    self.preferences.show_sidebar = false;
                 }
-                ui.add_space(12.0);
-                ui.separator();
-                ui.label(
-                    RichText::new("RUN A COMMAND")
-                        .small()
-                        .strong()
-                        .color(colors.muted),
-                );
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut self.command)
-                        .hint_text("command…")
-                        .desired_width(f32::INFINITY),
-                );
-                let run =
-                    response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-                if (ui
-                    .add_sized(
-                        [ui.available_width(), 30.0],
-                        egui::Button::new("Run in terminal"),
-                    )
-                    .clicked()
-                    || run)
-                    && !self.command.trim().is_empty()
-                {
-                    let command = std::mem::take(&mut self.command);
-                    self.run_command(command.trim());
+                if controls_available {
+                    ui.checkbox(
+                        &mut self.preferences.dock_compact,
+                        crate::i18n::text("en", crate::i18n::MessageKey::WorkspaceDockCompact, &[]),
+                    );
                 }
             });
+        });
+        if !self.preferences.dock_compact {
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new("Saved remote connections for the focused terminal")
+                    .small()
+                    .color(colors.muted),
+            );
+        }
+        ui.add_space(8.0);
+        let presets = self.preferences.ssh_presets.clone();
+        let mut action = None;
+        if presets.is_empty() {
+            ui.label(
+                RichText::new("No SSH presets yet")
+                    .small()
+                    .color(colors.muted),
+            );
+            ui.add_space(4.0);
+        }
+        if self.preferences.dock_compact {
+            ui.horizontal_wrapped(|ui| {
+                for (index, preset) in presets.iter().enumerate() {
+                    if ui
+                        .button(&preset.label)
+                        .on_hover_text(preset_hover_text(preset))
+                        .clicked()
+                    {
+                        action = Some(PresetAction::Run(PresetCollection::Ssh, index));
+                    }
+                    preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
+                }
+            });
+        } else {
+            for (index, preset) in presets.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    let action_width = 24.0;
+                    let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
+                    if ui
+                        .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
+                        .on_hover_text(preset_hover_text(preset))
+                        .clicked()
+                    {
+                        action = Some(PresetAction::Run(PresetCollection::Ssh, index));
+                    }
+                    preset_action_menu(ui, PresetCollection::Ssh, index, &mut action);
+                });
+            }
+        }
+        if ui
+            .add_sized(
+                [ui.available_width(), 28.0],
+                egui::Button::new("+ Add SSH preset"),
+            )
+            .clicked()
+        {
+            self.open_add_preset_editor(PresetCollection::Ssh);
+        }
+        if let Some(action) = action {
+            self.perform_preset_action(action);
+        }
+        ui.add_space(12.0);
+        ui.separator();
+        ui.label(
+            RichText::new("RUN A COMMAND")
+                .small()
+                .strong()
+                .color(colors.muted),
+        );
+        let response = ui.add(
+            egui::TextEdit::singleline(&mut self.command)
+                .hint_text("command…")
+                .desired_width(f32::INFINITY),
+        );
+        let run = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+        if (ui
+            .add_sized(
+                [ui.available_width(), 30.0],
+                egui::Button::new("Run in terminal"),
+            )
+            .clicked()
+            || run)
+            && !self.command.trim().is_empty()
+        {
+            let command = std::mem::take(&mut self.command);
+            self.run_command(command.trim());
+        }
     }
 
     fn status_bar(&mut self, ctx: &egui::Context) {
@@ -2315,15 +2463,76 @@ impl ButtonsApp {
                         if ui.small_button("Settings").clicked() {
                             self.show_settings = true;
                         }
-                        if ui.small_button("+").clicked() {
-                            self.preferences.typography.terminal.size =
-                                (self.preferences.typography.terminal.size + 1.0).min(32.0);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            let controls_enabled = workspace_controls_available();
+                            let calm_label = crate::i18n::text(
+                                "en",
+                                crate::i18n::MessageKey::CalmMode,
+                                &[],
+                            );
+                            let calm = if controls_enabled {
+                                ui.selectable_label(self.preferences.calm_mode, calm_label)
+                            } else {
+                                ui.label(calm_label)
+                            }
+                                .on_hover_text(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::CalmModeHelp,
+                                    &[],
+                                ));
+                            if controls_enabled && calm.clicked() {
+                                self.preferences.calm_mode = !self.preferences.calm_mode;
+                            }
+                            let zoom_in = ui
+                                .add_enabled(controls_enabled, egui::Button::new("+"))
+                                .on_hover_text(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalZoomIn,
+                                    &[],
+                                ));
+                            if zoom_in.clicked() {
+                                self.preferences.typography.terminal.size =
+                                    crate::dock::next_terminal_font_size(
+                                        self.preferences.typography.terminal.size,
+                                        crate::dock::ZoomAction::In,
+                                    );
+                            }
+                            let zoom_out = ui
+                                .add_enabled(controls_enabled, egui::Button::new("−"))
+                                .on_hover_text(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalZoomOut,
+                                    &[],
+                                ));
+                            if zoom_out.clicked() {
+                                self.preferences.typography.terminal.size =
+                                    crate::dock::next_terminal_font_size(
+                                        self.preferences.typography.terminal.size,
+                                        crate::dock::ZoomAction::Out,
+                                    );
+                            }
+                            let zoom = crate::dock::terminal_zoom_percent(
+                                self.preferences.typography.terminal.size,
+                            );
+                            let zoom_reset = if controls_enabled {
+                                ui.small_button(format!("{zoom}%"))
+                            } else {
+                                ui.label(format!("{zoom}%"))
+                            }
+                                .on_hover_text(crate::i18n::text(
+                                    "en",
+                                    crate::i18n::MessageKey::TerminalZoomReset,
+                                    &[],
+                                ));
+                            if controls_enabled && zoom_reset.clicked() {
+                                self.preferences.typography.terminal.size =
+                                    crate::dock::next_terminal_font_size(
+                                        self.preferences.typography.terminal.size,
+                                        crate::dock::ZoomAction::Reset,
+                                    );
+                            }
                         }
-                        if ui.small_button("−").clicked() {
-                            self.preferences.typography.terminal.size =
-                                (self.preferences.typography.terminal.size - 1.0).max(8.0);
-                        }
-                        ui.label(RichText::new("100%").small().color(colors.muted));
                     });
                 });
             });
@@ -4111,12 +4320,64 @@ impl ButtonsApp {
     }
 
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
+        use crate::i18n::{text, MessageKey as M};
         ui.heading("Workspace");
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
                 ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+                #[cfg(not(target_arch = "wasm32"))]
+                if workspace_controls_available() {
+                    ui.add_space(8.0);
+                    let width_changed = ui
+                        .add(
+                            egui::Slider::new(&mut self.preferences.dock_width, 124.0..=360.0)
+                                .text(text("en", M::WorkspaceDockWidth, &[])),
+                        )
+                        .changed();
+                    if width_changed {
+                        let width = self.preferences.dock_width;
+                        let panel_id = egui::Id::new("command_dock");
+                        ui.ctx().data_mut(|data| {
+                            if let Some(mut state) =
+                                data.get_persisted::<egui::containers::panel::PanelState>(panel_id)
+                            {
+                                state.rect.max.x = state.rect.min.x + width;
+                                data.insert_persisted(panel_id, state);
+                            }
+                        });
+                    }
+                    ui.checkbox(
+                        &mut self.preferences.dock_compact,
+                        text("en", M::WorkspaceDockCompact, &[]),
+                    );
+                    ui.checkbox(
+                        &mut self.preferences.dock_auto_hide,
+                        text("en", M::WorkspaceDockAutoHide, &[]),
+                    );
+                    if self.preferences.dock_auto_hide {
+                        ui.add(
+                            egui::Slider::new(
+                                &mut self.preferences.dock_auto_hide_ms,
+                                250..=30_000,
+                            )
+                            .text(text(
+                                "en",
+                                M::WorkspaceDockAutoHideDelay,
+                                &[],
+                            )),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut self.preferences.dock_opacity, 0.2..=1.0)
+                                .text(text("en", M::WorkspaceDockOpacity, &[])),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut self.preferences.dock_peek_radius, 0..=24)
+                                .text(text("en", M::WorkspaceDockPeekRadius, &[])),
+                        );
+                    }
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 self.shell_settings(ui);
                 #[cfg(target_arch = "wasm32")]
@@ -4908,7 +5169,7 @@ fn paint_terminal_effects(
             );
         }
     }
-    if theme.effects.gradient_animation || effects.static_opacity > 0.0 {
+    if crate::dock::effects_need_repaint(theme.effects.gradient_animation, effects.static_opacity) {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(80));
     }
