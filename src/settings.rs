@@ -105,6 +105,7 @@ pub(crate) struct Preferences {
     pub(crate) effects_theme_id: String,
     pub(crate) theme_apply: ThemeApplyScopes,
     pub(crate) calm_mode: bool,
+    pub(crate) effects_focused_pane_only: bool,
     pub(crate) typography: Typography,
     pub(crate) show_sidebar: bool,
     pub(crate) show_presets: bool,
@@ -138,6 +139,7 @@ impl Default for Preferences {
             effects_theme_id: String::new(),
             theme_apply: ThemeApplyScopes::default(),
             calm_mode: false,
+            effects_focused_pane_only: false,
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
@@ -339,6 +341,19 @@ mod tests {
         preferences.window_opacity = f32::NAN;
         preferences.normalize_theme_sources();
         assert_eq!(preferences.window_opacity, 1.0);
+    }
+
+    #[test]
+    fn focused_pane_effect_preference_defaults_off_and_persists() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(!old.effects_focused_pane_only);
+        let saved = Preferences {
+            effects_focused_pane_only: true,
+            ..old
+        };
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert!(restored.effects_focused_pane_only);
     }
 
     #[test]

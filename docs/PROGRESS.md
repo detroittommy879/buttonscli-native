@@ -1,5 +1,21 @@
 # Reconstruction journal
 
+## 2026-09-29 — V01 repeating gradients and focused effects
+
+Ported repeating linear, radial, and conic gradient modes through theme
+projection, rendering, personal-theme editing, and export. Added a persisted
+focused-pane-only setting that removes background effects from other panes
+while preserving their theme colors. The effects master-off flag now suppresses
+gradient animation as well as static and scanline effects. The tier remains
+free under the existing `effectsMasterSwitch` and `calmThemeApply` entries.
+
+Automated checks cover repeat stop sampling and mesh bounds, each repeating
+geometry, master-off projection, focused/unfocused effects, and theme export.
+Windows `cargo test` passes (133 library tests, 2 fixture integration tests),
+the vendored renderer suite passes (14 tests), and Windows check/build plus the
+WASM library check pass. The native GUI and visual/frame-budget behavior have
+not had a live review.
+
 ## 2026-09-28 — U10 Cool Stuff installer and provider links
 
 Copied the exact source Windows, Ubuntu, and macOS installer scripts into the

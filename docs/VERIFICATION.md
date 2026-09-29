@@ -2,6 +2,20 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-29 V01 Windows checks
+
+Repeating gradient sampling/mesh, legacy geometry projection, master-off
+animation behavior, focused-pane filtering, and personal-theme export have
+automated coverage. The existing terminal grid still paints ANSI cell
+backgrounds over the gradient mesh. `cargo test` passed with 133 library and
+2 fixture integration tests; the vendored renderer suite passed 14 tests.
+Windows `cargo check --bin buttonscli`, `cargo build --bin buttonscli`, Rust
+formatting, and `cargo check --lib --target wasm32-unknown-unknown
+--no-default-features` passed. The WASM check reports existing native-only
+dead-code warnings. The binary build reports the existing bin/lib PDB filename
+collision. Live Windows theme editing, multi-pane visuals, and repaint/frame-
+cost review remain unverified.
+
 ## 2026-09-28 Windows source/build check
 
 `cargo fmt --all`, `cargo check --bin buttonscli`, `node --check

@@ -54,12 +54,13 @@ not a backlog disguised as release notes.
   changing terminal sessions. Source/build checks pass, but monitor movement,
   DPI scaling, focus, keyboard interaction, and live PTY continuity still need
   manual desktop review.
-- All 555 legacy theme selections are present. Linear, radial, and conic
-  multi-stop terminal gradients preserve their angle/position; animated drift,
-  static, and scanlines also render natively. Repeating gradients, hsync warp,
-  TV/simple noise variants, glow, wallpaper drawing, and the theme designer are
-  not rendered yet. Their original fields remain in the embedded JSON migration
-  assets.
+- All 555 legacy theme selections are present. Linear, radial, conic, and
+  repeating multi-stop terminal gradients preserve their type and geometry;
+  animated drift, static, and scanlines also render natively. The master-off
+  setting stops animation, and effects can be limited to the focused pane.
+  HSync warp, TV/simple noise variants, glow, wallpaper drawing, and the theme
+  designer are not rendered yet. Their original fields remain in the embedded
+  JSON migration assets.
 - The 20 bundled font families work offline. Native Settings also discovers
   local system fonts and imports profile-local `.ttf` / `.otf` files. Online
   Google Font downloads are deferred; online-only names in imported themes

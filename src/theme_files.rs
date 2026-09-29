@@ -156,11 +156,21 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
     let geometry = theme.effects.gradient_geometry;
     let (gradient_type, gradient_angle, radial_position) = match geometry {
         GradientGeometry::Linear { angle_degrees } => ("linear", angle_degrees, "center"),
+        GradientGeometry::RepeatingLinear { angle_degrees } => {
+            ("repeating-linear", angle_degrees, "center")
+        }
         GradientGeometry::Radial { center } => ("radial", 135.0, center_name(center)),
+        GradientGeometry::RepeatingRadial { center } => {
+            ("repeating-radial", 135.0, center_name(center))
+        }
         GradientGeometry::Conic {
             center,
             angle_degrees,
         } => ("conic", angle_degrees, center_name(center)),
+        GradientGeometry::RepeatingConic {
+            center,
+            angle_degrees,
+        } => ("repeating-conic", angle_degrees, center_name(center)),
     };
     let gradient_colors = theme
         .effects
@@ -256,6 +266,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             },
         },
         "effects": {
+            "masterDisabled": theme.effects.master_disabled,
             "staticEnabled": theme.effects.static_opacity > 0.0,
             "staticOpacity": theme.effects.static_opacity,
             "staticDensity": theme.effects.static_density,
@@ -464,6 +475,34 @@ mod tests {
             .unwrap_err()
             .contains("already exists"));
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn exported_personal_themes_keep_repeating_gradient_modes() {
+        let mut theme = crate::theme::ThemeCatalog::load().get("basic2").clone();
+        for (geometry, expected) in [
+            (
+                GradientGeometry::RepeatingLinear {
+                    angle_degrees: 42.0,
+                },
+                "repeating-linear",
+            ),
+            (
+                GradientGeometry::RepeatingRadial { center: [1.0, 0.0] },
+                "repeating-radial",
+            ),
+            (
+                GradientGeometry::RepeatingConic {
+                    center: [1.0, 0.0],
+                    angle_degrees: 42.0,
+                },
+                "repeating-conic",
+            ),
+        ] {
+            theme.effects.gradient_geometry = geometry;
+            let document = document_from_theme(&theme, "Repeat");
+            assert_eq!(document["theme"]["terminal"]["gradientType"], expected);
+        }
     }
 
     #[test]

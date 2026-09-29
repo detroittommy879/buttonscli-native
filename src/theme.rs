@@ -277,6 +277,7 @@ pub struct TerminalEffects {
     pub gradient: Option<[Color32; 4]>,
     pub gradient_geometry: GradientGeometry,
     pub gradient_animation: bool,
+    pub master_disabled: bool,
     pub static_opacity: f32,
     pub static_density: f32,
     pub scanlines_strength: f32,
@@ -288,10 +289,20 @@ pub enum GradientGeometry {
     Linear {
         angle_degrees: f32,
     },
+    RepeatingLinear {
+        angle_degrees: f32,
+    },
     Radial {
         center: [f32; 2],
     },
+    RepeatingRadial {
+        center: [f32; 2],
+    },
     Conic {
+        center: [f32; 2],
+        angle_degrees: f32,
+    },
+    RepeatingConic {
         center: [f32; 2],
         angle_degrees: f32,
     },
@@ -588,10 +599,13 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
     TerminalEffects {
         gradient,
         gradient_geometry: parse_gradient_geometry(terminal),
-        gradient_animation: terminal
-            .get("gradientAnimation")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
+        gradient_animation: gradient_enabled
+            && !disabled
+            && terminal
+                .get("gradientAnimation")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        master_disabled: disabled,
         static_opacity: if enabled("staticEnabled") {
             unit("staticOpacity", unit("staticIntensity", 0.08)).clamp(0.0, 0.35)
         } else {
@@ -621,13 +635,23 @@ fn parse_gradient_geometry(terminal: &Value) -> GradientGeometry {
             .or_else(|| string_at(terminal, "gradientPosition"))
             .unwrap_or("center"),
     );
-    if kind.contains("radial") {
+    let repeating = kind.starts_with("repeating-");
+    if kind.contains("radial") && repeating {
+        GradientGeometry::RepeatingRadial { center }
+    } else if kind.contains("radial") {
         GradientGeometry::Radial { center }
+    } else if kind.contains("conic") && repeating {
+        GradientGeometry::RepeatingConic {
+            center,
+            angle_degrees,
+        }
     } else if kind.contains("conic") {
         GradientGeometry::Conic {
             center,
             angle_degrees,
         }
+    } else if repeating {
+        GradientGeometry::RepeatingLinear { angle_degrees }
     } else {
         GradientGeometry::Linear { angle_degrees }
     }
@@ -880,6 +904,67 @@ mod tests {
                 angle_degrees: 90.0,
             }
         );
+    }
+
+    #[test]
+    fn repeating_gradient_modes_and_master_disable_are_projected() {
+        let modes = [
+            (
+                "repeating-linear",
+                GradientGeometry::RepeatingLinear {
+                    angle_degrees: 42.0,
+                },
+            ),
+            (
+                "repeating-radial",
+                GradientGeometry::RepeatingRadial { center: [1.0, 0.0] },
+            ),
+            (
+                "repeating-conic",
+                GradientGeometry::RepeatingConic {
+                    center: [1.0, 0.0],
+                    angle_degrees: 42.0,
+                },
+            ),
+        ];
+        for (kind, expected) in modes {
+            let document = serde_json::json!({
+                "metadata": {"id": "repeat", "name": "Repeat"},
+                "theme": {"terminal": {
+                    "useGradient": true,
+                    "gradientType": kind,
+                    "gradientAngle": 42,
+                    "gradientRadialPosition": "top-right",
+                    "gradientAnimation": true,
+                    "gradientColors": ["#ff0000", "#00ff00", "#0000ff", "#ffffff"]
+                }},
+                "effects": {
+                    "masterDisabled": true,
+                    "staticEnabled": true,
+                    "scanlinesEnabled": true
+                }
+            });
+            let theme = parse_legacy_value("repeat", &document, ThemeSource::Personal).unwrap();
+            assert_eq!(theme.effects.gradient_geometry, expected, "{kind}");
+            assert!(theme.effects.gradient.is_some(), "{kind}");
+            assert!(!theme.effects.gradient_animation, "{kind}");
+            assert_eq!(theme.effects.static_opacity, 0.0, "{kind}");
+            assert_eq!(theme.effects.scanlines_strength, 0.0, "{kind}");
+        }
+    }
+
+    #[test]
+    fn disabled_gradient_does_not_request_animation() {
+        let document = serde_json::json!({
+            "metadata": {"id": "no-gradient", "name": "No gradient"},
+            "theme": {"terminal": {
+                "useGradient": false,
+                "gradientAnimation": true
+            }}
+        });
+        let theme = parse_legacy_value("no-gradient", &document, ThemeSource::Personal).unwrap();
+        assert!(theme.effects.gradient.is_none());
+        assert!(!theme.effects.gradient_animation);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

@@ -13,11 +13,11 @@ use crate::layout::{self, Bounds, LayoutMode};
 use crate::session::actions::{
     self, Action, ActionError, Dispatcher, Inbox, SessionInfo, Snapshot, Target,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::settings::ShellProfile;
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
-use crate::settings::{
-    default_presets, CommandPreset, LocalizationMode, Preferences, ShellProfile,
-};
+use crate::settings::{default_presets, CommandPreset, LocalizationMode, Preferences};
 use crate::shortcuts::{ShortcutAction, ShortcutAssignError, ShortcutChord};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage::import::{self, ImportCommit, ImportPreview};
@@ -121,6 +121,17 @@ fn terminal_search_available() -> bool {
 fn workspace_controls_available() -> bool {
     crate::features::access::resolve(
         crate::features::catalog::FeatureKey::WorkspaceControls,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn effects_master_switch_available() -> bool {
+    crate::features::access::resolve(
+        crate::features::catalog::FeatureKey::EffectsMasterSwitch,
         &crate::features::access::RuntimeAccess::default(),
         &None,
         0,
@@ -972,7 +983,10 @@ impl ButtonsApp {
         theme.effects = TerminalEffects {
             gradient: gradient.gradient,
             gradient_geometry: gradient.gradient_geometry,
-            gradient_animation: gradient.gradient_animation && !self.preferences.calm_mode,
+            gradient_animation: gradient.gradient_animation
+                && !effects.master_disabled
+                && !self.preferences.calm_mode,
+            master_disabled: effects.master_disabled,
             static_opacity: if self.preferences.calm_mode {
                 0.0
             } else {
@@ -1818,11 +1832,21 @@ impl ButtonsApp {
             .filter_map(|id| self.tabs.iter().position(|tab| tab.id == *id))
             .collect();
         self.rendered_panes = visible.clone();
+        let focused_effects_only =
+            self.preferences.effects_focused_pane_only && effects_master_switch_available();
         let override_themes: std::collections::BTreeMap<_, _> = visible
             .iter()
-            .filter_map(|index| self.tabs.get(*index))
-            .filter(|tab| self.theme_overrides.contains_key(&tab.id))
-            .map(|tab| (tab.id, self.terminal_presentation_for(tab.id)))
+            .filter_map(|index| self.tabs.get(*index).map(|tab| (*index, tab)))
+            .filter(|(index, tab)| {
+                self.theme_overrides.contains_key(&tab.id)
+                    || (focused_effects_only && *index != focused)
+            })
+            .map(|(index, tab)| {
+                let mut theme = self.terminal_presentation_for(tab.id);
+                theme.effects =
+                    pane_effects_for_focus(&theme.effects, index == focused, focused_effects_only);
+                (tab.id, theme)
+            })
             .collect();
         let tree = pane_tree(self.pane_layout, &visible, plan.rows, plan.columns);
         ui.allocate_rect(rect, egui::Sense::hover());
@@ -2261,12 +2285,16 @@ impl ButtonsApp {
                         }
                     });
                     ui.menu_button(crate::i18n::literal(&self.locale, "Help"), |ui| {
+                        #[cfg(not(target_arch = "wasm32"))]
                         if ui
-                            .button(crate::i18n::text(
-                                &self.locale,
-                                crate::i18n::MessageKey::AiHelp,
-                                &[],
-                            ))
+                            .add_enabled(
+                                ai_help_available(),
+                                egui::Button::new(crate::i18n::text(
+                                    &self.locale,
+                                    crate::i18n::MessageKey::AiHelp,
+                                    &[],
+                                )),
+                            )
                             .clicked()
                         {
                             if let Ok(mut state) = self.ai_help_state.lock() {
@@ -4922,6 +4950,45 @@ impl ButtonsApp {
                     "/theme/terminal/useGradient",
                 );
                 if document["theme"]["terminal"]["useGradient"] == true {
+                    let gradient_types = [
+                        ("linear", "Linear"),
+                        ("radial", "Radial"),
+                        ("conic", "Conic"),
+                        ("repeating-linear", "Repeating Linear"),
+                        ("repeating-radial", "Repeating Radial"),
+                        ("repeating-conic", "Repeating Conic"),
+                    ];
+                    let mut gradient_type = document["theme"]["terminal"]["gradientType"]
+                        .as_str()
+                        .unwrap_or("linear")
+                        .to_owned();
+                    let selected_label = gradient_types
+                        .iter()
+                        .find(|(kind, _)| *kind == gradient_type)
+                        .map(|(_, label)| *label)
+                        .unwrap_or("Linear");
+                    egui::ComboBox::from_id_salt("personal-theme-gradient-type")
+                        .selected_text(crate::i18n::literal(&locale, selected_label))
+                        .show_ui(ui, |ui| {
+                            for (kind, label) in gradient_types {
+                                ui.selectable_value(
+                                    &mut gradient_type,
+                                    kind.to_owned(),
+                                    crate::i18n::literal(&locale, label),
+                                );
+                            }
+                        });
+                    if gradient_type
+                        != document["theme"]["terminal"]["gradientType"]
+                            .as_str()
+                            .unwrap_or("linear")
+                    {
+                        set_theme_document_value(
+                            &mut document,
+                            "/theme/terminal/gradientType",
+                            json!(gradient_type),
+                        );
+                    }
                     for (index, label) in [
                         "Gradient color 1",
                         "Gradient color 2",
@@ -6052,6 +6119,7 @@ impl ButtonsApp {
     }
 
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
+        #[cfg(not(target_arch = "wasm32"))]
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         egui::ScrollArea::vertical()
@@ -6059,6 +6127,17 @@ impl ButtonsApp {
             .show(ui, |ui| {
                 ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
                 ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let effects_enabled = effects_master_switch_available();
+                    ui.add_enabled(
+                        effects_enabled,
+                        egui::Checkbox::new(
+                            &mut self.preferences.effects_focused_pane_only,
+                            crate::i18n::literal(&self.locale, "Focused pane only"),
+                        ),
+                    );
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 if window_transparency_available() {
                     ui.add_space(8.0);
@@ -6882,11 +6961,28 @@ fn terminal_surface(
                 colors,
                 angle_degrees,
             },
+            GradientGeometry::RepeatingLinear { angle_degrees } => {
+                BackgroundGradient::RepeatingLinear {
+                    colors,
+                    angle_degrees,
+                }
+            }
             GradientGeometry::Radial { center } => BackgroundGradient::Radial { colors, center },
+            GradientGeometry::RepeatingRadial { center } => {
+                BackgroundGradient::RepeatingRadial { colors, center }
+            }
             GradientGeometry::Conic {
                 center,
                 angle_degrees,
             } => BackgroundGradient::Conic {
+                colors,
+                center,
+                angle_degrees,
+            },
+            GradientGeometry::RepeatingConic {
+                center,
+                angle_degrees,
+            } => BackgroundGradient::RepeatingConic {
                 colors,
                 center,
                 angle_degrees,
@@ -7037,6 +7133,19 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
         channel(a.g(), b.g()),
         channel(a.b(), b.b()),
     )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_effects_for_focus(
+    effects: &TerminalEffects,
+    focused: bool,
+    focused_only: bool,
+) -> TerminalEffects {
+    if focused_only && !focused {
+        TerminalEffects::default()
+    } else {
+        effects.clone()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -7890,6 +7999,31 @@ mod tests {
         assert_eq!(app.preferences.app_theme_id, "aurora");
         assert_eq!(app.preferences.terminal_theme_id, "basic2");
         assert_eq!(app.preferences.gradient_theme_id, "basic2");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn focused_pane_effect_policy_only_removes_effects_from_other_panes() {
+        let effects = TerminalEffects {
+            gradient: Some([Color32::RED, Color32::GREEN, Color32::BLUE, Color32::WHITE]),
+            gradient_animation: true,
+            static_opacity: 0.12,
+            scanlines_strength: 0.08,
+            ..TerminalEffects::default()
+        };
+        assert_eq!(
+            pane_effects_for_focus(&effects, true, true).gradient,
+            effects.gradient
+        );
+        let unfocused = pane_effects_for_focus(&effects, false, true);
+        assert!(unfocused.gradient.is_none());
+        assert!(!unfocused.gradient_animation);
+        assert_eq!(unfocused.static_opacity, 0.0);
+        assert_eq!(unfocused.scanlines_strength, 0.0);
+        assert_eq!(
+            pane_effects_for_focus(&effects, false, false).gradient,
+            effects.gradient
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]

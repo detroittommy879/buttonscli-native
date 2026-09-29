@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added repeating linear, radial, and conic gradients to the native renderer and personal-theme editor. The effects master-off setting now also stops gradient animation, and an optional focused-pane policy suppresses background effects on other panes.
 - Added saved Windows main-window opacity control with explicit capability information on other platforms. Imported legacy opacity values are mapped into the native preference and clamped to 25–100%.
 - Added the Cool Stuff installer preview, bundled Windows/Ubuntu/macOS scripts, safe copy/type-only commands, and the five source-matched provider links. Typing never presses Enter.
 

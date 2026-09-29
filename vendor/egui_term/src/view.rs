@@ -56,11 +56,24 @@ pub enum BackgroundGradient {
         colors: [Color32; 4],
         angle_degrees: f32,
     },
+    RepeatingLinear {
+        colors: [Color32; 4],
+        angle_degrees: f32,
+    },
     Radial {
         colors: [Color32; 4],
         center: [f32; 2],
     },
+    RepeatingRadial {
+        colors: [Color32; 4],
+        center: [f32; 2],
+    },
     Conic {
+        colors: [Color32; 4],
+        center: [f32; 2],
+        angle_degrees: f32,
+    },
+    RepeatingConic {
         colors: [Color32; 4],
         center: [f32; 2],
         angle_degrees: f32,
@@ -417,14 +430,26 @@ fn background_gradient_mesh(rect: Rect, gradient: BackgroundGradient) -> Mesh {
             colors,
             angle_degrees,
         } => linear_gradient_mesh(rect, colors, angle_degrees),
+        BackgroundGradient::RepeatingLinear {
+            colors,
+            angle_degrees,
+        } => repeating_linear_gradient_mesh(rect, colors, angle_degrees),
         BackgroundGradient::Radial { colors, center } => {
-            radial_gradient_mesh(rect, colors, center)
+            radial_gradient_mesh(rect, colors, center, false)
+        },
+        BackgroundGradient::RepeatingRadial { colors, center } => {
+            radial_gradient_mesh(rect, colors, center, true)
         },
         BackgroundGradient::Conic {
             colors,
             center,
             angle_degrees,
-        } => conic_gradient_mesh(rect, colors, center, angle_degrees),
+        } => conic_gradient_mesh(rect, colors, center, angle_degrees, false),
+        BackgroundGradient::RepeatingConic {
+            colors,
+            center,
+            angle_degrees,
+        } => conic_gradient_mesh(rect, colors, center, angle_degrees, true),
     }
 }
 
@@ -450,13 +475,117 @@ fn linear_gradient_mesh(
     mesh
 }
 
+fn repeating_linear_gradient_mesh(
+    rect: Rect,
+    colors: [Color32; 4],
+    angle_degrees: f32,
+) -> Mesh {
+    const BAND_COUNT: usize = 10;
+    let angle = angle_degrees.to_radians();
+    let direction = Vec2::new(angle.cos(), angle.sin());
+    let extent = (direction.x.abs() + direction.y.abs()).max(0.001);
+    let corners = [
+        Pos2::new(0.0, 0.0),
+        Pos2::new(1.0, 0.0),
+        Pos2::new(1.0, 1.0),
+        Pos2::new(0.0, 1.0),
+    ];
+    let progress = |point: Pos2| {
+        0.5 + ((point.x - 0.5) * direction.x + (point.y - 0.5) * direction.y)
+            / extent
+    };
+    let mut mesh = Mesh::default();
+
+    for band in 0..BAND_COUNT {
+        let low = band as f32 / BAND_COUNT as f32;
+        let high = (band + 1) as f32 / BAND_COUNT as f32;
+        let polygon =
+            clip_gradient_polygon(corners.to_vec(), low, true, &progress);
+        let polygon = clip_gradient_polygon(polygon, high, false, &progress);
+        if polygon.len() < 3 {
+            continue;
+        }
+
+        let first_vertex = mesh.vertices.len() as u32;
+        let first_color = colors[band % 3];
+        let second_color = colors[(band % 3) + 1];
+        for point in &polygon {
+            let amount =
+                ((progress(*point) - low) / (high - low)).clamp(0.0, 1.0);
+            let position = Pos2::new(
+                rect.left() + rect.width() * point.x,
+                rect.top() + rect.height() * point.y,
+            );
+            mesh.colored_vertex(
+                position,
+                mix_color(first_color, second_color, amount),
+            );
+        }
+        for vertex in 1..polygon.len() - 1 {
+            mesh.add_triangle(
+                first_vertex,
+                first_vertex + vertex as u32,
+                first_vertex + vertex as u32 + 1,
+            );
+        }
+    }
+    mesh
+}
+
+fn clip_gradient_polygon(
+    polygon: Vec<Pos2>,
+    boundary: f32,
+    keep_greater: bool,
+    progress: &impl Fn(Pos2) -> f32,
+) -> Vec<Pos2> {
+    if polygon.is_empty() {
+        return polygon;
+    }
+    let inside = |point: Pos2| {
+        if keep_greater {
+            progress(point) >= boundary
+        } else {
+            progress(point) <= boundary
+        }
+    };
+    let mut clipped = Vec::with_capacity(polygon.len() + 2);
+    let mut previous = *polygon.last().expect("nonempty polygon checked");
+    let mut previous_inside = inside(previous);
+    for current in polygon {
+        let current_inside = inside(current);
+        if current_inside != previous_inside {
+            let previous_progress = progress(previous);
+            let current_progress = progress(current);
+            let denominator = current_progress - previous_progress;
+            if denominator.abs() > f32::EPSILON {
+                let amount = ((boundary - previous_progress) / denominator)
+                    .clamp(0.0, 1.0);
+                clipped.push(previous + (current - previous) * amount);
+            }
+        }
+        if current_inside {
+            clipped.push(current);
+        }
+        previous = current;
+        previous_inside = current_inside;
+    }
+    clipped
+}
+
 fn radial_gradient_mesh(
     rect: Rect,
     colors: [Color32; 4],
     center: [f32; 2],
+    repeating: bool,
 ) -> Mesh {
     const SEGMENTS: usize = 48;
-    const RINGS: usize = 4;
+    const NORMAL_RINGS: usize = 4;
+    const REPEATING_RINGS: usize = 31;
+    let ring_count = if repeating {
+        REPEATING_RINGS
+    } else {
+        NORMAL_RINGS
+    };
     let center = Pos2::new(
         rect.left() + rect.width() * center[0].clamp(0.0, 1.0),
         rect.top() + rect.height() * center[1].clamp(0.0, 1.0),
@@ -471,18 +600,23 @@ fn radial_gradient_mesh(
     .map(|corner| center.distance(corner))
     .fold(0.0_f32, f32::max);
     let mut mesh = Mesh::default();
-    for ring in 0..RINGS {
-        let progress = ring as f32 / (RINGS - 1) as f32;
+    for ring in 0..ring_count {
+        let progress = ring as f32 / (ring_count - 1) as f32;
+        let color = if repeating {
+            repeating_linear_color(colors, progress)
+        } else {
+            gradient_color(colors, progress)
+        };
         for segment in 0..SEGMENTS {
             let angle =
                 std::f32::consts::TAU * segment as f32 / SEGMENTS as f32;
             mesh.colored_vertex(
                 center + Vec2::angled(angle) * radius * progress,
-                gradient_color(colors, progress),
+                color,
             );
         }
     }
-    for ring in 0..RINGS - 1 {
+    for ring in 0..ring_count - 1 {
         for segment in 0..SEGMENTS {
             let next = (segment + 1) % SEGMENTS;
             let inner = (ring * SEGMENTS + segment) as u32;
@@ -501,6 +635,7 @@ fn conic_gradient_mesh(
     colors: [Color32; 4],
     center: [f32; 2],
     angle_degrees: f32,
+    repeating: bool,
 ) -> Mesh {
     const SEGMENTS: usize = 64;
     let center = Pos2::new(
@@ -523,8 +658,16 @@ fn conic_gradient_mesh(
         let end = (segment + 1) as f32 / SEGMENTS as f32;
         let start_angle = std::f32::consts::TAU * start;
         let end_angle = std::f32::consts::TAU * end;
-        let start_color = conic_color(colors, start + offset);
-        let end_color = conic_color(colors, end + offset);
+        let start_color = if repeating {
+            repeating_conic_color(colors, start + offset)
+        } else {
+            conic_color(colors, start + offset)
+        };
+        let end_color = if repeating {
+            repeating_conic_color(colors, end + offset)
+        } else {
+            conic_color(colors, end + offset)
+        };
         let base = mesh.vertices.len() as u32;
         mesh.colored_vertex(center, start_color);
         mesh.colored_vertex(
@@ -554,6 +697,26 @@ fn conic_color(colors: [Color32; 4], progress: f32) -> Color32 {
         colors[(index + 1) % 4],
         scaled - index as f32,
     )
+}
+
+fn repeating_conic_color(colors: [Color32; 4], progress: f32) -> Color32 {
+    let within_turn = progress.rem_euclid(1.0 / 3.0) * 0.9;
+    repeating_linear_color(colors, within_turn)
+}
+
+fn repeating_linear_color(colors: [Color32; 4], progress: f32) -> Color32 {
+    let within_period = progress.rem_euclid(0.3);
+    let segment = (within_period / 0.1).floor() as usize;
+    let index = segment.min(2);
+    let amount = ((within_period - index as f32 * 0.1) / 0.1).clamp(0.0, 1.0);
+    let amount = if amount < 0.00001 {
+        0.0
+    } else if 1.0 - amount < 0.00001 {
+        1.0
+    } else {
+        amount
+    };
+    mix_color(colors[index], colors[index + 1], amount)
 }
 
 fn mix_color(first: Color32, second: Color32, amount: f32) -> Color32 {
@@ -860,4 +1023,58 @@ fn process_mouse_move(
     }
 
     actions
+}
+
+#[cfg(test)]
+mod background_gradient_tests {
+    use super::*;
+
+    fn colors() -> [Color32; 4] {
+        [Color32::RED, Color32::GREEN, Color32::BLUE, Color32::WHITE]
+    }
+
+    #[test]
+    fn repeating_gradient_samples_cycle_at_the_legacy_thirty_percent_period() {
+        let colors = colors();
+        assert_eq!(repeating_linear_color(colors, 0.0), Color32::RED);
+        assert_eq!(repeating_linear_color(colors, 0.1), Color32::GREEN);
+        assert_eq!(repeating_linear_color(colors, 0.2), Color32::BLUE);
+        assert_eq!(repeating_linear_color(colors, 0.3), Color32::RED);
+        assert_eq!(
+            repeating_linear_color(colors, 0.35),
+            mix_color(Color32::RED, Color32::GREEN, 0.5)
+        );
+        assert_eq!(
+            repeating_conic_color(colors, 0.0),
+            repeating_conic_color(colors, 1.0 / 3.0)
+        );
+    }
+
+    #[test]
+    fn repeating_linear_mesh_covers_the_terminal_rect_with_multiple_bands() {
+        let rect =
+            Rect::from_min_max(Pos2::new(10.0, 20.0), Pos2::new(210.0, 120.0));
+        let mesh = repeating_linear_gradient_mesh(rect, colors(), 135.0);
+        assert!(mesh.vertices.len() > 4);
+        assert!(!mesh.indices.is_empty());
+        assert!(mesh.vertices.iter().all(|vertex| {
+            vertex.pos.x >= rect.left() - 0.01
+                && vertex.pos.x <= rect.right() + 0.01
+                && vertex.pos.y >= rect.top() - 0.01
+                && vertex.pos.y <= rect.bottom() + 0.01
+        }));
+    }
+
+    #[test]
+    fn repeating_radial_and_conic_meshes_generate_their_repeated_regions() {
+        let rect =
+            Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(160.0, 80.0));
+        let radial = radial_gradient_mesh(rect, colors(), [0.5, 0.5], true);
+        assert_eq!(radial.vertices.len(), 31 * 48);
+        assert_eq!(radial.indices.len(), 30 * 48 * 6);
+
+        let conic = conic_gradient_mesh(rect, colors(), [0.5, 0.5], 45.0, true);
+        assert_eq!(conic.vertices.len(), 64 * 3);
+        assert_eq!(conic.indices.len(), 64 * 3);
+    }
 }
