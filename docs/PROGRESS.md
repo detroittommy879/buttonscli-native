@@ -1,5 +1,13 @@
 # Reconstruction journal
 
+## 2026-09-29 — V02 remaining effects audit
+
+Audited TV noise, glow, and wallpaper against the original source. TV noise has
+configuration fields but no runtime renderer; glow is part of Shader Lab GLSL
+presets; wallpaper has no legacy setting or renderer. Recorded those decisions
+so subsequent work does not invent parity. V02 source behavior is implemented,
+but 1/4/10-pane screenshots and frame-cost review remain open.
+
 ## 2026-09-29 — V02 simple noise and idle ramp
 
 Added native simple noise as a bounded pixelated grayscale mesh, with legacy
