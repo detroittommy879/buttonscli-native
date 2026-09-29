@@ -11,17 +11,19 @@ terminal, which the current native painter path does not expose. The decision
 and compatibility boundary are in [the Shader Lab decision](SHADER-LAB-DECISION.md).
 Imported enabled shader flags remain inert, are preserved, and show a localized
 warning. This work proceeds on Windows without a Fedora/VM dependency; other
-platform acceptance can follow separately.
+platform acceptance can follow separately. P05 now has an isolated Windows GUI
+startup smoke at `scripts/native-smoke.ps1`; it checks window creation only and
+does not replace interactive layout, PTY, provider, or visual acceptance.
 
 1. This file: priorities, current gaps, architecture, and milestones.
 2. [Compatibility contracts](CONTRACTS.md): imported data, control API, AI, and access rules.
 3. [Implementation tasks](TASKS.md): bounded tasks suitable for GPT-6-luna, dependencies, acceptance checks.
 4. [Testing and handoff](TESTING.md): fixtures, regression locations, platform checks, and task prompt.
-5. [`egui_dock` research](DOCKING-RESEARCH.md): compatible version, limits and Fedora prototype decision.
+5. [`egui_dock` research](DOCKING-RESEARCH.md): compatible version, limits and prototype decision.
 
 Original source root (O): `G:/ccc/z_terminals/w111erd`, HEAD `032c9f21a17f17e48974f57259b1ad4a6506b858`.
 Native destination root (N): `G:/z/buttonscli-native`, baseline HEAD `ab84efafa6dbd8a03a76e8b06358a824d8dca19d`.
-Paths prefixed O or N below are relative to those roots on this Windows host; map them to the corresponding clones in Fedora. Recheck revisions before implementation; the original checkout has unrelated local changes. Do not stage or repair those changes.
+Paths prefixed O or N below are relative to those roots on this Windows host. Recheck revisions before implementation; the original checkout has unrelated local changes. Do not stage or repair those changes. Linux clones are optional later validation, not a prerequisite for this Windows work.
 
 ## Recommended order
 
@@ -36,7 +38,7 @@ Keep egui/eframe, Alacritty, offline assets, and event-driven rendering. Port be
 ## What the audit establishes
 
 - N `src/app.rs` provides tabs, recursive pane layouts, command/SSH preset editing, shell selection, theme scopes, and font controls. UI tab/layout mutations now use the stable-ID `session/actions.rs` queue. Preferences save in versioned native storage, with one-time fallback reading of earlier eframe data.
-- N now plans COL/ROW/GRID from available viewport size and minimum cell bounds, hides overflow without closing its PTYs, and includes the focused session in the rendered slice. Tabs wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive Fedora reproduction and resize evidence.
+- N now plans COL/ROW/GRID from available viewport size and minimum cell bounds, hides overflow without closing its PTYs, and includes the focused session in the rendered slice. Tabs wrap and new terminals receive stable `termN` names. Pane behavior still needs interactive Windows reproduction and resize evidence; Linux checks can follow separately.
 - N `src/theme.rs::ThemeCatalog::load` reads embedded assets (555 legacy choices plus four native themes). Native-profile personal theme files load separately; Settings can now import valid original-profile files after preview.
 - O `src-tauri/src/main.rs` resolves `~/.buttonscli/active-profile.json`, `profiles/<name>/config.json`, profile `themes/` and `shaders/`; root `config.json` is a migration fallback.
 - O `src-tauri/src/control_api.rs` exposes an authenticated `/v1` API; O `scripts/buttonsclictl.mjs` already supports an explicit discovery-file environment override. This makes reuse of the existing CLI practical before writing a Rust CLI.
@@ -56,16 +58,16 @@ The supplied screenshot is visual context for the current native UI, not an inst
 |---|---|---|
 | Legacy active profile/config import | Preview and staged new-profile commit exist for active or selected original profile; synthetic tests pass. Matching keys can transfer to OS storage when explicitly selected. | P0 live GUI acceptance on Windows/Linux |
 | Existing command/SSH presets | Native editor present, isolated storage; O `PresetBar.tsx` | P0 compatible import/native save, order and type-only semantics |
-| Personal themes | Native-profile JSON loader and explicit original-profile import exist | P1 verify per-terminal/random/theme-all controls on Fedora; P2 CRUD and editor |
+| Personal themes | Native-profile JSON loader and explicit original-profile import exist | P1 verify per-terminal/random/theme-all controls on Windows; P2 CRUD and editor |
 | Shell profiles | Present but simpler discovery; O shellProfiles, backend discovery | P1 preserve settings; P2 Windows Terminal/WSL/wrappers and platform checks |
-| COL/ROW/GRID | Responsive reducer and wrapped render tree are wired; GUI acceptance remains | P0 verify focus, PTY resize, new-tab placement and no blank panes on Fedora |
-| Tab strip/names | `termN` and multi-row strip implemented; Fedora interaction pending | P0 GUI acceptance for narrow/many-tab layouts |
+| COL/ROW/GRID | Responsive reducer and wrapped render tree are wired; GUI acceptance remains | P0 verify focus, PTY resize, new-tab placement and no blank panes on Windows |
+| Tab strip/names | `termN` and multi-row strip implemented; Windows interaction pending | P0 GUI acceptance for narrow/many-tab layouts |
 | Docking library | N uses a custom pane tree | P0 evaluate compatible `egui_dock` 0.16 as a bounded prototype |
 | Tabs/panes | Present, ten visible panes; O tabStore/sessionStore | P0 stable IDs/action dispatcher; preserve hidden tab targeting and lifecycle |
 | Agent control CLI | Native authenticated `/v1` routes, per-instance discovery, installed Node helper and Agent Inst. handoff are source-implemented; runtime acceptance remains open | P1 compatible `/v1`, instance-safe discovery, Agent Inst. handoff |
 | MCP | Missing; O control_mcp_helper_template.mjs | P1 after CLI acceptance; optional Node helper, no Node GUI dependency |
 | Plain AI Help | Separate window, provider requests, stream parser, bounded grid context and reviewed terminal actions implemented; release entitlement and GUI acceptance remain | P1 explain terminal, suggest reviewed commands in a separate window |
-| Terminal scrollbar/search/zoom | Real-grid scrollbar and grid-backed search, clear, and select-all are source-implemented; GUI acceptance pending | P1 verify scroll/drag/alternate-screen and search/buffer actions on Fedora; P2 zoom |
+| Terminal scrollbar/search/zoom | Real-grid scrollbar and grid-backed search, clear, and select-all are source-implemented; GUI acceptance pending | P1 verify scroll/drag/alternate-screen and search/buffer actions on Windows; P2 zoom |
 | Paste/input shortcuts | GUI clipboard plus native API raw, bracketed and paced input source paths; API behavior is not runtime-certified | P1 verify input contract; P2 editable keys and GUI paste-mode settings |
 | Dividers/rounding | Visible dividers and adjustable chrome radius now exist; GUI acceptance remains | P1 verify drag/contrast/scale and complete theme editor/export |
 | Dock/status/settings behavior | Partial; O PresetBar/StatusBar/SettingsDialog | P1 detached Settings for live theme preview; P2 compact/auto-hide/resizing and Revert & Close |

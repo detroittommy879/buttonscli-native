@@ -1,6 +1,8 @@
 # Dependency-ordered implementation tasks
 
-Implementation status, 2026-09-29: R02–R04 and C01–C04 have Windows source implementations, alongside A01–A04 and the A05 Windows viewport prototype/A06 AI Help source path. C05 has a native stdio adapter and a fake-API initialize/list/status smoke pass. U01–U10 have Windows source implementations. V01 includes repeating gradient rendering/editing, master-off animation handling, and focused-pane effect filtering. V02 records the HSync renderer no-go and implements row banding plus bounded simple noise/idle ramp in source. V03 has a Pro-gated, review-first AI theme palette generator with bounded correction, validation and collision-safe draft/save flow; mock-provider tests pass. V04 now records the offscreen-renderer requirement and preserves/warns on imported legacy GLSL requests, but native shader editing, compilation and preview remain unimplemented. The original TV-noise fields have no runtime implementation in the audited source and remain unsupported. Windows source checks pass; live GUI, provider interactions, visual review and cross-platform acceptance remain unverified. R02 throughput/fixture work and full C01–C05 route/client acceptance also remain open. C06, the remainder of V04, V05 and optional follow-up effects remain open. See `docs/PROGRESS.md`, `docs/CONTROL-API.md`, `docs/SHORTCUTS.md`, `docs/TERMINAL-SEARCH.md`, `docs/WORKSPACE-CONTROLS.md`, `docs/SETTINGS-PREVIEW.md`, `docs/LOCALIZATION.md` and the decision notes for current evidence and boundaries.
+Implementation status, 2026-09-29: R02–R04 and C01–C04 have Windows source implementations, alongside A01–A04 and the A05 Windows viewport prototype/A06 AI Help source path. C05 has a native stdio adapter and a fake-API initialize/list/status smoke pass. U01–U10 have Windows source implementations. V01 includes repeating gradient rendering/editing, master-off animation handling, and focused-pane effect filtering. V02 records the HSync renderer no-go and implements row banding plus bounded simple noise/idle ramp in source. V03 has a Pro-gated, review-first AI theme palette generator with bounded correction, validation and collision-safe draft/save flow; mock-provider tests pass. V04 records the offscreen-renderer requirement and preserves/warns on imported legacy GLSL requests, but native shader editing, compilation and preview remain unimplemented. P05 now has a Windows isolated GUI startup script and a successful startup smoke; interaction and cross-platform checks remain open. The original TV-noise fields have no runtime implementation in the audited source and remain unsupported. Windows source checks pass; interactive GUI, provider requests, visual review and cross-platform acceptance remain unverified. R02 throughput/fixture work and full C01–C05 route/client acceptance also remain open. C06, the remainder of V04, V05 and optional follow-up effects remain open. See `docs/PROGRESS.md`, `docs/CONTROL-API.md`, `docs/SHORTCUTS.md`, `docs/TERMINAL-SEARCH.md`, `docs/WORKSPACE-CONTROLS.md`, `docs/SETTINGS-PREVIEW.md`, `docs/LOCALIZATION.md` and the decision notes for current evidence and boundaries.
+
+Platform execution: continue implementation and live smoke checks on Windows. Fedora or a VM is not required. Linux/X11/Wayland and macOS checks remain separate follow-up evidence for cross-platform release readiness.
 
 Use [contracts](CONTRACTS.md) throughout. O/N paths are defined in [README](README.md). All new destination paths below are proposed. Each task is a separate reviewable commit; do not implement an entire phase in one Luna prompt. The original repository is a read-only reference unless a task explicitly changes its maintained contract. No such original-runtime change is required for the separate-folder plan.
 
@@ -30,7 +32,7 @@ Task sizes: **S** = one isolated function/module and focused tests; **M** = one 
 
 ## L — repair daily terminal layout (M2)
 
-These are early tasks because the user reports partially working layouts. First reproduce on the Fedora workstation VM with harmless local PTYs; source inspection alone does not certify interaction.
+These are early tasks because the user reports partially working layouts. Reproduce them first on Windows with harmless local PTYs; source inspection alone does not certify interaction. Linux/X11/Wayland acceptance can follow separately.
 
 ### L01 — Layout behavior matrix [S, no dependency]
 - Record actual behavior of COL, ROW and GRID for 1–10 visible panes while adding, focusing, closing and resizing. Inspect N `set_pane_layout`, `set_visible_pane_count`, `pane_tree`, `render_pane_tree` and existing pane tests. Define COL/ROW/GRID semantics with screenshots and a minimum useful pane width/height.
@@ -43,7 +45,7 @@ These are early tasks because the user reports partially working layouts. First 
 
 ### L03 — Responsive pane layout reducer [M, L01]
 - Extract geometry/count/pane order into a pure module, then wire COL/ROW/GRID. Use available width/height and minimum terminal cell bounds; preserve stable session IDs, focus and persisted divider ratios when panes wrap/reflow.
-- Test 2–10 panes at narrow/wide bounds, resize back and forth, new/hidden tab, close focused pane, equal/unequal split ratios and PTY resize events. On Fedora verify no blank panes or shell respawn. Free.
+- Test 2–10 panes at narrow/wide bounds, resize back and forth, new/hidden tab, close focused pane, equal/unequal split ratios and PTY resize events. On Windows verify no blank panes or shell respawn; Linux checks can follow separately. Free.
 
 ### L04 — Multi-row tab strip [S, L02]
 - Replace the fixed 40-pixel, horizontal-scroll-only tab bar with a wrapping layout that grows to two or more rows. Keep add/reopen/menu controls reachable, keyboard tab navigation, drag/reorder behavior and clear active/visible states.
@@ -54,7 +56,7 @@ These are early tasks because the user reports partially working layouts. First 
 - Test scroll position after new output, resize, truncation, clear, switching panes and dragging to bottom. No outer `ScrollArea` around terminal cells, which would steal selection or misreport PTY dimensions. Free.
 
 ### L06 — Docking library compatibility probe [Spike, L01]
-- Prototype `egui_dock` **0.16** in a disposable branch or example against pinned egui/eframe 0.31; current `egui_dock` 0.21 targets egui 0.36. Evaluate tab move/close/rename, split resize, stable PTY ownership, serialization, minimum pane size, Fedora X11/Wayland, and native window drag-out.
+- Prototype `egui_dock` **0.16** in a disposable branch or example against pinned egui/eframe 0.31; current `egui_dock` 0.21 targets egui 0.36. Evaluate tab move/close/rename, split resize, stable PTY ownership, serialization, minimum pane size and native window drag-out on Windows; Linux X11/Wayland checks can follow separately.
 - Compare with the existing recursive pane tree. `egui_dock` supports binary dock splits and separate egui windows, but its README says it lacks direct multi-child grid support. It may help tab docking while custom responsive COL/ROW/GRID remains. Do not adopt it solely for rounded tabs or wrap: test those requirements explicitly.
 - Done: `docs/migration/DOCKING-DECISION.md` records exact version/dependency tree, runnable prototype, regression/performance cost and go/no-go decision. No production dependency until it passes. Free.
 
@@ -72,7 +74,7 @@ These are early tasks because the user reports partially working layouts. First 
 - Test scale, focus outlines, hit targets, dark theme contrast and persistence. Free.
 
 ### L10 — Native secondary viewport probe [Spike, no dependency]
-- Use pinned egui/eframe 0.31 `Context::show_viewport_deferred` or `show_viewport_immediate` in a tiny example with fake settings data. On Fedora X11 and Wayland, test separate OS window, monitor move, focus, close/reopen and main-window close; identify fallback and shared-state pattern.
+- Use pinned egui/eframe 0.31 `Context::show_viewport_deferred` or `show_viewport_immediate` in a tiny example with fake settings data. On Windows, test the separate OS window, monitor move, focus, close/reopen and main-window close; record Linux X11/Wayland checks separately.
 - Done: `docs/migration/VIEWPORT-DECISION.md` records exact API used and tested display backend. Reuse for Settings (U04) and Help (A05). Free infrastructure.
 
 ## S — independent data root and importer (M1)
@@ -185,7 +187,7 @@ These are early tasks because the user reports partially working layouts. First 
 - Done: explicit insert/run/key actions, no automatic execution, bounded context and no clipboard/file collection. Pro.
 
 ### A05 — Independent Help window prototype [Spike, L10, F04; can precede A04]
-- Apply the L10 viewport decision to fake assistant state on Fedora first; verify focus, keyboard, monitor/DPI move, main-window shutdown and reopen.
+- Apply the L10 viewport decision to fake assistant state on Windows; verify focus, keyboard, monitor/DPI move, main-window shutdown and reopen. Record Linux display-backend checks separately.
 - Deliver short decision note identifying any dependency/platform blocker. Avoid framework upgrade as a side effect; a required upgrade becomes its own task.
 - Done: demonstrably separate window on tested OS, with untested OS clearly recorded. Pro surface.
 
@@ -231,7 +233,7 @@ Use `src/plugins/effects/` for new effects; each effect is independently enabled
 | P02 / F03, A01 | Internal Quick Secrets design and implementation | Separate encryption/unlock/autolock review, fake key store, wrong password/recovery tests, explicit target paste; no auto-import vault |
 | P03 / R01, F04 | Native read-only text/Markdown guide/display tabs | No PTY input to display tab; URL/content bounds, safe external open, offline failures. Arbitrary browsing/webview remains deferred |
 | P04 / F03 | Feedback/privacy/analytics | Explicit opt-in policy, redaction, mock non-2xx responses, original receiver/schema contract tests if service reused; never rely on UI success only |
-| P05 / M4 | Cross-platform local build/smoke scripts | Fedora X11/Wayland first, then Windows/macOS evidence; WASM has no local HTTP/PTY/credential features; no automatic GitHub desktop builds introduced |
+| P05 / M4 | Partial: Windows build and `scripts/native-smoke.ps1` isolated GUI startup pass | Add interaction checks and Linux X11/Wayland/macOS local smoke scripts when those hosts are available; WASM has no local HTTP/PTY/credential features; no automatic GitHub desktop builds introduced |
 | P06 / P05, P01 | Native packaging/signing/update design then platform adapters | Distinct native product/artifact IDs and settings root; tampered signature rejected; rollback; no Tauri channel/pointer overwrite; manual local release workflow |
 
 Cloud settings sync, hosted theme sharing, JSON workbench and cloud text vault remain new product work, not migration blockers. Do not implement them merely because the original Account UI lists them.

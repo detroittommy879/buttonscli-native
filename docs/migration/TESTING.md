@@ -1,5 +1,9 @@
 # Test strategy and implementation handoff
 
+Run current implementation and GUI checks on Windows. Fedora or a VM is not a
+prerequisite. Linux/X11/Wayland and macOS checks remain separate evidence for
+cross-platform release readiness.
+
 ## Audit baseline
 
 On 2026-09-27 this planning audit ran `cargo test --release` in N on Windows: 29 passed, zero failed, zero ignored; binary and doc targets had zero tests. This validates existing library coverage, not a new GUI or PTY smoke test. Existing Linux manual evidence is in `../VERIFICATION.md`. No paid API requests, personal settings reads, private terminal reads, or production actions were needed for the audit.
@@ -10,7 +14,7 @@ On 2026-09-27 this planning audit ran `cargo test --release` in N on Windows: 29
 |---|---|---|
 | Presets/settings | N app inline tests; O configStore/profileStore tests and types | `tests/config_import.rs`, `tests/native_storage.rs`; temp roots, source hashes and sanitized golden JSON |
 | Themes/fonts | N theme/fonts inline tests; O customThemeStorage/themeValidation/themeHydration | `tests/theme_import.rs`; keep embedded catalog tests and raw-format round trips |
-| Session/layout/tabs | N pane/index tests; O tabStore/sessionStore/TerminalPane tests | Pure `termN`, pane geometry/reflow, tab-wrap and session reducer tests; Fedora GUI checks for focus/PTY resize |
+| Session/layout/tabs | N pane/index tests; O tabStore/sessionStore/TerminalPane tests | Pure `termN`, pane geometry/reflow, tab-wrap and session reducer tests; Windows GUI checks for focus/PTY resize |
 | Input | O keyboardShortcuts and assistantActions tests | `session/input.rs` unit tests and fake notifier; actual PTY in separate OS smoke |
 | Output/context/scrollbar | O control_api tests, terminalRegistry and assistant freshness tests | `tests/output_capture.rs` transcripts and real offset/viewport invariants; hidden/alternate-screen cases |
 | CLI/API | O `scripts/buttonsclictl.test.mjs`, control_api DTOs | `tests/control_api.rs` fake service + `tests/cli_contract.mjs` launches pinned helper against test server |
@@ -40,7 +44,7 @@ cargo test --release
 cargo fmt --all -- --check
 ```
 
-On Fedora, run these commands in Bash, plus `cargo clippy --all-targets -- -D warnings`, `cargo build --release --bin buttonscli`, and a local `./target/release/buttonscli` GUI smoke. Install missing X11/Wayland development packages according to `docs/BUILDING.md`; do not turn a missing system package into an app failure. Use separate X11 and Wayland sessions when testing both.
+On Windows, run the commands below and `pwsh -NoProfile -File scripts/native-smoke.ps1` for an isolated local GUI startup check. Linux builds, X11/Wayland smoke tests and macOS checks are separate follow-up platform validation; they do not block Windows implementation work.
 
 During implementation use `cargo test <focused_filter>` for fast model checks, then full tests at a milestone. Use `cargo clippy --all-targets -- -D warnings` for touched Rust surfaces; record baseline failures rather than silently changing unrelated code. For actual executable validation use `cargo build --release --bin buttonscli`; binary-only tests run zero current tests and are insufficient.
 
@@ -58,22 +62,22 @@ Once C tasks add the pinned helper/harness, run `node --test tests/cli_contract.
 Use a synthetic legacy root containing recognizable command/SSH presets and custom colors. Import via preview; restart native; verify labels/order, type-only behavior and custom theme. Modify native; confirm original tree hashes unchanged. Cancel import and simulate one broken file. Test empty native and existing eframe-preference migration independently.
 
 ### M2 — responsive terminal workspace
-On Fedora, open 2, 3, 4, 6 and 10 harmless local terminals. Exercise COL/ROW/GRID, grow/shrink the window, drag dividers, close/focus hidden panes and verify no blank panes or shell restarts. Narrow the window until panes form a second row and tabs form a second tab-strip row. Check distinct `termN` titles, per-pane scrollbar offsets, theme overrides, Random Theme, Theme All, divider color and corner radius. Record screenshots at known viewport sizes and verify PTY `stty size` matches the rendered pane.
+On Windows, open 2, 3, 4, 6 and 10 harmless local terminals. Exercise COL/ROW/GRID, grow/shrink the window, drag dividers, close/focus hidden panes and verify no blank panes or shell restarts. Narrow the window until panes form a second row and tabs form a second tab-strip row. Check distinct `termN` titles, per-pane scrollbar offsets, theme overrides, Random Theme, Theme All, divider color and corner radius. Record screenshots at known viewport sizes and verify PTY dimensions match the rendered pane. Linux X11/Wayland checks can follow separately.
 
 ### M3 — agent workflow
 Start original and native with separate test data (or a fake original descriptor if launching original is unsuitable). Handoff to native, create two uniquely named tabs, run harmless shell-appropriate marker commands, read, wait, rename, open layouts, send Ctrl+C, and run a type-only preset. Close target during a wait. Confirm no command appeared in another app/tab. Test native restart and two native instances. Record the observation result separately from shell completion.
 
 ### M4 — independent plain Help window
-Import fake provider endpoints/models and optionally keys into a fake credential store. On Fedora, open Help beside a terminal, preferably on another monitor. Test mock provider streaming while terminal emits bounded output; explain terminal text, generate a command suggestion, context off/on, cancel/retry, failed key, manual model entry, action insertion and explicit reviewed run. Switch focus before review and close original target; verify correct target/error. Close/reopen Help and close main app; confirm no orphan workers or shells. There is no Agent Mode or Stall Recovery UI/background task.
+Import fake provider endpoints/models and optionally keys into a fake credential store. On Windows, open Help beside a terminal, preferably on another monitor. Test mock provider streaming while terminal emits bounded output; explain terminal text, generate a command suggestion, context off/on, cancel/retry, failed key, manual model entry, action insertion and explicit reviewed run. Switch focus before review and close original target; verify correct target/error. Close/reopen Help and close main app; confirm no orphan workers or shells. There is no Agent Mode or Stall Recovery UI/background task.
 
 ### M5/M7 — platform matrix
-Record OS/version, shell, display backend, scale, hardware and release hash. Start with the Fedora workstation VM: Bash and any installed Zsh/Fish/Nushell; X11 and Wayland separately where available. Then test Windows cmd/PowerShell/pwsh and WSL when installed, plus macOS shell/modifier/menu behavior. Include resize, scrollback and visible scrollbar, copy/paste, bracketed paste, links, IME composition, Unicode selection, emoji fallback, DPI/monitor moves, detached Settings/Help windows, keyboard-only focus, inaccessible credential store and child shutdown. A successful build does not satisfy these checks.
+Record OS/version, shell, display backend, scale, hardware and release hash. Test Windows cmd/PowerShell/pwsh and WSL when installed first, including resize, scrollback and visible scrollbar, copy/paste, bracketed paste, links, IME composition, Unicode selection, emoji fallback, DPI/monitor moves, detached Settings/Help windows, keyboard-only focus, inaccessible credential store and child shutdown. Then record Linux X11/Wayland and macOS checks separately. A successful build does not satisfy these checks.
 
 WASM: shared UI still builds; terminal stays a sandboxed demo; no native disk import, local provider credentials, local control listener or real PTY is exposed. If Help is represented, label it as a demo/unsupported capability rather than simulate successful local work.
 
 ## Preserve the speed advantage
 
-Before L03/R02 or networking changes, record a reproducible release baseline on the same Fedora VM with the same graphics/session settings. No absolute performance numbers were measured in this planning audit.
+Before L03/R02 or networking changes, record a reproducible Windows release baseline with the same graphics/session settings. No absolute performance numbers were measured in this planning audit. Linux display-backend baselines can be added separately.
 
 - Measure cold launch to usable shell (at least five trials), idle working set/CPU, CPU during bounded transcript replay, output throughput, input/resize responsiveness, and release artifact size.
 - Repeat with one, four, and ten panes; effects off and a representative animated theme. Include hidden tabs producing output.
@@ -84,7 +88,7 @@ Before L03/R02 or networking changes, record a reproducible release baseline on 
 
 ## Release boundary
 
-N currently has push/PR Linux and WASM CI. Do not expand this plan into automatic GitHub desktop release builds. Prefer Fedora local scripts and explicit/manual checks, respecting the original release-cockpit policy. Keep native artifact names, updater metadata, signing setup and settings separate from Tauri until a reviewed native release design exists. Successful installer generation does not prove signing/update behavior.
+N currently has push/PR Linux and WASM CI. Do not expand this plan into automatic GitHub desktop release builds. Prefer Windows local scripts and explicit/manual checks, respecting the original release-cockpit policy. Keep native artifact names, updater metadata, signing setup and settings separate from Tauri until a reviewed native release design exists. Successful installer generation does not prove signing/update behavior.
 
 ## Copyable Luna task prompt
 
@@ -100,8 +104,8 @@ Keep egui/Alacritty; never use LiteLLM. Do not upgrade frameworks incidentally.
 State the access tier. Add a failing focused regression for the acceptance
 case, implement the smallest change, run relevant checks, update user docs
 and docs/PROGRESS.md, and create one focused local commit.
-On Fedora, map those source roots to the VM's actual checkout paths before
-starting; do not assume Windows drive letters exist there.
+Use the Windows source roots in this checkout when running commands. Linux
+platform work may use a separate clone later; do not make it a prerequisite.
 Do not use real keys, live terminal sessions, or production services in tests.
 If a prerequisite or architecture decision is missing, report the exact
 blocker and a smaller follow-up task rather than expanding scope.

@@ -22,8 +22,8 @@ constraints.
 | Area | Status | Next acceptance milestone |
 | --- | --- | --- |
 | Terminal engine | Done | Keep regression coverage while upgrading dependencies |
-| Tabs and sessions | Partial | `termN` naming and multi-row tab strip are implemented; finish pane reflow and Fedora interaction checks |
-| Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Fedora |
+| Tabs and sessions | Partial | `termN` naming and multi-row tab strip are implemented; finish pane reflow and Windows interaction checks |
+| Pane layouts | Partial | Responsive wrapping is wired; verify COL/ROW/GRID and PTY resizing on Windows |
 | Command presets | Done | Keep both command and SSH collection regressions covered |
 | Themes and fonts | Partial | Personal-theme CRUD/editor, offline system/custom fonts, and the review-first V03 generator source path are implemented; finish GUI/provider acceptance, remaining effect rendering, sharing, and separately opted-in online fonts |
 | AI Help | Partial | Provider settings, secure key storage, connection test, model discovery, separate-window conversation, bounded context and reviewed actions exist in source; finish GUI/provider acceptance |
@@ -36,9 +36,9 @@ constraints.
 | --- | --- | --- | --- |
 | Real local PTY and VT semantics | Done | `src/services/ptyLifecycle.ts`, `src/components/TerminalPane.tsx` | Login shell accepts input, streams output, resizes, scrolls, selects, copies/pastes, opens links, and exits without orphaning its child process. |
 | Browser-safe demo | Done | Product behavior, not a direct port | The WASM build remains deterministic and cannot access a visitor's local shell. |
-| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults and multi-row tab strip are implemented; verify wrapped interactions and pane mapping on Fedora. |
-| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Pure geometry reducer and wrapped tree are implemented; verify add/remove/focus, PTY resize, ratio restoration and no blank panes on Fedora. |
-| Visible scrollbars | Partial | native `vendor/egui_term` | Real grid history, viewport and offset drive a per-pane drag track; verify selection, PTY size, wheel and alternate-screen behavior on Fedora/Windows. |
+| Session tabs | Partial | `src/store/tabStore.ts`, `src/components/TabBar.tsx` | `termN` defaults and multi-row tab strip are implemented; verify wrapped interactions and pane mapping on Windows. |
+| Pane layouts | Partial | `src/services/terminalLayout.ts`, `src/store/sessionStore.ts` | Pure geometry reducer and wrapped tree are implemented; verify add/remove/focus, PTY resize, ratio restoration and no blank panes on Windows. |
+| Visible scrollbars | Partial | native `vendor/egui_term` | Real grid history, viewport and offset drive a per-pane drag track; verify selection, PTY size, wheel and alternate-screen behavior on Windows. |
 | Shell profiles | Done | `src/services/shellProfiles.ts` | Discover supported shells, choose default/per-tab profile and working directory, persist the choice, and show a useful launch error. |
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
@@ -59,7 +59,7 @@ constraints.
 | Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear, radial, conic, and repeating variants preserve type, angle, and named position and can be edited in personal themes; full animation parity remains. |
 | Terminal effects | Partial | `src/plugins/effects/`, `src/theme.rs`, `vendor/egui_term/src/view.rs` | Master-off, calm mode, focused-pane filtering, row banding, and bounded simple noise with idle ramp now work in source. HSync needs an offscreen renderer spike; TV noise has no original runtime implementation; glow belongs with Shader Lab; wallpaper is new feature work. See `docs/migration/OPTIONAL-EFFECTS-DECISION.md`. |
 | Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
-| Random/per-terminal/theme-all | Partial | native theme catalog and terminal palette | Stable-ID overrides, random current/all, persisted global default and theme-all are wired; verify 1/4/10 panes, imported themes and live PTY preservation on Fedora. |
+| Random/per-terminal/theme-all | Partial | native theme catalog and terminal palette | Stable-ID overrides, random current/all, persisted global default and theme-all are wired; verify 1/4/10 panes, imported themes and live PTY preservation on Windows. |
 | Colored dividers/rounded chrome | Partial | native pane renderer and theme settings | Visible dividers inherit the app theme or saved native overrides; a 0–16 point tab/chrome radius persists. Verify GUI dragging, scale, contrast and focus; theme editor/export remains. |
 | Theme designer | Partial | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts`, native `src/theme_generation.rs` | V03 generates a constrained palette through the selected provider, validates text contrast, makes at most one correction attempt, preserves non-palette/unknown fields, and offers candidate preview or draft/save with provider/model provenance. Entitlement and live provider/GUI acceptance remain open. |
 | Shader Lab | Partial | `src/components/ShaderLabCard.tsx`, `src/services/shaderDesignerService.ts` | Imported legacy GLSL requests are retained and flagged in Themes settings; none run. Native editor, WGSL compiler/pipeline, preview, and GPU fallback await the offscreen renderer architecture decision in `docs/migration/SHADER-LAB-DECISION.md`. |
@@ -95,7 +95,7 @@ preferences JSON.
 | Accounts/entitlements/sync | Deferred | auth/entitlement stores | Reconfirm the service contract and open-source boundary before implementation. |
 | Feedback/contact/analytics | Deferred | feedback/contact/analytics services | Make telemetry opt-in and documented; do not silently revive legacy endpoints. |
 | Update and release flow | Missing | `src/services/updateCheckService.ts` | Signed artifacts, release CI, channel-aware update checks, rollback guidance, and published checksums. |
-| Cross-platform verification | Partial | native portability target | Add Linux/Windows/macOS CI, then record manual PTY/font/clipboard/window verification on each platform. |
+| Cross-platform verification | Partial | native portability target | An isolated Windows GUI startup smoke exists; add manual PTY/font/clipboard/window verification and separate Linux/macOS checks. Do not add automatic GitHub desktop builds. |
 | Accessibility and input | Partial | product-wide | Verify keyboard-only UI, readable focus, screen scaling, IME, color contrast, and reduced-motion behavior. |
 | Performance budgets | Partial | `docs/VERIFICATION.md` | Track cold start, steady memory/CPU/GPU, resize latency, shell throughput, and binary/WASM size on release builds. |
 
@@ -107,7 +107,7 @@ visual-first ordering and breaks the work into bounded implementation tasks.
 1. Establish `~/.buttonscli-native/` with optional import from the original
    `~/.buttonscli/`; leave the original settings untouched.
 2. Repair COL/ROW/GRID, tab wrapping/naming, scrollbars, per-terminal themes,
-   dividers and detached Settings on Fedora.
+   dividers and detached Settings on Windows.
 3. Build stable session/output/input services and compatible `buttonsclictl`.
 4. Build imported provider configuration and plain, separate AI Help.
 5. Address optional effects, platform/accessibility/performance and releases.
