@@ -102,5 +102,8 @@ Terminal command text is sent as input to the selected PTY; it is not evaluated
 by the control server itself.
 
 The native control API and helpers have passed Windows source/build checks and
-Node syntax checks. No live API/PTY interaction, MCP-client launch, GUI
-handoff, provider request, or cross-platform runtime acceptance is claimed yet.
+Node syntax checks. `node scripts/test-mcp-smoke.mjs` exercises all 14 MCP tools
+against a test-owned fake API, including route/body mapping, bearer auth,
+server-side feature denial, and a stopped-server error. This is protocol-only
+evidence. No live API/PTY interaction, external MCP-client launch, GUI handoff,
+provider request, or cross-platform runtime acceptance is claimed yet.

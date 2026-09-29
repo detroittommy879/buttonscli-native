@@ -54,7 +54,7 @@ For shared code and dependency additions, use the existing WASM target recipe wh
 cargo check --target wasm32-unknown-unknown --no-default-features
 ```
 
-Once C tasks add the pinned helper/harness, run `node --test tests/cli_contract.mjs` and relevant original helper regression cases. These proposed test paths must be created before treating commands as available. Do not run a mutating integration test against the user's existing app/control file. Start a test-owned native instance with a temporary data root and explicit discovery path.
+Run `node scripts/test-mcp-smoke.mjs` for the optional MCP adapter's fake-API route/gate/disconnect contract. This protocol test uses a temporary descriptor and server; it does not exercise a running app or PTY. Do not run a mutating integration test against the user's existing app/control file. Live CLI/MCP acceptance should use a test-owned native instance with a temporary data root and explicit discovery path.
 
 ## Manual milestone acceptance
 

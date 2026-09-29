@@ -1,5 +1,16 @@
 # Reconstruction journal
 
+## 2026-09-29 — MCP control contract coverage
+
+Expanded `scripts/test-mcp-smoke.mjs` from initialize/list/status into a
+test-owned fake API contract pass for all 14 advertised MCP tools. It checks
+route and body mapping, selector escaping, bearer authentication, bracketed
+delivery, a server-side feature denial, invalid payload handling, descriptor
+path selection, and a stopped-server error. Node syntax checks and the smoke
+pass succeeded. This remains protocol evidence only: no live ButtonsCLI API,
+PTY, external MCP client, or GUI handoff was exercised. C05's fake-API test
+criterion is complete; its live M3 workflow is still open.
+
 ## 2026-09-29 — R02 output transcript fixture and microbenchmark
 
 Added `tests/fixtures/output-transcript.json` for raw ANSI/cursor controls,
