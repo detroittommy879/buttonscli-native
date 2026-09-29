@@ -18,7 +18,7 @@ On 2026-09-27 this planning audit ran `cargo test --release` in N on Windows: 29
 | Input | O keyboardShortcuts and assistantActions tests | `session/input.rs` unit tests and fake notifier; actual PTY in separate OS smoke |
 | Output/context/scrollbar | O control_api tests, terminalRegistry and assistant freshness tests | `tests/output_capture.rs` transcripts and real offset/viewport invariants; hidden/alternate-screen cases |
 | CLI/API | O `scripts/buttonsclictl.test.mjs`, control_api DTOs | `tests/control_api.rs` fake service + `tests/cli_contract.mjs` launches pinned helper against test server |
-| AI transport | O Rust stream parsing and assistantService tests | `tests/assistant_transport.rs` local fake server; no internet or real credentials |
+| AI transport | O Rust stream parsing and provider contract tests | `src/assistant/client.rs` loopback fake-server test exercises Reqwest connection check, models discovery and fragmented SSE streaming; no internet or real credentials |
 | Plain AI Help | O assistantActions, prompts and assistantService tests | Pure reply parser, context snapshot, explicit action review and cancellation tests; no agent/stall cases |
 | Access/localization | O features/access and i18n tests | `tests/feature_access.rs`, catalog completeness/fallback tests; UI and action denial |
 | Native windows/PTY/GPU | O Windows `tests/e2e.ps1` is a pattern, not a drop-in native harness | New opt-in native smoke harness + human/agent review on each OS |

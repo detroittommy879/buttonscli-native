@@ -291,6 +291,10 @@ fn completion_content(body: &[u8]) -> Result<String, ClientError> {
 mod tests {
     use super::super::transport::{Response, TransportError};
     use super::*;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::thread::{self, JoinHandle};
+    use std::time::Duration;
 
     struct FakeTransport {
         status: u16,
@@ -305,6 +309,72 @@ mod tests {
                 content_type: Some("application/json".into()),
             })
         }
+    }
+
+    fn local_provider_server(
+        status: u16,
+        content_type: &'static str,
+        body: Vec<u8>,
+    ) -> (String, JoinHandle<String>) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let request = read_http_request(&mut stream);
+            let reason = if (200..300).contains(&status) {
+                "OK"
+            } else {
+                "Error"
+            };
+            let redirect = if status == 302 {
+                "location: http://127.0.0.1:9/redirected\r\n"
+            } else {
+                ""
+            };
+            write!(
+                stream,
+                "HTTP/1.1 {status} {reason}\r\n{redirect}content-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            for chunk in body.chunks(13) {
+                stream.write_all(chunk).unwrap();
+                stream.flush().unwrap();
+                thread::sleep(Duration::from_millis(2));
+            }
+            String::from_utf8_lossy(&request).into_owned()
+        });
+        (format!("http://{address}/v1/chat/completions"), handle)
+    }
+
+    fn read_http_request(stream: &mut TcpStream) -> Vec<u8> {
+        let mut request = Vec::new();
+        loop {
+            let mut chunk = [0_u8; 2048];
+            let read = stream.read(&mut chunk).unwrap();
+            if read == 0 {
+                break;
+            }
+            request.extend_from_slice(&chunk[..read]);
+            let Some(header_end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") else {
+                continue;
+            };
+            let header = String::from_utf8_lossy(&request[..header_end]).to_ascii_lowercase();
+            let content_length = header
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("content-length:")
+                        .and_then(|length| length.trim().parse::<usize>().ok())
+                })
+                .unwrap_or(0);
+            if request.len() >= header_end + 4 + content_length {
+                break;
+            }
+        }
+        request
     }
 
     #[test]
@@ -386,5 +456,89 @@ mod tests {
             test_connection(&invalid, &provider, None),
             Err(ClientError::InvalidReply)
         );
+    }
+
+    #[test]
+    fn reqwest_transport_completes_loopback_provider_check_discovery_and_streaming() {
+        let transport = super::super::transport::ReqwestTransport;
+        let (endpoint, server) = local_provider_server(
+            200,
+            "application/json",
+            br#"{"choices":[{"message":{"content":"OK"}}]}"#.to_vec(),
+        );
+        let provider = ProviderProfile {
+            endpoint: endpoint.clone(),
+            model: "offline-test-model".into(),
+            ..ProviderProfile::default()
+        };
+        test_connection(
+            &transport,
+            &provider,
+            Some(Zeroizing::new("FAKE-LOCAL-KEY".into())),
+        )
+        .unwrap();
+        let request = server.join().unwrap().to_ascii_lowercase();
+        assert!(request.starts_with("post /v1/chat/completions "));
+        assert!(request.contains("authorization: bearer fake-local-key"));
+        assert!(request.contains("offline-test-model"));
+
+        let (endpoint, server) =
+            local_provider_server(302, "application/json", b"FAKE-REDIRECT-BODY".to_vec());
+        let provider = ProviderProfile {
+            endpoint,
+            model: "offline-test-model".into(),
+            ..ProviderProfile::default()
+        };
+        let error = test_connection(&transport, &provider, None).unwrap_err();
+        assert_eq!(error, ClientError::Http(302));
+        assert!(!error.to_string().contains("FAKE-REDIRECT-BODY"));
+        assert!(server
+            .join()
+            .unwrap()
+            .starts_with("POST /v1/chat/completions "));
+
+        let (endpoint, server) = local_provider_server(
+            200,
+            "application/json",
+            br#"{"data":[{"id":"z-model"},{"id":"a-model"}]}"#.to_vec(),
+        );
+        let provider = ProviderProfile {
+            endpoint,
+            model: "offline-test-model".into(),
+            ..ProviderProfile::default()
+        };
+        assert_eq!(
+            discover_models(&transport, &provider, None).unwrap(),
+            vec!["a-model", "z-model"]
+        );
+        assert!(server.join().unwrap().starts_with("GET /v1/models "));
+
+        let body = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"from local\"}}]}\n\n",
+            "data: [DONE]\n\n"
+        );
+        let (endpoint, server) =
+            local_provider_server(200, "text/event-stream", body.as_bytes().to_vec());
+        let provider = ProviderProfile {
+            endpoint,
+            model: "offline-test-model".into(),
+            ..ProviderProfile::default()
+        };
+        let mut deltas = Vec::new();
+        let answer = stream_completion(
+            &transport,
+            &provider,
+            None,
+            "You are a test assistant.",
+            "Say hello.",
+            &[],
+            &AtomicBool::new(false),
+            &mut |delta| deltas.push(delta.to_owned()),
+        )
+        .unwrap();
+        assert_eq!(answer, "hello from local");
+        assert_eq!(deltas.concat(), answer);
+        assert!(server.join().unwrap().contains("\"stream\":true"));
     }
 }

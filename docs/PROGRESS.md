@@ -43,6 +43,17 @@ production trust root, activation/rollback launcher, update UI, and release
 endpoint. The release tool is internal developer tooling and adds no customer
 entitlement tier.
 
+## 2026-09-29 — A02 loopback provider transport acceptance
+
+Added a real local HTTP-server test for the app-owned Reqwest transport. It
+exercises the provider connection-check POST with a test-only bearer key, model
+discovery on `/v1/models`, redirect refusal, and fragmented server-sent-event
+streaming. The test uses loopback only; no external provider or real credential
+is contacted.
+`cargo test --lib assistant::client::tests::reqwest_transport_completes_loopback_provider_check_discovery_and_streaming`
+passes. AI Help GUI/provider setup interaction and real-provider use remain
+unverified. Access tier remains Pro (`aiHelp`).
+
 ## 2026-09-29 — MCP control contract coverage
 
 Expanded `scripts/test-mcp-smoke.mjs` from initialize/list/status into a
