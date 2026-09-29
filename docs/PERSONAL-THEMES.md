@@ -29,5 +29,9 @@ confirmation before removing the saved profile file. Unsupported fields remain
 in JSON for a later version or external editor, but only fields the native app
 supports affect its appearance.
 
+Some imported legacy themes request a GLSL Shader Lab effect. The request and
+shader data remain in the theme file, and Themes settings shows a warning for
+those themes. Native ButtonsCLI does not execute the legacy shader.
+
 The editor is a hand-operated visual editor. It does not generate themes or
 execute imported content.

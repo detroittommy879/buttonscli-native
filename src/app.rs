@@ -4740,11 +4740,11 @@ impl ButtonsApp {
                                 .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                                 .inner_margin(10.0);
                             ui.allocate_ui_with_layout(
-                                Vec2::new(card_width, 174.0),
+                                Vec2::new(card_width, 198.0),
                                 Layout::top_down(Align::Min),
                                 |ui| {
                                     frame.show(ui, |ui| {
-                                        ui.set_min_size(Vec2::new(card_width - 20.0, 154.0));
+                                        ui.set_min_size(Vec2::new(card_width - 20.0, 178.0));
                                         ui.set_max_width(card_width - 20.0);
                                         ui.label(
                                             RichText::new(&theme.name)
@@ -4756,6 +4756,16 @@ impl ButtonsApp {
                                                 .small()
                                                 .color(theme.colors.muted),
                                         );
+                                        if theme.legacy_shader_requested {
+                                            ui.colored_label(
+                                                theme.colors.warning,
+                                                crate::i18n::text(
+                                                    &self.locale,
+                                                    crate::i18n::MessageKey::LegacyShaderNotRendered,
+                                                    &[],
+                                                ),
+                                            );
+                                        }
                                         ui.add_space(5.0);
                                         ui.horizontal(|ui| {
                                             for swatch in [

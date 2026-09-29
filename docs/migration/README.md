@@ -6,6 +6,13 @@ Implementation update, 2026-09-29: F01–F04, S01–S06, R01–R04, A01–A04, C
 
 ## Read in this order
 
+V04 update: the original GLSL path needs a sampleable image of the completed
+terminal, which the current native painter path does not expose. The decision
+and compatibility boundary are in [the Shader Lab decision](SHADER-LAB-DECISION.md).
+Imported enabled shader flags remain inert, are preserved, and show a localized
+warning. This work proceeds on Windows without a Fedora/VM dependency; other
+platform acceptance can follow separately.
+
 1. This file: priorities, current gaps, architecture, and milestones.
 2. [Compatibility contracts](CONTRACTS.md): imported data, control API, AI, and access rules.
 3. [Implementation tasks](TASKS.md): bounded tasks suitable for GPT-6-luna, dependencies, acceptance checks.
@@ -65,7 +72,7 @@ The supplied screenshot is visual context for the current native UI, not an inst
 | Fonts/appearance | Bundled, offline system discovery and profile-local TTF/OTF import implemented; O fontLoader/themeDesignerService | P2 GUI/scale/performance acceptance; P3 online downloads only as a separate opt-in |
 | Effects | Static/scanlines and gradient subset present; O plugins/effects, config types | P3 native effect modules, master/calm controls, performance caps |
 | Theme generation | Missing; O themeDesignerService/themeRecipeDesignerService | P3 after editable theme format and AI transport |
-| Shader Lab/generation | Missing; O ShaderLabCard/shaderDesignerService | P3 separate shader compatibility/design spike; GLSL is not automatically WGPU-compatible |
+| Shader Lab/generation | Partial; imported shader flags are retained and warned about, but remain inert | Native per-pane offscreen renderer, WGSL compiler/editor and preview are an architecture task; see [Shader Lab decision](SHADER-LAB-DECISION.md). AI generation remains gated behind that contract |
 | Transparency/window controls | Missing/partial; O windowManager and window config | P2 platform capabilities and explicit unsupported fallback |
 | Localization/onboarding | Native lookup seam exists; existing UI and onboarding remain untranslated | Full catalog/UI audit P2 |
 | Feature access | Central catalog/resolver exists; future UI/actions still need gates | Reuse keys/tiers at each new execution path |

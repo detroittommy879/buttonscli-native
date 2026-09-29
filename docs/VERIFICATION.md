@@ -2,6 +2,19 @@
 
 Last run: 2026-08-14 on Linux Mint, X11, Rust 1.97.1.
 
+## 2026-09-29 V04 Shader Lab compatibility warning
+
+`cargo test --lib` passes 150 tests, including checks that imported themes
+retain enabled and disabled `shaderLabEnabled` values as inert metadata, and
+that the warning has translations for all 21 supported locales. `cargo check
+--bin buttonscli`, the WASM library check, `cargo build --bin buttonscli`, Rust
+formatting, and `git diff --check` pass. The WASM build has the existing 50
+native-only warnings; the Windows build has the existing bin/lib PDB filename
+collision. The renderer decision is based on the original WebGL
+composite/readback path, `TerminalView` painting through the egui painter, and
+the pinned egui-wgpu callback contract. No native shader editor, compilation,
+preview, GPU fallback, or visual acceptance is claimed.
+
 ## 2026-09-29 V03 Windows source checks
 
 The native theme generator sends only a bounded user brief and selected theme

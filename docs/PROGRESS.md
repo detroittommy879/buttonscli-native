@@ -1,5 +1,18 @@
 # Reconstruction journal
 
+## 2026-09-29 — V04 Shader Lab renderer decision
+
+Compared the original WebGL image-composite contract with the native
+`egui_term`/egui painter path. A custom wgpu callback can paint in egui's pass,
+but cannot sample the terminal output already painted there. A real Shader Lab
+port first needs an offscreen per-pane render texture and a bounded WGSL
+pipeline; arbitrary GLSL conversion is not safe. Added compatibility metadata
+and a localized Theme Library warning for imported themes that request a legacy
+shader. The flag remains inert and shader JSON remains preserved. Shader Lab is
+still partial: editor, compiler, preview, device-pipeline fallback and live GUI
+checks are open. Access tier: free beta (`shaderLab`); AI shader generation
+(`vibeCodeShaders`) remains Pro and waits for that renderer/compiler contract.
+
 ## 2026-09-29 — V03 AI theme generator
 
 Added a Pro-gated AI palette generator to native Themes settings. It uses the

@@ -344,10 +344,11 @@ pub enum MessageKey {
     SettingsTitle,
     SettingsKeepClose,
     SettingsRevertClose,
+    LegacyShaderNotRendered,
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 140] = [
+    pub const ALL: [Self; 141] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -488,6 +489,7 @@ impl MessageKey {
         Self::SettingsTitle,
         Self::SettingsKeepClose,
         Self::SettingsRevertClose,
+        Self::LegacyShaderNotRendered,
     ];
 }
 
@@ -682,12 +684,36 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::SettingsTitle => "ButtonsCLI Settings",
         MessageKey::SettingsKeepClose => "Keep changes and close",
         MessageKey::SettingsRevertClose => "Revert and close",
+        MessageKey::LegacyShaderNotRendered => {
+            "This theme’s legacy GLSL shader is preserved but not run by native rendering."
+        }
     }
 }
 
 fn override_text(locale: &str, key: MessageKey) -> Option<&'static str> {
     // Like the original catalog, partial locale entries fall back to English.
     match (locale, key) {
+        ("en", MessageKey::LegacyShaderNotRendered) => Some("This theme’s legacy GLSL shader is preserved but not run by native rendering."),
+        ("es", MessageKey::LegacyShaderNotRendered) => Some("El shader GLSL heredado de este tema se conserva, pero no se ejecuta en el renderizado nativo."),
+        ("zh-CN", MessageKey::LegacyShaderNotRendered) => Some("此主题的旧版 GLSL 着色器会保留，但不会在原生渲染中运行。"),
+        ("fr", MessageKey::LegacyShaderNotRendered) => Some("Le shader GLSL historique de ce thème est conservé, mais n’est pas exécuté dans le rendu natif."),
+        ("ja", MessageKey::LegacyShaderNotRendered) => Some("このテーマの旧式 GLSL シェーダーは保持されますが、ネイティブ描画では実行されません。"),
+        ("hi", MessageKey::LegacyShaderNotRendered) => Some("इस थीम का पुराना GLSL शेडर सुरक्षित रखा गया है, लेकिन नेटिव रेंडरिंग में नहीं चलता।"),
+        ("de", MessageKey::LegacyShaderNotRendered) => Some("Der ältere GLSL-Shader dieses Themes bleibt erhalten, wird nativ aber nicht ausgeführt."),
+        ("pt-BR", MessageKey::LegacyShaderNotRendered) => Some("O shader GLSL legado deste tema é preservado, mas não é executado na renderização nativa."),
+        ("it", MessageKey::LegacyShaderNotRendered) => Some("Lo shader GLSL legacy di questo tema viene conservato, ma non viene eseguito nel rendering nativo."),
+        ("ru", MessageKey::LegacyShaderNotRendered) => Some("Устаревший шейдер GLSL этой темы сохранён, но в нативной отрисовке не выполняется."),
+        ("uk", MessageKey::LegacyShaderNotRendered) => Some("Застарілий шейдер GLSL цієї теми збережено, але він не виконується в нативному рендерингу."),
+        ("ko", MessageKey::LegacyShaderNotRendered) => Some("이 테마의 레거시 GLSL 셰이더는 보존되지만 기본 렌더링에서는 실행되지 않습니다."),
+        ("ar", MessageKey::LegacyShaderNotRendered) => Some("يُحتفَظ بمظلّل GLSL القديم لهذا المظهر، لكنه لا يعمل في العرض الأصلي."),
+        ("tr", MessageKey::LegacyShaderNotRendered) => Some("Bu temanın eski GLSL gölgelendiricisi korunur, ancak yerel çizimde çalıştırılmaz."),
+        ("pl", MessageKey::LegacyShaderNotRendered) => Some("Starszy shader GLSL tego motywu zostaje zachowany, ale nie jest uruchamiany w renderowaniu natywnym."),
+        ("nl", MessageKey::LegacyShaderNotRendered) => Some("De oudere GLSL-shader van dit thema blijft behouden, maar wordt niet uitgevoerd in de native weergave."),
+        ("sv", MessageKey::LegacyShaderNotRendered) => Some("Temats äldre GLSL-shader bevaras, men körs inte i den inbyggda renderingen."),
+        ("da", MessageKey::LegacyShaderNotRendered) => Some("Temaets ældre GLSL-shader bevares, men køres ikke i den indbyggede rendering."),
+        ("fi", MessageKey::LegacyShaderNotRendered) => Some("Teeman vanha GLSL-varjostin säilyy, mutta sitä ei suoriteta natiivissa renderöinnissä."),
+        ("no", MessageKey::LegacyShaderNotRendered) => Some("Temaets eldre GLSL-shader bevares, men kjøres ikke i den innebygde gjengivelsen."),
+        ("zh-TW", MessageKey::LegacyShaderNotRendered) => Some("此主題的舊版 GLSL 著色器會保留，但不會在原生繪製中執行。"),
         ("es", MessageKey::ImportFromOriginal) => Some("Importar desde ButtonsCLI original"),
         ("es", MessageKey::AiHelp) => Some("Ayuda de IA"),
         ("es", MessageKey::Cancel) => Some("Cancelar"),
@@ -926,6 +952,21 @@ mod tests {
             for key in MessageKey::ALL {
                 assert!(!text(locale, key, &[]).is_empty());
             }
+        }
+    }
+
+    #[test]
+    fn legacy_shader_warning_has_a_translation_for_every_supported_locale() {
+        let english = text("en", MessageKey::LegacyShaderNotRendered, &[]);
+        for locale in SUPPORTED_LOCALES
+            .into_iter()
+            .filter(|locale| *locale != "en")
+        {
+            assert_ne!(
+                text(locale, MessageKey::LegacyShaderNotRendered, &[]),
+                english,
+                "{locale}"
+            );
         }
     }
 }

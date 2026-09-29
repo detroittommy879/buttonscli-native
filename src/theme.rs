@@ -18,6 +18,8 @@ pub struct ThemeDefinition {
     pub colors: AppColors,
     pub pane_divider: PaneDividerTheme,
     pub terminal_colors: TerminalColors,
+    /// Retained compatibility metadata for a legacy shader request. This is not rendered.
+    pub legacy_shader_requested: bool,
     pub effects: TerminalEffects,
     pub typography: Option<Typography>,
 }
@@ -450,6 +452,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
             description: "Native ButtonsCLI foundation theme".into(),
             source: ThemeSource::Native,
             terminal_colors: terminal_from_app(&colors),
+            legacy_shader_requested: false,
             effects: TerminalEffects::default(),
             colors,
             pane_divider: PaneDividerTheme {
@@ -575,6 +578,10 @@ fn parse_legacy_value(
         colors,
         pane_divider: divider,
         terminal_colors,
+        legacy_shader_requested: effects_value
+            .get("shaderLabEnabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         effects: parse_effects(terminal, effects_value),
         typography: parse_typography(&theme["typography"], terminal),
     })
@@ -1095,6 +1102,19 @@ mod tests {
         let theme = parse_legacy_value("no-gradient", &document, ThemeSource::Personal).unwrap();
         assert!(theme.effects.gradient.is_none());
         assert!(!theme.effects.gradient_animation);
+    }
+
+    #[test]
+    fn legacy_shader_request_is_preserved_as_inert_metadata() {
+        for requested in [false, true] {
+            let document = serde_json::json!({
+                "metadata": {"id": "shader", "name": "Shader"},
+                "theme": {"terminal": {}},
+                "effects": {"shaderLabEnabled": requested}
+            });
+            let theme = parse_legacy_value("shader", &document, ThemeSource::Personal).unwrap();
+            assert_eq!(theme.legacy_shader_requested, requested);
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]

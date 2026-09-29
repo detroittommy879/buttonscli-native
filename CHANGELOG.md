@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserved enabled legacy Shader Lab flags in imported themes and added a localized warning in Themes settings. Native rendering does not execute those GLSL shaders; see the Shader Lab renderer decision.
 - Added a Pro-gated AI theme generator to Themes settings. It sends a bounded style brief and selected color palette to the active configured provider, checks schema and text contrast, allows one correction attempt, and keeps results as reviewable drafts until selected. Existing fonts, effects and unknown theme fields are preserved; saving always creates a new collision-safe file.
 - Added free row banding to native terminal themes, with editable color and opacity; the overlay follows actual terminal cell height and respects master-off/focused-pane effect settings. Documented why faithful HSync needs a separate offscreen renderer spike.
 - Added configurable simple noise to native themes with bounded pixelated rendering, FPS and brightness controls, and an optional idle ramp based on visible terminal activity. The original TV-noise fields have no source runtime renderer and remain unsupported.

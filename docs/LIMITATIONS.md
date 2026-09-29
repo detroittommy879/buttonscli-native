@@ -72,6 +72,11 @@ not a backlog disguised as release notes.
   Other original fields remain in the embedded JSON migration assets. The
   original TV-noise fields are configuration-only in the inspected source tree;
   no runtime renderer was found, so the native app leaves them unsupported.
+- Shader Lab is not implemented in the native renderer. Imported themes that
+  request a legacy GLSL effect keep that setting and show a warning in Themes
+  settings, but the shader does not run. Native shader editing needs an
+  offscreen per-pane rendering path and a separately validated WGSL pipeline;
+  see [`migration/SHADER-LAB-DECISION.md`](migration/SHADER-LAB-DECISION.md).
 - The 20 bundled font families work offline. Native Settings also discovers
   local system fonts and imports profile-local `.ttf` / `.otf` files. Online
   Google Font downloads are deferred; online-only names in imported themes
