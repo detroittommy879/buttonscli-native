@@ -11,6 +11,20 @@ pass succeeded. This remains protocol evidence only: no live ButtonsCLI API,
 PTY, external MCP client, or GUI handoff was exercised. C05's fake-API test
 criterion is complete; its live M3 workflow is still open.
 
+## 2026-09-29 — Windows live PTY observer smoke
+
+Added `scripts/test-control-live.ps1`. It builds or launches the debug app with
+a disposable home and development-only control access, authenticates with that
+instance's descriptor, creates two PowerShell PTYs, and confirms unique output
+markers through run/read while one PTY is visible and then backgrounded. On
+shutdown the test verifies the two test-owned shell child processes exit and
+removes only its GUID-named temp root. The full build-and-run and a second
+`-SkipBuild` run passed. WGPU emitted validation-layer/registry warnings, but
+the app and API test completed successfully. This verifies Windows live
+visible/background capture and app-shutdown cleanup; cancellation during paced
+input, full CLI/MCP-client workflows, GUI focus/typing, and Linux/macOS runtime
+checks remain open.
+
 ## 2026-09-29 — R02 output transcript fixture and microbenchmark
 
 Added `tests/fixtures/output-transcript.json` for raw ANSI/cursor controls,

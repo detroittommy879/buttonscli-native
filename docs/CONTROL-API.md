@@ -105,5 +105,8 @@ The native control API and helpers have passed Windows source/build checks and
 Node syntax checks. `node scripts/test-mcp-smoke.mjs` exercises all 14 MCP tools
 against a test-owned fake API, including route/body mapping, bearer auth,
 server-side feature denial, and a stopped-server error. This is protocol-only
-evidence. No live API/PTY interaction, external MCP-client launch, GUI handoff,
-provider request, or cross-platform runtime acceptance is claimed yet.
+evidence. `pwsh -NoProfile -File scripts/test-control-live.ps1` also confirms
+authenticated status/create/run/read against a test-owned Windows app, output
+capture for visible and background PTYs, and PTY shell cleanup at app shutdown.
+No full CLI/MCP-client workflow, direct GUI handoff, provider request, or
+cross-platform runtime acceptance is claimed yet.

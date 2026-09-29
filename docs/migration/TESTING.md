@@ -54,7 +54,7 @@ For shared code and dependency additions, use the existing WASM target recipe wh
 cargo check --target wasm32-unknown-unknown --no-default-features
 ```
 
-Run `node scripts/test-mcp-smoke.mjs` for the optional MCP adapter's fake-API route/gate/disconnect contract. This protocol test uses a temporary descriptor and server; it does not exercise a running app or PTY. Do not run a mutating integration test against the user's existing app/control file. Live CLI/MCP acceptance should use a test-owned native instance with a temporary data root and explicit discovery path.
+Run `node scripts/test-mcp-smoke.mjs` for the optional MCP adapter's fake-API route/gate/disconnect contract. Run `pwsh -NoProfile -File scripts/test-control-live.ps1` for authenticated API and visible/background PTY output against a debug app with a disposable home; add `-SkipBuild` to reuse the current debug binary. The live smoke closes the test app and verifies its test shell children exit. Neither test uses the user's existing app/control file. Full CLI/MCP acceptance still needs a test-owned native instance.
 
 ## Manual milestone acceptance
 

@@ -1,8 +1,8 @@
 # Output capture seam and decision
 
-Date: 2026-09-28; evidence update: 2026-09-29
+Date: 2026-09-28; evidence updates: 2026-09-29
 
-Scope: R02 seam decision and R03 bounded CLI-compatible raw output source implementation. Synthetic transcript and microbenchmark coverage are included; live PTY behavior remains unverified.
+Scope: R02 seam decision and R03 bounded CLI-compatible raw output implementation. Synthetic transcript, microbenchmark, and a Windows live visible/background PTY smoke are included; slow-input cancellation and cross-platform PTY behavior remain unverified.
 
 ## Decision
 
@@ -45,6 +45,11 @@ They are host-specific observations, not a throughput guarantee.
 
 Windows `cargo fmt --all` and `cargo check --bin buttonscli` passed after the implementation. Source inspection confirms the observer is called inside the existing single PTY `Read` loop and before parsing. The native API reads the per-session capture and uses output sequence plus text for quiet/match waits.
 
-The fixture and unit tests do not certify visible/hidden PTY output, close/cancel
-races, alternate-screen renderer behavior, or AI-grid-to-raw-transcript
-separation in a live application. Those OS/runtime checks remain open.
+`pwsh -NoProfile -File scripts/test-control-live.ps1` launched the debug app
+with a disposable home, authenticated using its exact control descriptor, and
+captured unique markers from both a visible and a background PowerShell PTY via
+`run` and `read`. It also confirmed both test shell processes exited when the
+app closed. This validates the live observer path on Windows for these cases.
+Cancellation during paced input, alternate-screen renderer behavior,
+AI-grid-to-raw-transcript separation, and Linux/macOS runtime behavior remain
+open.
