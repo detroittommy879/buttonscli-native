@@ -9,3 +9,4 @@
 # Working notes, credentials, release keys, and non-public research belong here.
 /.private/
 
+/docs/migration/
