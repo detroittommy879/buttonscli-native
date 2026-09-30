@@ -3668,6 +3668,7 @@ impl ButtonsApp {
             &self.preferences.typography.settings,
         );
         egui::ScrollArea::horizontal()
+            .id_salt("settings-tab-strip")
             .max_height(34.0)
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -5184,11 +5185,12 @@ impl ButtonsApp {
         let state = Arc::clone(&self.ai_help_state);
         let actions = self.ai_help_tx.clone();
         let title = crate::i18n::text(&locale, crate::i18n::MessageKey::AiHelp, &[]);
-        ctx.show_viewport_deferred(
+        ctx.show_viewport_immediate(
             egui::ViewportId::from_hash_of("buttonscli-ai-help"),
             egui::ViewportBuilder::default()
                 .with_title(title.clone())
-                .with_inner_size([740.0, 620.0]),
+                .with_inner_size([740.0, 620.0])
+                .with_min_inner_size([560.0, 600.0]),
             move |child_ctx, class| {
                 let Ok(mut state) = state.lock() else {
                     return;
@@ -5198,6 +5200,11 @@ impl ButtonsApp {
                     child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     return;
                 }
+                let queue = |command: AiHelpCommand| {
+                    if actions.send(command).is_ok() {
+                        child_ctx.request_repaint_of(egui::ViewportId::ROOT);
+                    }
+                };
                 let body = |ui: &mut egui::Ui, state: &mut AiHelpWindowState| {
                     use crate::i18n::{text, MessageKey};
                     ui.heading(text(&locale, MessageKey::AiHelp, &[]));
@@ -5209,10 +5216,32 @@ impl ButtonsApp {
                             .button(text(&locale, MessageKey::AiHelpProviderSettings, &[]))
                             .clicked()
                         {
-                            let _ = actions.send(AiHelpCommand::OpenSettings);
+                            queue(AiHelpCommand::OpenSettings);
                         }
                     }
+                    // Reserve room for the composer, including the optional context preview.
+                    // A long transcript must scroll instead of pushing Send offscreen.
+                    let composer_height = if state.context_preview.is_some() {
+                        410.0
+                    } else if state.include_context {
+                        245.0
+                    } else {
+                        165.0
+                    };
+                    let status_height = if state.error.is_some() {
+                        70.0
+                    } else if state.busy {
+                        35.0
+                    } else if state.status.is_some() {
+                        25.0
+                    } else {
+                        0.0
+                    };
+                    let transcript_height =
+                        (ui.available_height() - composer_height - status_height).max(80.0);
                     egui::ScrollArea::vertical()
+                        .id_salt("ai-help-conversation")
+                        .max_height(transcript_height)
                         .stick_to_bottom(true)
                         .show(ui, |ui| {
                             for (assistant, message) in &state.messages {
@@ -5277,7 +5306,7 @@ impl ButtonsApp {
                                                 )
                                                 .clicked()
                                             {
-                                                let _ = actions.send(AiHelpCommand::Deliver {
+                                                queue(AiHelpCommand::Deliver {
                                                     target_id,
                                                     action: action.clone(),
                                                     press_enter: false,
@@ -5294,7 +5323,7 @@ impl ButtonsApp {
                                                 )
                                                 .clicked()
                                             {
-                                                let _ = actions.send(AiHelpCommand::Deliver {
+                                                queue(AiHelpCommand::Deliver {
                                                     target_id,
                                                     action: action.clone(),
                                                     press_enter: true,
@@ -5334,7 +5363,7 @@ impl ButtonsApp {
                                             )
                                             .clicked()
                                         {
-                                            let _ = actions.send(AiHelpCommand::Deliver {
+                                            queue(AiHelpCommand::Deliver {
                                                 target_id,
                                                 action: action.clone(),
                                                 press_enter: false,
@@ -5367,8 +5396,7 @@ impl ButtonsApp {
                                 .button(text(&locale, MessageKey::AiHelpRetry, &[]))
                                 .clicked()
                             {
-                                let _ =
-                                    actions.send(AiHelpCommand::Submit(question, context, target));
+                                queue(AiHelpCommand::Submit(question, context, target));
                             }
                         }
                     }
@@ -5397,7 +5425,7 @@ impl ButtonsApp {
                             {
                                 state.context_busy = true;
                                 state.context_preview = None;
-                                let _ = actions.send(AiHelpCommand::PreviewContext);
+                                queue(AiHelpCommand::PreviewContext);
                             }
                             if state.context_busy {
                                 ui.spinner();
@@ -5414,6 +5442,7 @@ impl ButtonsApp {
                                     ],
                                 ));
                                 egui::ScrollArea::vertical()
+                                    .id_salt("ai-help-context-preview")
                                     .max_height(150.0)
                                     .show(ui, |ui| {
                                         ui.monospace(&preview.output);
@@ -5445,8 +5474,7 @@ impl ButtonsApp {
                                     .as_ref()
                                     .map(|context| context.session_id)
                                     .or_else(|| state.target.as_ref().map(|target| target.0));
-                                let _ =
-                                    actions.send(AiHelpCommand::Submit(question, context, target));
+                                queue(AiHelpCommand::Submit(question, context, target));
                             }
                         }
                     });
@@ -5466,7 +5494,10 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn process_ai_help_commands(&mut self, ctx: &egui::Context) {
         let locale = self.locale.clone();
+        let help_viewport = egui::ViewportId::from_hash_of("buttonscli-ai-help");
+        let mut processed_any = false;
         while let Ok(command) = self.ai_help_rx.try_recv() {
+            processed_any = true;
             match command {
                 AiHelpCommand::OpenSettings => {
                     self.show_settings = true;
@@ -5617,7 +5648,7 @@ impl ButtonsApp {
                                     ));
                                     state.context_busy = false;
                                 }
-                                ctx.request_repaint();
+                                ctx.request_repaint_of(help_viewport);
                                 return;
                             }
                         };
@@ -5629,7 +5660,7 @@ impl ButtonsApp {
                             state.context_preview = Some(snapshot);
                             state.context_busy = false;
                         }
-                        ctx.request_repaint();
+                        ctx.request_repaint_of(help_viewport);
                     });
                 }
                 AiHelpCommand::Submit(question, context, target) => {
@@ -5756,7 +5787,7 @@ impl ButtonsApp {
                                             message.push_str(delta);
                                         }
                                     }
-                                    ctx.request_repaint();
+                                    ctx.request_repaint_of(help_viewport);
                                 },
                             )
                             .map_err(|error| error.to_string())
@@ -5796,10 +5827,13 @@ impl ButtonsApp {
                                 }
                             }
                         }
-                        ctx.request_repaint();
+                        ctx.request_repaint_of(help_viewport);
                     });
                 }
             }
+        }
+        if processed_any {
+            ctx.request_repaint_of(help_viewport);
         }
     }
 
@@ -5922,6 +5956,7 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         let mut all_theme = None;
         egui::ScrollArea::vertical()
+            .id_salt("settings-themes")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 let card_width = 276.0;
@@ -7416,96 +7451,98 @@ impl ButtonsApp {
         ui.separator();
         let font_catalog = self.font_catalog.clone();
         let locale = self.locale.clone();
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Shell / UI",
-                &mut self.preferences.typography.shell,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Tabs",
-                &mut self.preferences.typography.tabs,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Command Dock",
-                &mut self.preferences.typography.preset_dock,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Settings Dialog",
-                &mut self.preferences.typography.settings,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "AI Help Window",
-                &mut self.preferences.typography.assistant,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Status Bar",
-                &mut self.preferences.typography.status_bar,
-                false,
-            );
-            font_zone_editor(
-                ui,
-                &locale,
-                &font_catalog,
-                "Terminal",
-                &mut self.preferences.typography.terminal,
-                true,
-            );
-            egui::Frame::new()
-                .fill(ui.visuals().faint_bg_color)
-                .stroke(ui.visuals().widgets.inactive.bg_stroke)
-                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
-                .inner_margin(10.0)
-                .show(ui, |ui| {
-                    ui.label(RichText::new("Terminal bold rendering").strong());
-                    ui.horizontal_wrapped(|ui| {
-                        let family = self.preferences.typography.terminal.family.clone();
-                        let requested = self.preferences.typography.terminal_bold_weight;
-                        let resolved = font_catalog.resolved_weight(&family, requested);
-                        egui::ComboBox::from_id_salt("terminal-bold-weight")
-                            .selected_text(if requested == resolved {
-                                format!("{requested} bold weight")
-                            } else {
-                                format!("{requested} requested → {resolved} file")
-                            })
-                            .show_ui(ui, |ui| {
-                                for weight in font_catalog.weights_for(&family) {
-                                    ui.selectable_value(
-                                        &mut self.preferences.typography.terminal_bold_weight,
-                                        weight,
-                                        weight.to_string(),
-                                    );
-                                }
-                            });
-                        ui.checkbox(
-                            &mut self.preferences.typography.draw_bold_bright,
-                            "Use bright ANSI colors for bold text",
-                        );
+        egui::ScrollArea::vertical()
+            .id_salt("settings-fonts")
+            .show(ui, |ui| {
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Shell / UI",
+                    &mut self.preferences.typography.shell,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Tabs",
+                    &mut self.preferences.typography.tabs,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Command Dock",
+                    &mut self.preferences.typography.preset_dock,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Settings Dialog",
+                    &mut self.preferences.typography.settings,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "AI Help Window",
+                    &mut self.preferences.typography.assistant,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Status Bar",
+                    &mut self.preferences.typography.status_bar,
+                    false,
+                );
+                font_zone_editor(
+                    ui,
+                    &locale,
+                    &font_catalog,
+                    "Terminal",
+                    &mut self.preferences.typography.terminal,
+                    true,
+                );
+                egui::Frame::new()
+                    .fill(ui.visuals().faint_bg_color)
+                    .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                    .corner_radius(ui.visuals().widgets.inactive.corner_radius)
+                    .inner_margin(10.0)
+                    .show(ui, |ui| {
+                        ui.label(RichText::new("Terminal bold rendering").strong());
+                        ui.horizontal_wrapped(|ui| {
+                            let family = self.preferences.typography.terminal.family.clone();
+                            let requested = self.preferences.typography.terminal_bold_weight;
+                            let resolved = font_catalog.resolved_weight(&family, requested);
+                            egui::ComboBox::from_id_salt("terminal-bold-weight")
+                                .selected_text(if requested == resolved {
+                                    format!("{requested} bold weight")
+                                } else {
+                                    format!("{requested} requested → {resolved} file")
+                                })
+                                .show_ui(ui, |ui| {
+                                    for weight in font_catalog.weights_for(&family) {
+                                        ui.selectable_value(
+                                            &mut self.preferences.typography.terminal_bold_weight,
+                                            weight,
+                                            weight.to_string(),
+                                        );
+                                    }
+                                });
+                            ui.checkbox(
+                                &mut self.preferences.typography.draw_bold_bright,
+                                "Use bright ANSI colors for bold text",
+                            );
+                        });
                     });
-                });
-        });
+            });
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -7899,6 +7936,7 @@ impl ButtonsApp {
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         egui::ScrollArea::vertical()
+            .id_salt("settings-workspace")
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
@@ -8251,6 +8289,7 @@ impl ButtonsApp {
         let presets = self.presets(collection).to_vec();
         let mut action = None;
         egui::ScrollArea::vertical()
+            .id_salt(("settings-presets", collection.label()))
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (index, preset) in presets.iter().enumerate() {
