@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-09-29 — Partial Windows AI Help GUI acceptance
+
+Ran the debug native app with an isolated temporary home and the explicit
+development AI Help override. First-run language setup completed; **Help → AI
+Help** opened a separate viewport. A loopback fake provider was configured in
+the isolated native profile; Settings discovered its one model, and AI Help
+rendered a streamed reply plus an inert command suggestion targeted at `term1`.
+The test terminal showed no marker before review; clicking **Insert + Enter**
+produced the expected harmless echo. Two identical markers appeared during
+pointer calibration, so the terminal action was exercised more than once. No
+real provider, API key, or user profile was used.
+
+This is partial M4 evidence, not full acceptance. The provider editor's Test
+Connection was not validated: the first fake server returned SSE where that
+button expects a non-streaming JSON reply, so it correctly reported an invalid
+response. Context preview, cancellation, retry/failure, target switching,
+main-window shutdown/reopen, and broader focus/DPI checks remain open. The
+detached Settings screenshot also showed red egui duplicate ScrollArea/widget
+ID diagnostics; the source of that overlay is not yet identified.
+
 ## 2026-09-29 — P06 signed-manifest verifier core
 
 Added `src/distribution.rs` with exact-byte Ed25519 strict signature checking,
