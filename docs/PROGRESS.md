@@ -20,6 +20,20 @@ main-window shutdown/reopen, and broader focus/DPI checks remain open. The
 detached Settings screenshot also showed red egui duplicate ScrollArea/widget
 ID diagnostics; the source of that overlay is not yet identified.
 
+## 2026-09-29 — Windows tab-close-during-paste acceptance
+
+Added `scripts/test-close-during-paste.ps1`, which starts a test-owned native
+app with a disposable home, opens two PowerShell PTYs, starts a long paced send
+to the active tab, and closes that tab with the app's `Ctrl+Shift+W` shortcut.
+The live request returned a closed-target error, the receiving tab stayed
+available, and its output did not contain the payload marker. The first
+harness attempt left the first-run language dialog open, so the shortcut did
+not reach the app; the script now completes first-run setup before exercising
+the race and removes only its GUID-named temp root after shutdown. No app-code
+fix was needed: stable-ID dispatch already fails closed when the target closes.
+Contended throughput/frame measurements and cross-platform behavior remain
+open.
+
 ## 2026-09-29 — P06 signed-manifest verifier core
 
 Added `src/distribution.rs` with exact-byte Ed25519 strict signature checking,
