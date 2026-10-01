@@ -176,9 +176,10 @@ fn build_command(platform: InstallerPlatform, script_path: &Path) -> String {
 fn preferred_powershell(detected_shells: &[(String, String)]) -> Option<String> {
     for suffix in ["pwsh.exe", "powershell.exe", "pwsh", "powershell"] {
         if let Some((id, _)) = detected_shells.iter().find(|(_, command)| {
-            Path::new(command)
-                .file_name()
-                .and_then(|name| name.to_str())
+            // This Windows plan also runs in portable tests on Unix hosts.
+            command
+                .rsplit(['/', '\\'])
+                .next()
                 .is_some_and(|name| name.eq_ignore_ascii_case(suffix))
         }) {
             return Some(id.clone());
