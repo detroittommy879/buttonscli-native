@@ -1,7 +1,46 @@
 # Verification record
 
-Last run: 2026-09-29 on Windows 11, Rust 1.97.1. Earlier Linux-only checks
+Last run: 2026-10-01 on Windows 11, Rust 1.98.1. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-01 startup, CLI and remote checkpoint
+
+- `cargo fmt --all -- --check` and `git diff --check` pass.
+- `cargo test --locked` passes 222 library tests and two legacy fixture tests;
+  three optional library tests are ignored.
+- `cargo build --bin buttonscli --locked` passes. Its help/version options exit
+  successfully; an invalid tab count exits with code 2. The existing Windows
+  bin/lib PDB output-name warning remains.
+- `pwsh -NoProfile -File scripts/test-control-live.ps1 -SkipBuild` passes against
+  an isolated profile: three startup tabs, one command each in tabs 1 and 3,
+  no input in tab 2, the installed Node CLI matrix, visible/background output,
+  paced-send cancellation on PTY exit, and child-shell cleanup. This does not
+  certify keyboard, clipboard, monitor, DPI or broader visual interaction.
+- `node --test scripts/test-cli.mjs` passes five loopback HTTP deadline/error
+  regressions. `node scripts/test-mcp-smoke.mjs` passes all 14 tool contracts.
+- Native `cargo clippy --all-targets --locked -- -D warnings` fails on existing
+  strict lints. WASM Clippy compiles without denial but reports 52 warnings;
+  the strict WebAssembly CI gate remains failing. No lint gate was weakened.
+- `cargo build --target wasm32-unknown-unknown --release --no-default-features
+  --locked` passes with the existing 51 compiler warnings. Browser canvas
+  interaction was not rerun.
+- The live control smoke with `-WithLoadProbe` passes for 1, 4 and 10 terminals,
+  including 200 Unicode output lines per terminal, target isolation and child
+  cleanup. Measured completion times were 6,716 / 25,112 / 31,655 ms including
+  delivery, shell execution, polling and deliberate sleeps. This is functional
+  contention evidence, not an FPS or maximum-throughput benchmark. Raw long
+  markers can be split by ConPTY wrap/redraw VT; the test uses short markers.
+
+The current migration is backed up on `codex/native-migration` with draft
+[PR #1](https://github.com/detroittommy879/buttonscli-native/pull/1). The draft
+preserves the unfinished Agent Mode prototype with a separate explicit debug
+opt-in. Windows results do not certify Linux/macOS behavior or production
+entitlement, signing and update services.
+
+GitHub rejected a proposed Node CI job because the current token lacks workflow
+permission. That optional workflow edit was removed from the unpublished
+commit, preserving the existing CI configuration. The reviewed job is saved in
+[`CI-FOLLOWUP.md`](CI-FOLLOWUP.md); local Node checks above still pass.
 
 ## 2026-09-29 P01 feature grant resolution
 

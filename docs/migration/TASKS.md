@@ -121,6 +121,7 @@ These are early tasks because the user reports partially working layouts. Reprod
 - Done: UI uses the same dispatcher future callers will use. Free core; callers apply their feature gate.
 
 ### R02 — Output capture seam decision [Spike, R01]
+- 2026-10-01: `scripts/test-control-live.ps1 -WithLoadProbe` passes 1/4/10-terminal functional contention checks with 200 Unicode lines per terminal, stable targets and child cleanup. API readiness does not imply a shell prompt, and ConPTY wrap/redraw can split long raw markers; the probe uses short markers. This is partial R02 evidence; frame-cost, maximum throughput and cross-platform checks remain open. See `docs/VERIFICATION.md` for measured completion times and limits.
 - Inspect N `vendor/egui_term/src/backend/mod.rs`, Alacritty event-loop APIs at the pinned version, and O `record_output`/read cleanup behavior.
 - Prototype bounded raw output observation and independent grid snapshots; do not create a second PTY reader. A manual release microbenchmark now measures aggregate write/read calls; isolated lock time and allocation counts remain open.
 - Deliver `docs/migration/OUTPUT-CAPTURE-DECISION.md` with chosen seam, alternative costs, patch scope and transcript fixture. If raw capture requires vendoring more code, review scope before proceeding; do not quietly downgrade `/v1` semantics.

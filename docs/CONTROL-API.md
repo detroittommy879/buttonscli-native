@@ -99,6 +99,12 @@ it stopped observing; `quiet` means no new output was observed for the requested
 interval, not that a command succeeded. `wait-for-text` and `wait-for-quiet`
 are CLI-side polling commands built on bounded reads.
 
+On Windows, ConPTY can insert cursor movement and wrap/redraw sequences inside
+text that looks continuous on screen, especially in narrow panes. A long
+`wait-for-text` marker may therefore fail to match the raw stream even after a
+command prints it. Use short markers that fit the pane when checking completion;
+the raw transcript is not a reconstruction of the rendered terminal grid.
+
 The control listener does not accept browser-origin requests, checks the local
 Host header and bearer token on reads and writes, caps bodies at 1 MiB and
 concurrent requests at 32, and submits actions through the bounded stable-ID
@@ -115,5 +121,15 @@ authenticated status/create/run/read against a test-owned Windows app, output
 capture for visible and background PTYs, and PTY shell cleanup at app shutdown.
 The installed Node CLI command matrix also passes there, including stdin/file/
 base64/paced payloads, the type-only preset, hidden-tab targeting, and grid layout.
+The 2026-10-01 Windows rerun also verified three startup tabs with commands
+delivered once to tabs 1 and 3, leaving tab 2 untouched. The loopback regression
+suite at `node --test scripts/test-cli.mjs` covers stalled headers/body reads,
+overall polling deadlines, uncertain write delivery without retry, and malformed
+response errors without body disclosure.
+Add `-WithLoadProbe` to the live Windows script for 1-, 4- and 10-terminal
+output checks. The 2026-10-01 run retained every one of 200 Unicode lines per
+terminal, kept output isolated by target, and verified child-shell cleanup.
+The probe waits for the PowerShell prompt; API `ready` means the PTY is live,
+not that its shell has finished startup. It does not measure frame rate.
 No external MCP-client launch, direct GUI handoff, provider request, or
 cross-platform runtime acceptance is claimed yet.

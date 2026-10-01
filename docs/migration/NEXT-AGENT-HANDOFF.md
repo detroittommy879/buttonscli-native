@@ -2,7 +2,39 @@
 
 Updated 2026-09-29. This is a working handoff, not a completion claim. Continue the native migration in this repository; the legacy React/Tauri checkout is a read-only reference.
 
-## Latest Windows checkpoint — 2026-09-30
+## Latest Windows checkpoint — 2026-10-01
+
+Work continues on `codex/native-migration`, backed up in draft
+[PR #1](https://github.com/detroittommy879/buttonscli-native/pull/1). Preserve
+that branch and update the existing PR. `CONTRIBUTING.md` documents the branch,
+push, review and merge workflow; do not merge while the strict CI gates fail.
+
+- One-shot startup tabs/commands, shell and cwd are source-implemented and
+  documented in `docs/STARTUP.md`. Startup is free. Parsing preserves literal
+  help/version values and rejects ambiguous singleton options.
+- Full Windows tests pass 222 library tests plus two compatibility fixtures,
+  with three optional tests ignored. Desktop and optimized WASM builds pass.
+  Strict native Clippy fails on existing lints; WASM Clippy reports 52 warnings
+  without denial. Those gates remain intact. Linux CI exposed an existing
+  Windows-path parsing test failure; basename matching is now host-independent.
+- The installed Windows CLI/startup matrix passes. Five loopback HTTP timeout
+  regressions and the 14-tool MCP fake-API contract pass. A proposed separate
+  Node CI job is documented in `docs/CI-FOLLOWUP.md`; the current GitHub token
+  cannot update workflows. Optional `-WithLoadProbe` passes 1/4/10-terminal Unicode output,
+  target isolation and shell cleanup. This does not certify FPS or broad GUI
+  interaction. The first-run language chooser remains open in the isolated
+  four-pane screenshot. ConPTY wrap/redraw can split long raw text markers;
+  use short ones in narrow panes. API readiness is not shell prompt readiness.
+- An unfinished Agent Mode prototype was found in the worktree and preserved
+  in the backup. It remains outside migration scope and unavailable in release
+  builds; debug access additionally requires `BUTTONSCLI_NATIVE_DEV_AI_AGENT=1`
+  alongside the AI Help override. Do not expand it as a core parity task.
+
+Continue with strict CI cleanup, M4 target-selection/focus acceptance, broader
+GUI/load evidence, then P06 activation/rollback. See `docs/PROGRESS.md` and
+`docs/VERIFICATION.md` for exact results and remaining limits.
+
+## Previous Windows checkpoint — 2026-09-30
 
 Current checkout: `C:/ext/buttonscli-both/buttonscli-native`; reference:
 `C:/ext/buttonscli-both/w111erd`. The dated paths and baseline below describe

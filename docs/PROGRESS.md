@@ -1,5 +1,53 @@
 # Reconstruction journal
 
+## 2026-10-01 — Startup and CLI follow-through
+
+Startup parsing now recognizes help/version only in flag positions, preserving
+those strings when they are command or directory values. Duplicate singleton
+options are rejected, and command validation reports its actual 4096-byte UTF-8
+limit. Four parser tests, executable help/version/error-exit checks, the desktop
+build, and the isolated live Windows CLI/startup matrix pass. Startup remains
+free and one-shot; `docs/STARTUP.md` documents its shell-settling limits.
+
+Five real loopback HTTP regressions exercise the shipped Node CLI's stalled
+headers, stalled response body, overall polling deadline, uncertain write
+without retry, and malformed-response redaction. They all pass, as does the
+14-tool MCP fake-API contract. `docs/CI-FOLLOWUP.md` preserves the proposed Node
+CI job: GitHub rejected the workflow edit because the logged-in token lacks
+workflow permission. The unpublished commit excludes that optional workflow
+edit so the implementation and tests can still be pushed normally.
+The preserved Agent Mode prototype requires its own explicit debug-only
+`BUTTONSCLI_NATIVE_DEV_AI_AGENT=1` opt-in in addition to AI Help; normal AI Help
+development access keeps it hidden. Release and live Agent Mode acceptance are
+not claimed.
+
+The full Windows Rust suite passes 222 library tests and two compatibility
+fixtures, with three optional library tests ignored. Native strict Clippy
+still fails on existing warnings (18 with all test targets on this toolchain).
+WASM Clippy without denial compiles with 52 warnings: 49 dead-code warnings,
+two unused variables and one loop-style lint. Strict CI keeps those gates;
+the optimized WASM build also passes (51 compiler warnings). The PR remains
+draft. Linux CI exposed host-dependent parsing of Windows shell
+paths in an existing installer test; Windows shell basename matching now
+recognizes both separator styles on every host. `CONTRIBUTING.md` records the
+branch, push, draft PR, review, and merge workflow.
+
+The optional `-WithLoadProbe` Windows control smoke passes at 1, 4 and 10
+terminals, verifying 200 Unicode output lines per terminal, isolated target
+delivery, retained session IDs, increasing output sequence and clean child-shell
+shutdown. The final runs took 6,716 / 25,112 / 31,655 ms, including command
+delivery, shell processing, polling and deliberate sleeps; these are functional
+VM measurements, not frame-rate or maximum-throughput benchmarks. The harness
+waits for a PowerShell prompt because API readiness only identifies a live PTY.
+Initial narrow-pane probes also exposed ConPTY wrapping inside long raw markers;
+short markers now fit the physical pane width. The API intentionally preserves
+that raw VT contract, and `docs/CONTROL-API.md` records the matching limitation.
+Cleanup retries transient Windows directory handles and preserves the original
+test error. The isolated four-pane screenshot at `target/load-review.png` shows
+live Unicode output and wrapping tabs, with the first-run language chooser still
+open; it does not certify onboarding or keyboard interaction. Broader contention,
+frame-cost, focus and DPI acceptance remain open.
+
 ## 2026-10-01 — Remote backup checkpoint
 
 Moved the local migration checkpoint and remaining worktree edits onto

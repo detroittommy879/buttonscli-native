@@ -2,6 +2,7 @@
 param(
     [switch]$SkipBuild,
     [switch]$WithMcpSdk,
+    [switch]$WithLoadProbe,
     [ValidateRange(10, 120)]
     [int]$StartupTimeoutSeconds = 30
 )
@@ -17,6 +18,7 @@ $controlDir = Join-Path $smokeHome '.buttonscli-native\control'
 $process = $null
 $ownedShellIds = @()
 $cleanupFailure = $null
+$smokeError = $null
 
 New-Item -ItemType Directory -Path $roaming, $local | Out-Null
 
@@ -383,6 +385,92 @@ try {
         Remove-Job -Job $slowJob -Force -ErrorAction SilentlyContinue
     }
 
+    if ($WithLoadProbe) {
+        foreach ($paneCount in @(1, 4, 10)) {
+            # Keep emitted lines below even a narrow pane's physical width.
+            # The compatibility output stream contains raw ConPTY wrap/redraw VT.
+            $loadTag = "L$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+            if ($paneCount -eq 1) {
+                $created = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body @{
+                    name = "Load $paneCount"; shell = $shellCommand; cwd = $smokeHome
+                }
+                $loadTabs = @($created.tab)
+            }
+            else {
+                $created = Invoke-ControlApi -Method POST -Path '/v1/layout/open' -Body @{
+                    layout = 'grid'; columns = [int][Math]::Ceiling([Math]::Sqrt($paneCount))
+                    names = @(1..$paneCount | ForEach-Object { "Load $paneCount pane $_" })
+                    shell = $shellCommand; cwd = $smokeHome
+                }
+                $loadTabs = @($created.tabs)
+            }
+            if ($loadTabs.Count -ne $paneCount) { throw "Load probe did not open $paneCount terminals." }
+            $baselines = @{}
+            $markers = @{}
+            foreach ($loadTab in $loadTabs) {
+                $ready = Wait-ControlTabReady $loadTab.tabId
+                # API readiness identifies a live PTY, not a ready shell prompt.
+                $shellDeadline = [DateTime]::UtcNow.AddSeconds(20)
+                do {
+                    $prompt = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=4096"
+                    if ($prompt.text -match 'PS [^\r\n]*>') { break }
+                    Start-Sleep -Milliseconds 100
+                } while ([DateTime]::UtcNow -lt $shellDeadline)
+                if ($prompt.text -notmatch 'PS [^\r\n]*>') {
+                    throw "Load probe shell did not reach its prompt on $($loadTab.tabId)."
+                }
+                $baselines[$loadTab.tabId] = $ready.outputSequence
+                $markers[$loadTab.tabId] = "${loadTag}_$($loadTab.ptyId)"
+            }
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            foreach ($loadTab in $loadTabs) {
+                # The complete DONE marker never appears in echoed command text.
+                $command = 'for ($i=1; $i -le 200; $i++) {{ Write-Output (''{0}:雪:'' + $i); Start-Sleep -Milliseconds 10 }}; Write-Output (''{0}'' + '':DONE'')' -f $markers[$loadTab.tabId]
+                $null = Invoke-ControlApi -Method POST -Path "/v1/tabs/$($loadTab.tabId)/send" -Body @{
+                    text = $command; enter = $true
+                }
+            }
+            $remaining = @($loadTabs)
+            while ($remaining.Count -gt 0 -and $watch.Elapsed.TotalSeconds -lt 45) {
+                $unfinished = @()
+                foreach ($loadTab in $remaining) {
+                    $read = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=20000"
+                    $marker = $markers[$loadTab.tabId]
+                    if (-not $read.text.Contains("${marker}:DONE")) {
+                        $unfinished += $loadTab
+                        continue
+                    }
+                    for ($line = 1; $line -le 200; $line++) {
+                        if (-not $read.text.Contains("${marker}:雪:$line`r`n")) {
+                            throw "Load probe lost Unicode output line $line on $($loadTab.tabId)."
+                        }
+                    }
+                    foreach ($otherMarker in $markers.Values) {
+                        if ($otherMarker -ne $marker -and $read.text.Contains($otherMarker)) {
+                            throw "Load output crossed into $($loadTab.tabId)."
+                        }
+                    }
+                    if ($read.tab.ptyId -ne $loadTab.ptyId -or $read.tab.exited -or
+                        $read.tab.outputSequence -le $baselines[$loadTab.tabId]) {
+                        throw "Load probe changed or lost the live PTY $($loadTab.tabId)."
+                    }
+                }
+                $remaining = @($unfinished)
+                if ($remaining.Count -gt 0) { Start-Sleep -Milliseconds 100 }
+            }
+            if ($remaining.Count -gt 0) {
+                foreach ($loadTab in $remaining) {
+                    $diagnostic = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=20000"
+                    # Only synthetic output from this test-owned profile is saved.
+                    $diagnostic | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $repoRoot "target/load-probe-$($loadTab.tabId).json") -Encoding utf8
+                    Write-Output "Load failure output for $($loadTab.tabId): $($diagnostic.text)"
+                }
+                throw "Load probe timed out with $($remaining.Count) unfinished terminals."
+            }
+            Write-Output "Load probe: $paneCount terminals, $($paneCount * 200) Unicode output lines verified in $($watch.ElapsedMilliseconds) ms."
+        }
+    }
+
     $ownedShellProcesses = @(
         Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" |
             Where-Object { $_.Name -in @('pwsh.exe', 'powershell.exe') }
@@ -397,6 +485,10 @@ try {
     Write-Output 'Paced delivery stopped with a clear error after its test PTY exited.'
     Write-Output 'Visible and background PTYs both captured unique output markers.'
     Write-Output "Background run completion: $($hiddenRun.completionReason); timed out: $($hiddenRun.timedOut)."
+}
+catch {
+    $smokeError = $_
+    throw
 }
 finally {
     if ($null -ne $process -and -not $process.HasExited) {
@@ -428,11 +520,28 @@ finally {
     $withinTemp = $resolvedSmokeHome.StartsWith($resolvedTempRoot, [System.StringComparison]::OrdinalIgnoreCase)
     $expectedName = [System.IO.Path]::GetFileName($resolvedSmokeHome).StartsWith('buttonscli-native-control-live-', [System.StringComparison]::Ordinal)
     if ($withinTemp -and $expectedName -and (Test-Path -LiteralPath $resolvedSmokeHome)) {
-        Remove-Item -LiteralPath $resolvedSmokeHome -Recurse -Force
+        # Windows may retain the shell's directory handle briefly after exit.
+        $cleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while (Test-Path -LiteralPath $resolvedSmokeHome) {
+            try {
+                Remove-Item -LiteralPath $resolvedSmokeHome -Recurse -Force
+                break
+            }
+            catch {
+                if ([DateTime]::UtcNow -ge $cleanupDeadline) {
+                    $cleanupFailure = "Could not remove test profile ${resolvedSmokeHome}: $($_.Exception.Message)"
+                    break
+                }
+                Start-Sleep -Milliseconds 100
+            }
+        }
     }
     elseif (Test-Path -LiteralPath $resolvedSmokeHome) {
         Write-Error "Refusing to remove unexpected smoke path: $resolvedSmokeHome"
     }
     Pop-Location
-    if ($cleanupFailure) { throw $cleanupFailure }
+    if ($cleanupFailure) {
+        if ($null -ne $smokeError) { Write-Warning $cleanupFailure }
+        else { throw $cleanupFailure }
+    }
 }

@@ -65,6 +65,14 @@ Run `node scripts/test-mcp-smoke.mjs` for the MCP adapter's fake-API route/gate/
 
 ## Manual milestone acceptance
 
+The CLI timeout regression command is `node --test scripts/test-cli.mjs`.
+It uses real local HTTP and the shipped helper in a child process, covering
+stalled headers/body reads, bounded poll intervals, no retry after uncertain
+writes, and malformed-response redaction. Add `-WithLoadProbe` to the live
+Windows control script for 1/4/10-terminal Unicode output and target-isolation
+checks. The probe waits for a PowerShell prompt and uses markers short enough
+to avoid ConPTY wrap/redraw splitting; it is not a frame-rate benchmark.
+
 ### M1 — imported workspace
 Use a synthetic legacy root containing recognizable command/SSH presets and custom colors. Import via preview; restart native; verify labels/order, type-only behavior and custom theme. Modify native; confirm original tree hashes unchanged. Cancel import and simulate one broken file. Test empty native and existing eframe-preference migration independently.
 
