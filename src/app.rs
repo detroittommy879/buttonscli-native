@@ -67,19 +67,29 @@ use zeroize::{Zeroize, Zeroizing};
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_help_available() -> bool {
-    use crate::features::{access, catalog::FeatureKey};
+    ai_feature_available(crate::features::catalog::FeatureKey::AiHelp)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn ai_agent_available() -> bool {
+    ai_help_available() && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn ai_feature_available(feature: crate::features::catalog::FeatureKey) -> bool {
+    use crate::features::access;
     let mut runtime = crate::account::current_runtime_config().access();
     if cfg!(debug_assertions)
         && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_HELP").is_ok_and(|value| value == "1")
     {
-        runtime.development_overrides.insert(FeatureKey::AiHelp);
+        runtime.development_overrides.insert(feature);
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or_default();
     let entitlement = crate::account_api::current_entitlement();
-    access::resolve(FeatureKey::AiHelp, &runtime, &entitlement, now).available
+    access::resolve(feature, &runtime, &entitlement, now).available
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -480,6 +490,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     ai_help_rx: Receiver<AiHelpCommand>,
     #[cfg(not(target_arch = "wasm32"))]
+    startup_commands: Vec<(u64, String, std::time::Instant)>,
+    #[cfg(not(target_arch = "wasm32"))]
     quick_secrets_open: bool,
     #[cfg(not(target_arch = "wasm32"))]
     quick_secrets_busy: bool,
@@ -691,6 +703,8 @@ struct QuickSecretsEvent {
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Default)]
 struct AiHelpWindowState {
+    agent_mode: bool,
+    last_request_agent: bool,
     open: bool,
     input: String,
     messages: Vec<(bool, String)>,
@@ -843,6 +857,25 @@ impl ButtonsApp {
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        Self::new_configured(
+            cc,
+            #[cfg(not(target_arch = "wasm32"))]
+            crate::startup::StartupOptions::default(),
+        )
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new_with_startup(
+        cc: &eframe::CreationContext<'_>,
+        startup: crate::startup::StartupOptions,
+    ) -> Self {
+        Self::new_configured(cc, startup)
+    }
+
+    fn new_configured(
+        cc: &eframe::CreationContext<'_>,
+        #[cfg(not(target_arch = "wasm32"))] startup: crate::startup::StartupOptions,
+    ) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(render_state) = &cc.wgpu_render_state {
             crate::plugins::effects::analog_static::register(
@@ -916,7 +949,7 @@ impl ButtonsApp {
         fonts::install(&cc.egui_ctx, &app.font_catalog);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
-        app.open_tab(cc.egui_ctx.clone());
+        app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
             app.notice = Some(format!("Native settings could not load: {error}"));
@@ -1151,6 +1184,8 @@ impl ButtonsApp {
             ai_help_tx,
             #[cfg(not(target_arch = "wasm32"))]
             ai_help_rx,
+            #[cfg(not(target_arch = "wasm32"))]
+            startup_commands: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             quick_secrets_open: false,
             #[cfg(not(target_arch = "wasm32"))]
@@ -1638,6 +1673,77 @@ impl ButtonsApp {
                 }
                 Ok(Some(id))
             }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_startup_tabs(&mut self, ctx: &egui::Context, startup: crate::startup::StartupOptions) {
+        for number in 1..=startup.tabs {
+            let result = self.dispatch_ui_action(
+                None,
+                Action::CreateNamed {
+                    name: format!("term{number}"),
+                    shell: startup.shell.clone(),
+                    cwd: startup.cwd.clone(),
+                },
+                ctx,
+            );
+            match result {
+                Ok(Some(id)) => {
+                    if let Some(command) = startup.commands.get(&number) {
+                        self.startup_commands.push((
+                            id,
+                            command.clone(),
+                            std::time::Instant::now(),
+                        ));
+                    }
+                }
+                _ => {
+                    self.notice = Some(format!("Could not launch startup tab {number}; remaining startup tabs were not opened."));
+                    break;
+                }
+            }
+        }
+        if !self.tabs.is_empty() {
+            self.dispatch_ui_or_notice(Some(Target::Id(self.tabs[0].id)), Action::Focus, ctx);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_startup_commands(&mut self, ctx: &egui::Context) {
+        let pending = std::mem::take(&mut self.startup_commands);
+        for (id, command, started) in pending {
+            let Some(tab) = self.tabs.iter().find(|tab| tab.id == id && !tab.exited) else {
+                self.notice = Some("Startup command cancelled because its terminal closed.".into());
+                continue;
+            };
+            let output = tab.output.snapshot();
+            if output.last_input_at_ms.is_some() {
+                self.notice = Some(
+                    "Startup command cancelled because the terminal already received input.".into(),
+                );
+                continue;
+            }
+            let quiet = output
+                .last_output_at_ms
+                .is_some_and(|last| crate::session::output::now_ms().saturating_sub(last) >= 300);
+            if started.elapsed() >= Duration::from_millis(750) && quiet {
+                match crate::session::input::command_bytes(&command, true) {
+                    Ok(bytes) => {
+                        self.dispatch_ui_or_notice(Some(Target::Id(id)), Action::Send(bytes), ctx)
+                    }
+                    Err(error) => self.notice = Some(error.to_owned()),
+                }
+            } else if started.elapsed() >= Duration::from_secs(30) {
+                self.notice = Some(
+                    "Startup command was not sent: shell did not settle within 30 seconds.".into(),
+                );
+            } else {
+                self.startup_commands.push((id, command, started));
+            }
+        }
+        if !self.startup_commands.is_empty() {
+            ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
 
@@ -5242,6 +5348,11 @@ impl ButtonsApp {
                     return;
                 };
                 if child_ctx.input(|input| input.viewport().close_requested()) {
+                    if state.agent_mode {
+                        if let Some(cancel) = &state.cancel {
+                            cancel.store(true, Ordering::Relaxed);
+                        }
+                    }
                     state.open = false;
                     child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     return;
@@ -5444,7 +5555,7 @@ impl ButtonsApp {
                             }
                         });
                     }
-                    if state.error.is_some() && !state.busy {
+                    if state.error.is_some() && !state.busy && !state.last_request_agent {
                         if let Some((question, context, target)) = state.last_request.clone() {
                             if ui
                                 .button(text(&locale, MessageKey::AiHelpRetry, &[]))
@@ -5456,6 +5567,23 @@ impl ButtonsApp {
                     }
                     ui.separator();
                     ui.add_enabled_ui(!state.busy && ai_help_available(), |ui| {
+                        if ui
+                            .add_enabled(
+                                ai_agent_available(),
+                                egui::Checkbox::new(
+                                    &mut state.agent_mode,
+                                    text(&locale, MessageKey::AiAgentMode, &[]),
+                                ),
+                            )
+                            .changed()
+                        {
+                            state.include_context = state.agent_mode;
+                            state.context_preview = None;
+                            state.reviewed_actions.clear();
+                        }
+                        if state.agent_mode {
+                            ui.small(text(&locale, MessageKey::AiAgentConsent, &[]));
+                        }
                         let changed = ui
                             .checkbox(
                                 &mut state.include_context,
@@ -5509,8 +5637,8 @@ impl ButtonsApp {
                                 .desired_rows(3)
                                 .hint_text(text(&locale, MessageKey::AiHelpQuestionHint, &[])),
                         );
-                        let context_ready =
-                            !state.include_context || state.context_preview.is_some();
+                        let context_ready = (!state.include_context && !state.agent_mode)
+                            || state.context_preview.is_some();
                         if ui
                             .add_enabled(
                                 context_ready,
@@ -5772,14 +5900,26 @@ impl ButtonsApp {
                         }
                         continue;
                     }
-                    let (cancel, profile_name, history) = {
+                    let (cancel, profile_name, history, agent_mode) = {
                         let Ok(mut state) = self.ai_help_state.lock() else {
                             continue;
                         };
                         if state.busy {
                             continue;
                         }
+                        if state.agent_mode && (context.is_none() || target.is_none()) {
+                            state.error = Some(
+                                "Preview the target terminal before starting Agent Mode.".into(),
+                            );
+                            continue;
+                        }
+                        if state.agent_mode && !ai_agent_available() {
+                            state.error =
+                                Some("Agent Mode is not available for this account.".into());
+                            continue;
+                        }
                         if state.error.is_some()
+                            && !state.last_request_agent
                             && state.messages.len() >= 2
                             && state
                                 .messages
@@ -5790,6 +5930,7 @@ impl ButtonsApp {
                             state.messages.truncate(retained);
                         }
                         state.busy = true;
+                        state.last_request_agent = state.agent_mode;
                         state.error = None;
                         state.reviewed_actions.clear();
                         state.last_request = Some((question.clone(), context.clone(), target));
@@ -5818,6 +5959,7 @@ impl ButtonsApp {
                                 .map_or("default", NativeStore::profile_name)
                                 .to_owned(),
                             state.history.clone(),
+                            state.agent_mode,
                         )
                     };
                     let expected_reference = credentials::reference(&profile_name, &provider.id);
@@ -5829,6 +5971,19 @@ impl ButtonsApp {
                     let system_prompt = crate::session::context::build_system_prompt();
                     let request_question = question.clone();
                     let request_locale = locale.clone();
+                    let mut agent_host = crate::assistant::agent::TerminalHost {
+                        target: target.unwrap_or(0),
+                        snapshot: Arc::clone(&self.control_snapshot),
+                        dispatcher: self.session_dispatcher.clone(),
+                        ctx: ctx.clone(),
+                        cancelled: Arc::clone(&cancel),
+                        allowed: ai_agent_available,
+                        expected_input: self
+                            .tabs
+                            .iter()
+                            .find(|tab| Some(tab.id) == target)
+                            .map_or(0, |tab| tab.output.snapshot().input_sequence),
+                    };
                     std::thread::spawn(move || {
                         let mut streamed = String::new();
                         let result = provider_key(
@@ -5838,6 +5993,26 @@ impl ButtonsApp {
                         )
                         .map_err(|error| error.to_string())
                         .and_then(|key| {
+                            if agent_mode {
+                                return crate::assistant::agent::run(
+                                    &crate::assistant::transport::ReqwestTransport,
+                                    &provider,
+                                    key,
+                                    &request_question,
+                                    &cancel,
+                                    &mut agent_host,
+                                    &mut |event| {
+                                        if let Ok(mut state) = state.lock() {
+                                            if let Some((true, message)) = state.messages.last_mut()
+                                            {
+                                                message.push_str(event);
+                                                message.push_str("\n\n");
+                                            }
+                                        }
+                                        ctx.request_repaint_of(help_viewport);
+                                    },
+                                );
+                            }
                             crate::assistant::client::stream_completion(
                                 &crate::assistant::transport::ReqwestTransport,
                                 &provider,
@@ -5864,6 +6039,14 @@ impl ButtonsApp {
                             state.cancel = None;
                             match result {
                                 Ok(raw) => {
+                                    if agent_mode {
+                                        if let Some((true, message)) = state.messages.last_mut() {
+                                            message.push_str(&raw);
+                                        }
+                                        state.context_preview = None;
+                                        ctx.request_repaint_of(help_viewport);
+                                        return;
+                                    }
                                     let parsed =
                                         crate::assistant::reply::parse_assistant_reply(&raw);
                                     let answer = parsed.answer;
@@ -10210,6 +10393,8 @@ impl eframe::App for ButtonsApp {
         self.maintain_quick_secrets(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_terminal_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
         self.shortcuts(ctx);

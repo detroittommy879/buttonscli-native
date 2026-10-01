@@ -31,6 +31,8 @@ mod secret_vault;
 mod session;
 mod settings;
 mod shortcuts;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod startup;
 pub mod theme;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;

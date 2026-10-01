@@ -121,6 +121,11 @@ try {
     $startInfo.FileName = $binaryPath
     $startInfo.WorkingDirectory = $smokeHome
     $startInfo.UseShellExecute = $false
+    foreach ($argument in @('--tabs', '3', '--shell', $shellCommand, '--cwd', $smokeHome,
+        '--command', '1', "Add-Content -LiteralPath startup-one.txt -Value 'startup-one'",
+        '--command', '3', "Add-Content -LiteralPath startup-three.txt -Value 'startup-three'")) {
+        $startInfo.ArgumentList.Add($argument)
+    }
     $startInfo.Environment['USERPROFILE'] = $smokeHome
     $startInfo.Environment['HOME'] = $smokeHome
     $startInfo.Environment['APPDATA'] = $roaming
@@ -168,6 +173,22 @@ try {
         throw 'Installed Node CLI did not connect to the selected test instance.'
     }
     $null = Invoke-NativeCli -Arguments @('tabs', '--json')
+    $startupDeadline = [DateTime]::UtcNow.AddSeconds(35)
+    while ([DateTime]::UtcNow -lt $startupDeadline -and
+        (-not (Test-Path -LiteralPath (Join-Path $smokeHome 'startup-one.txt')) -or
+         -not (Test-Path -LiteralPath (Join-Path $smokeHome 'startup-three.txt')))) {
+        Start-Sleep -Milliseconds 200
+    }
+    $startupTabs = (Invoke-ControlApi -Method GET -Path '/v1/tabs').tabs
+    if ($startupTabs.Count -ne 3) { throw 'Startup did not create exactly three tabs.' }
+    if ($startupTabs[1].lastInput) { throw 'Startup sent input to the tab without a command.' }
+    foreach ($suffix in @('one', 'three')) {
+        $startupFile = Join-Path $smokeHome "startup-$suffix.txt"
+        if ((Get-Content -LiteralPath $startupFile -Raw).Trim() -ne "startup-$suffix") {
+            throw "Startup command $suffix did not run exactly once in its requested working directory."
+        }
+    }
+    Write-Output 'Startup created three tabs and ran each of two targeted commands once; the middle tab received no input.'
     if ($WithMcpSdk) {
         $sdkSmokePath = Join-Path $PSScriptRoot 'test-mcp-sdk.mjs'
         $sdkSmokeOutput = & $script:nodePath $sdkSmokePath --descriptor $descriptorPath 2>&1

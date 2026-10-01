@@ -1,5 +1,16 @@
 # Reconstruction journal
 
+## 2026-10-01 — Remote backup checkpoint
+
+Moved the local migration checkpoint and remaining worktree edits onto
+`codex/native-migration` for a GitHub backup and draft pull request. The
+existing checkpoint covers native effects, layout repairs, AI Help window
+behavior and bounded CLI requests. Additional edits include one-shot startup
+tabs/commands, compatible provider base URLs, and an unfinished Agent Mode
+prototype. This checkpoint preserves that prototype; it does not change the
+documented priority of core parity and review-first AI Help, or certify Agent
+Mode for release. Startup/CLI live acceptance and documentation follow next.
+
 ## 2026-09-30 — Bounded CLI request deadlines
 
 The native Node CLI previously had no deadline for ordinary API requests or

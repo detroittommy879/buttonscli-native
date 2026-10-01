@@ -16,6 +16,7 @@ pub(crate) struct OutputSnapshot {
     pub last_output_at_ms: Option<u64>,
     pub last_updated_at_ms: u64,
     pub output_sequence: u64,
+    pub input_sequence: u64,
 }
 
 struct State {
@@ -27,6 +28,7 @@ struct State {
     last_output_at_ms: Option<u64>,
     last_updated_at_ms: u64,
     output_sequence: u64,
+    input_sequence: u64,
 }
 
 impl Default for State {
@@ -40,6 +42,7 @@ impl Default for State {
             last_output_at_ms: None,
             last_updated_at_ms: now_ms(),
             output_sequence: 0,
+            input_sequence: 0,
         }
     }
 }
@@ -122,6 +125,7 @@ impl OutputCapture {
             return;
         };
         state.last_input = chars.into_iter().collect();
+        state.input_sequence = state.input_sequence.saturating_add(1);
         let now = now_ms();
         state.last_input_at_ms = Some(now);
         state.last_updated_at_ms = now;
@@ -134,6 +138,7 @@ impl OutputCapture {
             return;
         };
         state.last_input.clear();
+        state.input_sequence = state.input_sequence.saturating_add(1);
         let now = now_ms();
         state.last_input_at_ms = Some(now);
         state.last_updated_at_ms = now;
@@ -157,6 +162,7 @@ impl OutputCapture {
             last_output_at_ms: state.last_output_at_ms,
             last_updated_at_ms: state.last_updated_at_ms,
             output_sequence: state.output_sequence,
+            input_sequence: state.input_sequence,
         }
     }
 
@@ -326,7 +332,7 @@ mod tests {
     }
 }
 
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)

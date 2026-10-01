@@ -261,6 +261,13 @@ pub(crate) struct QueuedAction {
     pub action: Action,
     deadline: Instant,
     reply: SyncSender<Result<Option<u64>, ActionError>>,
+    guard: Option<ExecutionGuard>,
+}
+
+pub(crate) struct ExecutionGuard {
+    pub cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub allowed: fn() -> bool,
+    pub input_sequence: u64,
 }
 
 impl QueuedAction {
@@ -270,6 +277,20 @@ impl QueuedAction {
         }
         if let Some(id) = self.target_id {
             current.validate_current(id, &self.action)?;
+            if let Some(guard) = &self.guard {
+                if guard.cancelled.load(std::sync::atomic::Ordering::Relaxed) || !(guard.allowed)()
+                {
+                    return Err(ActionError::DeniedAccess);
+                }
+                let session = current
+                    .sessions
+                    .iter()
+                    .find(|session| session.id == id)
+                    .ok_or(ActionError::Closed)?;
+                if session.output_capture.snapshot().input_sequence != guard.input_sequence {
+                    return Err(ActionError::InvalidInput);
+                }
+            }
         }
         Ok(())
     }
@@ -316,6 +337,18 @@ impl Dispatcher {
         allowed: bool,
         timeout: Duration,
     ) -> Result<Pending, ActionError> {
+        self.submit_guarded(snapshot, target, action, allowed, timeout, None)
+    }
+
+    pub(crate) fn submit_guarded(
+        &self,
+        snapshot: &Snapshot,
+        target: Option<Target>,
+        action: Action,
+        allowed: bool,
+        timeout: Duration,
+        guard: Option<ExecutionGuard>,
+    ) -> Result<Pending, ActionError> {
         if !allowed {
             return Err(ActionError::DeniedAccess);
         }
@@ -337,6 +370,7 @@ impl Dispatcher {
                 action,
                 deadline: Instant::now() + timeout.min(Duration::from_secs(30)),
                 reply,
+                guard,
             })
             .map_err(|error| match error {
                 TrySendError::Full(_) => ActionError::QueueFull,
@@ -355,6 +389,42 @@ impl Inbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn guarded_input_rechecks_cancellation_access_and_intervening_input() {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+        for scenario in 0..3 {
+            let current = snapshot();
+            let (dispatcher, inbox) = bounded(4);
+            let cancelled = Arc::new(AtomicBool::new(false));
+            let _pending = dispatcher
+                .submit_guarded(
+                    &current,
+                    Some(Target::Id(1)),
+                    Action::Send(b"echo test\r".to_vec()),
+                    true,
+                    Duration::from_secs(1),
+                    Some(ExecutionGuard {
+                        cancelled: Arc::clone(&cancelled),
+                        allowed: if scenario == 1 { || false } else { || true },
+                        input_sequence: 0,
+                    }),
+                )
+                .unwrap();
+            if scenario == 0 {
+                cancelled.store(true, Ordering::Relaxed);
+            }
+            if scenario == 2 {
+                current.sessions[0]
+                    .output_capture
+                    .record_input_bytes(b"user input");
+            }
+            assert!(inbox.try_next().unwrap().validate(&current).is_err());
+        }
+    }
 
     fn snapshot() -> Snapshot {
         Snapshot {
@@ -507,6 +577,7 @@ mod tests {
         assert!(inbox.try_next().is_none());
         let (reply, _pending) = mpsc::sync_channel(1);
         let expired = QueuedAction {
+            guard: None,
             target_id: Some(1),
             action: Action::Focus,
             deadline: Instant::now() - Duration::from_millis(1),

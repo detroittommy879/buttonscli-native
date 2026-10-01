@@ -830,6 +830,8 @@ pub enum MessageKey {
     ModelsFound,
     AiHelpLockedProvider,
     AiHelpDescription,
+    AiAgentMode,
+    AiAgentConsent,
     AiHelpProviderSettings,
     AiHelpConversationSession,
     AiHelpReviewCommand,
@@ -916,7 +918,7 @@ pub enum MessageKey {
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 141] = [
+    pub const ALL: [Self; 143] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -975,6 +977,8 @@ impl MessageKey {
         Self::ModelsFound,
         Self::AiHelpLockedProvider,
         Self::AiHelpDescription,
+        Self::AiAgentMode,
+        Self::AiAgentConsent,
         Self::AiHelpProviderSettings,
         Self::AiHelpConversationSession,
         Self::AiHelpReviewCommand,
@@ -1170,6 +1174,8 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::ModelsFound => "Found {count} models.",
         MessageKey::AiHelpLockedProvider => "AI Help is a Pro feature. In development builds, set BUTTONSCLI_NATIVE_DEV_AI_HELP=1 to exercise the provider connection tools.",
         MessageKey::AiHelpDescription => "Ask a question or request a command. Suggested terminal actions require separate review.",
+        MessageKey::AiAgentMode => "Agent Mode — execute this task",
+        MessageKey::AiAgentConsent => "Send lets the agent run commands and share output from the previewed terminal for this task (up to 12 turns). Use an idle shell. Cancel stops further actions; a running command may need Ctrl+C in its terminal.",
         MessageKey::AiHelpProviderSettings => "Open provider settings",
         MessageKey::AiHelpConversationSession => "Your conversation stays in this window for this session.",
         MessageKey::AiHelpReviewCommand => "Review command: {label}",
