@@ -1,5 +1,9 @@
 # Workspace controls
 
+To open several terminals and optionally run a command in selected tabs at
+launch, see [launching a workspace](STARTUP.md). Those options apply only to
+that launch and do not overwrite the settings below.
+
 Open **Settings → Workspace** to resize the command dock, switch it to compact
 SSH buttons, or enable auto-hide. The dock keeps an 18-pixel rail beside the
 terminal area while hidden; moving over the rail or the nearby peek area opens

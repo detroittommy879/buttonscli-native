@@ -72,7 +72,10 @@ fn ai_help_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_agent_available() -> bool {
-    ai_help_available() && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
+    cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_AGENT").is_ok_and(|value| value == "1")
+        && ai_help_available()
+        && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -5567,15 +5570,16 @@ impl ButtonsApp {
                     }
                     ui.separator();
                     ui.add_enabled_ui(!state.busy && ai_help_available(), |ui| {
-                        if ui
-                            .add_enabled(
-                                ai_agent_available(),
-                                egui::Checkbox::new(
-                                    &mut state.agent_mode,
-                                    text(&locale, MessageKey::AiAgentMode, &[]),
-                                ),
-                            )
-                            .changed()
+                        if ai_agent_available()
+                            && ui
+                                .add_enabled(
+                                    ai_agent_available(),
+                                    egui::Checkbox::new(
+                                        &mut state.agent_mode,
+                                        text(&locale, MessageKey::AiAgentMode, &[]),
+                                    ),
+                                )
+                                .changed()
                         {
                             state.include_context = state.agent_mode;
                             state.context_preview = None;

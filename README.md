@@ -135,6 +135,10 @@ See [`docs/AI-HELP.md`](docs/AI-HELP.md) for provider and review behavior, and
 [`docs/CONTROL-API.md`](docs/CONTROL-API.md) for the native agent-control
 handoff, supported routes, and current access limits.
 
+See [launching a workspace](docs/STARTUP.md) for one-shot startup tabs,
+commands, shell and working-directory options. Development follows the
+[branch and pull-request workflow](CONTRIBUTING.md).
+
 The [feature migration plan](docs/migration/README.md) compares the original
 Tauri app with this native implementation, records source/build evidence for
 completed work, and tracks remaining platform and acceptance checks.

@@ -2,17 +2,17 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
-        println!("{}", buttonscli::startup::HELP);
-        return Ok(());
-    }
-    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
-        println!("ButtonsCLI {}", env!("CARGO_PKG_VERSION"));
-        return Ok(());
-    }
-    let startup = match buttonscli::startup::StartupOptions::parse(args) {
-        Ok(options) => options,
+    use buttonscli::startup::StartupRequest;
+    let startup = match StartupRequest::parse(std::env::args().skip(1)) {
+        Ok(StartupRequest::Launch(options)) => options,
+        Ok(StartupRequest::Help) => {
+            println!("{}", buttonscli::startup::HELP);
+            return Ok(());
+        }
+        Ok(StartupRequest::Version) => {
+            println!("ButtonsCLI {}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
         Err(error) => {
             eprintln!("{error}\n\n{}", buttonscli::startup::HELP);
             std::process::exit(2);
