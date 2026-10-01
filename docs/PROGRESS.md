@@ -1,5 +1,93 @@
 # Reconstruction journal
 
+## 2026-09-30 — Bounded CLI request deadlines
+
+The native Node CLI previously had no deadline for ordinary API requests or
+response bodies, allowing a stalled read to defeat `wait-for-text` and
+`wait-for-quiet` timeouts. Calls now use an AbortSignal through body reading;
+ordinary requests get 10 seconds, with extra allowance for the existing
+30-second paced delivery and 60-second run-wait bounds. Poll requests and
+intervals are capped by the remaining wait deadline. Writes are never retried
+automatically, and their timeout message explains that delivery may have begun.
+Malformed response JSON produces a concise error without echoing its body.
+`node --check scripts/buttonsclictl.mjs` passes. Runtime timeout/PTY acceptance
+has not been rerun for this change.
+
+## 2026-09-30 — AI Help window follow-through
+
+Isolated Windows GUI review with a loopback fake provider exercised streaming,
+explicit terminal-context preview and transmission, and HTTP 503 failure/retry.
+No public provider or real credential was used. This review found that Windows'
+system light-mode update could select an unconfigured egui style after startup,
+leaving menus and AI Help light and Settings headings unreadable against the
+native palette. Native palette application now explicitly selects its configured
+style, including detached Settings and AI Help. AI Help applies its own font
+zone and has a scroll fallback for unusually large composer content.
+
+Streaming now displays the answer portion of the response envelope rather than
+flashing XML tags or action JSON. Suggested actions still become available only
+after complete reply validation. Transcript space remains stable during streaming
+so growing text cannot move the Cancel button under the pointer. Cancellation showed a cancelled status and Retry; Retry completed successfully.
+Closing/reopening AI Help preserved that conversation. Updated native palette
+screenshots are saved locally in `target/ai-help-review.png` and
+`target/settings-review.png`. The library and a separately linked current
+`target/debug/buttonscli-updated.exe` build successfully. This is partial M4
+evidence; target switching and broader focus/DPI/platform checks remain open.
+
+Local checkpoint commits use the explicit agent identity `Codex <codex@localhost>`
+through per-command Git options. User and global Git settings are unchanged;
+missing personal author configuration does not block migration work.
+
+## 2026-09-30 — Windows effects and layout follow-through
+
+Ported the original analog-static procedural shader to a native WGSL callback,
+including screen blending, half-resolution sampling, intensity, density, drift,
+brightness and opacity. The pipeline validates on this VM's graphics adapter.
+Simple noise now uses physical display pixels, keeps animating at nonzero idle
+amounts, avoids repeated uploads within a noise frame and owns its bounded
+textures on the terminal tab so closing tabs releases them. Unsupported GPU
+contexts retain a bounded grayscale fallback; this does not implement HSync or
+Shader Lab post-processing.
+
+Menu, preset and status bars size to their content. Settings has one bounded
+scrolling body, distinct nested IDs, adaptive theme columns and footer buttons
+anchored to the window's original bounds. Moved the dock's Compact checkbox to
+its own row. A large-font minimum-window layout regression passed during this
+work; subsequent screenshot review caught and fixed horizontal footer overflow.
+
+`uvx appsnap` works on this host; the smoke script now falls back to it when no
+standalone `appsnap.exe` is installed. A separately linked review executable
+used an isolated native home, leaving the user's running app untouched.
+`target/static-review.png` shows dense native analog static and readable 22 px
+status text; `target/settings-review.png` shows 24 px Settings text and both
+footer buttons. GPU pipeline validation and `cargo build --lib` passed. Wider
+DPI/platform and 4/10-pane performance acceptance remain open.
+
+Fresh Windows system-default launches now prefer installed PowerShell 7, then
+bundled Windows PowerShell, so the PowerShell starter presets work. Explicit
+cmd profiles keep their selected shell. User priorities remain core parity,
+then reliable AI explanations/single commands, vibe themes and CLI hardening.
+
+## 2026-09-30 — Fine-grain effects and status-bar sizing
+
+Replaced the native simple-noise rectangle mesh with a bounded grayscale
+texture sized from the legacy resolution setting. Analog static now paints a
+dense animated noise texture instead of a few hundred isolated dots. Both
+effects cap texture dimensions and pixel count to keep large panes bounded.
+Changed the status panel from a fixed 31 px height to a minimum height so its
+controls and custom status font can determine the required row size.
+
+`cargo check --bin buttonscli` passes on Windows. `cargo build --bin
+buttonscli` passed after the user closed the running app. The isolated GUI
+smoke reached its screenshot step, but this VM has no `appsnap.exe`, so no
+capture was saved. The computer-use inventory also exposed no native windows.
+Live appearance and frame cost at 1/4/10 panes still need review.
+
+Priority clarification from the user: complete core migration/parity first,
+then modernize AI Help for dependable explanations and single-command
+suggestions, improve vibe-coded theme generation, and harden the mostly
+working `buttonsctl` flow. Agent Mode remains outside the planned migration.
+
 ## 2026-09-29 — Partial Windows AI Help GUI acceptance
 
 Ran the debug native app with an isolated temporary home and the explicit

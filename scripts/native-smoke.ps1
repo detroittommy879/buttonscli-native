@@ -137,8 +137,13 @@ public static class ButtonsCliSmokeWindow {
     Start-Sleep -Seconds 2
 
     if (-not [string]::IsNullOrWhiteSpace($CapturePath)) {
-        $appsnap = Get-Command appsnap.exe -ErrorAction Stop
-        & $appsnap.Source -o $CapturePath $smokeWindowTitle
+        $appsnap = Get-Command appsnap.exe -ErrorAction SilentlyContinue
+        if ($null -ne $appsnap) {
+            & $appsnap.Source -o $CapturePath $smokeWindowTitle
+        } else {
+            $uvx = Get-Command uvx -ErrorAction Stop
+            & $uvx.Source appsnap -o $CapturePath $smokeWindowTitle
+        }
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $CapturePath -PathType Leaf)) {
             throw "appsnap could not capture the test-owned native window"
         }

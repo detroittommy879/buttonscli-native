@@ -17,6 +17,7 @@ pub struct TerminalTab {
     pub profile_id: String,
     pub backend: TerminalBackend,
     pub(crate) output: Arc<OutputCapture>,
+    pub(crate) effect_textures: crate::plugins::effects::simple_noise::NoiseTextures,
     pub exited: bool,
 }
 
@@ -130,6 +131,7 @@ impl TerminalTab {
             profile_id: launch.profile_id,
             backend,
             output,
+            effect_textures: Default::default(),
             exited: false,
         })
     }
@@ -593,6 +595,18 @@ mod tests {
 
 #[cfg(windows)]
 fn default_shell() -> (String, Vec<String>) {
+    // Starter presets use PowerShell syntax. Prefer the modern installation,
+    // then Windows' bundled version; explicitly selected cmd profiles still
+    // launch cmd through ShellLaunch::from_command_line.
+    if executable_on_path("pwsh.exe") {
+        return ("pwsh.exe".into(), Vec::new());
+    }
+    if let Some(root) = std::env::var_os("SystemRoot") {
+        let powershell = PathBuf::from(root).join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        if powershell.is_file() {
+            return (powershell.to_string_lossy().into_owned(), Vec::new());
+        }
+    }
     (
         std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()),
         Vec::new(),

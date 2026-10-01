@@ -3,7 +3,7 @@
  * 032c9f21a17f17e48974f57259b1ad4a6506b858
  * (SHA-256 B44265F1212A8C7381E2713BEDF685D7EDD57BE8A6B6AF7AC8ACE286EF6DB76B).
  * Native changes are limited to exact ~/.buttonscli-native discovery,
- * descriptor validation, and bracketed input mode. Keep O read-only.
+ * descriptor validation, bracketed input mode, and bounded request deadlines. Keep O read-only.
  */
 import { readFile, readdir } from "node:fs/promises";
 import os from "node:os";
@@ -480,12 +480,14 @@ function buildReadQuery({ chars, lines, from }) {
   return query;
 }
 
-async function readTabSnapshot(connection, { tab, chars, lines, from }) {
+async function readTabSnapshot(connection, { tab, chars, lines, from }, timeoutMs) {
   const query = buildReadQuery({ chars, lines, from });
   return apiRequest(
     connection,
     "GET",
     `/v1/tabs/${encodeURIComponent(tab)}/read?${query.toString()}`,
+    undefined,
+    timeoutMs,
   );
 }
 
@@ -515,7 +517,7 @@ async function waitForText(connection, parsed) {
       tab: parsed.tab,
       chars: parsed.chars,
       from: "bottom",
-    });
+    }, Math.max(1, Math.min(10_000, deadline - Date.now())));
 
     if (textMatches(payload.text || "", parsed.text, parsed.ignoreCase)) {
       return {
@@ -535,7 +537,7 @@ async function waitForText(connection, parsed) {
       );
     }
 
-    await sleep(parsed.intervalMs);
+    await sleep(Math.max(1, Math.min(parsed.intervalMs, deadline - Date.now())));
   }
 }
 
@@ -550,7 +552,7 @@ async function waitForQuiet(connection, parsed) {
       tab: parsed.tab,
       chars: parsed.chars,
       from: "bottom",
-    });
+    }, Math.max(1, Math.min(10_000, deadline - Date.now())));
     const now = Date.now();
     const signature = `${payload.tab.lastUpdatedAtMs}:${payload.text || ""}`;
 
@@ -576,7 +578,7 @@ async function waitForQuiet(connection, parsed) {
       );
     }
 
-    await sleep(parsed.intervalMs);
+    await sleep(Math.max(1, Math.min(parsed.intervalMs, deadline - Date.now())));
   }
 }
 
@@ -698,24 +700,45 @@ function buildConnectionFailureMessage(connection, error) {
   return pieces.join(" ");
 }
 
-async function apiRequest(connection, method, pathname, body) {
-  const response = await fetch(`${connection.baseUrl}${pathname}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${connection.authToken}`,
-      "Content-Type": "application/json",
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  }).catch((error) => {
-    throw new Error(buildConnectionFailureMessage(connection, error));
-  });
+// Server-side run waits cap at 60 seconds and paced delivery at 30 seconds.
+// Give those operations time to finish while bounding a stalled connection.
+function requestTimeoutMs(pathname, body) {
+  const delivery = body?.delivery === "slow-typed" ? 30_000 : 0;
+  const wait = pathname.endsWith("/run") && pathname.startsWith("/v1/tabs/")
+    ? Math.min(body?.maxWaitMs ?? 8_000, 60_000) : 0;
+  return 10_000 + delivery + wait;
+}
 
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+async function apiRequest(connection, method, pathname, body, timeoutMs) {
+  let response;
+  let text;
+  try {
+    response = await fetch(`${connection.baseUrl}${pathname}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${connection.authToken}`,
+        "Content-Type": "application/json",
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs ?? requestTimeoutMs(pathname, body)))),
+    });
+    text = await response.text();
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      const advice = method === "POST"
+        ? " Delivery may have begun; check the target before repeating the request." : "";
+      throw new Error(`Control API request timed out.${advice}`);
+    }
+    throw new Error(buildConnectionFailureMessage(connection, error));
+  }
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`Control API returned invalid JSON (HTTP ${response.status}).`);
+  }
   if (!response.ok) {
-    throw new Error(
-      payload?.error || `Control API returned ${response.status}.`,
-    );
+    throw new Error(payload?.error || `Control API returned ${response.status}.`);
   }
   return payload;
 }

@@ -27,7 +27,12 @@ Native files live under `~/.buttonscli-native/`:
 The helper is a native adaptation of the read-only reference copy at original
 revision `032c9f21a17f17e48974f57259b1ad4a6506b858` (source SHA-256
 `B44265F1212A8C7381E2713BEDF685D7EDD57BE8A6B6AF7AC8ACE286EF6DB76B`). Native
-changes cover native-only discovery and bracketed delivery.
+changes cover native-only discovery, bracketed delivery and bounded request deadlines.
+Ordinary API calls time out after 10 seconds; paced input and `run` get an
+additional allowance for their server-side duration limits. A timed-out write
+is never automatically repeated. Check the target terminal before retrying,
+because delivery may already have begun. Read polling respects its requested
+wait deadline even when an individual response stalls.
 
 The helper honors `BUTTONSCLI_CONTROL_INFO_PATH`. Without an explicit path, it
 probes valid native descriptors and proceeds only when exactly one instance is

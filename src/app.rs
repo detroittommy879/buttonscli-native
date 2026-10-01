@@ -844,6 +844,13 @@ impl ButtonsApp {
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
+        if let Some(render_state) = &cc.wgpu_render_state {
+            crate::plugins::effects::analog_static::register(
+                &cc.egui_ctx,
+                render_state.target_format,
+            );
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         crate::account::refresh_runtime_config(cc.egui_ctx.clone());
         let stored_preferences: Option<Preferences> = cc
             .storage
@@ -1229,6 +1236,9 @@ impl ButtonsApp {
     }
 
     fn apply_style(&self, ctx: &egui::Context) {
+        // Native palettes define their own colors. Keep that style selected
+        // when Windows reports a different system theme after initialization.
+        ctx.set_theme(egui::Theme::Dark);
         let colors = &self.active_app_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
@@ -1310,6 +1320,9 @@ impl ButtonsApp {
                 effects.static_opacity
             },
             static_density: effects.static_density,
+            static_intensity: effects.static_intensity,
+            static_amplitude: effects.static_amplitude,
+            static_brightness: effects.static_brightness,
             scanlines_strength: if self.preferences.calm_mode {
                 0.0
             } else {
@@ -2474,7 +2487,7 @@ impl ButtonsApp {
     fn top_menu(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
         egui::TopBottomPanel::top("menu")
-            .exact_height(31.0)
+            .min_height(31.0)
             .frame(
                 egui::Frame::new()
                     .fill(colors.panel)
@@ -3074,7 +3087,7 @@ impl ButtonsApp {
         }
         let colors = self.colors();
         egui::TopBottomPanel::top("presets")
-            .exact_height(38.0)
+            .min_height(38.0)
             .frame(
                 egui::Frame::new()
                     .fill(colors.canvas)
@@ -3230,7 +3243,7 @@ impl ButtonsApp {
                     ui.set_max_width(overlay_width);
                     egui::Frame::new()
                         .fill(colors.dock_background)
-                        .stroke(Stroke::new(1.0, colors.border))
+                        .stroke(Stroke::new(1.0_f32, colors.border))
                         .inner_margin(10.0)
                         .show(ui, |ui| {
                             egui::ScrollArea::vertical()
@@ -3263,18 +3276,20 @@ impl ButtonsApp {
                 {
                     self.preferences.show_sidebar = false;
                 }
-                if controls_available {
-                    ui.checkbox(
-                        &mut self.preferences.dock_compact,
-                        crate::i18n::text(
-                            &self.locale,
-                            crate::i18n::MessageKey::WorkspaceDockCompact,
-                            &[],
-                        ),
-                    );
-                }
             });
         });
+        if controls_available {
+            ui.horizontal_wrapped(|ui| {
+                ui.checkbox(
+                    &mut self.preferences.dock_compact,
+                    crate::i18n::text(
+                        &self.locale,
+                        crate::i18n::MessageKey::WorkspaceDockCompact,
+                        &[],
+                    ),
+                );
+            });
+        }
         if !self.preferences.dock_compact {
             ui.add_space(4.0);
             ui.label(
@@ -3366,7 +3381,9 @@ impl ButtonsApp {
     fn status_bar(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
         egui::TopBottomPanel::bottom("status")
-            .exact_height(31.0)
+            // Let egui size the panel from its tallest control and selected
+            // font; the fixed height clipped controls after frame margins.
+            .min_height(31.0)
             .frame(
                 egui::Frame::new()
                     .fill(colors.status_background)
@@ -3375,7 +3392,7 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
                     ui.label(
@@ -3459,7 +3476,7 @@ impl ButtonsApp {
                             self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count + 1 }, ctx);
                         }
                     }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.horizontal_wrapped(|ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.control_server.is_some()
                             && ui
@@ -3588,6 +3605,7 @@ impl ButtonsApp {
                 .with_inner_size([980.0, 760.0])
                 .with_min_inner_size([720.0, 520.0]),
             |child_ctx, class| {
+                self.apply_style(child_ctx);
                 if child_ctx.input(|input| input.viewport().close_requested()) {
                     close_action = Some(SettingsCloseAction::Keep);
                     child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -3669,8 +3687,7 @@ impl ButtonsApp {
         );
         egui::ScrollArea::horizontal()
             .id_salt("settings-tab-strip")
-            .max_height(34.0)
-            .auto_shrink([false, false])
+            .auto_shrink([false, true])
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.selectable_value(
@@ -3732,48 +3749,72 @@ impl ButtonsApp {
                 });
             });
         ui.separator();
-        match self.settings_tab {
-            SettingsTab::Themes => self.theme_settings(ui),
-            SettingsTab::Fonts => self.font_settings(ui, ctx),
-            SettingsTab::Commands => self.command_settings(ui),
-            SettingsTab::Workspace => self.workspace_settings(ui),
-            SettingsTab::Language if localization_settings_available() => {
-                self.language_settings(ui)
-            }
-            SettingsTab::Language => self.theme_settings(ui),
-            SettingsTab::Shortcuts => self.shortcut_settings(ui),
-            #[cfg(not(target_arch = "wasm32"))]
-            SettingsTab::Providers => self.provider_settings(ui, ctx),
-            #[cfg(not(target_arch = "wasm32"))]
-            SettingsTab::Account if account_signin_available() => self.account_settings(ui, ctx),
-            #[cfg(not(target_arch = "wasm32"))]
-            SettingsTab::Account => self.theme_settings(ui),
-            #[cfg(not(target_arch = "wasm32"))]
-            SettingsTab::Import => self.import_settings(ui, ctx),
-        }
+        let settings_bounds = ui.available_rect_before_wrap();
+        let footer_height =
+            ui.spacing().interact_size.y.max(
+                ui.text_style_height(&TextStyle::Button) + 2.0 * ui.spacing().button_padding.y,
+            ) + 2.0 * ui.spacing().item_spacing.y
+                + 4.0;
+        let body_height = (ui.available_height() - footer_height).max(1.0);
+        egui::ScrollArea::vertical()
+            .id_salt("settings-body")
+            .max_height(body_height)
+            .auto_shrink([false, false])
+            .show(ui, |ui| match self.settings_tab {
+                SettingsTab::Themes => self.theme_settings(ui),
+                SettingsTab::Fonts => self.font_settings(ui, ctx),
+                SettingsTab::Commands => self.command_settings(ui),
+                SettingsTab::Workspace => self.workspace_settings(ui),
+                SettingsTab::Language if localization_settings_available() => {
+                    self.language_settings(ui)
+                }
+                SettingsTab::Language => self.theme_settings(ui),
+                SettingsTab::Shortcuts => self.shortcut_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Providers => self.provider_settings(ui, ctx),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Account if account_signin_available() => {
+                    self.account_settings(ui, ctx)
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Account => self.theme_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Import => self.import_settings(ui, ctx),
+            });
         ui.separator();
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if ui
-                .button(crate::i18n::text(
-                    &self.locale,
-                    crate::i18n::MessageKey::SettingsKeepClose,
-                    &[],
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .max_rect(egui::Rect::from_min_max(
+                    egui::pos2(
+                        settings_bounds.left(),
+                        settings_bounds.bottom() - footer_height + 4.0,
+                    ),
+                    settings_bounds.max,
                 ))
-                .clicked()
-            {
-                *close_action = Some(SettingsCloseAction::Keep);
-            }
-            if ui
-                .button(crate::i18n::text(
-                    &self.locale,
-                    crate::i18n::MessageKey::SettingsRevertClose,
-                    &[],
-                ))
-                .clicked()
-            {
-                *close_action = Some(SettingsCloseAction::Revert);
-            }
-        });
+                .layout(Layout::right_to_left(Align::Center)),
+            |ui| {
+                if ui
+                    .button(crate::i18n::text(
+                        &self.locale,
+                        crate::i18n::MessageKey::SettingsKeepClose,
+                        &[],
+                    ))
+                    .clicked()
+                {
+                    *close_action = Some(SettingsCloseAction::Keep);
+                }
+                if ui
+                    .button(crate::i18n::text(
+                        &self.locale,
+                        crate::i18n::MessageKey::SettingsRevertClose,
+                        &[],
+                    ))
+                    .clicked()
+                {
+                    *close_action = Some(SettingsCloseAction::Revert);
+                }
+            },
+        );
     }
 
     fn language_settings(&mut self, ui: &mut egui::Ui) {
@@ -5178,6 +5219,9 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn ai_help_window(&self, ctx: &egui::Context) {
         let locale = self.locale.clone();
+        let style = ctx.style_of(egui::Theme::Dark);
+        let catalog = self.font_catalog.clone();
+        let assistant_font = self.preferences.typography.assistant.clone();
         let state_open = self.ai_help_state.lock().is_ok_and(|state| state.open);
         if !state_open {
             return;
@@ -5192,6 +5236,8 @@ impl ButtonsApp {
                 .with_inner_size([740.0, 620.0])
                 .with_min_inner_size([560.0, 600.0]),
             move |child_ctx, class| {
+                child_ctx.set_theme(egui::Theme::Dark);
+                child_ctx.set_style((*style).clone());
                 let Ok(mut state) = state.lock() else {
                     return;
                 };
@@ -5205,7 +5251,11 @@ impl ButtonsApp {
                         child_ctx.request_repaint_of(egui::ViewportId::ROOT);
                     }
                 };
-                let body = |ui: &mut egui::Ui, state: &mut AiHelpWindowState| {
+                let body = |ui: &mut egui::Ui,
+                            state: &mut AiHelpWindowState,
+                            window_height: f32| {
+                    let body_top = ui.cursor().top();
+                    apply_zone_style(ui, &catalog, &assistant_font);
                     use crate::i18n::{text, MessageKey};
                     ui.heading(text(&locale, MessageKey::AiHelp, &[]));
                     ui.label(text(&locale, MessageKey::AiHelpDescription, &[]));
@@ -5237,11 +5287,15 @@ impl ButtonsApp {
                     } else {
                         0.0
                     };
-                    let transcript_height =
-                        (ui.available_height() - composer_height - status_height).max(80.0);
+                    let transcript_height = (window_height
+                        - (ui.cursor().top() - body_top)
+                        - composer_height * (assistant_font.size / 14.0).max(1.0)
+                        - status_height)
+                        .max(80.0);
                     egui::ScrollArea::vertical()
                         .id_salt("ai-help-conversation")
                         .max_height(transcript_height)
+                        .auto_shrink([false, false])
                         .stick_to_bottom(true)
                         .show(ui, |ui| {
                             for (assistant, message) in &state.messages {
@@ -5481,10 +5535,20 @@ impl ButtonsApp {
                 };
                 match class {
                     egui::ViewportClass::Embedded => {
-                        egui::Window::new(title.clone()).show(child_ctx, |ui| body(ui, &mut state));
+                        egui::Window::new(title.clone()).show(child_ctx, |ui| {
+                            let height =
+                                ui.available_height().min(child_ctx.screen_rect().height());
+                            body(ui, &mut state, height);
+                        });
                     }
                     _ => {
-                        egui::CentralPanel::default().show(child_ctx, |ui| body(ui, &mut state));
+                        egui::CentralPanel::default().show(child_ctx, |ui| {
+                            let height = ui.available_height();
+                            egui::ScrollArea::vertical()
+                                .id_salt("ai-help-body")
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| body(ui, &mut state, height));
+                        });
                     }
                 }
             },
@@ -5766,6 +5830,7 @@ impl ButtonsApp {
                     let request_question = question.clone();
                     let request_locale = locale.clone();
                     std::thread::spawn(move || {
+                        let mut streamed = String::new();
                         let result = provider_key(
                             &session,
                             &expected_reference,
@@ -5782,9 +5847,11 @@ impl ButtonsApp {
                                 &history,
                                 &cancel,
                                 &mut |delta| {
+                                    streamed.push_str(delta);
                                     if let Ok(mut state) = state.lock() {
                                         if let Some((true, message)) = state.messages.last_mut() {
-                                            message.push_str(delta);
+                                            *message =
+                                                crate::assistant::reply::streamed_answer(&streamed);
                                         }
                                     }
                                     ctx.request_repaint_of(help_viewport);
@@ -5957,11 +6024,14 @@ impl ButtonsApp {
         let mut all_theme = None;
         egui::ScrollArea::vertical()
             .id_salt("settings-themes")
+            .max_height(400.0)
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                let card_width = 276.0;
+                let columns = (ui.available_width() / 284.0).floor().clamp(1.0, 3.0) as usize;
+                let card_width = ((ui.available_width() - 8.0 * (columns - 1) as f32) / columns as f32)
+                    .clamp(140.0, 276.0);
                 egui::Grid::new("theme-card-grid")
-                    .num_columns(3)
+                    .num_columns(columns)
                     .spacing([8.0, 8.0])
                     .show(ui, |ui| {
                         for (position, index) in matches.into_iter().enumerate() {
@@ -6077,7 +6147,7 @@ impl ButtonsApp {
                                     });
                                 },
                             );
-                            if position % 3 == 2 {
+                            if position % columns == columns - 1 {
                                 ui.end_row();
                             }
                         }
@@ -6526,9 +6596,45 @@ impl ButtonsApp {
                         ui,
                         &locale,
                         &mut document,
-                        "Static intensity",
+                        "Static overlay opacity",
                         "/effects/staticOpacity",
                     );
+                    for (label, pointer, fallback) in [
+                        ("Static intensity", "/effects/staticIntensity", 50.0),
+                        ("Static pattern drift", "/effects/staticAmplitude", 50.0),
+                        ("Static brightness", "/effects/staticBrightness", 42.0),
+                    ] {
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            label,
+                            pointer,
+                            0.0,
+                            100.0,
+                            fallback,
+                            "%",
+                        );
+                    }
+                    let density = document["effects"]["staticDensity"].as_f64().unwrap_or(0.2);
+                    let mut percent = if density > 1.0 {
+                        density
+                    } else {
+                        density * 100.0
+                    } as f32;
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut percent, 0.0..=100.0)
+                                .text(crate::i18n::literal(&locale, "Static density")),
+                        )
+                        .changed()
+                    {
+                        set_theme_document_value(
+                            &mut document,
+                            "/effects/staticDensity",
+                            json!(percent),
+                        );
+                    }
                 }
                 theme_document_toggle(
                     ui,
@@ -7451,98 +7557,96 @@ impl ButtonsApp {
         ui.separator();
         let font_catalog = self.font_catalog.clone();
         let locale = self.locale.clone();
-        egui::ScrollArea::vertical()
-            .id_salt("settings-fonts")
-            .show(ui, |ui| {
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Shell / UI",
-                    &mut self.preferences.typography.shell,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Tabs",
-                    &mut self.preferences.typography.tabs,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Command Dock",
-                    &mut self.preferences.typography.preset_dock,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Settings Dialog",
-                    &mut self.preferences.typography.settings,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "AI Help Window",
-                    &mut self.preferences.typography.assistant,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Status Bar",
-                    &mut self.preferences.typography.status_bar,
-                    false,
-                );
-                font_zone_editor(
-                    ui,
-                    &locale,
-                    &font_catalog,
-                    "Terminal",
-                    &mut self.preferences.typography.terminal,
-                    true,
-                );
-                egui::Frame::new()
-                    .fill(ui.visuals().faint_bg_color)
-                    .stroke(ui.visuals().widgets.inactive.bg_stroke)
-                    .corner_radius(ui.visuals().widgets.inactive.corner_radius)
-                    .inner_margin(10.0)
-                    .show(ui, |ui| {
-                        ui.label(RichText::new("Terminal bold rendering").strong());
-                        ui.horizontal_wrapped(|ui| {
-                            let family = self.preferences.typography.terminal.family.clone();
-                            let requested = self.preferences.typography.terminal_bold_weight;
-                            let resolved = font_catalog.resolved_weight(&family, requested);
-                            egui::ComboBox::from_id_salt("terminal-bold-weight")
-                                .selected_text(if requested == resolved {
-                                    format!("{requested} bold weight")
-                                } else {
-                                    format!("{requested} requested → {resolved} file")
-                                })
-                                .show_ui(ui, |ui| {
-                                    for weight in font_catalog.weights_for(&family) {
-                                        ui.selectable_value(
-                                            &mut self.preferences.typography.terminal_bold_weight,
-                                            weight,
-                                            weight.to_string(),
-                                        );
-                                    }
-                                });
-                            ui.checkbox(
-                                &mut self.preferences.typography.draw_bold_bright,
-                                "Use bright ANSI colors for bold text",
-                            );
-                        });
+        ui.push_id("settings-fonts", |ui| {
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Shell / UI",
+                &mut self.preferences.typography.shell,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Tabs",
+                &mut self.preferences.typography.tabs,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Command Dock",
+                &mut self.preferences.typography.preset_dock,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Settings Dialog",
+                &mut self.preferences.typography.settings,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "AI Help Window",
+                &mut self.preferences.typography.assistant,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Status Bar",
+                &mut self.preferences.typography.status_bar,
+                false,
+            );
+            font_zone_editor(
+                ui,
+                &locale,
+                &font_catalog,
+                "Terminal",
+                &mut self.preferences.typography.terminal,
+                true,
+            );
+            egui::Frame::new()
+                .fill(ui.visuals().faint_bg_color)
+                .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                .corner_radius(ui.visuals().widgets.inactive.corner_radius)
+                .inner_margin(10.0)
+                .show(ui, |ui| {
+                    ui.label(RichText::new("Terminal bold rendering").strong());
+                    ui.horizontal_wrapped(|ui| {
+                        let family = self.preferences.typography.terminal.family.clone();
+                        let requested = self.preferences.typography.terminal_bold_weight;
+                        let resolved = font_catalog.resolved_weight(&family, requested);
+                        egui::ComboBox::from_id_salt("terminal-bold-weight")
+                            .selected_text(if requested == resolved {
+                                format!("{requested} bold weight")
+                            } else {
+                                format!("{requested} requested → {resolved} file")
+                            })
+                            .show_ui(ui, |ui| {
+                                for weight in font_catalog.weights_for(&family) {
+                                    ui.selectable_value(
+                                        &mut self.preferences.typography.terminal_bold_weight,
+                                        weight,
+                                        weight.to_string(),
+                                    );
+                                }
+                            });
+                        ui.checkbox(
+                            &mut self.preferences.typography.draw_bold_bright,
+                            "Use bright ANSI colors for bold text",
+                        );
                     });
-            });
+                });
+        });
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -7935,117 +8039,102 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
-        egui::ScrollArea::vertical()
-            .id_salt("settings-workspace")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-                ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    let effects_enabled = effects_master_switch_available();
-                    ui.add_enabled(
-                        effects_enabled,
-                        egui::Checkbox::new(
-                            &mut self.preferences.effects_focused_pane_only,
-                            crate::i18n::literal(&self.locale, "Focused pane only"),
-                        ),
-                    );
-                }
-                #[cfg(not(target_arch = "wasm32"))]
-                if window_transparency_available() {
-                    ui.add_space(8.0);
-                    if crate::window_opacity::is_supported() {
-                        ui.add(
-                            egui::Slider::new(
-                                &mut self.preferences.window_opacity,
-                                crate::window_opacity::MIN_OPACITY
-                                    ..=crate::window_opacity::MAX_OPACITY,
-                            )
-                            .text(text(
-                                &self.locale,
-                                M::WindowOpacity,
-                                &[],
-                            )),
-                        );
-                        ui.label(text(&self.locale, M::WindowOpacitySupported, &[]));
-                        if let Some(error) = &self.window_opacity_error {
-                            ui.colored_label(
-                                self.colors().warning,
-                                text(&self.locale, M::WindowOpacityFailed, &[("error", error)]),
-                            );
-                        }
-                    } else {
-                        ui.label(text(&self.locale, M::WindowOpacityUnsupported, &[]));
-                    }
-                }
-                #[cfg(not(target_arch = "wasm32"))]
-                if workspace_controls_available() {
-                    ui.add_space(8.0);
-                    let width_changed = ui
-                        .add(
-                            egui::Slider::new(&mut self.preferences.dock_width, 124.0..=360.0)
-                                .text(text(&self.locale, M::WorkspaceDockWidth, &[])),
+        ui.push_id("settings-workspace", |ui| {
+            ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
+            ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let effects_enabled = effects_master_switch_available();
+                ui.add_enabled(
+                    effects_enabled,
+                    egui::Checkbox::new(
+                        &mut self.preferences.effects_focused_pane_only,
+                        crate::i18n::literal(&self.locale, "Focused pane only"),
+                    ),
+                );
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if window_transparency_available() {
+                ui.add_space(8.0);
+                if crate::window_opacity::is_supported() {
+                    ui.add(
+                        egui::Slider::new(
+                            &mut self.preferences.window_opacity,
+                            crate::window_opacity::MIN_OPACITY..=crate::window_opacity::MAX_OPACITY,
                         )
-                        .changed();
-                    if width_changed {
-                        let width = self.preferences.dock_width;
-                        let panel_id = egui::Id::new("command_dock");
-                        ui.ctx().data_mut(|data| {
-                            if let Some(mut state) =
-                                data.get_persisted::<egui::containers::panel::PanelState>(panel_id)
-                            {
-                                state.rect.max.x = state.rect.min.x + width;
-                                data.insert_persisted(panel_id, state);
-                            }
-                        });
-                    }
-                    ui.checkbox(
-                        &mut self.preferences.dock_compact,
-                        text(&self.locale, M::WorkspaceDockCompact, &[]),
+                        .text(text(&self.locale, M::WindowOpacity, &[])),
                     );
-                    ui.checkbox(
-                        &mut self.preferences.dock_auto_hide,
-                        text(&self.locale, M::WorkspaceDockAutoHide, &[]),
-                    );
-                    if self.preferences.dock_auto_hide {
-                        ui.add(
-                            egui::Slider::new(
-                                &mut self.preferences.dock_auto_hide_ms,
-                                250..=30_000,
-                            )
-                            .text(text(
-                                &self.locale,
-                                M::WorkspaceDockAutoHideDelay,
-                                &[],
-                            )),
-                        );
-                        ui.add(
-                            egui::Slider::new(&mut self.preferences.dock_opacity, 0.2..=1.0)
-                                .text(text(&self.locale, M::WorkspaceDockOpacity, &[])),
-                        );
-                        ui.add(
-                            egui::Slider::new(&mut self.preferences.dock_peek_radius, 0..=24)
-                                .text(text(&self.locale, M::WorkspaceDockPeekRadius, &[])),
+                    ui.label(text(&self.locale, M::WindowOpacitySupported, &[]));
+                    if let Some(error) = &self.window_opacity_error {
+                        ui.colored_label(
+                            self.colors().warning,
+                            text(&self.locale, M::WindowOpacityFailed, &[("error", error)]),
                         );
                     }
+                } else {
+                    ui.label(text(&self.locale, M::WindowOpacityUnsupported, &[]));
                 }
-                #[cfg(not(target_arch = "wasm32"))]
-                self.shell_settings(ui);
-                #[cfg(target_arch = "wasm32")]
-                {
-                    ui.add_space(12.0);
-                    ui.label(crate::i18n::literal(
-                        &self.locale,
-                        "Shell profiles are available in the native desktop app.",
-                    ));
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if workspace_controls_available() {
+                ui.add_space(8.0);
+                let width_changed = ui
+                    .add(
+                        egui::Slider::new(&mut self.preferences.dock_width, 124.0..=360.0)
+                            .text(text(&self.locale, M::WorkspaceDockWidth, &[])),
+                    )
+                    .changed();
+                if width_changed {
+                    let width = self.preferences.dock_width;
+                    let panel_id = egui::Id::new("command_dock");
+                    ui.ctx().data_mut(|data| {
+                        if let Some(mut state) =
+                            data.get_persisted::<egui::containers::panel::PanelState>(panel_id)
+                        {
+                            state.rect.max.x = state.rect.min.x + width;
+                            data.insert_persisted(panel_id, state);
+                        }
+                    });
                 }
+                ui.checkbox(
+                    &mut self.preferences.dock_compact,
+                    text(&self.locale, M::WorkspaceDockCompact, &[]),
+                );
+                ui.checkbox(
+                    &mut self.preferences.dock_auto_hide,
+                    text(&self.locale, M::WorkspaceDockAutoHide, &[]),
+                );
+                if self.preferences.dock_auto_hide {
+                    ui.add(
+                        egui::Slider::new(&mut self.preferences.dock_auto_hide_ms, 250..=30_000)
+                            .text(text(&self.locale, M::WorkspaceDockAutoHideDelay, &[])),
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut self.preferences.dock_opacity, 0.2..=1.0)
+                            .text(text(&self.locale, M::WorkspaceDockOpacity, &[])),
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut self.preferences.dock_peek_radius, 0..=24)
+                            .text(text(&self.locale, M::WorkspaceDockPeekRadius, &[])),
+                    );
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            self.shell_settings(ui);
+            #[cfg(target_arch = "wasm32")]
+            {
                 ui.add_space(12.0);
                 ui.label(crate::i18n::literal(
                     &self.locale,
-                    "Preferences are saved locally and restored on the next launch.",
+                    "Shell profiles are available in the native desktop app.",
                 ));
-            });
+            }
+            ui.add_space(12.0);
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "Preferences are saved locally and restored on the next launch.",
+            ));
+        });
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -8288,61 +8377,58 @@ impl ButtonsApp {
         ui.add_space(8.0);
         let presets = self.presets(collection).to_vec();
         let mut action = None;
-        egui::ScrollArea::vertical()
-            .id_salt(("settings-presets", collection.label()))
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                for (index, preset) in presets.iter().enumerate() {
-                    egui::Frame::new()
-                        .fill(colors.raised)
-                        .stroke(Stroke::new(1.0_f32, colors.border))
-                        .corner_radius(ui.visuals().widgets.inactive.corner_radius)
-                        .inner_margin(10.0)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(RichText::new(&preset.label).strong());
-                                    ui.label(
-                                        RichText::new(&preset.command)
-                                            .monospace()
-                                            .small()
-                                            .color(colors.muted),
-                                    );
-                                    ui.label(
-                                        RichText::new(if preset.send_enter {
-                                            "Runs immediately (sends Enter)"
-                                        } else {
-                                            "Types only (does not send Enter)"
-                                        })
+        ui.push_id(("settings-presets", collection.label()), |ui| {
+            for (index, preset) in presets.iter().enumerate() {
+                egui::Frame::new()
+                    .fill(colors.raised)
+                    .stroke(Stroke::new(1.0_f32, colors.border))
+                    .corner_radius(ui.visuals().widgets.inactive.corner_radius)
+                    .inner_margin(10.0)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&preset.label).strong());
+                                ui.label(
+                                    RichText::new(&preset.command)
+                                        .monospace()
                                         .small()
-                                        .color(colors.accent_alt),
-                                    );
-                                });
-                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                    if ui
-                                        .button(crate::i18n::literal(&self.locale, "Delete"))
-                                        .clicked()
-                                    {
-                                        action = Some(PresetAction::Delete(collection, index));
-                                    }
-                                    if ui
-                                        .button(crate::i18n::literal(&self.locale, "Edit"))
-                                        .clicked()
-                                    {
-                                        action = Some(PresetAction::Edit(collection, index));
-                                    }
-                                    if ui
-                                        .button(crate::i18n::literal(&self.locale, "Run"))
-                                        .clicked()
-                                    {
-                                        action = Some(PresetAction::Run(collection, index));
-                                    }
-                                });
+                                        .color(colors.muted),
+                                );
+                                ui.label(
+                                    RichText::new(if preset.send_enter {
+                                        "Runs immediately (sends Enter)"
+                                    } else {
+                                        "Types only (does not send Enter)"
+                                    })
+                                    .small()
+                                    .color(colors.accent_alt),
+                                );
+                            });
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                if ui
+                                    .button(crate::i18n::literal(&self.locale, "Delete"))
+                                    .clicked()
+                                {
+                                    action = Some(PresetAction::Delete(collection, index));
+                                }
+                                if ui
+                                    .button(crate::i18n::literal(&self.locale, "Edit"))
+                                    .clicked()
+                                {
+                                    action = Some(PresetAction::Edit(collection, index));
+                                }
+                                if ui
+                                    .button(crate::i18n::literal(&self.locale, "Run"))
+                                    .clicked()
+                                {
+                                    action = Some(PresetAction::Run(collection, index));
+                                }
                             });
                         });
-                    ui.add_space(6.0);
-                }
-            });
+                    });
+                ui.add_space(6.0);
+            }
+        });
         if let Some(action) = action {
             self.perform_preset_action(action);
         }
@@ -9206,6 +9292,7 @@ fn terminal_surface(
         tab.id,
         latest_activity_at_ms,
         time,
+        &mut tab.effect_textures,
     );
     let scrollbar_clicked = if scrollbar_width > 0.0 {
         let track = egui::Rect::from_min_size(
@@ -9284,8 +9371,14 @@ fn paint_terminal_effects(
     terminal_id: u64,
     latest_activity_at_ms: u64,
     time: f32,
+    textures: &mut crate::plugins::effects::simple_noise::NoiseTextures,
 ) {
+    use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
+    if effects.master_disabled {
+        *textures = Default::default();
+        return;
+    }
     if effects.scanlines_strength > 0.0 {
         let alpha = (effects.scanlines_strength * 255.0) as u8;
         let mut y = rect.top();
@@ -9297,33 +9390,28 @@ fn paint_terminal_effects(
             y += effects.scanlines_period;
         }
     }
-    if effects.static_opacity > 0.0 {
-        let frame = (time * 12.0) as u64;
-        let mut state = terminal_id
-            .wrapping_mul(0x9e37_79b9_7f4a_7c15)
-            .wrapping_add(frame);
-        let count = ((rect.area() / 1800.0) * effects.static_density).clamp(24.0, 500.0) as usize;
-        let alpha = (effects.static_opacity * 255.0) as u8;
-        for _ in 0..count {
-            state = state
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            let x = rect.left() + ((state >> 16) as u32 as f32 / u32::MAX as f32) * rect.width();
-            state = state
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            let y = rect.top() + ((state >> 16) as u32 as f32 / u32::MAX as f32) * rect.height();
-            let color = if state & 1 == 0 {
-                Color32::from_white_alpha(alpha)
-            } else {
-                Color32::from_black_alpha(alpha)
-            };
-            ui.painter().rect_filled(
-                egui::Rect::from_min_size(egui::pos2(x, y), Vec2::splat(1.25)),
-                0.0,
-                color,
+    let static_active = effects.static_opacity > 0.0 && effects.static_intensity > 0.0;
+    if static_active {
+        if crate::plugins::effects::analog_static::paint(ui, rect, effects, terminal_id, time) {
+            textures.analog = None;
+        } else {
+            paint_noise(
+                ui,
+                rect,
+                NoiseFrame {
+                    resolution: effects.static_density,
+                    minimum: 0.0,
+                    maximum: (0.65 + effects.static_brightness * 1.25).min(1.0),
+                    seed: terminal_id
+                        .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                        .wrapping_add((time * 60.0) as u64),
+                    opacity: effects.static_opacity * effects.static_intensity,
+                },
+                &mut textures.analog,
             );
         }
+    } else {
+        textures.analog = None;
     }
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -9332,26 +9420,32 @@ fn paint_terminal_effects(
     let noise_plan =
         crate::plugins::effects::simple_noise::frame_plan(effects, latest_activity_at_ms, now_ms);
     if noise_plan.opacity > 0.0 {
-        let frame_interval = if effects.simple_noise_fps == 0 {
-            (1000.0_f32 / 24.0).round() as u32
+        let fps = if effects.simple_noise_fps == 0 {
+            24
         } else {
-            (1000.0_f32 / effects.simple_noise_fps.clamp(1, 60) as f32).round() as u32
+            effects.simple_noise_fps.clamp(1, 60)
         };
-        let frame = now_ms / frame_interval.max(1) as u64;
-        let mesh = crate::plugins::effects::simple_noise::noise_mesh(
+        let interval = (1000.0_f32 / fps as f32).round().max(1.0) as u64;
+        paint_noise(
+            ui,
             rect,
-            effects.simple_noise_resolution,
-            effects.simple_noise_min_brightness,
-            effects.simple_noise_max_brightness,
-            terminal_id ^ frame,
-            noise_plan.opacity,
+            NoiseFrame {
+                resolution: effects.simple_noise_resolution,
+                minimum: effects.simple_noise_min_brightness,
+                maximum: effects.simple_noise_max_brightness,
+                seed: terminal_id ^ (now_ms / interval),
+                opacity: noise_plan.opacity,
+            },
+            &mut textures.simple,
         );
-        ui.painter().add(egui::Shape::mesh(mesh));
+    } else {
+        textures.simple = None;
     }
-
-    let mut repaint_after_ms =
-        crate::dock::effects_need_repaint(theme.effects.gradient_animation, effects.static_opacity)
-            .then_some(80);
+    let mut repaint_after_ms = if static_active {
+        Some(16)
+    } else {
+        crate::dock::effects_need_repaint(effects.gradient_animation, 0.0).then_some(80)
+    };
     if let Some(noise_delay) = noise_plan.repaint_after_ms {
         repaint_after_ms =
             Some(repaint_after_ms.map_or(noise_delay, |delay| delay.min(noise_delay)));
@@ -9958,6 +10052,9 @@ fn theme_document_unit_slider(
         .pointer(pointer)
         .and_then(Value::as_f64)
         .unwrap_or(0.08) as f32;
+    if value > 1.0 {
+        value /= 100.0;
+    }
     if ui
         .add(egui::Slider::new(&mut value, 0.0..=0.35).text(crate::i18n::literal(locale, label)))
         .changed()
@@ -10266,6 +10363,66 @@ mod tests {
         let _output = ctx.run(egui::RawInput::default(), |ctx| app.settings_window(ctx));
         assert!(app.show_settings);
         assert!(app.settings_snapshot.is_some());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn settings_footer_stays_visible_with_large_fonts_at_minimum_window_size() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.locale = "en".into();
+        app.preferences.typography.settings.size = 24.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        app.apply_style(&ctx);
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(720.0, 520.0));
+        let revert_label =
+            crate::i18n::text("en", crate::i18n::MessageKey::SettingsRevertClose, &[]);
+        for tab in [
+            SettingsTab::Themes,
+            SettingsTab::Fonts,
+            SettingsTab::Commands,
+            SettingsTab::Workspace,
+            SettingsTab::Language,
+            SettingsTab::Shortcuts,
+            SettingsTab::Providers,
+            SettingsTab::Import,
+        ] {
+            app.settings_tab = tab;
+            let output = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.settings_contents(ui, ctx, &mut None);
+                    });
+                },
+            );
+            let mut footer_found = false;
+            for clipped in &output.shapes {
+                if let egui::Shape::Text(shape) = &clipped.shape {
+                    let text = &shape.galley.job.text;
+                    assert!(
+                        !text.contains("use of") || !text.contains(" ID "),
+                        "duplicate widget ID: {text}"
+                    );
+                    if text == &revert_label {
+                        footer_found = true;
+                        let bounds = clipped.shape.visual_bounding_rect();
+                        assert!(
+                            screen.contains_rect(bounds),
+                            "Settings footer extends past window: {bounds:?}"
+                        );
+                        assert!(
+                            clipped.clip_rect.contains_rect(bounds),
+                            "Settings footer is clipped: {bounds:?}"
+                        );
+                    }
+                }
+            }
+            assert!(footer_found, "Settings footer was not painted");
+        }
     }
 
     #[test]
