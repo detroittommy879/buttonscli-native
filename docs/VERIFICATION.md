@@ -1,7 +1,139 @@
 # Verification record
 
-Last run: 2026-09-29 on Windows 11, Rust 1.97.1. Earlier Linux-only checks
+Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-02 README and integration checks
+
+- Formatting, strict native Clippy, desktop build and `git diff --check` pass.
+- Full native suite: 235 library tests and two import fixtures pass; five
+  optional library tests remain ignored. WSL decoding coverage still runs on
+  non-Windows test hosts; Windows-only discovery helpers now compile only there.
+- Five Node CLI deadline regressions and the 14-tool MCP fake-API contract pass.
+- `pwsh -NoProfile -File scripts/test-control-live.ps1 -SkipBuild -WithMcpSdk`
+  passes against isolated test state. The official client lists 14 tools and
+  calls status/tabs on the live app; the installed CLI matrix checks targeted
+  startup, input formats, layouts, visible/background output, paced cancellation
+  and child-shell cleanup. No full live MCP tool matrix or GUI handoff is claimed.
+- The desktop build retains the existing bin/lib PDB naming warning. Vulkan
+  validation-layer warnings and ended-pipe messages appeared during the live
+  smoke; functional and cleanup assertions pass.
+- The README's local links resolve; its four public screenshots were inspected,
+  copied without modification, and checked in the GitHub render. The private
+  provider import capture was excluded. GitHub CI is pending at this checkpoint.
+
+## 2026-10-01 favorites and migration checks
+
+- Full native suite: 235 library tests and two import fixtures pass; five
+  optional library tests are ignored in the default run.
+- Explicit `auto_tile_session_lifecycle` passes: per-pane theme IDs remain
+  correct across reorder, random avoids the current theme, global clears only
+  that override, and closed targets cannot affect another pane. The actual
+  workspace painter shows the hovered tab name, hides it when disabled, and
+  preserves session IDs.
+- Explicit `rapid_close_terminates` passes: eight CMD shells close immediately
+  without sending `exit`, plus a busy PowerShell shell and its CMD descendant
+  exit after dropping the pane. Test-owned handle guards prevent orphaned
+  processes on assertion failures.
+- Pointer/menu tests verify the pane actions and favorite ID selection;
+  settings tests verify profile round-trip, deduplication and bounds.
+- Strict native `cargo clippy --all-targets --locked -- -D warnings` and WASM
+  `cargo clippy --target wasm32-unknown-unknown --no-default-features --locked
+  -- -D warnings` pass. No new lint suppression or relaxed CI gate was added.
+- Desktop and optimized WASM builds pass. The pre-existing bin/lib PDB filename
+  warning remains; the browser compiler warnings have been eliminated.
+- Five Node CLI deadline regressions and the 14-tool MCP contract pass.
+- The live Windows control/startup matrix passes after the cleanup changes,
+  including visible/background PTYs, paced-send cancellation and shell cleanup.
+- `native-smoke.ps1 -SkipBuild -WithThemeControls -CapturePath
+  target/favorites-startup.png` passes. The inspected 1296×859 capture shows
+  readable Favorite themes and Random theme status buttons with no onboarding
+  overlay or clipped controls.
+- `native-smoke.ps1 -SkipBuild -WithThemeControls -WithAbruptExit` passes:
+  killing only the test host terminates its tracked shell, without recursively
+  killing children from the harness.
+
+These supersede the older failing-lint and orphan-CMD records below. Manual
+full-screen app mouse behavior, monitor/DPI, clipboard and cross-platform GUI
+acceptance are still separate checks. `native-smoke.ps1 -WithThemeControls`
+seeds only its isolated profile so the first-run chooser does not cover the
+status controls during capture.
+
+## 2026-10-01 workspace follow-up
+
+- `cargo test --locked --quiet`: 232 library tests and two import fixtures
+  pass; four optional tests ignored.
+- `cargo test --locked --lib auto_tile_session_lifecycle -- --ignored
+  --nocapture`: passes with four test-owned Windows ConPTY shells, count
+  restoration, stable membership, reorder, solo view and close/reopen.
+- Headless egui pointer tests pass for right-click tabs and both preset
+  collections, optional dots, and the AI Help status button.
+- Both old metrics production adapters return Disabled before constructing
+  a client or sending feedback. Mock tests cover the retained contracts.
+- Desktop build, formatting/diff checks, five Node CLI deadline regressions
+  and the 14-tool MCP contract pass.
+- Optimized WASM build passes with the existing 51 compiler warnings.
+- Strict Clippy still fails on the existing 18 native and 52 WASM findings.
+  No lint gate is weakened. The PR remains draft.
+- The isolated desktop startup/capture smoke passes at 1296×859, showing
+  AI Help, All and hidden dots. The language chooser remains open, so this
+  capture is startup evidence rather than complete native interaction review.
+
+The first live CLI rerun failed a long visible-output marker. Waiting for a
+real PowerShell prompt and using short unique markers repaired the functional
+matrix. A subsequent run completed those checks but declared child cleanup
+failed after only 300 ms; those children exited shortly afterward. The script
+now uses a bounded five-second exit poll. The final updated live CLI/startup
+matrix passes, including visible/background output and child-shell cleanup.
+
+The initial rapid-close unit fixture used unbounded CMD `/K` processes; four
+survived queued `exit` input followed immediately by backend teardown. Only
+those verified test-owned processes were stopped. The opt-in membership test
+now uses finite PowerShell processes so failures cannot leave unbounded shells.
+This test validates selection/session ownership, not graceful shutdown of every
+shell. Rapid CMD close/teardown deserves a separate terminal-lifecycle follow-up.
+
+The earlier checkpoint below records additional load/GUI limits; this feature
+slice does not certify broad desktop/provider parity.
+
+## 2026-10-01 startup, CLI and remote checkpoint
+
+- `cargo fmt --all -- --check` and `git diff --check` pass.
+- `cargo test --locked` passes 222 library tests and two legacy fixture tests;
+  three optional library tests are ignored.
+- `cargo build --bin buttonscli --locked` passes. Its help/version options exit
+  successfully; an invalid tab count exits with code 2. The existing Windows
+  bin/lib PDB output-name warning remains.
+- `pwsh -NoProfile -File scripts/test-control-live.ps1 -SkipBuild` passes against
+  an isolated profile: three startup tabs, one command each in tabs 1 and 3,
+  no input in tab 2, the installed Node CLI matrix, visible/background output,
+  paced-send cancellation on PTY exit, and child-shell cleanup. This does not
+  certify keyboard, clipboard, monitor, DPI or broader visual interaction.
+- `node --test scripts/test-cli.mjs` passes five loopback HTTP deadline/error
+  regressions. `node scripts/test-mcp-smoke.mjs` passes all 14 tool contracts.
+- Native `cargo clippy --all-targets --locked -- -D warnings` fails on existing
+  strict lints. WASM Clippy compiles without denial but reports 52 warnings;
+  the strict WebAssembly CI gate remains failing. No lint gate was weakened.
+- `cargo build --target wasm32-unknown-unknown --release --no-default-features
+  --locked` passes with the existing 51 compiler warnings. Browser canvas
+  interaction was not rerun.
+- The live control smoke with `-WithLoadProbe` passes for 1, 4 and 10 terminals,
+  including 200 Unicode output lines per terminal, target isolation and child
+  cleanup. Measured completion times were 6,716 / 25,112 / 31,655 ms including
+  delivery, shell execution, polling and deliberate sleeps. This is functional
+  contention evidence, not an FPS or maximum-throughput benchmark. Raw long
+  markers can be split by ConPTY wrap/redraw VT; the test uses short markers.
+
+The current migration is backed up on `codex/native-migration` with draft
+[PR #1](https://github.com/detroittommy879/buttonscli-native/pull/1). The draft
+preserves the unfinished Agent Mode prototype with a separate explicit debug
+opt-in. Windows results do not certify Linux/macOS behavior or production
+entitlement, signing and update services.
+
+GitHub rejected a proposed Node CI job because the current token lacks workflow
+permission. That optional workflow edit was removed from the unpublished
+commit, preserving the existing CI configuration. The reviewed job is saved in
+[`CI-FOLLOWUP.md`](CI-FOLLOWUP.md); local Node checks above still pass.
 
 ## 2026-09-29 P01 feature grant resolution
 

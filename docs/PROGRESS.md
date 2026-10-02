@@ -1,5 +1,267 @@
 # Reconstruction journal
 
+## 2026-10-02 — GitHub README and integration follow-through
+
+Rebuilt the README around the usable terminal workspace: centered title/badges,
+feature table, source-build quick start, four user-supplied October screenshots,
+and explicit AI Help/CLI/MCP access and remaining-work sections. Originals are
+unchanged; the import screenshot with a private provider endpoint was excluded.
+Public documentation images are now distinguished from diagnostic captures in
+CONTRIBUTING.md. The first README patch failed because delete/add targeted the
+same file; writing the complete UTF-8 document succeeded.
+
+PR #1's Linux CI fails on five platform-specific warnings in `terminal.rs`.
+Scoped Windows-only helpers/imports to Windows, retained WSL decoding under
+tests on other hosts, and made the shell collection mutable only where it is
+extended. Local Rust 1.96 also caught a boolean simplification in theme metadata;
+the equivalent `is_none_or` form passes strict native Clippy. No CI gate was
+relaxed. Incremental-cache finalization reported Windows access errors on the
+first check; a process-local `CARGO_INCREMENTAL=0` avoids that cache issue.
+Five CLI deadline tests and the 14-tool MCP fake-API contract pass. Full Windows
+tests pass 235 library tests plus two fixtures, with five optional tests ignored;
+formatting, strict native Clippy and the desktop build pass. The isolated live
+CLI/startup matrix with `-WithMcpSdk` passes, including official-client discovery
+of 14 tools and live status/tabs calls, output targeting, paced cancellation and
+child-shell cleanup. Shutdown emitted existing ended-pipe diagnostics; cleanup
+assertions passed. No personal terminals or settings were used.
+README local links resolve, copied images match their originals, and the public
+GitHub render was visually checked. GitHub CI is rerunning before integration.
+
+## 2026-10-01 — Theme favorites, pane controls and migration gate repairs
+
+Free `themeFavorites`, `terminalContextMenu` and `paneHoverLabel` features are
+registered centrally. Stars on theme cards save profile-local IDs; a dedicated
+section near the top of Themes and the status menu provide quick access.
+The status random action shares the existing random-selection implementation.
+Pane menus bind actions to session IDs, including after reorder or close.
+They expose favorites/random/global, copy, select-all, clear, rename,
+auto-tile inclusion and close. Hover labels paint the tab name without adding
+a hit target; Workspace saves independent font/size/weight and opacity.
+
+The native and WASM strict Clippy gates now pass without new lint suppressions.
+Repairs group related arguments, remove unnecessary closure dropping, relocate
+helpers before tests, simplify parser/option operations, replace a post-1.85
+Windows API usage, and omit desktop-only code from the browser target.
+Full Windows tests pass 235 library tests and two import fixtures; five optional
+tests are ignored in the default run. The explicit auto-tile lifecycle test
+also verifies favorite/random/global targeting, closed-target rejection, hover
+visibility/disable, and unchanged session IDs. Pointer tests cover menu actions.
+Native and optimized WASM builds pass, with the existing native PDB naming
+warning. Five Node CLI deadline regressions and the MCP contract pass.
+
+Windows ConPTY creation now assigns each shell atomically to its own
+kill-on-close job. Closing a pane ends its shell and descendants, including
+when queued `exit` has not been processed. Child-watcher callbacks retain a
+valid context until synchronous unregister completes; duplicated process
+handles, initial-thread handles and redundant pipe ends now close explicitly.
+Failed watcher setup closes ConPTY while its reader can still drain output.
+The explicit rapid-close test passes eight immediately dropped CMD shells and
+a busy PowerShell shell with a CMD descendant. This fixes the prior orphan-shell
+finding rather than hiding it behind a finite fixture.
+
+The updated live Windows control/startup matrix passes after these changes.
+A seeded isolated startup capture shows readable Favorites/Random controls at
+1296×859 without the language chooser covering the workspace. A separate
+abrupt-exit smoke kills only the host and verifies its held shell process
+handle becomes signaled. This checks OS job cleanup independently of queued
+graceful `exit` input or a recursive process kill in the harness.
+
+References: Microsoft's [atomic job assignment example](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812/)
+and [ConPTY lifetime contract](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session).
+Broad hands-on focus/clipboard/DPI, real-provider/hosted-entitlement acceptance,
+Linux/macOS checks, production signing roots and activation/rollback integration
+remain open. Optional Shader Lab/HSync still need the separately documented
+offscreen-renderer work; no shader parity is claimed.
+
+## 2026-10-01 — Auto-tile membership, context menus and AI Help discovery
+
+Tabs now offer right-click menus with session-local **Include in auto-tile**
+membership. Stable IDs preserve that choice across moves; reopening a closed
+tab restores its membership. Excluded sessions remain alive and can be selected
+alone. COL/ROW/GRID preserve the requested pane count across single view and
+orientation changes without spawning replacements for excluded tabs. All
+gathers existing included sessions up to the ten-pane limit.
+
+Command and SSH presets share their action content between right-click menus
+and optional dots. The persisted Workspace toggle defaults to hiding dots.
+AI Help has a status-bar entry and an enabled Help-menu entry; the window can
+show its access explanation/provider-settings link while requests retain the
+existing Pro/development gates. New labels use the native literal catalog seam
+with English fallback where the source catalog has no entry.
+
+Per user direction, the old metrics-hosted runtime-config fetch and feedback
+sender are disabled in production entry points. Feedback is hidden. Mock
+adapter tests retain the old contract without contacting its host. The separate
+auth and provider paths remain available. No new metrics sender or container
+is introduced. `docs/migration/WORKSPACE-FOLLOWUPS.md` records later isolated
+experiments for movable chrome and detached terminals, plus the new service.
+
+Windows full tests pass 232 library tests plus two import fixtures, with four
+optional tests ignored. The new ignored ConPTY lifecycle test passes when run
+explicitly: four test-owned shells, remembered counts, stable-ID exclusion,
+reordering, solo selection, orientation changes, close/reopen and re-inclusion.
+Headless egui pointer tests cover tab/preset context menus, optional dots and
+the AI Help status button. Desktop build, formatting and diff checks pass;
+five CLI deadline regressions and the 14-tool MCP contract pass. Strict native
+and WASM Clippy still fail on the existing 18/52 findings; gates stay intact.
+The startup screenshot shows the new controls with the first-run language
+chooser still open. Broader DPI/focus, provider/Vibe and cross-platform GUI
+acceptance remain open.
+
+The revised live Windows CLI/startup matrix passes, including child-shell
+cleanup. Its prompt-aware readiness and short markers avoid sending into a
+starting shell and ConPTY-split marker failures. Cleanup now polls exit for up
+to five seconds instead of assuming shutdown completes within 300 ms. The
+rapid-close CMD unit-fixture finding and bounded replacement are recorded in
+`docs/VERIFICATION.md` for a separate lifecycle follow-up.
+
+## 2026-10-01 — Startup and CLI follow-through
+
+Startup parsing now recognizes help/version only in flag positions, preserving
+those strings when they are command or directory values. Duplicate singleton
+options are rejected, and command validation reports its actual 4096-byte UTF-8
+limit. Four parser tests, executable help/version/error-exit checks, the desktop
+build, and the isolated live Windows CLI/startup matrix pass. Startup remains
+free and one-shot; `docs/STARTUP.md` documents its shell-settling limits.
+
+Five real loopback HTTP regressions exercise the shipped Node CLI's stalled
+headers, stalled response body, overall polling deadline, uncertain write
+without retry, and malformed-response redaction. They all pass, as does the
+14-tool MCP fake-API contract. `docs/CI-FOLLOWUP.md` preserves the proposed Node
+CI job: GitHub rejected the workflow edit because the logged-in token lacks
+workflow permission. The unpublished commit excludes that optional workflow
+edit so the implementation and tests can still be pushed normally.
+The preserved Agent Mode prototype requires its own explicit debug-only
+`BUTTONSCLI_NATIVE_DEV_AI_AGENT=1` opt-in in addition to AI Help; normal AI Help
+development access keeps it hidden. Release and live Agent Mode acceptance are
+not claimed.
+
+The full Windows Rust suite passes 222 library tests and two compatibility
+fixtures, with three optional library tests ignored. Native strict Clippy
+still fails on existing warnings (18 with all test targets on this toolchain).
+WASM Clippy without denial compiles with 52 warnings: 49 dead-code warnings,
+two unused variables and one loop-style lint. Strict CI keeps those gates;
+the optimized WASM build also passes (51 compiler warnings). The PR remains
+draft. Linux CI exposed host-dependent parsing of Windows shell
+paths in an existing installer test; Windows shell basename matching now
+recognizes both separator styles on every host. `CONTRIBUTING.md` records the
+branch, push, draft PR, review, and merge workflow.
+
+The optional `-WithLoadProbe` Windows control smoke passes at 1, 4 and 10
+terminals, verifying 200 Unicode output lines per terminal, isolated target
+delivery, retained session IDs, increasing output sequence and clean child-shell
+shutdown. The final runs took 6,716 / 25,112 / 31,655 ms, including command
+delivery, shell processing, polling and deliberate sleeps; these are functional
+VM measurements, not frame-rate or maximum-throughput benchmarks. The harness
+waits for a PowerShell prompt because API readiness only identifies a live PTY.
+Initial narrow-pane probes also exposed ConPTY wrapping inside long raw markers;
+short markers now fit the physical pane width. The API intentionally preserves
+that raw VT contract, and `docs/CONTROL-API.md` records the matching limitation.
+Cleanup retries transient Windows directory handles and preserves the original
+test error. The isolated four-pane screenshot at `target/load-review.png` shows
+live Unicode output and wrapping tabs, with the first-run language chooser still
+open; it does not certify onboarding or keyboard interaction. Broader contention,
+frame-cost, focus and DPI acceptance remain open.
+
+## 2026-10-01 — Remote backup checkpoint
+
+Moved the local migration checkpoint and remaining worktree edits onto
+`codex/native-migration` for a GitHub backup and draft pull request. The
+existing checkpoint covers native effects, layout repairs, AI Help window
+behavior and bounded CLI requests. Additional edits include one-shot startup
+tabs/commands, compatible provider base URLs, and an unfinished Agent Mode
+prototype. This checkpoint preserves that prototype; it does not change the
+documented priority of core parity and review-first AI Help, or certify Agent
+Mode for release. Startup/CLI live acceptance and documentation follow next.
+
+## 2026-09-30 — Bounded CLI request deadlines
+
+The native Node CLI previously had no deadline for ordinary API requests or
+response bodies, allowing a stalled read to defeat `wait-for-text` and
+`wait-for-quiet` timeouts. Calls now use an AbortSignal through body reading;
+ordinary requests get 10 seconds, with extra allowance for the existing
+30-second paced delivery and 60-second run-wait bounds. Poll requests and
+intervals are capped by the remaining wait deadline. Writes are never retried
+automatically, and their timeout message explains that delivery may have begun.
+Malformed response JSON produces a concise error without echoing its body.
+`node --check scripts/buttonsclictl.mjs` passes. Runtime timeout/PTY acceptance
+has not been rerun for this change.
+
+## 2026-09-30 — AI Help window follow-through
+
+Isolated Windows GUI review with a loopback fake provider exercised streaming,
+explicit terminal-context preview and transmission, and HTTP 503 failure/retry.
+No public provider or real credential was used. This review found that Windows'
+system light-mode update could select an unconfigured egui style after startup,
+leaving menus and AI Help light and Settings headings unreadable against the
+native palette. Native palette application now explicitly selects its configured
+style, including detached Settings and AI Help. AI Help applies its own font
+zone and has a scroll fallback for unusually large composer content.
+
+Streaming now displays the answer portion of the response envelope rather than
+flashing XML tags or action JSON. Suggested actions still become available only
+after complete reply validation. Transcript space remains stable during streaming
+so growing text cannot move the Cancel button under the pointer. Cancellation showed a cancelled status and Retry; Retry completed successfully.
+Closing/reopening AI Help preserved that conversation. Updated native palette
+screenshots are saved locally in `target/ai-help-review.png` and
+`target/settings-review.png`. The library and a separately linked current
+`target/debug/buttonscli-updated.exe` build successfully. This is partial M4
+evidence; target switching and broader focus/DPI/platform checks remain open.
+
+Local checkpoint commits use the explicit agent identity `Codex <codex@localhost>`
+through per-command Git options. User and global Git settings are unchanged;
+missing personal author configuration does not block migration work.
+
+## 2026-09-30 — Windows effects and layout follow-through
+
+Ported the original analog-static procedural shader to a native WGSL callback,
+including screen blending, half-resolution sampling, intensity, density, drift,
+brightness and opacity. The pipeline validates on this VM's graphics adapter.
+Simple noise now uses physical display pixels, keeps animating at nonzero idle
+amounts, avoids repeated uploads within a noise frame and owns its bounded
+textures on the terminal tab so closing tabs releases them. Unsupported GPU
+contexts retain a bounded grayscale fallback; this does not implement HSync or
+Shader Lab post-processing.
+
+Menu, preset and status bars size to their content. Settings has one bounded
+scrolling body, distinct nested IDs, adaptive theme columns and footer buttons
+anchored to the window's original bounds. Moved the dock's Compact checkbox to
+its own row. A large-font minimum-window layout regression passed during this
+work; subsequent screenshot review caught and fixed horizontal footer overflow.
+
+`uvx appsnap` works on this host; the smoke script now falls back to it when no
+standalone `appsnap.exe` is installed. A separately linked review executable
+used an isolated native home, leaving the user's running app untouched.
+`target/static-review.png` shows dense native analog static and readable 22 px
+status text; `target/settings-review.png` shows 24 px Settings text and both
+footer buttons. GPU pipeline validation and `cargo build --lib` passed. Wider
+DPI/platform and 4/10-pane performance acceptance remain open.
+
+Fresh Windows system-default launches now prefer installed PowerShell 7, then
+bundled Windows PowerShell, so the PowerShell starter presets work. Explicit
+cmd profiles keep their selected shell. User priorities remain core parity,
+then reliable AI explanations/single commands, vibe themes and CLI hardening.
+
+## 2026-09-30 — Fine-grain effects and status-bar sizing
+
+Replaced the native simple-noise rectangle mesh with a bounded grayscale
+texture sized from the legacy resolution setting. Analog static now paints a
+dense animated noise texture instead of a few hundred isolated dots. Both
+effects cap texture dimensions and pixel count to keep large panes bounded.
+Changed the status panel from a fixed 31 px height to a minimum height so its
+controls and custom status font can determine the required row size.
+
+`cargo check --bin buttonscli` passes on Windows. `cargo build --bin
+buttonscli` passed after the user closed the running app. The isolated GUI
+smoke reached its screenshot step, but this VM has no `appsnap.exe`, so no
+capture was saved. The computer-use inventory also exposed no native windows.
+Live appearance and frame cost at 1/4/10 panes still need review.
+
+Priority clarification from the user: complete core migration/parity first,
+then modernize AI Help for dependable explanations and single-command
+suggestions, improve vibe-coded theme generation, and harden the mostly
+working `buttonsctl` flow. Agent Mode remains outside the planned migration.
+
 ## 2026-09-29 — Partial Windows AI Help GUI acceptance
 
 Ran the debug native app with an isolated temporary home and the explicit

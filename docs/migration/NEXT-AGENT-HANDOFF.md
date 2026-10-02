@@ -2,6 +2,93 @@
 
 Updated 2026-09-29. This is a working handoff, not a completion claim. Continue the native migration in this repository; the legacy React/Tauri checkout is a read-only reference.
 
+## Latest Windows checkpoint — 2026-10-01
+
+Latest user steering: prioritize tab/layout ergonomics and AI Help discovery.
+Right-click menus and optional dots now serve tabs, command presets and SSH
+presets; auto-tile membership uses stable session IDs, All selects existing
+included terminals, and layout orientation preserves requested counts.
+AI Help now has a status-bar button and can open its locked explanation.
+The old metrics-hosted runtime-config and feedback production paths are
+disabled pending a new service. Movable docks/status chrome and detached
+terminals remain later, separate-branch experiments. See
+[workspace follow-ups](WORKSPACE-FOLLOWUPS.md) for scope and feasibility.
+
+Current Windows checks: 232 library tests plus two fixtures pass, four optional
+tests ignored; the finite-ConPTY membership test passes explicitly. Desktop
+and optimized WASM builds pass. Strict native/WASM lints still report 18/52
+findings. Right-click and AI Help discovery have headless pointer-test coverage.
+The live smoke now waits for shell prompts and polls child exit up to five
+seconds instead of 300 ms. Rapid close of a CMD `/K` unit fixture exposed
+queued-exit/teardown cleanup limits; the test is bounded now, but broader CMD
+shutdown behavior remains a separate lifecycle item. See `../VERIFICATION.md`.
+
+Work continues on `codex/native-migration`, backed up in draft
+[PR #1](https://github.com/detroittommy879/buttonscli-native/pull/1). Preserve
+that branch and update the existing PR. `CONTRIBUTING.md` documents the branch,
+push, review and merge workflow; do not merge while the strict CI gates fail.
+
+- One-shot startup tabs/commands, shell and cwd are source-implemented and
+  documented in `docs/STARTUP.md`. Startup is free. Parsing preserves literal
+  help/version values and rejects ambiguous singleton options.
+- Full Windows tests pass 222 library tests plus two compatibility fixtures,
+  with three optional tests ignored. Desktop and optimized WASM builds pass.
+  Strict native Clippy fails on existing lints; WASM Clippy reports 52 warnings
+  without denial. Those gates remain intact. Linux CI exposed an existing
+  Windows-path parsing test failure; basename matching is now host-independent.
+- The installed Windows CLI/startup matrix passes. Five loopback HTTP timeout
+  regressions and the 14-tool MCP fake-API contract pass. A proposed separate
+  Node CI job is documented in `docs/CI-FOLLOWUP.md`; the current GitHub token
+  cannot update workflows. Optional `-WithLoadProbe` passes 1/4/10-terminal Unicode output,
+  target isolation and shell cleanup. This does not certify FPS or broad GUI
+  interaction. The first-run language chooser remains open in the isolated
+  four-pane screenshot. ConPTY wrap/redraw can split long raw text markers;
+  use short ones in narrow panes. API readiness is not shell prompt readiness.
+- An unfinished Agent Mode prototype was found in the worktree and preserved
+  in the backup. It remains outside migration scope and unavailable in release
+  builds; debug access additionally requires `BUTTONSCLI_NATIVE_DEV_AI_AGENT=1`
+  alongside the AI Help override. Do not expand it as a core parity task.
+
+Continue with strict CI cleanup, M4 target-selection/focus acceptance, broader
+GUI/load evidence, then P06 activation/rollback. See `docs/PROGRESS.md` and
+`docs/VERIFICATION.md` for exact results and remaining limits.
+
+## Previous Windows checkpoint — 2026-09-30
+
+Current checkout: `C:/ext/buttonscli-both/buttonscli-native`; reference:
+`C:/ext/buttonscli-both/w111erd`. The dated paths and baseline below describe
+an earlier machine. Use current source and `docs/PROGRESS.md`.
+
+- Analog static now ports the legacy procedural shader to WGSL; adapter
+  validation and an isolated one-pane screenshot passed. Simple noise uses
+  bounded physical-pixel textures, continuous idle animation and tab-owned
+  caches. Wider DPI and 4/10-pane frame-cost acceptance remain open.
+- Larger menu/preset/status fonts fit; status controls wrap. Settings scrolling
+  IDs, adaptive theme columns and footer bounds are repaired. Windows' system
+  theme could previously select an unconfigured egui style after startup; native
+  palette selection now survives that change, including detached Settings and
+  AI Help. Updated screenshots are in ignored `target/` diagnostics.
+- AI Help loopback GUI review covered streaming, context preview/transmission,
+  cancellation, Retry and child-window close/reopen. Streaming displays answer
+  text without its envelope; fixed transcript space stops Cancel moving as text
+  grows. Target switching, broader focus/DPI and other-platform review remain.
+- CLI API/body reads now have deadlines; paced send/run retain their duration
+  allowance. Wait polling respects the overall deadline, and timed-out writes
+  are never automatically repeated. Syntax passes; rerun isolated live CLI/PTY
+  acceptance for this change when requested.
+- `cargo build --lib` and a separately linked current main executable at
+  `target/debug/buttonscli-updated.exe` pass. The user's older running executable
+  was left intact. Test-owned review app, PowerShell children and fake provider
+  have been closed.
+- Local checkpoint commits use `Codex <codex@localhost>` through per-command
+  Git options. No user identity is assumed and no global configuration is
+  changed. Missing personal Git configuration does not block migration work.
+
+Continue with target-selection/focus acceptance and bounded terminal load work,
+then P06 activation/rollback. Hosted entitlement/release verification still
+requires its external production decisions. HSync/Shader Lab still need the
+bounded offscreen terminal renderer; analog static does not provide that stage.
+
 ## Start on the machine you have
 
 1. Identify the OS, shell, checkout path, Git branch/status/recent commits, Rust toolchain and installed targets. Check whether a usable desktop display is available before planning GUI tests. Windows is a valid development host; Fedora or another VM is optional for Linux acceptance.

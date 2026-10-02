@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Added free saved theme favorites with a section in Themes, stars on theme cards,
+  and a status-bar menu, plus a quick random-theme button for the focused terminal.
+- Added free per-pane right-click menus for themes, selection/buffer actions,
+  rename, auto-tile membership, and close, with stable session targeting.
+- Added free terminal-name hover labels with separate font, size, weight, and
+  opacity controls in Workspace settings.
+- Fixed rapid Windows terminal closure leaving shells running. Each pane now
+  owns a Windows job for its shell and descendants, including on host exit.
+- Repaired native and WASM strict Clippy migration gates without disabling lints,
+  and removed a post-Rust-1.85 API usage from Windows shell discovery.
+
 - Added free Help → Send Feedback with a reviewed redaction preview, one-shot random request IDs, no terminal attachments, and visible failure handling that preserves the draft. The native app emits no routine product analytics events; see `docs/PRIVACY-AND-FEEDBACK.md`.
 - Added a free read-only Guides window with bundled offline Quick Start and AI Help guides, plus an explicit bounded HTTPS Markdown fetch from the trusted ButtonsCLI guide path.
 - Added internal, debug-only Quick Secrets with a profile-bound encrypted vault, Argon2id key derivation, explicit confirmed reset, auto-lock, and reviewed single-line paste to a selected terminal. Release builds keep the feature hidden; terminal echo may still put pasted text in output.

@@ -187,6 +187,6 @@ mod tests {
         assert_eq!(auto_hide_overlay_width(false, 220.0, 800.0), None);
         assert_eq!(auto_hide_overlay_width(true, 220.0, 800.0), Some(220.0));
         assert_eq!(auto_hide_overlay_width(true, 220.0, 0.0), Some(1.0));
-        assert!(AUTO_HIDE_RAIL_WIDTH > 0.0);
+        const { assert!(AUTO_HIDE_RAIL_WIDTH > 0.0) };
     }
 }

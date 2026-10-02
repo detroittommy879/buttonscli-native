@@ -5,9 +5,10 @@ not a backlog disguised as release notes.
 
 ## Platform verification
 
-- Linux Mint/X11 is the only desktop target run manually so far.
-- Windows source checks pass, but the detached Help window, native control API,
-  Node handoff and real PTY input/output have not had a live Windows pass.
+- Linux Mint/X11 has earlier manual desktop evidence. Windows 11 has isolated
+  startup, real PTY/control-CLI checks and partial AI Help GUI review using a
+  loopback provider. Broader keyboard, clipboard, DPI, performance and visual
+  acceptance remain open; see [the verification record](VERIFICATION.md).
 - Eframe and Alacritty expose macOS and Windows implementations, and the app has
   no Unix-only UI code, but those targets still need native CI and manual tests.
 - The browser package compiles and packages successfully. The available VM
@@ -24,8 +25,8 @@ not a backlog disguised as release notes.
   status bar. Fedora GUI resizing and PTY behavior still need direct review.
 - Dividers paint continuously and inherit color/width from the active app theme;
   Settings can save a custom color and width. Personal theme documents may set
-  `theme.app.shell.paneDivider`. There is no personal-theme editor/export flow
-  for this field yet, and contrast/drag behavior needs GUI review.
+  `theme.app.shell.paneDivider`; the personal-theme editor and export preserve
+  its color and thickness. Contrast/drag behavior still needs GUI review.
 - Theme Settings saves a 0–16 point corner radius for tabs, controls, menus,
   cards and Settings. It does not round terminal cells. Visuals at different DPI
   scales and keyboard focus outlines still need desktop review.
@@ -33,6 +34,15 @@ not a backlog disguised as release notes.
   terminal or all open terminals, including hidden tabs. App chrome stays
   global. Per-terminal choices are session-only and reset on restart; the
   global default persists. Fedora GUI/PTY theme-switch behavior is unverified.
+- Theme favorites persist by theme ID in each native profile. Pane menus apply
+  to their own session, and hover labels have independent font/size/opacity.
+  Pointer/menu and stable-target tests pass; broader interactive DPI and
+  full-screen-terminal application review remains open.
+- Windows shells are launched atomically inside per-pane kill-on-close jobs.
+  Rapid-close tests cover eight immediate CMD closures and a busy PowerShell
+  shell with a CMD descendant. Closing a pane also ends its descendants;
+  unusual programs that use external services to launch detached processes
+  are outside that process-tree guarantee.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
   screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior
@@ -59,9 +69,10 @@ not a backlog disguised as release notes.
   animated drift, static, and scanlines also render natively. The master-off
   setting stops animation, and effects can be limited to the focused pane.
   Row banding now tints every other terminal row using the measured cell pitch.
-  Simple noise is a bounded pixelated grayscale overlay with a configurable
-  frame rate and optional idle ramp. Its mesh is capped at 1,024 cells per pane;
-  GUI frame-cost review remains open. HSync warp and standalone wallpaper
+  Simple noise uses bounded physical-pixel grayscale textures with a configurable
+  frame rate and optional idle ramp. Analog static uses a native procedural WGSL
+  callback with a bounded fallback. One-pane adapter/visual review passed;
+  multi-pane frame-cost and wider DPI review remain open. HSync warp and standalone wallpaper
   drawing are not rendered. The AI theme generator has a review-first source
   path but remains Pro-gated until entitlement integration is available; live
   provider and GUI checks remain open.
@@ -87,8 +98,10 @@ not a backlog disguised as release notes.
   profiles, default/per-tab selection, arguments, and working directories. The
   Linux paths have been exercised manually; Windows and macOS discovery and
   launch behavior still need their platform verification passes.
-- Profile switching, accounts, and updater/release infrastructure are not part
-  of this lean core yet.
+- General profile switching remains absent. Account sign-in, runtime config,
+  signed-package verification and staging have source implementations, but
+  hosted entitlement acceptance, production trust keys, active-version switching
+  and a rollback launcher remain open.
 - Window opacity is currently supported on Windows only. Linux and macOS show
   the unsupported capability state; monitor, DPI and live desktop-compositor
   behavior still need manual review.
@@ -108,13 +121,17 @@ not a backlog disguised as release notes.
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
   release builds stay locked until entitlement integration exists. The
   `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
-  live window/provider/credential interaction is certified.
+  real-provider or OS-credential interaction is certified. Partial Windows
+  window/stream/context/retry review used a loopback fake provider. The preserved
+  Agent Mode prototype is outside migration scope and requires a separate debug
+  opt-in; it is unavailable in release builds.
 - Native agent control has an authenticated loopback API, exact-instance
   discovery, a Node helper and tab/layout/preset/input routes in source. It is
   Pro-gated; release builds stay locked until entitlement integration exists.
   The `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1` override works only in debug
-  builds. The HTTP/PTY flow and Agent Inst. clipboard handoff have not been
-  runtime-tested.
+  builds. The isolated Windows HTTP/PTY and installed Node CLI matrix passes;
+  direct Agent Inst. clipboard handoff and cross-platform runtime review remain
+  open.
 - Desktop Settings can preview and import an original-app profile as a new native
   snapshot. There is no general profile switcher. Selected keys for imported
   providers can transfer to the OS credential store; other legacy keys are not

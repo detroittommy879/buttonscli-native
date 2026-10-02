@@ -2,6 +2,7 @@
 param(
     [switch]$SkipBuild,
     [switch]$WithMcpSdk,
+    [switch]$WithLoadProbe,
     [ValidateRange(10, 120)]
     [int]$StartupTimeoutSeconds = 30
 )
@@ -17,6 +18,7 @@ $controlDir = Join-Path $smokeHome '.buttonscli-native\control'
 $process = $null
 $ownedShellIds = @()
 $cleanupFailure = $null
+$smokeError = $null
 
 New-Item -ItemType Directory -Path $roaming, $local | Out-Null
 
@@ -76,7 +78,7 @@ function Invoke-NativeCli {
 }
 
 function Wait-ControlTabReady {
-    param([Parameter(Mandatory)][string]$TabId)
+    param([Parameter(Mandatory)][string]$TabId, [switch]$ShellPrompt)
 
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -90,7 +92,10 @@ function Wait-ControlTabReady {
             throw "Test PTY $TabId exited before becoming ready."
         }
         if ($tab.ready) {
-            return $tab
+            if (-not $ShellPrompt) { return $tab }
+            # A live PTY is not proof that PowerShell is ready for input.
+            $prompt = Invoke-ControlApi -Method GET -Path "/v1/tabs/$TabId/read?chars=4096"
+            if ($prompt.text -match 'PS [^\r\n]*>') { return $tab }
         }
         Start-Sleep -Milliseconds 100
     }
@@ -121,6 +126,11 @@ try {
     $startInfo.FileName = $binaryPath
     $startInfo.WorkingDirectory = $smokeHome
     $startInfo.UseShellExecute = $false
+    foreach ($argument in @('--tabs', '3', '--shell', $shellCommand, '--cwd', $smokeHome,
+        '--command', '1', "Add-Content -LiteralPath startup-one.txt -Value 'startup-one'",
+        '--command', '3', "Add-Content -LiteralPath startup-three.txt -Value 'startup-three'")) {
+        $startInfo.ArgumentList.Add($argument)
+    }
     $startInfo.Environment['USERPROFILE'] = $smokeHome
     $startInfo.Environment['HOME'] = $smokeHome
     $startInfo.Environment['APPDATA'] = $roaming
@@ -168,6 +178,22 @@ try {
         throw 'Installed Node CLI did not connect to the selected test instance.'
     }
     $null = Invoke-NativeCli -Arguments @('tabs', '--json')
+    $startupDeadline = [DateTime]::UtcNow.AddSeconds(35)
+    while ([DateTime]::UtcNow -lt $startupDeadline -and
+        (-not (Test-Path -LiteralPath (Join-Path $smokeHome 'startup-one.txt')) -or
+         -not (Test-Path -LiteralPath (Join-Path $smokeHome 'startup-three.txt')))) {
+        Start-Sleep -Milliseconds 200
+    }
+    $startupTabs = (Invoke-ControlApi -Method GET -Path '/v1/tabs').tabs
+    if ($startupTabs.Count -ne 3) { throw 'Startup did not create exactly three tabs.' }
+    if ($startupTabs[1].lastInput) { throw 'Startup sent input to the tab without a command.' }
+    foreach ($suffix in @('one', 'three')) {
+        $startupFile = Join-Path $smokeHome "startup-$suffix.txt"
+        if ((Get-Content -LiteralPath $startupFile -Raw).Trim() -ne "startup-$suffix") {
+            throw "Startup command $suffix did not run exactly once in its requested working directory."
+        }
+    }
+    Write-Output 'Startup created three tabs and ran each of two targeted commands once; the middle tab received no input.'
     if ($WithMcpSdk) {
         $sdkSmokePath = Join-Path $PSScriptRoot 'test-mcp-sdk.mjs'
         $sdkSmokeOutput = & $script:nodePath $sdkSmokePath --descriptor $descriptorPath 2>&1
@@ -182,7 +208,7 @@ try {
         '--cwd', $smokeHome, '--json'
     )
     $visibleTabId = $visible.tab.tabId
-    Wait-ControlTabReady $visibleTabId | Out-Null
+    Wait-ControlTabReady $visibleTabId -ShellPrompt | Out-Null
     $renamed = Invoke-NativeCli -Arguments @(
         'rename-tab', '--tab', $visibleTabId, '--name', 'Control Live Visible Renamed', '--json'
     )
@@ -190,7 +216,7 @@ try {
         throw 'Installed Node CLI did not rename the test tab.'
     }
 
-    $visibleMarker = "BUTTONSCLI_VISIBLE_$([guid]::NewGuid().ToString('N'))"
+    $visibleMarker = "VISIBLE_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $visibleRun = Invoke-NativeCli -Arguments @(
         'run', '--tab', $visibleTabId, '--text', "Write-Output '$visibleMarker'",
         '--wait-for-text', $visibleMarker, '--chars', '8192', '--timeout-ms', '12000',
@@ -220,13 +246,13 @@ try {
     }
     $hidden = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body $hiddenBody
     $hiddenTabId = $hidden.tab.tabId
-    Wait-ControlTabReady $hiddenTabId | Out-Null
+    Wait-ControlTabReady $hiddenTabId -ShellPrompt | Out-Null
     $state = Invoke-ControlApi -Method GET -Path '/v1/tabs'
     $visibleState = $state.tabs | Where-Object { $_.tabId -eq $visibleTabId } | Select-Object -First 1
     if ($null -eq $visibleState -or $visibleState.isActive) {
         throw 'Creating a second tab did not move the first test PTY into the background.'
     }
-    $hiddenMarker = "BUTTONSCLI_HIDDEN_$([guid]::NewGuid().ToString('N'))"
+    $hiddenMarker = "HIDDEN_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $hiddenRun = Invoke-NativeCli -Arguments @(
         'run', '--tab', $visibleTabId, '--text', "Write-Output '$hiddenMarker'",
         '--wait-for-text', $hiddenMarker, '--chars', '8192', '--timeout-ms', '12000',
@@ -238,7 +264,7 @@ try {
     }
     $null = Invoke-NativeCli -Arguments @('presets', '--json')
 
-    $base64Marker = "BUTTONSCLI_BASE64_$([guid]::NewGuid().ToString('N'))"
+    $base64Marker = "BASE64_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $base64Command = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("Write-Output '$base64Marker'"))
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--base64', $base64Command, '--enter', '--json'
@@ -248,7 +274,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $fileMarker = "BUTTONSCLI_FILE_$([guid]::NewGuid().ToString('N'))"
+    $fileMarker = "FILE_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $payloadFile = Join-Path $smokeHome 'cli-payload.txt'
     [System.IO.File]::WriteAllText(
         $payloadFile,
@@ -263,7 +289,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $stdinMarker = "BUTTONSCLI_STDIN_$([guid]::NewGuid().ToString('N'))"
+    $stdinMarker = "STDIN_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $stdinCommand = "Write-Output '$stdinMarker'"
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--stdin', '--enter', '--json'
@@ -273,7 +299,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $pacedMarker = "BUTTONSCLI_PACED_$([guid]::NewGuid().ToString('N'))"
+    $pacedMarker = "PACED_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--delivery', 'slow-typed', '--delay-ms', '1',
         '--text', "Write-Output '$pacedMarker'", '--enter', '--json'
@@ -362,6 +388,82 @@ try {
         Remove-Job -Job $slowJob -Force -ErrorAction SilentlyContinue
     }
 
+    if ($WithLoadProbe) {
+        foreach ($paneCount in @(1, 4, 10)) {
+            # Keep emitted lines below even a narrow pane's physical width.
+            # The compatibility output stream contains raw ConPTY wrap/redraw VT.
+            $loadTag = "L$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+            if ($paneCount -eq 1) {
+                $created = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body @{
+                    name = "Load $paneCount"; shell = $shellCommand; cwd = $smokeHome
+                }
+                $loadTabs = @($created.tab)
+            }
+            else {
+                $created = Invoke-ControlApi -Method POST -Path '/v1/layout/open' -Body @{
+                    layout = 'grid'; columns = [int][Math]::Ceiling([Math]::Sqrt($paneCount))
+                    names = @(1..$paneCount | ForEach-Object { "Load $paneCount pane $_" })
+                    shell = $shellCommand; cwd = $smokeHome
+                }
+                $loadTabs = @($created.tabs)
+            }
+            if ($loadTabs.Count -ne $paneCount) { throw "Load probe did not open $paneCount terminals." }
+            $baselines = @{}
+            $markers = @{}
+            foreach ($loadTab in $loadTabs) {
+                $ready = Wait-ControlTabReady $loadTab.tabId -ShellPrompt
+                $baselines[$loadTab.tabId] = $ready.outputSequence
+                $markers[$loadTab.tabId] = "${loadTag}_$($loadTab.ptyId)"
+            }
+            $watch = [Diagnostics.Stopwatch]::StartNew()
+            foreach ($loadTab in $loadTabs) {
+                # The complete DONE marker never appears in echoed command text.
+                $command = 'for ($i=1; $i -le 200; $i++) {{ Write-Output (''{0}:雪:'' + $i); Start-Sleep -Milliseconds 10 }}; Write-Output (''{0}'' + '':DONE'')' -f $markers[$loadTab.tabId]
+                $null = Invoke-ControlApi -Method POST -Path "/v1/tabs/$($loadTab.tabId)/send" -Body @{
+                    text = $command; enter = $true
+                }
+            }
+            $remaining = @($loadTabs)
+            while ($remaining.Count -gt 0 -and $watch.Elapsed.TotalSeconds -lt 45) {
+                $unfinished = @()
+                foreach ($loadTab in $remaining) {
+                    $read = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=20000"
+                    $marker = $markers[$loadTab.tabId]
+                    if (-not $read.text.Contains("${marker}:DONE")) {
+                        $unfinished += $loadTab
+                        continue
+                    }
+                    for ($line = 1; $line -le 200; $line++) {
+                        if (-not $read.text.Contains("${marker}:雪:$line`r`n")) {
+                            throw "Load probe lost Unicode output line $line on $($loadTab.tabId)."
+                        }
+                    }
+                    foreach ($otherMarker in $markers.Values) {
+                        if ($otherMarker -ne $marker -and $read.text.Contains($otherMarker)) {
+                            throw "Load output crossed into $($loadTab.tabId)."
+                        }
+                    }
+                    if ($read.tab.ptyId -ne $loadTab.ptyId -or $read.tab.exited -or
+                        $read.tab.outputSequence -le $baselines[$loadTab.tabId]) {
+                        throw "Load probe changed or lost the live PTY $($loadTab.tabId)."
+                    }
+                }
+                $remaining = @($unfinished)
+                if ($remaining.Count -gt 0) { Start-Sleep -Milliseconds 100 }
+            }
+            if ($remaining.Count -gt 0) {
+                foreach ($loadTab in $remaining) {
+                    $diagnostic = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=20000"
+                    # Only synthetic output from this test-owned profile is saved.
+                    $diagnostic | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $repoRoot "target/load-probe-$($loadTab.tabId).json") -Encoding utf8
+                    Write-Output "Load failure output for $($loadTab.tabId): $($diagnostic.text)"
+                }
+                throw "Load probe timed out with $($remaining.Count) unfinished terminals."
+            }
+            Write-Output "Load probe: $paneCount terminals, $($paneCount * 200) Unicode output lines verified in $($watch.ElapsedMilliseconds) ms."
+        }
+    }
+
     $ownedShellProcesses = @(
         Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" |
             Where-Object { $_.Name -in @('pwsh.exe', 'powershell.exe') }
@@ -376,6 +478,10 @@ try {
     Write-Output 'Paced delivery stopped with a clear error after its test PTY exited.'
     Write-Output 'Visible and background PTYs both captured unique output markers.'
     Write-Output "Background run completion: $($hiddenRun.completionReason); timed out: $($hiddenRun.timedOut)."
+}
+catch {
+    $smokeError = $_
+    throw
 }
 finally {
     if ($null -ne $process -and -not $process.HasExited) {
@@ -393,10 +499,16 @@ finally {
         $process.Dispose()
     }
     if ($ownedShellIds.Count -gt 0) {
-        Start-Sleep -Milliseconds 300
-        $remainingShells = @($ownedShellIds | Where-Object {
-            Get-Process -Id $_ -ErrorAction SilentlyContinue
-        })
+        # ConPTY exit is asynchronous; wait for the test-owned shells instead
+        # of declaring a leak after a fixed 300 ms pause.
+        $shellCleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        do {
+            $remainingShells = @($ownedShellIds | Where-Object {
+                Get-Process -Id $_ -ErrorAction SilentlyContinue
+            })
+            if ($remainingShells.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $shellCleanupDeadline)
         if ($remainingShells.Count -gt 0) {
             $cleanupFailure = "PTY child process cleanup failed for PID(s): $($remainingShells -join ', ')"
         }
@@ -407,11 +519,28 @@ finally {
     $withinTemp = $resolvedSmokeHome.StartsWith($resolvedTempRoot, [System.StringComparison]::OrdinalIgnoreCase)
     $expectedName = [System.IO.Path]::GetFileName($resolvedSmokeHome).StartsWith('buttonscli-native-control-live-', [System.StringComparison]::Ordinal)
     if ($withinTemp -and $expectedName -and (Test-Path -LiteralPath $resolvedSmokeHome)) {
-        Remove-Item -LiteralPath $resolvedSmokeHome -Recurse -Force
+        # Windows may retain the shell's directory handle briefly after exit.
+        $cleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        while (Test-Path -LiteralPath $resolvedSmokeHome) {
+            try {
+                Remove-Item -LiteralPath $resolvedSmokeHome -Recurse -Force
+                break
+            }
+            catch {
+                if ([DateTime]::UtcNow -ge $cleanupDeadline) {
+                    $cleanupFailure = "Could not remove test profile ${resolvedSmokeHome}: $($_.Exception.Message)"
+                    break
+                }
+                Start-Sleep -Milliseconds 100
+            }
+        }
     }
     elseif (Test-Path -LiteralPath $resolvedSmokeHome) {
         Write-Error "Refusing to remove unexpected smoke path: $resolvedSmokeHome"
     }
     Pop-Location
-    if ($cleanupFailure) { throw $cleanupFailure }
+    if ($cleanupFailure) {
+        if ($null -ne $smokeError) { Write-Warning $cleanupFailure }
+        else { throw $cleanupFailure }
+    }
 }

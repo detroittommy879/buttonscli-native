@@ -1,5 +1,5 @@
 use crate::assistant::provider::ProviderSettings;
-use crate::fonts::Typography;
+use crate::fonts::{FontZone, Typography};
 use crate::shortcuts::ShortcutSettings;
 use serde::{Deserialize, Serialize};
 
@@ -104,11 +104,14 @@ pub(crate) struct Preferences {
     pub(crate) gradient_theme_id: String,
     pub(crate) effects_theme_id: String,
     pub(crate) theme_apply: ThemeApplyScopes,
+    pub(crate) favorite_theme_ids: Vec<String>,
+    pub(crate) pane_hover_label: PaneHoverLabel,
     pub(crate) calm_mode: bool,
     pub(crate) effects_focused_pane_only: bool,
     pub(crate) typography: Typography,
     pub(crate) show_sidebar: bool,
     pub(crate) show_presets: bool,
+    pub(crate) show_action_buttons: bool,
     pub(crate) dock_width: f32,
     pub(crate) dock_compact: bool,
     pub(crate) dock_auto_hide: bool,
@@ -139,11 +142,14 @@ impl Default for Preferences {
             gradient_theme_id: String::new(),
             effects_theme_id: String::new(),
             theme_apply: ThemeApplyScopes::default(),
+            favorite_theme_ids: Vec::new(),
+            pane_hover_label: PaneHoverLabel::default(),
             calm_mode: false,
             effects_focused_pane_only: false,
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
+            show_action_buttons: false,
             dock_width: 176.0,
             dock_compact: false,
             dock_auto_hide: false,
@@ -204,7 +210,23 @@ pub(crate) struct PaneDividerAppearance {
 }
 
 impl Preferences {
+    pub(crate) fn toggle_favorite_theme(&mut self, id: &str) {
+        if self
+            .favorite_theme_ids
+            .iter()
+            .any(|favorite| favorite == id)
+        {
+            self.favorite_theme_ids.retain(|favorite| favorite != id);
+        } else {
+            self.favorite_theme_ids.push(id.to_owned());
+        }
+    }
+
     pub(crate) fn normalize_theme_sources(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        self.favorite_theme_ids
+            .retain(|id| !id.is_empty() && seen.insert(id.clone()));
+        self.pane_hover_label.normalize();
         self.localization.manual_locale =
             crate::i18n::resolve_locale(&self.localization.manual_locale).to_owned();
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
@@ -239,6 +261,42 @@ impl Preferences {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
+pub(crate) struct PaneHoverLabel {
+    pub(crate) enabled: bool,
+    pub(crate) font: FontZone,
+    pub(crate) opacity: f32,
+}
+
+impl Default for PaneHoverLabel {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            font: FontZone {
+                size: 28.0,
+                ..Default::default()
+            },
+            opacity: 0.45,
+        }
+    }
+}
+
+impl PaneHoverLabel {
+    fn normalize(&mut self) {
+        self.font.size = if self.font.size.is_finite() {
+            self.font.size.clamp(8.0, 32.0)
+        } else {
+            28.0
+        };
+        self.opacity = if self.opacity.is_finite() {
+            self.opacity.clamp(0.0, 1.0)
+        } else {
+            0.45
+        };
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub(crate) struct ThemeApplyScopes {
     pub(crate) app: bool,
     pub(crate) terminal: bool,
@@ -262,6 +320,24 @@ impl Default for ThemeApplyScopes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn favorites_and_hover_preferences_survive_restart_and_normalize_old_data() {
+        let mut preferences: Preferences = serde_json::from_str(r#"{"favorite_theme_ids":["basic2","basic2","","missing-custom"],"pane_hover_label":{"opacity":4,"font":{"size":80}}}"#).unwrap();
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.favorite_theme_ids, ["basic2", "missing-custom"]);
+        assert_eq!(preferences.pane_hover_label.opacity, 1.0);
+        assert_eq!(preferences.pane_hover_label.font.size, 32.0);
+        preferences.toggle_favorite_theme("basic2");
+        preferences.toggle_favorite_theme("new-theme");
+        let restored: Preferences =
+            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
+        assert_eq!(restored.favorite_theme_ids, ["missing-custom", "new-theme"]);
+        assert_eq!(restored.pane_hover_label, preferences.pane_hover_label);
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(old.favorite_theme_ids.is_empty());
+        assert_eq!(old.pane_hover_label, PaneHoverLabel::default());
+    }
 
     #[test]
     fn decoded_preset_keeps_whitespace_until_editor_normalizes_it() {
@@ -307,6 +383,19 @@ mod tests {
             serde_json::from_str(r#"{"chrome_corner_radius":255}"#).unwrap();
         oversized.normalize_theme_sources();
         assert_eq!(oversized.chrome_corner_radius, 16);
+    }
+
+    #[test]
+    fn menu_button_preference_defaults_to_right_click_and_round_trips() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(!old.show_action_buttons);
+        let saved = Preferences {
+            show_action_buttons: true,
+            ..old
+        };
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert!(restored.show_action_buttons);
     }
 
     #[test]

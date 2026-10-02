@@ -2,8 +2,12 @@
 pub enum FeatureKey {
     PaneLayout,
     TabNaming,
+    StartupTabs,
     TabWrapping,
     ThemeSelection,
+    ThemeFavorites,
+    TerminalContextMenu,
+    PaneHoverLabel,
     TerminalScrollbar,
     PaneDivider,
     KeyboardShortcuts,
@@ -22,6 +26,7 @@ pub enum FeatureKey {
     WindowTransparency,
     ShaderLab,
     AiHelp,
+    AiAgent,
     AutomationRemoteControl,
     VibeCodeThemes,
     VibeCodeShaders,
@@ -33,11 +38,15 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 35] = [
         Self::PaneLayout,
         Self::TabNaming,
+        Self::StartupTabs,
         Self::TabWrapping,
         Self::ThemeSelection,
+        Self::ThemeFavorites,
+        Self::TerminalContextMenu,
+        Self::PaneHoverLabel,
         Self::TerminalScrollbar,
         Self::PaneDivider,
         Self::KeyboardShortcuts,
@@ -56,6 +65,7 @@ impl FeatureKey {
         Self::WindowTransparency,
         Self::ShaderLab,
         Self::AiHelp,
+        Self::AiAgent,
         Self::AutomationRemoteControl,
         Self::VibeCodeThemes,
         Self::VibeCodeShaders,
@@ -70,8 +80,12 @@ impl FeatureKey {
         match self {
             Self::PaneLayout => "paneLayout",
             Self::TabNaming => "tabNaming",
+            Self::StartupTabs => "startupTabs",
             Self::TabWrapping => "tabWrapping",
             Self::ThemeSelection => "themeSelection",
+            Self::ThemeFavorites => "themeFavorites",
+            Self::TerminalContextMenu => "terminalContextMenu",
+            Self::PaneHoverLabel => "paneHoverLabel",
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
             Self::KeyboardShortcuts => "keyboardShortcuts",
@@ -90,6 +104,7 @@ impl FeatureKey {
             Self::WindowTransparency => "windowTransparency",
             Self::ShaderLab => "shaderLab",
             Self::AiHelp => "aiHelp",
+            Self::AiAgent => "aiAgent",
             Self::AutomationRemoteControl => "automationRemoteControl",
             Self::VibeCodeThemes => "vibeCodeThemes",
             Self::VibeCodeShaders => "vibeCodeShaders",
@@ -112,14 +127,18 @@ impl FeatureKey {
             | K::TerminalScrollbar
             | K::PaneDivider => (T::Free, true, R::Active, "layout"),
             K::KeyboardShortcuts => (T::Free, true, R::Active, "shortcuts"),
-            K::TerminalSearch => (T::Free, true, R::Active, "terminal"),
-            K::WorkspaceControls => (T::Free, true, R::Active, "workspace"),
+            K::TerminalSearch | K::TerminalContextMenu | K::PaneHoverLabel => {
+                (T::Free, true, R::Active, "terminal")
+            }
+            K::WorkspaceControls | K::StartupTabs => (T::Free, true, R::Active, "workspace"),
             K::LocalizationSettings => (T::Free, true, R::Active, "localization"),
             K::ShellProfiles => (T::Free, true, R::Active, "terminal"),
             K::PersonalThemeEditor => (T::Free, true, R::Active, "themes"),
             K::CustomFonts => (T::Free, true, R::Active, "fonts"),
             K::CoolStuffInstallers => (T::Free, true, R::Active, "onboarding"),
-            K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
+            K::ThemeSelection | K::ThemeFavorites | K::CalmThemeApply => {
+                (T::Free, true, R::Active, "themes")
+            }
             K::SettingsAppearance | K::OriginalSettingsImport => {
                 (T::Free, true, R::Active, "settings")
             }
@@ -128,6 +147,7 @@ impl FeatureKey {
             K::WindowTransparency => (T::Free, true, R::Active, "appearance"),
             K::ShaderLab => (T::Free, false, R::Planned, "effects"),
             K::AiHelp => (T::Pro, false, R::Planned, "assistant"),
+            K::AiAgent => (T::Pro, false, R::Planned, "assistant"),
             K::AutomationRemoteControl => (T::Pro, false, R::Planned, "automation"),
             K::VibeCodeThemes => (T::Pro, false, R::Planned, "themes"),
             K::VibeCodeShaders => (T::Pro, false, R::Planned, "effects"),

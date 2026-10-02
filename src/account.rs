@@ -14,6 +14,9 @@ use crate::features::access::RuntimeAccess;
 
 const RUNTIME_CONFIG_URL: &str = "https://buttonscli.com/bcli-metrics/api/v1/runtime-config";
 const HTTP: ReqwestTransport = ReqwestTransport;
+// The native replacement service is not deployed. Never fall back to the old
+// metrics host until its replacement contract and rollout are reviewed.
+pub(crate) const LEGACY_METRICS_ENABLED: bool = false;
 static CONFIG_REFRESH_STARTED: AtomicBool = AtomicBool::new(false);
 static CACHED_RUNTIME_CONFIG: OnceLock<RwLock<RuntimeConfig>> = OnceLock::new();
 
@@ -47,7 +50,8 @@ pub(crate) fn current_runtime_config() -> RuntimeConfig {
 
 /// Fetch broad rollout flags without delaying GUI or terminal startup.
 pub(crate) fn refresh_runtime_config(context: egui::Context) {
-    if std::env::var("BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG").is_ok_and(|value| value == "1")
+    if !LEGACY_METRICS_ENABLED
+        || std::env::var("BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG").is_ok_and(|value| value == "1")
         || CONFIG_REFRESH_STARTED.swap(true, Ordering::AcqRel)
     {
         return;
@@ -71,6 +75,7 @@ pub(crate) fn refresh_runtime_config(context: egui::Context) {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RuntimeConfigError {
+    Disabled,
     Endpoint,
     Network,
     Http(u16),
@@ -81,6 +86,9 @@ pub(crate) enum RuntimeConfigError {
 impl std::fmt::Display for RuntimeConfigError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Disabled => {
+                formatter.write_str("hosted runtime config is disabled pending the native service")
+            }
             Self::Endpoint => formatter.write_str("runtime config endpoint is invalid"),
             Self::Network => formatter.write_str("could not reach ButtonsCLI runtime config"),
             Self::Http(status) => write!(formatter, "runtime config returned HTTP {status}"),
@@ -97,6 +105,9 @@ pub(crate) struct RuntimeConfigClient<'a> {
 
 impl RuntimeConfigClient<'static> {
     pub(crate) fn production() -> Result<Self, RuntimeConfigError> {
+        if !LEGACY_METRICS_ENABLED {
+            return Err(RuntimeConfigError::Disabled);
+        }
         Self::new(RUNTIME_CONFIG_URL, &HTTP)
     }
 }
@@ -215,6 +226,14 @@ mod tests {
 
     fn client<'a>(transport: &'a dyn HttpTransport) -> RuntimeConfigClient<'a> {
         RuntimeConfigClient::new("http://127.0.0.1:38173/api/v1/runtime-config", transport).unwrap()
+    }
+
+    #[test]
+    fn old_metrics_runtime_config_is_disabled_before_constructing_a_client() {
+        assert!(matches!(
+            RuntimeConfigClient::production(),
+            Err(RuntimeConfigError::Disabled)
+        ));
     }
 
     #[test]

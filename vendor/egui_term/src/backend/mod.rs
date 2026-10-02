@@ -178,6 +178,8 @@ pub struct TerminalBackend {
     term: Arc<FairMutex<Term<EventProxy>>>,
     size: TerminalSize,
     notifier: Notifier,
+    #[cfg(windows)]
+    child_process_id: Option<std::num::NonZeroU32>,
     last_content: RenderableContent,
     input_observer: Option<ByteObserver>,
     search_dirty: Arc<AtomicBool>,
@@ -220,6 +222,8 @@ impl TerminalBackend {
         let config = term::Config::default();
         let terminal_size = TerminalSize::default();
         let pty = tty::new(&pty_config, terminal_size.into(), id)?;
+        #[cfg(windows)]
+        let child_process_id = pty.child_watcher().pid();
         let search_dirty = Arc::new(AtomicBool::new(true));
         let output_observer = {
             let search_dirty = Arc::clone(&search_dirty);
@@ -277,6 +281,8 @@ impl TerminalBackend {
             term: term.clone(),
             size: terminal_size,
             notifier,
+            #[cfg(windows)]
+            child_process_id,
             last_content: initial_content,
             input_observer,
             search_dirty,
@@ -938,6 +944,14 @@ impl Default for RenderableContent {
 impl Drop for TerminalBackend {
     fn drop(&mut self) {
         let _ = self.notifier.0.send(Msg::Shutdown);
+    }
+}
+
+#[cfg(windows)]
+impl TerminalBackend {
+    /// Identity of the shell launched by this backend, for bounded lifecycle checks.
+    pub fn child_process_id(&self) -> Option<std::num::NonZeroU32> {
+        self.child_process_id
     }
 }
 

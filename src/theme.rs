@@ -212,6 +212,7 @@ impl ThemeCatalog {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
     let valid_metadata = |key: &str| {
         document["metadata"][key]
@@ -282,6 +283,9 @@ pub struct TerminalEffects {
     pub master_disabled: bool,
     pub static_opacity: f32,
     pub static_density: f32,
+    pub static_intensity: f32,
+    pub static_amplitude: f32,
+    pub static_brightness: f32,
     pub scanlines_strength: f32,
     pub scanlines_period: f32,
     pub row_banding_enabled: bool,
@@ -308,6 +312,9 @@ impl Default for TerminalEffects {
             master_disabled: false,
             static_opacity: 0.0,
             static_density: 0.2,
+            static_intensity: 0.5,
+            static_amplitude: 0.5,
+            static_brightness: 0.42,
             scanlines_strength: 0.0,
             scanlines_period: 4.0,
             row_banding_enabled: false,
@@ -661,6 +668,9 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
             0.0
         },
         static_density: unit("staticDensity", 0.2).clamp(0.02, 1.0),
+        static_intensity: percent("staticIntensity", 50.0).clamp(0.0, 1.0),
+        static_amplitude: percent("staticAmplitude", 50.0).clamp(0.0, 1.0),
+        static_brightness: percent("staticBrightness", 42.0).clamp(0.0, 1.0),
         scanlines_strength: if enabled("scanlinesEnabled") {
             unit("scanlinesStrength", 0.08).clamp(0.0, 0.35)
         } else {

@@ -17,6 +17,7 @@ pub struct TerminalTab {
     pub profile_id: String,
     pub backend: TerminalBackend,
     pub(crate) output: Arc<OutputCapture>,
+    pub(crate) effect_textures: crate::plugins::effects::simple_noise::NoiseTextures,
     pub exited: bool,
 }
 
@@ -130,6 +131,7 @@ impl TerminalTab {
             profile_id: launch.profile_id,
             backend,
             output,
+            effect_textures: Default::default(),
             exited: false,
         })
     }
@@ -223,7 +225,7 @@ pub fn detected_shells() -> Vec<DetectedShell> {
     }
 
     let mut seen = HashSet::new();
-    let mut shells: Vec<_> = commands
+    let shells: Vec<_> = commands
         .into_iter()
         .filter(|command| seen.insert(shell_command_key(command)))
         .map(|command| DetectedShell {
@@ -237,7 +239,11 @@ pub fn detected_shells() -> Vec<DetectedShell> {
         .collect();
 
     #[cfg(windows)]
-    shells.extend(wsl_distribution_shells(wsl_distributions));
+    let shells = {
+        let mut shells = shells;
+        shells.extend(wsl_distribution_shells(wsl_distributions));
+        shells
+    };
 
     shells
 }
@@ -249,7 +255,7 @@ fn shell_command_key(command: &str) -> String {
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or(command);
-        return file_name.to_ascii_lowercase();
+        file_name.to_ascii_lowercase()
     }
     #[cfg(not(windows))]
     {
@@ -257,6 +263,7 @@ fn shell_command_key(command: &str) -> String {
     }
 }
 
+#[cfg(windows)]
 fn detected_shell_id(command: &str, args: &[String]) -> String {
     if args.is_empty() {
         format!("detected:{command}")
@@ -301,6 +308,7 @@ fn detect_wsl_distributions() -> Vec<String> {
     parse_wsl_distribution_output(&output.stdout)
 }
 
+#[cfg(any(windows, test))]
 fn parse_wsl_distribution_output(bytes: &[u8]) -> Vec<String> {
     let decoded = decode_wsl_output(bytes);
     let mut seen = HashSet::new();
@@ -318,13 +326,14 @@ fn parse_wsl_distribution_output(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
+#[cfg(any(windows, test))]
 fn decode_wsl_output(bytes: &[u8]) -> String {
     let (encoding, payload) = if bytes.starts_with(&[0xff, 0xfe]) {
         (Some(false), &bytes[2..])
     } else if bytes.starts_with(&[0xfe, 0xff]) {
         (Some(true), &bytes[2..])
     } else if bytes.len() >= 4
-        && bytes.len().is_multiple_of(2)
+        && bytes.len() % 2 == 0
         && bytes
             .iter()
             .skip(1)
@@ -365,12 +374,11 @@ fn executable_on_path(command: &str) -> bool {
 #[cfg(windows)]
 fn executable_path_on_path(command: &str) -> Option<PathBuf> {
     std::env::var_os("PATH")
-        .map(|paths| {
+        .and_then(|paths| {
             std::env::split_paths(&paths)
                 .map(|directory| directory.join(command))
                 .find(|candidate| candidate.is_file())
         })
-        .flatten()
         .or_else(|| {
             std::env::var_os("SystemRoot")
                 .map(PathBuf::from)
@@ -493,11 +501,117 @@ fn default_shell() -> (String, Vec<String>) {
     )
 }
 
+#[cfg(windows)]
+fn default_shell() -> (String, Vec<String>) {
+    // Starter presets use PowerShell syntax. Prefer the modern installation,
+    // then Windows' bundled version; explicitly selected cmd profiles still
+    // launch cmd through ShellLaunch::from_command_line.
+    if executable_on_path("pwsh.exe") {
+        return ("pwsh.exe".into(), Vec::new());
+    }
+    if let Some(root) = std::env::var_os("SystemRoot") {
+        let powershell = PathBuf::from(root).join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        if powershell.is_file() {
+            return (powershell.to_string_lossy().into_owned(), Vec::new());
+        }
+    }
+    (
+        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()),
+        Vec::new(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "launches test-owned ConPTY shells and a descendant; run explicitly on Windows"]
+    fn rapid_close_terminates_owned_shell_and_busy_descendant() {
+        use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+        use std::time::{Duration, Instant};
+        use windows_sys::Win32::Foundation::{HANDLE, WAIT_OBJECT_0};
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_TERMINATE,
+        };
+
+        struct OwnedProcess(OwnedHandle);
+        impl OwnedProcess {
+            fn open(pid: u32) -> Self {
+                let handle = unsafe { OpenProcess(0x0010_0000 | PROCESS_TERMINATE, 0, pid) };
+                assert!(
+                    !handle.is_null(),
+                    "could not track test-owned process {pid}"
+                );
+                Self(unsafe { OwnedHandle::from_raw_handle(handle) })
+            }
+            fn exited(&self, timeout: u32) -> bool {
+                unsafe {
+                    WaitForSingleObject(self.0.as_raw_handle() as HANDLE, timeout) == WAIT_OBJECT_0
+                }
+            }
+        }
+        impl Drop for OwnedProcess {
+            fn drop(&mut self) {
+                if !self.exited(0) {
+                    unsafe {
+                        TerminateProcess(self.0.as_raw_handle() as HANDLE, 1);
+                    }
+                }
+            }
+        }
+        let ctx = egui::Context::default();
+        for id in 100..108 {
+            let (tx, _rx) = std::sync::mpsc::channel();
+            let tab = super::TerminalTab::spawn(
+                id,
+                "rapid-close-test".into(),
+                ctx.clone(),
+                tx,
+                super::ShellLaunch::from_command_line("test", "cmd.exe /Q /K", None).unwrap(),
+            )
+            .unwrap();
+            let child = OwnedProcess::open(tab.backend.child_process_id().unwrap().get());
+            drop(tab); // Deliberately no `exit` input or shell-prompt wait.
+            assert!(
+                child.exited(5_000),
+                "rapidly closed shell survived PTY teardown"
+            );
+        }
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let tab = super::TerminalTab::spawn(200, "busy-close-test".into(), ctx, tx,
+            super::ShellLaunch::from_command_line("test", r#"powershell.exe -NoLogo -NoProfile -Command "$child = Start-Process cmd.exe -ArgumentList '/Q /K' -PassThru -WindowStyle Hidden; Write-Output ('CHILD:' + $child.Id); Start-Sleep -Seconds 30""#, None).unwrap()).unwrap();
+        let shell = OwnedProcess::open(tab.backend.child_process_id().unwrap().get());
+        let deadline = Instant::now() + Duration::from_secs(15);
+        let descendant_id = loop {
+            let output = tab.output.read_chars(4096, false);
+            if let Some(pid) = output.split("CHILD:").skip(1).find_map(|part| {
+                part.chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .ok()
+            }) {
+                break pid;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "busy shell did not announce its test-owned descendant"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let descendant = OwnedProcess::open(descendant_id);
+        drop(tab);
+        assert!(shell.exited(5_000), "busy shell survived PTY teardown");
+        assert!(
+            descendant.exited(5_000),
+            "shell descendant survived PTY teardown"
+        );
+    }
+    #[cfg(windows)]
+    use super::detected_shell_id;
     use super::{
-        detected_shell_id, detected_shells, next_available_title, parse_wsl_distribution_output,
-        shell_title, split_command_line,
+        detected_shells, next_available_title, parse_wsl_distribution_output, shell_title,
+        split_command_line,
     };
 
     #[test]
@@ -589,12 +703,4 @@ mod tests {
             detected_shell_id("wsl.exe", &["--distribution".into(), "Ubuntu Work".into()])
         );
     }
-}
-
-#[cfg(windows)]
-fn default_shell() -> (String, Vec<String>) {
-    (
-        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".into()),
-        Vec::new(),
-    )
 }

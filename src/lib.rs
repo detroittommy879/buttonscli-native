@@ -5,6 +5,8 @@ mod account_api;
 pub mod app;
 mod assistant;
 #[cfg(not(target_arch = "wasm32"))]
+mod autotile;
+#[cfg(not(target_arch = "wasm32"))]
 mod control;
 #[cfg(not(target_arch = "wasm32"))]
 mod cool_stuff;
@@ -13,6 +15,7 @@ mod display;
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]
 mod distribution;
+#[cfg(not(target_arch = "wasm32"))]
 mod dock;
 pub mod features;
 #[cfg(not(target_arch = "wasm32"))]
@@ -31,6 +34,8 @@ mod secret_vault;
 mod session;
 mod settings;
 mod shortcuts;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod startup;
 pub mod theme;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;

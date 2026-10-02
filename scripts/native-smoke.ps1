@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
+    [switch]$WithThemeControls,
+    [switch]$WithAbruptExit,
     [string]$CapturePath,
     [ValidateRange(5, 120)]
     [int]$StartupTimeoutSeconds = 30
@@ -14,8 +16,23 @@ $appData = Join-Path $smokeHome 'AppData'
 $roaming = Join-Path $appData 'Roaming'
 $local = Join-Path $appData 'Local'
 $process = $null
+$trackedShells = @()
 
 New-Item -ItemType Directory -Path $roaming, $local -Force | Out-Null
+
+if ($WithThemeControls) {
+    # Seed only the test-owned profile; leave the user's settings untouched.
+    $fixtureProfile = Join-Path $smokeHome '.buttonscli-native\profiles\default'
+    New-Item -ItemType Directory -Path $fixtureProfile -Force | Out-Null
+    @{
+        schema_version = 1
+        revision = 1
+        preferences = @{
+            localization = @{ mode = 'manual'; manual_locale = 'en'; first_run_language_confirmed = $true }
+            favorite_theme_ids = @('basic2')
+        }
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $fixtureProfile 'native.json') -Encoding utf8NoBOM
+}
 
 Push-Location $repoRoot
 try {
@@ -137,8 +154,13 @@ public static class ButtonsCliSmokeWindow {
     Start-Sleep -Seconds 2
 
     if (-not [string]::IsNullOrWhiteSpace($CapturePath)) {
-        $appsnap = Get-Command appsnap.exe -ErrorAction Stop
-        & $appsnap.Source -o $CapturePath $smokeWindowTitle
+        $appsnap = Get-Command appsnap.exe -ErrorAction SilentlyContinue
+        if ($null -ne $appsnap) {
+            & $appsnap.Source -o $CapturePath $smokeWindowTitle
+        } else {
+            $uvx = Get-Command uvx -ErrorAction Stop
+            & $uvx.Source appsnap -o $CapturePath $smokeWindowTitle
+        }
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $CapturePath -PathType Leaf)) {
             throw "appsnap could not capture the test-owned native window"
         }
@@ -156,8 +178,30 @@ public static class ButtonsCliSmokeWindow {
     Write-Output "Window bounds: ${windowWidth}x${windowHeight}px"
     Write-Output "Unique smoke window title: $smokeWindowTitle"
     Write-Output "Isolated native data root: $smokeHome\.buttonscli-native"
+    if ($WithAbruptExit) {
+        $trackedShells = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" |
+            Where-Object { $_.Name -in @('cmd.exe', 'powershell.exe', 'pwsh.exe') } |
+            ForEach-Object { [System.Diagnostics.Process]::GetProcessById([int]$_.ProcessId) })
+        if ($trackedShells.Count -eq 0) {
+            throw 'No test-owned shell was found for abrupt-exit verification.'
+        }
+        # Hold handles before exit, so PID reuse cannot retarget this check.
+        foreach ($shell in $trackedShells) { $null = $shell.Handle }
+        $process.Kill($false) # Only the host: jobs must clean up the shells.
+        $process.WaitForExit()
+        foreach ($shell in $trackedShells) {
+            if (-not $shell.WaitForExit(5000)) {
+                throw "Test-owned shell survived abrupt host exit: $($shell.Id)"
+            }
+        }
+        Write-Output "Abrupt host exit cleaned up $($trackedShells.Count) test-owned shell(s)."
+    }
 }
 finally {
+    foreach ($shell in $trackedShells) {
+        if (-not $shell.HasExited) { $shell.Kill($true); $shell.WaitForExit() }
+        $shell.Dispose()
+    }
     if ($null -ne $process -and -not $process.HasExited) {
         if (-not $process.CloseMainWindow() -or -not $process.WaitForExit(5000)) {
             $process.Kill($true)

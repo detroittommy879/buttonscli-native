@@ -240,11 +240,11 @@ pub(crate) fn verify_and_stage_package(
     signature_bytes: &[u8],
     trusted_keys: &[TrustedSigningKey],
     expected_target: ReleaseTarget<'_>,
-    installed_version: &str,
-    updater_version: &str,
+    versions: (&str, &str),
     artifact: &[u8],
     staging_root: &Path,
 ) -> Result<PathBuf, VerifyError> {
+    let (installed_version, updater_version) = versions;
     let manifest = verify_signed_package(
         manifest_bytes,
         signature_bytes,
@@ -1380,8 +1380,7 @@ mod tests {
             &signature,
             &[trusted_key(&key)],
             TARGET,
-            "1.2.2",
-            "1.0.0",
+            ("1.2.2", "1.0.0"),
             &artifact,
             &root,
         )
@@ -1407,8 +1406,7 @@ mod tests {
                 &signature,
                 &[trusted_key(&key)],
                 TARGET,
-                "1.2.2",
-                "1.0.0",
+                ("1.2.2", "1.0.0"),
                 &artifact,
                 &root,
             ),
@@ -1436,8 +1434,7 @@ mod tests {
                 &signature,
                 &[trusted_key(&key)],
                 TARGET,
-                "1.2.2",
-                "1.0.0",
+                ("1.2.2", "1.0.0"),
                 &artifact,
                 &root,
             ),

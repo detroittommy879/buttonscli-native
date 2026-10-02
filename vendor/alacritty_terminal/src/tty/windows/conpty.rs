@@ -3,20 +3,25 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io::{Error, Result};
 use std::os::windows::ffi::OsStrExt;
-use std::os::windows::io::IntoRawHandle;
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::{mem, ptr};
 
-use windows_sys::Win32::Foundation::{HANDLE, S_OK};
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, S_OK};
 use windows_sys::Win32::System::Console::{
     COORD, ClosePseudoConsole, CreatePseudoConsole, HPCON, ResizePseudoConsole,
+};
+use windows_sys::Win32::System::JobObjects::{
+    CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JobObjectExtendedLimitInformation, SetInformationJobObject,
 };
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows_sys::core::{HRESULT, PWSTR};
 use windows_sys::{s, w};
 
 use windows_sys::Win32::System::Threading::{
-    CREATE_UNICODE_ENVIRONMENT, CreateProcessW, EXTENDED_STARTUPINFO_PRESENT,
-    InitializeProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION,
+    CREATE_UNICODE_ENVIRONMENT, CreateProcessW, DeleteProcThreadAttributeList,
+    EXTENDED_STARTUPINFO_PRESENT, InitializeProcThreadAttributeList,
+    PROC_THREAD_ATTRIBUTE_JOB_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION,
     STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, UpdateProcThreadAttribute,
 };
 
@@ -92,10 +97,14 @@ impl ConptyApi {
 pub struct Conpty {
     pub handle: HPCON,
     api: ConptyApi,
+    job: Option<OwnedHandle>,
 }
 
 impl Drop for Conpty {
     fn drop(&mut self) {
+        // Kill only this pane's process tree before draining/closing ConPTY.
+        // The OS also closes this handle if the host exits unexpectedly.
+        drop(self.job.take());
         // XXX: This will block until the conout pipe is drained. Will cause a deadlock if the
         // conout pipe has already been dropped by this point.
         //
@@ -109,6 +118,7 @@ unsafe impl Send for Conpty {}
 
 pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
     let api = ConptyApi::new();
+    let job = terminal_job()?;
     let mut pty_handle: HPCON = 0;
 
     // Passing 0 as the size parameter allows the "system default" buffer
@@ -122,14 +132,25 @@ pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
     let result = unsafe {
         (api.create)(
             window_size.into(),
-            conin_pty_handle.into_raw_handle() as HANDLE,
-            conout_pty_handle.into_raw_handle() as HANDLE,
+            conin_pty_handle.as_raw_handle() as HANDLE,
+            conout_pty_handle.as_raw_handle() as HANDLE,
             0,
             &mut pty_handle as *mut _,
         )
     };
 
-    assert_eq!(result, S_OK);
+    if result != S_OK {
+        return Err(Error::other(format!(
+            "CreatePseudoConsole failed (HRESULT {result:#x})"
+        )));
+    }
+
+    // Own the console immediately so subsequent launch errors clean it up.
+    let conpty = Conpty {
+        handle: pty_handle,
+        api,
+        job: Some(job),
+    };
 
     let mut success;
 
@@ -150,7 +171,7 @@ pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
     // Create the appropriately sized thread attribute list.
     unsafe {
         let failure =
-            InitializeProcThreadAttributeList(ptr::null_mut(), 1, 0, &mut size as *mut usize) > 0;
+            InitializeProcThreadAttributeList(ptr::null_mut(), 2, 0, &mut size as *mut usize) > 0;
 
         // This call was expected to return false.
         if failure {
@@ -174,13 +195,33 @@ pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
     unsafe {
         success = InitializeProcThreadAttributeList(
             startup_info_ex.lpAttributeList,
-            1,
+            2,
             0,
             &mut size as *mut usize,
         ) > 0;
 
         if !success {
             return Err(Error::last_os_error());
+        }
+    }
+
+    // Assignment is atomic with process creation, before shell code can spawn
+    // descendants. No suspended process can be orphaned between two calls.
+    let job_handle = conpty.job.as_ref().unwrap().as_raw_handle() as HANDLE;
+    unsafe {
+        if UpdateProcThreadAttribute(
+            startup_info_ex.lpAttributeList,
+            0,
+            PROC_THREAD_ATTRIBUTE_JOB_LIST as usize,
+            &job_handle as *const HANDLE as *mut std::ffi::c_void,
+            mem::size_of::<HANDLE>(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        ) == 0
+        {
+            let error = Error::last_os_error();
+            DeleteProcThreadAttributeList(startup_info_ex.lpAttributeList);
+            return Err(error);
         }
     }
 
@@ -197,7 +238,9 @@ pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
         ) > 0;
 
         if !success {
-            return Err(Error::last_os_error());
+            let error = Error::last_os_error();
+            DeleteProcThreadAttributeList(startup_info_ex.lpAttributeList);
+            return Err(error);
         }
     }
 
@@ -228,22 +271,57 @@ pub fn new(config: &Options, window_size: WindowSize) -> Result<Pty> {
             &mut startup_info_ex.StartupInfo as *mut STARTUPINFOW,
             &mut proc_info as *mut PROCESS_INFORMATION,
         ) > 0;
-
+        let error = Error::last_os_error();
+        DeleteProcThreadAttributeList(startup_info_ex.lpAttributeList);
         if !success {
-            return Err(Error::last_os_error());
+            return Err(error);
         }
+        CloseHandle(proc_info.hThread);
     }
+    // ConPTY owns its copies now. Release the host's redundant pipe ends so
+    // readers can detect EOF and repeated tab creation cannot leak handles.
+    drop(conin_pty_handle);
+    drop(conout_pty_handle);
 
     let conin = UnblockedWriter::new(conin, PIPE_CAPACITY);
     let conout = UnblockedReader::new(conout, PIPE_CAPACITY);
 
-    let child_watcher = ChildExitWatcher::new(proc_info.hProcess)?;
-    let conpty = Conpty {
-        handle: pty_handle as HPCON,
-        api,
+    let child_watcher = ChildExitWatcher::new(proc_info.hProcess);
+    unsafe {
+        CloseHandle(proc_info.hProcess);
+    }
+    let child_watcher = match child_watcher {
+        Ok(watcher) => watcher,
+        Err(error) => {
+            // Keep the draining reader alive until ClosePseudoConsole finishes.
+            drop(conpty);
+            return Err(error);
+        }
     };
 
     Ok(Pty::new(conpty, conout, conin, child_watcher))
+}
+
+fn terminal_job() -> Result<OwnedHandle> {
+    unsafe {
+        let raw = CreateJobObjectW(ptr::null(), ptr::null());
+        if raw.is_null() {
+            return Err(Error::last_os_error());
+        }
+        let job = OwnedHandle::from_raw_handle(raw);
+        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = mem::zeroed();
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if SetInformationJobObject(
+            raw,
+            JobObjectExtendedLimitInformation,
+            &limits as *const _ as *const std::ffi::c_void,
+            mem::size_of_val(&limits) as u32,
+        ) == 0
+        {
+            return Err(Error::last_os_error());
+        }
+        Ok(job)
+    }
 }
 
 // Windows environment variables are case-insensitive, and the caller is responsible for

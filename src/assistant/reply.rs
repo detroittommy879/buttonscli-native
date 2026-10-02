@@ -39,10 +39,7 @@ impl SseDecoder {
             return Err(ReplyError::EventTooLarge);
         }
         let mut output = Vec::new();
-        loop {
-            let Some((start, width)) = find_separator(&self.buffer) else {
-                break;
-            };
+        while let Some((start, width)) = find_separator(&self.buffer) {
             let event = self.buffer.drain(..start).collect::<Vec<_>>();
             self.buffer.drain(..width);
             output.extend(self.decode_event(&event)?);
@@ -231,6 +228,30 @@ struct StructuredReply {
     answer: Option<String>,
     commands: Option<ActionInput>,
     action: Option<ActionObject>,
+}
+
+/// Display only answer text while the response envelope is incomplete.
+/// Actions remain unavailable until the complete reply has been validated.
+pub(crate) fn streamed_answer(raw: &str) -> String {
+    let raw = raw.trim_start();
+    if raw.starts_with('<') {
+        let lower = raw.to_ascii_lowercase();
+        let Some(start) = lower.find("<answer>").map(|start| start + 8) else {
+            return String::new();
+        };
+        let tail = &raw[start..];
+        // Hold an incomplete closing tag rather than flashing it in the UI.
+        let end = tail.find('<').unwrap_or(tail.len());
+        return bounded(&tail[..end]);
+    }
+    if raw.starts_with('{') {
+        return serde_json::from_str::<StructuredReply>(raw)
+            .ok()
+            .and_then(|reply| reply.answer)
+            .map(|answer| bounded(&answer))
+            .unwrap_or_default();
+    }
+    bounded(raw)
 }
 
 /// Supports the original XML response contract and the equivalent JSON form.

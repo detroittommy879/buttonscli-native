@@ -1,9 +1,86 @@
-use egui::{Color32, Mesh, Pos2, Rect};
+use egui::{Color32, ColorImage, Rect};
 
 use crate::theme::TerminalEffects;
 
-const MAX_NOISE_CELLS: usize = 1_024;
-const MIN_NOISE_CELLS: usize = 128;
+const MAX_NOISE_DIMENSION: usize = 1_024;
+const MAX_NOISE_PIXELS: usize = 196_608;
+
+#[derive(Default)]
+pub(crate) struct NoiseTextures {
+    pub simple: Option<NoiseTexture>,
+    pub analog: Option<NoiseTexture>,
+}
+
+pub(crate) struct NoiseTexture {
+    handle: egui::TextureHandle,
+    key: [u64; 5],
+}
+
+pub(crate) struct NoiseFrame {
+    pub resolution: f32,
+    pub minimum: f32,
+    pub maximum: f32,
+    pub seed: u64,
+    pub opacity: f32,
+}
+
+pub(crate) fn paint_noise(
+    ui: &egui::Ui,
+    rect: Rect,
+    frame: NoiseFrame,
+    cache: &mut Option<NoiseTexture>,
+) {
+    let physical = Rect::from_min_size(egui::Pos2::ZERO, rect.size() * ui.ctx().pixels_per_point());
+    let resolution = if frame.resolution.is_finite() {
+        frame.resolution.clamp(0.08, 1.0)
+    } else {
+        0.5
+    };
+    let dimensions = bounded_noise_dimensions(
+        (physical.width() * resolution).round() as usize,
+        (physical.height() * resolution).round() as usize,
+    );
+    let key = [
+        dimensions[0] as u64,
+        dimensions[1] as u64,
+        frame.minimum.to_bits() as u64,
+        frame.maximum.to_bits() as u64,
+        frame.seed,
+    ];
+    if cache.as_ref().is_none_or(|cached| cached.key != key) {
+        // Opacity belongs to the draw call, so idle ramps do not upload a new
+        // image unless its pixels or dimensions actually change.
+        let image = noise_image(
+            physical,
+            resolution,
+            frame.minimum,
+            frame.maximum,
+            frame.seed,
+            1.0,
+        );
+        if let Some(cached) = cache {
+            cached.handle.set(image, egui::TextureOptions::NEAREST);
+            cached.key = key;
+        } else {
+            *cache = Some(NoiseTexture {
+                handle: ui.ctx().load_texture(
+                    "terminal noise",
+                    image,
+                    egui::TextureOptions::NEAREST,
+                ),
+                key,
+            });
+        }
+    }
+    if let Some(cached) = cache {
+        ui.painter().image(
+            cached.handle.id(),
+            rect,
+            Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::from_white_alpha((frame.opacity.clamp(0.0, 1.0) * 255.0).round() as u8),
+        );
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct FramePlan {
@@ -61,10 +138,6 @@ pub(crate) fn frame_plan(
     let animating = progress < 1.0 || opacity > 0.0;
     let repaint_after_ms = if progress < 1.0 {
         Some(frame_interval_ms(effects).min((ramp_ms - ramp_elapsed_ms).max(1)))
-    } else if opacity > 0.0 && target != base {
-        // Paint the final value once; later frames are unnecessary until
-        // terminal activity changes the effect back to its base amount.
-        None
     } else if opacity > 0.0 {
         Some(frame_interval_ms(effects))
     } else {
@@ -73,7 +146,7 @@ pub(crate) fn frame_plan(
 
     FramePlan {
         opacity,
-        animate: animating && (progress < 1.0 || target == base),
+        animate: animating,
         repaint_after_ms,
     }
 }
@@ -87,30 +160,35 @@ fn frame_interval_ms(effects: &TerminalEffects) -> u64 {
     (1000.0 / fps as f32).round().max(1.0) as u64
 }
 
-pub(crate) fn noise_mesh(
+pub(crate) fn noise_image(
     rect: Rect,
     resolution: f32,
     minimum_brightness: f32,
     maximum_brightness: f32,
     seed: u64,
     opacity: f32,
-) -> Mesh {
-    let mut mesh = Mesh::default();
+) -> ColorImage {
     if rect.is_negative() || rect.area() <= 0.0 || opacity <= 0.0 || !opacity.is_finite() {
-        return mesh;
+        return ColorImage {
+            size: [1, 1],
+            pixels: vec![Color32::TRANSPARENT],
+        };
     }
 
-    let aspect = (rect.width() / rect.height()).clamp(0.25, 4.0);
     let resolution = if resolution.is_finite() {
         resolution.clamp(0.08, 1.0)
     } else {
         0.5
     };
-    let cells = (MIN_NOISE_CELLS as f32
-        + (MAX_NOISE_CELLS - MIN_NOISE_CELLS) as f32 * resolution * resolution)
-        .round() as usize;
-    let columns = ((cells as f32 * aspect).sqrt().round() as usize).clamp(1, cells);
-    let rows = (cells / columns).max(1);
+    // Resolution is a fraction of display pixels, matching the original
+    // canvas implementation. Keep the texture bounded for large windows and
+    // multi-pane layouts while preserving fine grain at normal sizes.
+    let dimensions = bounded_noise_dimensions(
+        (rect.width() * resolution).round() as usize,
+        (rect.height() * resolution).round() as usize,
+    );
+    let [width, height] = dimensions;
+    let mut pixels = Vec::with_capacity(width * height);
     let alpha = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
     let mut random = seed;
     let min_setting = minimum_brightness.clamp(0.0, 1.0);
@@ -120,33 +198,47 @@ pub(crate) fn noise_mesh(
     let min_brightness = (minimum * 255.0).round() as u8;
     let brightness_span = ((maximum - minimum) * 255.0).round() as u8;
 
-    for row in 0..rows {
-        let top = rect.top() + rect.height() * row as f32 / rows as f32;
-        let bottom = rect.top() + rect.height() * (row + 1) as f32 / rows as f32;
-        for column in 0..columns {
-            let left = rect.left() + rect.width() * column as f32 / columns as f32;
-            let right = rect.left() + rect.width() * (column + 1) as f32 / columns as f32;
+    for _ in 0..height {
+        for _ in 0..width {
             random = random
                 .wrapping_mul(6_364_136_223_846_793_005)
                 .wrapping_add(1_442_695_040_888_963_407);
             let unit = (random >> 40) as u8;
             let brightness =
                 min_brightness.saturating_add(((unit as u16 * brightness_span as u16) / 255) as u8);
-            mesh.add_colored_rect(
-                Rect::from_min_max(Pos2::new(left, top), Pos2::new(right, bottom)),
-                Color32::from_rgba_unmultiplied(brightness, brightness, brightness, alpha),
-            );
+            pixels.push(Color32::from_rgba_unmultiplied(
+                brightness, brightness, brightness, alpha,
+            ));
         }
     }
-    mesh
+    ColorImage {
+        size: dimensions,
+        pixels,
+    }
+}
+
+pub(crate) fn bounded_noise_dimensions(width: usize, height: usize) -> [usize; 2] {
+    let width = width.clamp(1, MAX_NOISE_DIMENSION);
+    let height = height.clamp(1, MAX_NOISE_DIMENSION);
+    let pixels = width.saturating_mul(height);
+    if pixels <= MAX_NOISE_PIXELS {
+        return [width, height];
+    }
+
+    let scale = (MAX_NOISE_PIXELS as f64 / pixels as f64).sqrt();
+    [
+        ((width as f64 * scale).floor() as usize).max(1),
+        ((height as f64 * scale).floor() as usize).max(1),
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::Pos2;
 
     #[test]
-    fn idle_noise_ramps_between_base_and_idle_amount_then_stops_repainting() {
+    fn idle_noise_ramps_between_base_and_idle_amount_and_keeps_animating() {
         let effects = TerminalEffects {
             simple_noise_enabled: true,
             simple_noise_amount: 0.2,
@@ -169,8 +261,8 @@ mod tests {
 
         let settled = frame_plan(&effects, 1_000, 67_000);
         assert!((settled.opacity - 0.5).abs() < f32::EPSILON);
-        assert!(!settled.animate);
-        assert_eq!(settled.repaint_after_ms, None);
+        assert!(settled.animate);
+        assert_eq!(settled.repaint_after_ms, Some(42));
     }
 
     #[test]
@@ -193,17 +285,12 @@ mod tests {
     }
 
     #[test]
-    fn noise_mesh_is_deterministic_bounded_and_covers_its_rect() {
+    fn noise_image_is_deterministic_fine_grained_and_bounded() {
         let rect = Rect::from_min_max(Pos2::new(5.0, 7.0), Pos2::new(205.0, 107.0));
-        let first = noise_mesh(rect, 0.5, 0.32, 0.68, 42, 0.25);
-        let second = noise_mesh(rect, 0.5, 0.32, 0.68, 42, 0.25);
+        let first = noise_image(rect, 0.5, 0.32, 0.68, 42, 0.25);
+        let second = noise_image(rect, 0.5, 0.32, 0.68, 42, 0.25);
         assert_eq!(first, second);
-        assert!(first.vertices.len() / 4 <= MAX_NOISE_CELLS);
-        assert!(first.vertices.iter().all(|vertex| {
-            vertex.pos.x >= rect.left()
-                && vertex.pos.x <= rect.right()
-                && vertex.pos.y >= rect.top()
-                && vertex.pos.y <= rect.bottom()
-        }));
+        assert_eq!(first.size, [100, 50]);
+        assert!(first.pixels.len() <= MAX_NOISE_PIXELS);
     }
 }

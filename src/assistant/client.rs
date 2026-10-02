@@ -38,9 +38,22 @@ impl std::fmt::Display for ClientError {
     }
 }
 
-pub(crate) fn models_url(endpoint: &str) -> Result<String, ClientError> {
+pub(crate) fn completion_url(endpoint: &str) -> Result<String, ClientError> {
     validate_endpoint(endpoint).map_err(|_| ClientError::Endpoint)?;
     let mut url = url::Url::parse(endpoint).map_err(|_| ClientError::Endpoint)?;
+    let path = url.path().trim_end_matches('/');
+    if path.is_empty() {
+        url.set_path("/v1/chat/completions");
+    } else if path.ends_with("/v1") {
+        let path = format!("{path}/chat/completions");
+        url.set_path(&path);
+    }
+    Ok(url.to_string())
+}
+
+pub(crate) fn models_url(endpoint: &str) -> Result<String, ClientError> {
+    let endpoint = completion_url(endpoint)?;
+    let mut url = url::Url::parse(&endpoint).map_err(|_| ClientError::Endpoint)?;
     let mut segments: Vec<String> = url
         .path_segments()
         .ok_or(ClientError::Endpoint)?
@@ -122,7 +135,7 @@ pub(crate) fn test_connection(
     }
     let response = transport.execute(Request {
         method: Method::Post,
-        url: provider.endpoint.clone(),
+        url: completion_url(&provider.endpoint)?,
         body: Some(json!({"model": provider.model, "messages": [{"role": "user", "content": "Reply OK."}], "max_tokens": 4, "stream": false})),
         key,
     }).map_err(ClientError::Transport)?;
@@ -145,12 +158,12 @@ pub(crate) fn stream_completion(
     transport: &dyn HttpTransport,
     provider: &ProviderProfile,
     key: Option<Zeroizing<String>>,
-    system_prompt: &str,
-    prompt: &str,
+    prompts: (&str, &str),
     history: &[(bool, String)],
     cancelled: &AtomicBool,
     on_delta: &mut dyn FnMut(&str),
 ) -> Result<String, ClientError> {
+    let (system_prompt, prompt) = prompts;
     validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
     if provider.model.trim().is_empty() {
         return Err(ClientError::Model);
@@ -228,12 +241,11 @@ pub(crate) fn stream_completion(
     }
     let request = Request {
         method: Method::Post,
-        url: provider.endpoint.clone(),
+        url: completion_url(&provider.endpoint)?,
         body: Some(request_body),
         key,
     };
     let response = transport.execute_stream(request, cancelled, &mut on_head, &mut on_chunk);
-    drop(on_chunk);
     if let Some(error) = parser_error {
         return Err(ClientError::Reply(error));
     }
@@ -289,6 +301,34 @@ fn completion_content(body: &[u8]) -> Result<String, ClientError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn base_urls_expand_without_changing_custom_completion_paths() {
+        for (input, expected) in [
+            (
+                "https://example.test",
+                "https://example.test/v1/chat/completions",
+            ),
+            (
+                "https://example.test/v1/",
+                "https://example.test/v1/chat/completions",
+            ),
+            (
+                "https://example.test/api/v1",
+                "https://example.test/api/v1/chat/completions",
+            ),
+            (
+                "https://example.test/custom/chat",
+                "https://example.test/custom/chat",
+            ),
+        ] {
+            assert_eq!(super::completion_url(input).unwrap(), expected);
+        }
+        assert_eq!(
+            super::models_url("https://example.test").unwrap(),
+            "https://example.test/v1/models"
+        );
+        assert!(super::completion_url("https://example.test?api_key=secret").is_err());
+    }
     use super::super::transport::{Response, TransportError};
     use super::*;
     use std::io::{Read, Write};
@@ -530,8 +570,7 @@ mod tests {
             &transport,
             &provider,
             None,
-            "You are a test assistant.",
-            "Say hello.",
+            ("You are a test assistant.", "Say hello."),
             &[],
             &AtomicBool::new(false),
             &mut |delta| deltas.push(delta.to_owned()),

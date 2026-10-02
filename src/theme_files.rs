@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-use crate::fonts::{FontZone, Typography};
+use crate::fonts::FontZone;
 use crate::storage::store::{NativeStore, StoreError};
 use crate::theme::{to_hex, validate_personal_document, GradientGeometry, ThemeDefinition};
 
@@ -177,7 +177,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
         .gradient
         .map(|colors| colors.map(to_hex).to_vec())
         .unwrap_or_default();
-    let typography = theme.typography.clone().unwrap_or_else(Typography::default);
+    let typography = theme.typography.clone().unwrap_or_default();
     json!({
         "version": 1,
         "metadata": {
@@ -270,6 +270,9 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             "staticEnabled": theme.effects.static_opacity > 0.0,
             "staticOpacity": theme.effects.static_opacity,
             "staticDensity": theme.effects.static_density,
+            "staticIntensity": theme.effects.static_intensity * 100.0,
+            "staticAmplitude": theme.effects.static_amplitude * 100.0,
+            "staticBrightness": theme.effects.static_brightness * 100.0,
             "scanlinesEnabled": theme.effects.scanlines_strength > 0.0,
             "scanlinesStrength": theme.effects.scanlines_strength,
             "scanlinesPeriod": theme.effects.scanlines_period,
@@ -323,10 +326,10 @@ fn update_metadata_times(document: &mut Value) {
     let metadata = document["metadata"]
         .as_object_mut()
         .expect("validated metadata");
-    if !metadata
+    if metadata
         .get("createdAt")
         .and_then(Value::as_str)
-        .is_some_and(|value| !value.trim().is_empty())
+        .is_none_or(|value| value.trim().is_empty())
     {
         metadata.insert("createdAt".into(), Value::String(now.clone()));
     }
