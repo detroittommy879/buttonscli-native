@@ -1172,7 +1172,7 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::DiscoverModels => "Discover models",
         MessageKey::ConnectionSucceeded => "Provider returned a valid chat response.",
         MessageKey::ModelsFound => "Found {count} models.",
-        MessageKey::AiHelpLockedProvider => "AI Help is a Pro feature. In development builds, set BUTTONSCLI_NATIVE_DEV_AI_HELP=1 to exercise the provider connection tools.",
+        MessageKey::AiHelpLockedProvider => "AI Help requires Pro access and is still being verified for the native release. You can configure a provider below.",
         MessageKey::AiHelpDescription => "Ask a question or request a command. Suggested terminal actions require separate review.",
         MessageKey::AiAgentMode => "Agent Mode — execute this task",
         MessageKey::AiAgentConsent => "Send lets the agent run commands and share output from the previewed terminal for this task (up to 12 turns). Use an idle shell. Cancel stops further actions; a running command may need Ctrl+C in its terminal.",

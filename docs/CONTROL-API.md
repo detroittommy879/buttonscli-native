@@ -85,6 +85,10 @@ open up to 32 tabs; at most ten panes are visible at once. Grid column requests
 are honored within the window's minimum pane sizes and may be reduced when the
 window is narrow.
 
+COL/ROW/GRID respect the UI's session-local auto-tile exclusions. Selecting an
+excluded session shows it alone. An explicit `layout/open` group includes its
+requested session IDs in auto-tile; named grouping remains an explicit choice.
+
 Payloads are limited to 64 KiB. Input delivery can be `raw`, `bracketed`, or
 `slow-typed`. Bracketed mode wraps only the pasted text and sends Enter after
 the closing marker. Slow-typed input requires valid UTF-8, sends whole Unicode

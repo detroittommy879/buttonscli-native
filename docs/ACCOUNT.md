@@ -20,6 +20,10 @@ Pro features remain locked until those gates are explicitly released and
 verified. Account sign-in does not enable native cloud sync or theme sharing;
 those features are not implemented in this app.
 
+The legacy metrics-hosted runtime-config fetch is disabled pending a separate
+native service, so broad production rollout flags currently remain closed.
+Account sign-in still uses the separate auth host.
+
 The native email-code form does not complete a browser Turnstile challenge.
 If the hosted auth service requires Turnstile, email-code requests will be
 rejected until a native challenge flow is added. Live sign-in and revocation

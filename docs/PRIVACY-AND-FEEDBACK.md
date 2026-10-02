@@ -1,6 +1,15 @@
 # Privacy and feedback
 
-Open **Help → Send Feedback** to submit a report or idea. Nothing is sent when
+The old metrics-hosted feedback sender and background rollout-config fetch
+are disabled pending a separate native service. **Send Feedback** is hidden,
+and the production adapter refuses submission before any request. The native
+app has no routine analytics collector or event queue. Auth and user-selected
+AI providers use separate services.
+
+The retained feedback implementation and mock compatibility tests describe
+the following behavior for a future reviewed service rollout.
+
+When enabled, **Help → Send Feedback** submits a report or idea. Nothing is sent when
 the window opens or while you type. The app sends one request only after you
 choose **Send**; it does not queue a draft for later. If the request fails, the
 draft stays in the window and the app reports the failure.
@@ -18,10 +27,11 @@ control the service's retention policy.
 Feedback is sent over HTTPS to the fixed ButtonsCLI feedback endpoint. The app
 checks for a successful HTTP response and a valid receipt before showing
 success. The native app currently emits no routine product analytics events and
-has no analytics event queue. Its separate startup runtime-config request
-retrieves rollout flags and does not include a feedback draft, terminal data,
-or account identifiers. Account sign-in and AI provider requests are separate
-actions and are made only when you use those features.
+has no analytics event queue. The retained runtime-config adapter retrieves
+rollout flags without a feedback draft, terminal data or account identifiers;
+its production path is currently disabled. Account sign-in and AI provider
+requests are separate flows. Saved account sessions are revalidated at startup
+and periodically; provider requests begin only through their explicit controls.
 
 Feedback is a free feature. See the [receiver contract snapshot](migration/FEEDBACK-CONTRACT.md)
 for the request fields and source revision used by the compatibility tests.

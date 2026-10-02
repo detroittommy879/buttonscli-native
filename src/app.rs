@@ -282,13 +282,14 @@ fn read_only_guides_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn user_feedback_available() -> bool {
-    crate::features::access::resolve(
-        crate::features::catalog::FeatureKey::UserFeedback,
-        &crate::features::access::RuntimeAccess::default(),
-        &None,
-        0,
-    )
-    .available
+    crate::account::LEGACY_METRICS_ENABLED
+        && crate::features::access::resolve(
+            crate::features::catalog::FeatureKey::UserFeedback,
+            &crate::features::access::RuntimeAccess::default(),
+            &None,
+            0,
+        )
+        .available
 }
 
 pub struct ButtonsApp {
@@ -549,6 +550,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     visible_panes: Vec<usize>,
     #[cfg(not(target_arch = "wasm32"))]
+    auto_tile: crate::autotile::AutoTile,
+    #[cfg(not(target_arch = "wasm32"))]
     rendered_panes: Vec<usize>,
     #[cfg(not(target_arch = "wasm32"))]
     layout_window_start: usize,
@@ -786,6 +789,7 @@ struct ClosedTab {
     had_custom_title: bool,
     profile_id: String,
     theme_override: Option<String>,
+    excluded_from_auto_tile: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -793,6 +797,7 @@ struct ClosedTab {
 enum TabAction {
     Activate(usize),
     Rename(usize),
+    ToggleAutoTile(usize),
     MoveLeft(usize),
     MoveRight(usize),
     Close(usize),
@@ -1244,6 +1249,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             visible_panes: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            auto_tile: crate::autotile::AutoTile::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             rendered_panes: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             layout_window_start: 0,
@@ -1649,6 +1656,12 @@ impl ButtonsApp {
                 if visible.len() > 1 && self.pane_layout == PaneLayout::Single {
                     self.pane_layout = PaneLayout::Grid;
                 }
+                for id in ids {
+                    self.auto_tile.set_included(*id, true);
+                }
+                if visible.len() > 1 {
+                    self.auto_tile.requested_count = visible.len();
+                }
                 self.visible_panes = visible;
                 self.focused = *self.visible_panes.last().ok_or(ActionError::InvalidInput)?;
                 Ok(None)
@@ -1781,6 +1794,10 @@ impl ButtonsApp {
                     self.pane_layout,
                 );
                 self.focused = index;
+                if self.pane_layout != PaneLayout::Single {
+                    self.auto_tile.requested_count = self.visible_panes.len().clamp(1, 10);
+                    self.refresh_auto_tiles();
+                }
                 self.notice = None;
             }
             Err(error) => self.notice = Some(format!("Could not start shell: {error}")),
@@ -1824,6 +1841,10 @@ impl ButtonsApp {
         self.visible_panes =
             pane_state_after_new_tab(&self.visible_panes, self.focused, index, self.pane_layout);
         self.focused = index;
+        if self.pane_layout != PaneLayout::Single {
+            self.auto_tile.requested_count = self.visible_panes.len().clamp(1, 10);
+            self.refresh_auto_tiles();
+        }
         self.notice = None;
         Ok(id)
     }
@@ -1949,6 +1970,7 @@ impl ButtonsApp {
             had_custom_title: tab.custom_title.is_some(),
             profile_id: tab.profile_id.clone(),
             theme_override: self.theme_overrides.remove(&tab.id),
+            excluded_from_auto_tile: self.auto_tile.forget(tab.id),
         };
         tab.request_exit();
         self.recently_closed.push(closed);
@@ -1964,8 +1986,8 @@ impl ButtonsApp {
 
         (self.visible_panes, self.focused) =
             pane_state_after_close(&self.visible_panes, self.focused, index, self.tabs.len());
-        if self.visible_panes.len() <= 1 {
-            self.pane_layout = PaneLayout::Single;
+        if self.pane_layout != PaneLayout::Single {
+            self.refresh_auto_tiles();
         }
     }
 
@@ -1983,6 +2005,11 @@ impl ButtonsApp {
         if closed.had_custom_title {
             if let Some(tab) = self.tabs.last_mut() {
                 tab.rename(closed.title);
+            }
+        }
+        if closed.excluded_from_auto_tile {
+            if let Some(index) = self.tabs.len().checked_sub(1) {
+                self.toggle_auto_tile(index);
             }
         }
         if let (Some(theme_id), Some(tab)) = (closed.theme_override, self.tabs.last()) {
@@ -2043,6 +2070,10 @@ impl ButtonsApp {
             TabAction::Activate(index) => (index, Action::Focus),
             TabAction::Rename(index) => {
                 self.open_tab_rename(index);
+                return;
+            }
+            TabAction::ToggleAutoTile(index) => {
+                self.toggle_auto_tile(index);
                 return;
             }
             TabAction::MoveLeft(index) => (index, Action::Move { direction: -1 }),
@@ -2179,7 +2210,12 @@ impl ButtonsApp {
             };
             return;
         }
-        self.set_visible_pane_count(self.visible_panes.len().max(2), context);
+        self.auto_tile.requested_count = self.auto_tile.requested_count.max(2);
+        if self.tabs.len() < 2 {
+            self.set_visible_pane_count(2, context);
+        } else {
+            self.refresh_auto_tiles();
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2192,26 +2228,69 @@ impl ButtonsApp {
         if self.pane_layout == PaneLayout::Single {
             self.pane_layout = PaneLayout::Grid;
         }
-        while self.tabs.len() < count {
+        self.auto_tile.requested_count = count;
+        while self.auto_tile.eligible_count(&self.tab_ids()) < count {
             let previous_len = self.tabs.len();
             self.open_tab(context.clone());
             if self.tabs.len() == previous_len {
                 break;
             }
         }
-        let count = count.min(self.tabs.len());
-        let focused = self.focused.min(self.tabs.len().saturating_sub(1));
-        let mut visible = Vec::with_capacity(count);
-        visible.push(focused);
-        for index in self.visible_panes.iter().copied().chain(0..self.tabs.len()) {
-            if visible.len() >= count {
-                break;
+        self.auto_tile.requested_count = count;
+        self.refresh_auto_tiles();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn tab_ids(&self) -> Vec<u64> {
+        self.tabs.iter().map(|tab| tab.id).collect()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn refresh_auto_tiles(&mut self) {
+        let visible = self
+            .auto_tile
+            .select(&self.tab_ids(), self.focused, &self.visible_panes);
+        if let Some(first) = visible.first() {
+            if !visible.contains(&self.focused) {
+                self.focused = *first;
             }
-            if !visible.contains(&index) {
-                visible.push(index);
-            }
+            self.visible_panes = visible;
+        } else {
+            // With no included sessions, keep the focused terminal reachable alone.
+            self.pane_layout = PaneLayout::Single;
+            self.visible_panes = if self.tabs.is_empty() {
+                Vec::new()
+            } else {
+                vec![self.focused.min(self.tabs.len() - 1)]
+            };
         }
-        self.visible_panes = visible;
+        self.rendered_panes.clear();
+        self.layout_window_start = 0;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn toggle_auto_tile(&mut self, index: usize) {
+        let Some(id) = self.tabs.get(index).map(|tab| tab.id) else {
+            return;
+        };
+        self.auto_tile
+            .set_included(id, !self.auto_tile.includes(id));
+        if self.pane_layout != PaneLayout::Single {
+            self.refresh_auto_tiles();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn show_all_auto_tiles(&mut self) {
+        let count = self.auto_tile.eligible_count(&self.tab_ids());
+        if count == 0 {
+            return;
+        }
+        self.auto_tile.requested_count = count.min(10);
+        if self.pane_layout == PaneLayout::Single {
+            self.pane_layout = PaneLayout::Grid;
+        }
+        self.refresh_auto_tiles();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2219,7 +2298,8 @@ impl ButtonsApp {
         if index >= self.tabs.len() {
             return;
         }
-        if self.pane_layout == PaneLayout::Single {
+        if self.pane_layout == PaneLayout::Single || !self.auto_tile.includes(self.tabs[index].id) {
+            self.pane_layout = PaneLayout::Single;
             self.visible_panes = vec![index];
         } else if !self.visible_panes.contains(&index) {
             let position = self
@@ -2796,23 +2876,14 @@ impl ButtonsApp {
                         }
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
-                            .add_enabled(
-                                ai_help_available(),
-                                egui::Button::new(crate::i18n::text(
-                                    &self.locale,
-                                    crate::i18n::MessageKey::AiHelp,
-                                    &[],
-                                )),
-                            )
+                            .button(crate::i18n::text(
+                                &self.locale,
+                                crate::i18n::MessageKey::AiHelp,
+                                &[],
+                            ))
                             .clicked()
                         {
-                            if let Ok(mut state) = self.ai_help_state.lock() {
-                                state.open = true;
-                                state.target = self
-                                    .tabs
-                                    .get(self.focused)
-                                    .map(|tab| (tab.id, tab.title.clone()));
-                            }
+                            self.open_ai_help();
                             ui.close_menu();
                         }
                         if ui
@@ -3116,6 +3187,12 @@ impl ButtonsApp {
                             format!("{}  · exited", tab.title)
                         } else if visible && !active {
                             format!("{}  · visible", tab.title)
+                        } else if !self.auto_tile.includes(tab.id) {
+                            format!(
+                                "{}  · {}",
+                                tab.title,
+                                crate::i18n::literal(&self.locale, "solo")
+                            )
                         } else {
                             tab.title.clone()
                         };
@@ -3149,7 +3226,29 @@ impl ButtonsApp {
                         } else if response.clicked() {
                             action = Some(TabAction::Activate(index));
                         }
-                        tab_action_menu(ui, &self.locale, index, self.tabs.len(), &mut action);
+                        let included = self.auto_tile.includes(tab.id);
+                        response.context_menu(|ui| {
+                            tab_action_menu(
+                                ui,
+                                &self.locale,
+                                index,
+                                self.tabs.len(),
+                                included,
+                                &mut action,
+                            );
+                        });
+                        if self.preferences.show_action_buttons {
+                            ui.menu_button("⋮", |ui| {
+                                tab_action_menu(
+                                    ui,
+                                    &self.locale,
+                                    index,
+                                    self.tabs.len(),
+                                    included,
+                                    &mut action,
+                                );
+                            });
+                        }
                     }
                     let options = self.shell_menu_options();
                     ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
@@ -3214,18 +3313,19 @@ impl ButtonsApp {
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     ui.horizontal(|ui| {
                         for (index, preset) in presets.iter().enumerate() {
-                            if ui
+                            let response = ui
                                 .button(&preset.label)
-                                .on_hover_text(preset_hover_text(&self.locale, preset))
-                                .clicked()
-                            {
+                                .on_hover_text(preset_hover_text(&self.locale, preset));
+                            if response.clicked() {
                                 action = Some(PresetAction::Run(PresetCollection::Commands, index));
                             }
-                            preset_action_menu(
+                            preset_button_menu(
                                 ui,
+                                &response,
                                 &self.locale,
                                 PresetCollection::Commands,
                                 index,
+                                self.preferences.show_action_buttons,
                                 &mut action,
                             );
                         }
@@ -3421,29 +3521,47 @@ impl ButtonsApp {
         if self.preferences.dock_compact {
             ui.horizontal_wrapped(|ui| {
                 for (index, preset) in presets.iter().enumerate() {
-                    if ui
+                    let response = ui
                         .button(&preset.label)
-                        .on_hover_text(preset_hover_text(&self.locale, preset))
-                        .clicked()
-                    {
+                        .on_hover_text(preset_hover_text(&self.locale, preset));
+                    if response.clicked() {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
                     }
-                    preset_action_menu(ui, &self.locale, PresetCollection::Ssh, index, &mut action);
+                    preset_button_menu(
+                        ui,
+                        &response,
+                        &self.locale,
+                        PresetCollection::Ssh,
+                        index,
+                        self.preferences.show_action_buttons,
+                        &mut action,
+                    );
                 }
             });
         } else {
             for (index, preset) in presets.iter().enumerate() {
                 ui.horizontal(|ui| {
-                    let action_width = 24.0;
+                    let action_width = if self.preferences.show_action_buttons {
+                        24.0
+                    } else {
+                        0.0
+                    };
                     let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
-                    if ui
+                    let response = ui
                         .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
-                        .on_hover_text(preset_hover_text(&self.locale, preset))
-                        .clicked()
-                    {
+                        .on_hover_text(preset_hover_text(&self.locale, preset));
+                    if response.clicked() {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
                     }
-                    preset_action_menu(ui, &self.locale, PresetCollection::Ssh, index, &mut action);
+                    preset_button_menu(
+                        ui,
+                        &response,
+                        &self.locale,
+                        PresetCollection::Ssh,
+                        index,
+                        self.preferences.show_action_buttons,
+                        &mut action,
+                    );
                 });
             }
         }
@@ -3585,6 +3703,13 @@ impl ButtonsApp {
                             self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count + 1 }, ctx);
                         }
                     }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if ui.add_enabled(self.auto_tile.eligible_count(&self.tab_ids()) > 0,
+                        egui::Button::new(crate::i18n::literal(&self.locale, "All")))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Auto-tile all included terminals (up to 10). No new terminals are opened."))
+                        .clicked() {
+                        self.show_all_auto_tiles();
+                    }
                     ui.horizontal_wrapped(|ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.control_server.is_some()
@@ -3606,6 +3731,10 @@ impl ButtonsApp {
                                     &[],
                                 ));
                             }
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui.small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
+                            self.open_ai_help();
                         }
                         if ui.small_button(crate::i18n::literal(&self.locale, "Settings")).clicked() {
                             self.show_settings = true;
@@ -5322,6 +5451,17 @@ impl ButtonsApp {
             self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
             self.quick_secrets_busy = false;
             self.lock_quick_secrets();
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_ai_help(&mut self) {
+        if let Ok(mut state) = self.ai_help_state.lock() {
+            state.open = true;
+            state.target = self
+                .tabs
+                .get(self.focused)
+                .map(|tab| (tab.id, tab.title.clone()));
         }
     }
 
@@ -8229,6 +8369,14 @@ impl ButtonsApp {
         ui.push_id("settings-workspace", |ui| {
             ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
             ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
+            ui.checkbox(
+                &mut self.preferences.show_action_buttons,
+                crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
+            );
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "Right-click a tab or preset for its menu. Menu buttons are optional.",
+            ));
             #[cfg(not(target_arch = "wasm32"))]
             {
                 let effects_enabled = effects_master_switch_available();
@@ -10041,42 +10189,53 @@ fn tab_action_menu(
     locale: &str,
     index: usize,
     tab_count: usize,
+    included: bool,
     action: &mut Option<TabAction>,
 ) {
-    ui.menu_button("⋮", |ui| {
-        if ui.button(crate::i18n::literal(locale, "Rename")).clicked() {
-            *action = Some(TabAction::Rename(index));
-            ui.close_menu();
-        }
-        if ui
-            .add_enabled(
-                index > 0,
-                egui::Button::new(crate::i18n::literal(locale, "Move left")),
-            )
-            .clicked()
-        {
-            *action = Some(TabAction::MoveLeft(index));
-            ui.close_menu();
-        }
-        if ui
-            .add_enabled(
-                index + 1 < tab_count,
-                egui::Button::new(crate::i18n::literal(locale, "Move right")),
-            )
-            .clicked()
-        {
-            *action = Some(TabAction::MoveRight(index));
-            ui.close_menu();
-        }
-        ui.separator();
-        if ui
-            .button(crate::i18n::literal(locale, "Close terminal"))
-            .clicked()
-        {
-            *action = Some(TabAction::Close(index));
-            ui.close_menu();
-        }
-    });
+    if ui.button(crate::i18n::literal(locale, "Rename")).clicked() {
+        *action = Some(TabAction::Rename(index));
+        ui.close_menu();
+    }
+    if ui
+        .add_enabled(
+            index > 0,
+            egui::Button::new(crate::i18n::literal(locale, "Move left")),
+        )
+        .clicked()
+    {
+        *action = Some(TabAction::MoveLeft(index));
+        ui.close_menu();
+    }
+    if ui
+        .add_enabled(
+            index + 1 < tab_count,
+            egui::Button::new(crate::i18n::literal(locale, "Move right")),
+        )
+        .clicked()
+    {
+        *action = Some(TabAction::MoveRight(index));
+        ui.close_menu();
+    }
+    ui.separator();
+    let mut include = included;
+    if ui
+        .checkbox(
+            &mut include,
+            crate::i18n::literal(locale, "Include in auto-tile"),
+        )
+        .changed()
+    {
+        *action = Some(TabAction::ToggleAutoTile(index));
+        ui.close_menu();
+    }
+    ui.separator();
+    if ui
+        .button(crate::i18n::literal(locale, "Close terminal"))
+        .clicked()
+    {
+        *action = Some(TabAction::Close(index));
+        ui.close_menu();
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10121,6 +10280,24 @@ fn provider_key(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn preset_button_menu(
+    ui: &mut egui::Ui,
+    response: &egui::Response,
+    locale: &str,
+    collection: PresetCollection,
+    index: usize,
+    show_button: bool,
+    action: &mut Option<PresetAction>,
+) {
+    response.context_menu(|ui| preset_action_menu(ui, locale, collection, index, action));
+    if show_button {
+        ui.menu_button("⋮", |ui| {
+            preset_action_menu(ui, locale, collection, index, action)
+        });
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(
     ui: &mut egui::Ui,
     locale: &str,
@@ -10128,21 +10305,19 @@ fn preset_action_menu(
     index: usize,
     action: &mut Option<PresetAction>,
 ) {
-    ui.menu_button("⋮", |ui| {
-        if ui.button(crate::i18n::literal(locale, "Run")).clicked() {
-            *action = Some(PresetAction::Run(collection, index));
-            ui.close_menu();
-        }
-        if ui.button(crate::i18n::literal(locale, "Edit")).clicked() {
-            *action = Some(PresetAction::Edit(collection, index));
-            ui.close_menu();
-        }
-        ui.separator();
-        if ui.button(crate::i18n::literal(locale, "Delete")).clicked() {
-            *action = Some(PresetAction::Delete(collection, index));
-            ui.close_menu();
-        }
-    });
+    if ui.button(crate::i18n::literal(locale, "Run")).clicked() {
+        *action = Some(PresetAction::Run(collection, index));
+        ui.close_menu();
+    }
+    if ui.button(crate::i18n::literal(locale, "Edit")).clicked() {
+        *action = Some(PresetAction::Edit(collection, index));
+        ui.close_menu();
+    }
+    ui.separator();
+    if ui.button(crate::i18n::literal(locale, "Delete")).clicked() {
+        *action = Some(PresetAction::Delete(collection, index));
+        ui.close_menu();
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10503,6 +10678,216 @@ impl eframe::App for ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn text_position(output: &egui::FullOutput, label: &str) -> Option<egui::Pos2> {
+        output.shapes.iter().find_map(|clipped| {
+            if let egui::Shape::Text(shape) = &clipped.shape {
+                if shape.galley.job.text == label {
+                    return Some(clipped.shape.visual_bounding_rect().center());
+                }
+            }
+            None
+        })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn pointer_events(
+        pos: egui::Pos2,
+        button: egui::PointerButton,
+        pressed: bool,
+    ) -> Vec<egui::Event> {
+        vec![
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton {
+                pos,
+                button,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            },
+        ]
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn right_click_tab_menu_can_toggle_membership_without_activating_the_tab() {
+        let ctx = egui::Context::default();
+        let mut action = None;
+        let mut render = |events| {
+            ctx.run(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        let response = ui.button("Terminal");
+                        if response.clicked() {
+                            action = Some(TabAction::Activate(2));
+                        }
+                        response
+                            .context_menu(|ui| tab_action_menu(ui, "en", 2, 4, true, &mut action));
+                    });
+                },
+            )
+        };
+        let first = render(vec![]);
+        let pos = text_position(&first, "Terminal").unwrap();
+        render(pointer_events(pos, egui::PointerButton::Secondary, true));
+        render(pointer_events(pos, egui::PointerButton::Secondary, false));
+        let menu = render(vec![]);
+        let checkbox =
+            text_position(&menu, "Include in auto-tile").expect("right-click menu opened");
+        assert!(text_position(&menu, "Close terminal").is_some());
+        render(pointer_events(checkbox, egui::PointerButton::Primary, true));
+        render(pointer_events(
+            checkbox,
+            egui::PointerButton::Primary,
+            false,
+        ));
+        assert_eq!(action, Some(TabAction::ToggleAutoTile(2)));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn status_bar_ai_help_button_opens_the_window_without_requiring_access() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let mut render = |events| {
+            ctx.run(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ctx| app.status_bar(ctx),
+            )
+        };
+        let first = render(vec![]);
+        let pos = text_position(&first, "AI Help").expect("discoverable status bar button");
+        render(pointer_events(pos, egui::PointerButton::Primary, true));
+        render(pointer_events(pos, egui::PointerButton::Primary, false));
+        assert!(app.ai_help_state.lock().unwrap().open);
+        assert!(app.ai_help_state.lock().unwrap().target.is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens four finite test-owned ConPTY sessions; run explicitly on Windows"]
+    fn auto_tile_session_lifecycle_preserves_membership_count_and_pty_ids() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let preferences = Preferences {
+            default_shell_id: "test-cmd".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "test-cmd".into(),
+                label: "Test CMD".into(),
+                // Bound lifetime even if a panic tears down the PTY before
+                // its queued graceful-exit input is processed.
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Start-Sleep -Seconds 3\""
+                    .into(),
+                working_directory: String::new(),
+            }],
+            ..Default::default()
+        };
+        let mut workspace = Workspace(ButtonsApp::empty(preferences));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        for _ in 0..4 {
+            app.open_tab(ctx.clone());
+        }
+        assert_eq!(app.tabs.len(), 4);
+        let ids = app.tab_ids();
+        app.show_all_auto_tiles();
+        assert_eq!(app.visible_panes.len(), 4);
+        app.set_pane_layout(PaneLayout::Single, &ctx);
+        app.set_pane_layout(PaneLayout::Rows, &ctx);
+        assert_eq!(app.visible_panes.len(), 4);
+        assert_eq!(app.tab_ids(), ids);
+        app.toggle_auto_tile(1);
+        app.move_tab(1, 0);
+        assert_eq!(app.tabs[0].id, ids[1]);
+        assert!(!app.auto_tile.includes(ids[1]));
+        assert!(!app.visible_panes.contains(&0));
+        app.activate_tab(0);
+        assert_eq!(app.pane_layout, PaneLayout::Single);
+        assert_eq!(app.visible_panes, vec![0]);
+        app.set_pane_layout(PaneLayout::Columns, &ctx);
+        assert_eq!(
+            app.tabs.len(),
+            4,
+            "changing orientation must not open shells to replace exclusions"
+        );
+        assert_eq!(app.visible_panes.len(), 3);
+        app.close_tab(1);
+        assert_eq!(app.visible_panes.len(), 2);
+        assert!(!app.visible_panes.contains(&0));
+        app.close_tab(0);
+        app.reopen_closed_tab(ctx.clone());
+        let restored = app.tabs.last().unwrap().id;
+        assert_ne!(restored, ids[1]);
+        assert!(!app.auto_tile.includes(restored));
+        app.show_all_auto_tiles();
+        assert_eq!(app.visible_panes.len(), 2);
+        assert_eq!(app.tabs.len(), 3);
+        app.toggle_auto_tile(2);
+        app.show_all_auto_tiles();
+        assert_eq!(app.visible_panes.len(), 3);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn right_click_preset_menu_edits_the_correct_collection_and_optional_dots_render() {
+        for collection in [PresetCollection::Commands, PresetCollection::Ssh] {
+            for show_button in [false, true] {
+                let ctx = egui::Context::default();
+                let mut action = None;
+                let mut render = |events| {
+                    ctx.run(
+                        egui::RawInput {
+                            events,
+                            ..Default::default()
+                        },
+                        |ctx| {
+                            egui::CentralPanel::default().show(ctx, |ui| {
+                                ui.horizontal(|ui| {
+                                    let response = ui.button("Preset");
+                                    if response.clicked() {
+                                        action = Some(PresetAction::Run(collection, 2));
+                                    }
+                                    preset_button_menu(
+                                        ui,
+                                        &response,
+                                        "en",
+                                        collection,
+                                        2,
+                                        show_button,
+                                        &mut action,
+                                    );
+                                });
+                            });
+                        },
+                    )
+                };
+                let first = render(vec![]);
+                assert_eq!(text_position(&first, "⋮").is_some(), show_button);
+                let pos = text_position(&first, "Preset").unwrap();
+                render(pointer_events(pos, egui::PointerButton::Secondary, true));
+                render(pointer_events(pos, egui::PointerButton::Secondary, false));
+                let menu = render(vec![]);
+                let edit = text_position(&menu, "Edit").expect("preset context menu opened");
+                render(pointer_events(edit, egui::PointerButton::Primary, true));
+                render(pointer_events(edit, egui::PointerButton::Primary, false));
+                assert_eq!(action, Some(PresetAction::Edit(collection, 2)));
+            }
+        }
+    }
 
     #[test]
     fn old_preferences_migrate_one_theme_to_all_sources() {

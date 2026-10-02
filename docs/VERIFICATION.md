@@ -3,6 +3,43 @@
 Last run: 2026-10-01 on Windows 11, Rust 1.98.1. Earlier Linux-only checks
 are labeled by date in the sections below.
 
+## 2026-10-01 workspace follow-up
+
+- `cargo test --locked --quiet`: 232 library tests and two import fixtures
+  pass; four optional tests ignored.
+- `cargo test --locked --lib auto_tile_session_lifecycle -- --ignored
+  --nocapture`: passes with four test-owned Windows ConPTY shells, count
+  restoration, stable membership, reorder, solo view and close/reopen.
+- Headless egui pointer tests pass for right-click tabs and both preset
+  collections, optional dots, and the AI Help status button.
+- Both old metrics production adapters return Disabled before constructing
+  a client or sending feedback. Mock tests cover the retained contracts.
+- Desktop build, formatting/diff checks, five Node CLI deadline regressions
+  and the 14-tool MCP contract pass.
+- Optimized WASM build passes with the existing 51 compiler warnings.
+- Strict Clippy still fails on the existing 18 native and 52 WASM findings.
+  No lint gate is weakened. The PR remains draft.
+- The isolated desktop startup/capture smoke passes at 1296×859, showing
+  AI Help, All and hidden dots. The language chooser remains open, so this
+  capture is startup evidence rather than complete native interaction review.
+
+The first live CLI rerun failed a long visible-output marker. Waiting for a
+real PowerShell prompt and using short unique markers repaired the functional
+matrix. A subsequent run completed those checks but declared child cleanup
+failed after only 300 ms; those children exited shortly afterward. The script
+now uses a bounded five-second exit poll. The final updated live CLI/startup
+matrix passes, including visible/background output and child-shell cleanup.
+
+The initial rapid-close unit fixture used unbounded CMD `/K` processes; four
+survived queued `exit` input followed immediately by backend teardown. Only
+those verified test-owned processes were stopped. The opt-in membership test
+now uses finite PowerShell processes so failures cannot leave unbounded shells.
+This test validates selection/session ownership, not graceful shutdown of every
+shell. Rapid CMD close/teardown deserves a separate terminal-lifecycle follow-up.
+
+The earlier checkpoint below records additional load/GUI limits; this feature
+slice does not certify broad desktop/provider parity.
+
 ## 2026-10-01 startup, CLI and remote checkpoint
 
 - `cargo fmt --all -- --check` and `git diff --check` pass.

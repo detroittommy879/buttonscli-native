@@ -80,6 +80,7 @@ pub(crate) struct FeedbackEvent {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum FeedbackError {
+    Disabled,
     Endpoint,
     Entropy,
     EmptyMessage,
@@ -93,6 +94,7 @@ pub(crate) enum FeedbackError {
 impl std::fmt::Display for FeedbackError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
+            Self::Disabled => "feedback is disabled pending the native service",
             Self::Endpoint => "feedback endpoint is invalid",
             Self::Entropy => "could not create temporary feedback identifiers",
             Self::EmptyMessage => "feedback message is empty",
@@ -114,6 +116,9 @@ pub(crate) fn redacted_message(input: &str) -> String {
 pub(crate) fn submit_feedback(
     submission: &FeedbackSubmission,
 ) -> Result<FeedbackReceipt, FeedbackError> {
+    if !crate::account::LEGACY_METRICS_ENABLED {
+        return Err(FeedbackError::Disabled);
+    }
     submit_feedback_with(&HTTP, FEEDBACK_URL, submission)
 }
 
@@ -230,6 +235,17 @@ mod tests {
     use crate::assistant::transport::{Response, TransportError};
 
     const TEST_ENDPOINT: &str = "https://buttonscli.com/bcli-metrics/api/v1/feedback";
+
+    #[test]
+    fn old_metrics_feedback_is_disabled_before_any_network_request() {
+        let submission = FeedbackSubmission {
+            category: FeedbackCategory::BugReport,
+            message: "Synthetic feedback".into(),
+            contact: String::new(),
+            locale: "en".into(),
+        };
+        assert_eq!(submit_feedback(&submission), Err(FeedbackError::Disabled));
+    }
 
     #[derive(Default)]
     struct MockTransport {

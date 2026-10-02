@@ -1,5 +1,47 @@
 # Reconstruction journal
 
+## 2026-10-01 — Auto-tile membership, context menus and AI Help discovery
+
+Tabs now offer right-click menus with session-local **Include in auto-tile**
+membership. Stable IDs preserve that choice across moves; reopening a closed
+tab restores its membership. Excluded sessions remain alive and can be selected
+alone. COL/ROW/GRID preserve the requested pane count across single view and
+orientation changes without spawning replacements for excluded tabs. All
+gathers existing included sessions up to the ten-pane limit.
+
+Command and SSH presets share their action content between right-click menus
+and optional dots. The persisted Workspace toggle defaults to hiding dots.
+AI Help has a status-bar entry and an enabled Help-menu entry; the window can
+show its access explanation/provider-settings link while requests retain the
+existing Pro/development gates. New labels use the native literal catalog seam
+with English fallback where the source catalog has no entry.
+
+Per user direction, the old metrics-hosted runtime-config fetch and feedback
+sender are disabled in production entry points. Feedback is hidden. Mock
+adapter tests retain the old contract without contacting its host. The separate
+auth and provider paths remain available. No new metrics sender or container
+is introduced. `docs/migration/WORKSPACE-FOLLOWUPS.md` records later isolated
+experiments for movable chrome and detached terminals, plus the new service.
+
+Windows full tests pass 232 library tests plus two import fixtures, with four
+optional tests ignored. The new ignored ConPTY lifecycle test passes when run
+explicitly: four test-owned shells, remembered counts, stable-ID exclusion,
+reordering, solo selection, orientation changes, close/reopen and re-inclusion.
+Headless egui pointer tests cover tab/preset context menus, optional dots and
+the AI Help status button. Desktop build, formatting and diff checks pass;
+five CLI deadline regressions and the 14-tool MCP contract pass. Strict native
+and WASM Clippy still fail on the existing 18/52 findings; gates stay intact.
+The startup screenshot shows the new controls with the first-run language
+chooser still open. Broader DPI/focus, provider/Vibe and cross-platform GUI
+acceptance remain open.
+
+The revised live Windows CLI/startup matrix passes, including child-shell
+cleanup. Its prompt-aware readiness and short markers avoid sending into a
+starting shell and ConPTY-split marker failures. Cleanup now polls exit for up
+to five seconds instead of assuming shutdown completes within 300 ms. The
+rapid-close CMD unit-fixture finding and bounded replacement are recorded in
+`docs/VERIFICATION.md` for a separate lifecycle follow-up.
+
 ## 2026-10-01 — Startup and CLI follow-through
 
 Startup parsing now recognizes help/version only in flag positions, preserving

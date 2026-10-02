@@ -78,7 +78,7 @@ function Invoke-NativeCli {
 }
 
 function Wait-ControlTabReady {
-    param([Parameter(Mandatory)][string]$TabId)
+    param([Parameter(Mandatory)][string]$TabId, [switch]$ShellPrompt)
 
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
     while ([DateTime]::UtcNow -lt $deadline) {
@@ -92,7 +92,10 @@ function Wait-ControlTabReady {
             throw "Test PTY $TabId exited before becoming ready."
         }
         if ($tab.ready) {
-            return $tab
+            if (-not $ShellPrompt) { return $tab }
+            # A live PTY is not proof that PowerShell is ready for input.
+            $prompt = Invoke-ControlApi -Method GET -Path "/v1/tabs/$TabId/read?chars=4096"
+            if ($prompt.text -match 'PS [^\r\n]*>') { return $tab }
         }
         Start-Sleep -Milliseconds 100
     }
@@ -205,7 +208,7 @@ try {
         '--cwd', $smokeHome, '--json'
     )
     $visibleTabId = $visible.tab.tabId
-    Wait-ControlTabReady $visibleTabId | Out-Null
+    Wait-ControlTabReady $visibleTabId -ShellPrompt | Out-Null
     $renamed = Invoke-NativeCli -Arguments @(
         'rename-tab', '--tab', $visibleTabId, '--name', 'Control Live Visible Renamed', '--json'
     )
@@ -213,7 +216,7 @@ try {
         throw 'Installed Node CLI did not rename the test tab.'
     }
 
-    $visibleMarker = "BUTTONSCLI_VISIBLE_$([guid]::NewGuid().ToString('N'))"
+    $visibleMarker = "VISIBLE_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $visibleRun = Invoke-NativeCli -Arguments @(
         'run', '--tab', $visibleTabId, '--text', "Write-Output '$visibleMarker'",
         '--wait-for-text', $visibleMarker, '--chars', '8192', '--timeout-ms', '12000',
@@ -243,13 +246,13 @@ try {
     }
     $hidden = Invoke-ControlApi -Method POST -Path '/v1/tabs' -Body $hiddenBody
     $hiddenTabId = $hidden.tab.tabId
-    Wait-ControlTabReady $hiddenTabId | Out-Null
+    Wait-ControlTabReady $hiddenTabId -ShellPrompt | Out-Null
     $state = Invoke-ControlApi -Method GET -Path '/v1/tabs'
     $visibleState = $state.tabs | Where-Object { $_.tabId -eq $visibleTabId } | Select-Object -First 1
     if ($null -eq $visibleState -or $visibleState.isActive) {
         throw 'Creating a second tab did not move the first test PTY into the background.'
     }
-    $hiddenMarker = "BUTTONSCLI_HIDDEN_$([guid]::NewGuid().ToString('N'))"
+    $hiddenMarker = "HIDDEN_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $hiddenRun = Invoke-NativeCli -Arguments @(
         'run', '--tab', $visibleTabId, '--text', "Write-Output '$hiddenMarker'",
         '--wait-for-text', $hiddenMarker, '--chars', '8192', '--timeout-ms', '12000',
@@ -261,7 +264,7 @@ try {
     }
     $null = Invoke-NativeCli -Arguments @('presets', '--json')
 
-    $base64Marker = "BUTTONSCLI_BASE64_$([guid]::NewGuid().ToString('N'))"
+    $base64Marker = "BASE64_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $base64Command = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("Write-Output '$base64Marker'"))
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--base64', $base64Command, '--enter', '--json'
@@ -271,7 +274,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $fileMarker = "BUTTONSCLI_FILE_$([guid]::NewGuid().ToString('N'))"
+    $fileMarker = "FILE_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $payloadFile = Join-Path $smokeHome 'cli-payload.txt'
     [System.IO.File]::WriteAllText(
         $payloadFile,
@@ -286,7 +289,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $stdinMarker = "BUTTONSCLI_STDIN_$([guid]::NewGuid().ToString('N'))"
+    $stdinMarker = "STDIN_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $stdinCommand = "Write-Output '$stdinMarker'"
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--stdin', '--enter', '--json'
@@ -296,7 +299,7 @@ try {
         '--timeout-ms', '5000', '--interval-ms', '50', '--json'
     )
 
-    $pacedMarker = "BUTTONSCLI_PACED_$([guid]::NewGuid().ToString('N'))"
+    $pacedMarker = "PACED_$([guid]::NewGuid().ToString('N').Substring(0, 8))"
     $null = Invoke-NativeCli -Arguments @(
         'send', '--tab', $visibleTabId, '--delivery', 'slow-typed', '--delay-ms', '1',
         '--text', "Write-Output '$pacedMarker'", '--enter', '--json'
@@ -408,17 +411,7 @@ try {
             $baselines = @{}
             $markers = @{}
             foreach ($loadTab in $loadTabs) {
-                $ready = Wait-ControlTabReady $loadTab.tabId
-                # API readiness identifies a live PTY, not a ready shell prompt.
-                $shellDeadline = [DateTime]::UtcNow.AddSeconds(20)
-                do {
-                    $prompt = Invoke-ControlApi -Method GET -Path "/v1/tabs/$($loadTab.tabId)/read?chars=4096"
-                    if ($prompt.text -match 'PS [^\r\n]*>') { break }
-                    Start-Sleep -Milliseconds 100
-                } while ([DateTime]::UtcNow -lt $shellDeadline)
-                if ($prompt.text -notmatch 'PS [^\r\n]*>') {
-                    throw "Load probe shell did not reach its prompt on $($loadTab.tabId)."
-                }
+                $ready = Wait-ControlTabReady $loadTab.tabId -ShellPrompt
                 $baselines[$loadTab.tabId] = $ready.outputSequence
                 $markers[$loadTab.tabId] = "${loadTag}_$($loadTab.ptyId)"
             }
@@ -506,10 +499,16 @@ finally {
         $process.Dispose()
     }
     if ($ownedShellIds.Count -gt 0) {
-        Start-Sleep -Milliseconds 300
-        $remainingShells = @($ownedShellIds | Where-Object {
-            Get-Process -Id $_ -ErrorAction SilentlyContinue
-        })
+        # ConPTY exit is asynchronous; wait for the test-owned shells instead
+        # of declaring a leak after a fixed 300 ms pause.
+        $shellCleanupDeadline = [DateTime]::UtcNow.AddSeconds(5)
+        do {
+            $remainingShells = @($ownedShellIds | Where-Object {
+                Get-Process -Id $_ -ErrorAction SilentlyContinue
+            })
+            if ($remainingShells.Count -eq 0) { break }
+            Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $shellCleanupDeadline)
         if ($remainingShells.Count -gt 0) {
             $cleanupFailure = "PTY child process cleanup failed for PID(s): $($remainingShells -join ', ')"
         }

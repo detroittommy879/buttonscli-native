@@ -109,6 +109,7 @@ pub(crate) struct Preferences {
     pub(crate) typography: Typography,
     pub(crate) show_sidebar: bool,
     pub(crate) show_presets: bool,
+    pub(crate) show_action_buttons: bool,
     pub(crate) dock_width: f32,
     pub(crate) dock_compact: bool,
     pub(crate) dock_auto_hide: bool,
@@ -144,6 +145,7 @@ impl Default for Preferences {
             typography: Typography::default(),
             show_sidebar: true,
             show_presets: true,
+            show_action_buttons: false,
             dock_width: 176.0,
             dock_compact: false,
             dock_auto_hide: false,
@@ -307,6 +309,19 @@ mod tests {
             serde_json::from_str(r#"{"chrome_corner_radius":255}"#).unwrap();
         oversized.normalize_theme_sources();
         assert_eq!(oversized.chrome_corner_radius, 16);
+    }
+
+    #[test]
+    fn menu_button_preference_defaults_to_right_click_and_round_trips() {
+        let old: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(!old.show_action_buttons);
+        let saved = Preferences {
+            show_action_buttons: true,
+            ..old
+        };
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+        assert!(restored.show_action_buttons);
     }
 
     #[test]

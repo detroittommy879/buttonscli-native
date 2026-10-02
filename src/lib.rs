@@ -5,6 +5,8 @@ mod account_api;
 pub mod app;
 mod assistant;
 #[cfg(not(target_arch = "wasm32"))]
+mod autotile;
+#[cfg(not(target_arch = "wasm32"))]
 mod control;
 #[cfg(not(target_arch = "wasm32"))]
 mod cool_stuff;

@@ -4,6 +4,25 @@ Updated 2026-09-29. This is a working handoff, not a completion claim. Continue 
 
 ## Latest Windows checkpoint — 2026-10-01
 
+Latest user steering: prioritize tab/layout ergonomics and AI Help discovery.
+Right-click menus and optional dots now serve tabs, command presets and SSH
+presets; auto-tile membership uses stable session IDs, All selects existing
+included terminals, and layout orientation preserves requested counts.
+AI Help now has a status-bar button and can open its locked explanation.
+The old metrics-hosted runtime-config and feedback production paths are
+disabled pending a new service. Movable docks/status chrome and detached
+terminals remain later, separate-branch experiments. See
+[workspace follow-ups](WORKSPACE-FOLLOWUPS.md) for scope and feasibility.
+
+Current Windows checks: 232 library tests plus two fixtures pass, four optional
+tests ignored; the finite-ConPTY membership test passes explicitly. Desktop
+and optimized WASM builds pass. Strict native/WASM lints still report 18/52
+findings. Right-click and AI Help discovery have headless pointer-test coverage.
+The live smoke now waits for shell prompts and polls child exit up to five
+seconds instead of 300 ms. Rapid close of a CMD `/K` unit fixture exposed
+queued-exit/teardown cleanup limits; the test is bounded now, but broader CMD
+shutdown behavior remains a separate lifecycle item. See `../VERIFICATION.md`.
+
 Work continues on `codex/native-migration`, backed up in draft
 [PR #1](https://github.com/detroittommy879/buttonscli-native/pull/1). Preserve
 that branch and update the existing PR. `CONTRIBUTING.md` documents the branch,
