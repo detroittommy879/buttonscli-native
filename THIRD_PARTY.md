@@ -4,7 +4,8 @@ ButtonsCLI depends on permissively licensed Rust crates recorded in
 `Cargo.lock`. Important direct components include:
 
 - `eframe` / `egui` — MIT or Apache-2.0
-- `alacritty_terminal` — Apache-2.0
+- `alacritty_terminal` — Apache-2.0; vendored with output observation,
+  Windows per-pane job ownership and child-watcher handle/callback cleanup
 - `egui_term` — MIT; vendored in `vendor/egui_term` with a local clipboard fix
 - the legacy ButtonsCLI font pack — 26 unchanged font binaries; all notices
   shipped by the source project are preserved in `assets/fonts`

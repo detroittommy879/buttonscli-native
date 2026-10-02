@@ -1,5 +1,51 @@
 # Reconstruction journal
 
+## 2026-10-01 — Theme favorites, pane controls and migration gate repairs
+
+Free `themeFavorites`, `terminalContextMenu` and `paneHoverLabel` features are
+registered centrally. Stars on theme cards save profile-local IDs; a dedicated
+section near the top of Themes and the status menu provide quick access.
+The status random action shares the existing random-selection implementation.
+Pane menus bind actions to session IDs, including after reorder or close.
+They expose favorites/random/global, copy, select-all, clear, rename,
+auto-tile inclusion and close. Hover labels paint the tab name without adding
+a hit target; Workspace saves independent font/size/weight and opacity.
+
+The native and WASM strict Clippy gates now pass without new lint suppressions.
+Repairs group related arguments, remove unnecessary closure dropping, relocate
+helpers before tests, simplify parser/option operations, replace a post-1.85
+Windows API usage, and omit desktop-only code from the browser target.
+Full Windows tests pass 235 library tests and two import fixtures; five optional
+tests are ignored in the default run. The explicit auto-tile lifecycle test
+also verifies favorite/random/global targeting, closed-target rejection, hover
+visibility/disable, and unchanged session IDs. Pointer tests cover menu actions.
+Native and optimized WASM builds pass, with the existing native PDB naming
+warning. Five Node CLI deadline regressions and the MCP contract pass.
+
+Windows ConPTY creation now assigns each shell atomically to its own
+kill-on-close job. Closing a pane ends its shell and descendants, including
+when queued `exit` has not been processed. Child-watcher callbacks retain a
+valid context until synchronous unregister completes; duplicated process
+handles, initial-thread handles and redundant pipe ends now close explicitly.
+Failed watcher setup closes ConPTY while its reader can still drain output.
+The explicit rapid-close test passes eight immediately dropped CMD shells and
+a busy PowerShell shell with a CMD descendant. This fixes the prior orphan-shell
+finding rather than hiding it behind a finite fixture.
+
+The updated live Windows control/startup matrix passes after these changes.
+A seeded isolated startup capture shows readable Favorites/Random controls at
+1296×859 without the language chooser covering the workspace. A separate
+abrupt-exit smoke kills only the host and verifies its held shell process
+handle becomes signaled. This checks OS job cleanup independently of queued
+graceful `exit` input or a recursive process kill in the harness.
+
+References: Microsoft's [atomic job assignment example](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812/)
+and [ConPTY lifetime contract](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session).
+Broad hands-on focus/clipboard/DPI, real-provider/hosted-entitlement acceptance,
+Linux/macOS checks, production signing roots and activation/rollback integration
+remain open. Optional Shader Lab/HSync still need the separately documented
+offscreen-renderer work; no shader parity is claimed.
+
 ## 2026-10-01 — Auto-tile membership, context menus and AI Help discovery
 
 Tabs now offer right-click menus with session-local **Include in auto-tile**

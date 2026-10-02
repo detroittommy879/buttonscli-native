@@ -54,6 +54,9 @@ Current desktop features include:
   drift, static, and scanline overlays rendered natively;
 - per-terminal theme choices plus **Theme all**, **Random current**, and
   **Random all** in Theme Settings; the tab hover shows its current theme;
+- saved theme favorites at the top of Themes and in the status bar, a quick
+  random-theme button, pane right-click menus, and configurable translucent
+  tab-name labels when hovering over panes;
 - persistent appearance preferences and clean child-process shutdown.
 
 ## Development

@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use eframe::Frame;
 
 pub const MIN_OPACITY: f32 = 0.25;
@@ -11,6 +12,7 @@ pub fn clamp(opacity: f32) -> f32 {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn is_supported() -> bool {
     cfg!(target_os = "windows")
 }
@@ -44,7 +46,7 @@ pub fn apply(frame: &Frame, opacity: f32) -> Result<f32, String> {
     Ok(opacity)
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_arch = "wasm32")))]
 pub fn apply(_frame: &Frame, _opacity: f32) -> Result<f32, String> {
     Err("window opacity is not supported on this platform".into())
 }

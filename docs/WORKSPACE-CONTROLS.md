@@ -15,6 +15,25 @@ action menu. **Settings → Workspace → Show menu buttons on tabs and presets*
 adds the three-dot buttons alongside the right-click menus. The default hides
 the dots; double-clicking a terminal tab still opens Rename.
 
+Right-click inside any terminal pane for its own menu: favorite themes, random
+theme, use global theme, copy selection, select all, clear screen, rename,
+auto-tile membership, and close. These actions target that pane even when
+another terminal has keyboard focus. Clear screen leaves its shell running.
+
+Star themes in **Settings → Themes**. Saved favorites appear in a dedicated
+section near the top and in the status bar's **Favorite themes** menu. Selecting
+a favorite there changes the focused terminal. **Random theme** in the status
+bar does the same as **Random current** in Theme Settings; a pane's random
+action changes that pane. Random selection avoids its current theme.
+Favorites persist in the native profile and include personal themes. Missing
+personal themes are hidden from menus while their saved IDs are retained.
+
+Moving over a terminal pane displays its tab name as translucent text. Under
+**Settings → Workspace**, **Show terminal name on hover** can disable it;
+**Terminal hover label** selects its own font, weight, and size, and **Hover
+label opacity** controls transparency. The label takes no clicks and does not
+change terminal output. These preferences also participate in Settings rollback.
+
 The tab menu's **Include in auto-tile** checkbox controls membership in
 **COL / ROW / GRID**. Excluded tabs show **solo** and remain running. Clicking
 one shows it alone; choose a tiled layout again to return to the included

@@ -3,6 +3,43 @@
 Last run: 2026-10-01 on Windows 11, Rust 1.98.1. Earlier Linux-only checks
 are labeled by date in the sections below.
 
+## 2026-10-01 favorites and migration checks
+
+- Full native suite: 235 library tests and two import fixtures pass; five
+  optional library tests are ignored in the default run.
+- Explicit `auto_tile_session_lifecycle` passes: per-pane theme IDs remain
+  correct across reorder, random avoids the current theme, global clears only
+  that override, and closed targets cannot affect another pane. The actual
+  workspace painter shows the hovered tab name, hides it when disabled, and
+  preserves session IDs.
+- Explicit `rapid_close_terminates` passes: eight CMD shells close immediately
+  without sending `exit`, plus a busy PowerShell shell and its CMD descendant
+  exit after dropping the pane. Test-owned handle guards prevent orphaned
+  processes on assertion failures.
+- Pointer/menu tests verify the pane actions and favorite ID selection;
+  settings tests verify profile round-trip, deduplication and bounds.
+- Strict native `cargo clippy --all-targets --locked -- -D warnings` and WASM
+  `cargo clippy --target wasm32-unknown-unknown --no-default-features --locked
+  -- -D warnings` pass. No new lint suppression or relaxed CI gate was added.
+- Desktop and optimized WASM builds pass. The pre-existing bin/lib PDB filename
+  warning remains; the browser compiler warnings have been eliminated.
+- Five Node CLI deadline regressions and the 14-tool MCP contract pass.
+- The live Windows control/startup matrix passes after the cleanup changes,
+  including visible/background PTYs, paced-send cancellation and shell cleanup.
+- `native-smoke.ps1 -SkipBuild -WithThemeControls -CapturePath
+  target/favorites-startup.png` passes. The inspected 1296×859 capture shows
+  readable Favorite themes and Random theme status buttons with no onboarding
+  overlay or clipped controls.
+- `native-smoke.ps1 -SkipBuild -WithThemeControls -WithAbruptExit` passes:
+  killing only the test host terminates its tracked shell, without recursively
+  killing children from the harness.
+
+These supersede the older failing-lint and orphan-CMD records below. Manual
+full-screen app mouse behavior, monitor/DPI, clipboard and cross-platform GUI
+acceptance are still separate checks. `native-smoke.ps1 -WithThemeControls`
+seeds only its isolated profile so the first-run chooser does not cover the
+status controls during capture.
+
 ## 2026-10-01 workspace follow-up
 
 - `cargo test --locked --quiet`: 232 library tests and two import fixtures

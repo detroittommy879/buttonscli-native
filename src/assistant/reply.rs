@@ -39,10 +39,7 @@ impl SseDecoder {
             return Err(ReplyError::EventTooLarge);
         }
         let mut output = Vec::new();
-        loop {
-            let Some((start, width)) = find_separator(&self.buffer) else {
-                break;
-            };
+        while let Some((start, width)) = find_separator(&self.buffer) {
             let event = self.buffer.drain(..start).collect::<Vec<_>>();
             self.buffer.drain(..width);
             output.extend(self.decode_event(&event)?);

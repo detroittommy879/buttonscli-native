@@ -35,6 +35,12 @@ visitor's local PTY.
 ## Lifecycle invariants
 
 - PTY state is owned by the native terminal backend.
+- On Windows, each ConPTY shell is created atomically inside a dedicated
+  kill-on-close job. The pane owns its job handle; close ends that process tree,
+  and host termination closes the handles even if graceful input is pending.
+  The child watcher owns its duplicated process handle and waits for callback
+  completion before releasing callback context. Redundant host pipe ends close
+  after process creation so EOF and teardown remain observable.
 - UI commands send bytes through the backend notifier; terminal output wakes
   the egui render loop.
 - A resize updates both the terminal grid and operating-system PTY.

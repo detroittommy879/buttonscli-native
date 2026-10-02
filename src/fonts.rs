@@ -264,9 +264,7 @@ impl FontCatalog {
                 FontSource::Custom,
                 true,
                 &mut seen_paths,
-                &mut remaining,
-                &mut remaining_entries,
-                &mut total_bytes,
+                (&mut remaining, &mut remaining_entries, &mut total_bytes),
                 &mut warnings,
             );
         }
@@ -276,9 +274,7 @@ impl FontCatalog {
                 FontSource::System,
                 false,
                 &mut seen_paths,
-                &mut remaining,
-                &mut remaining_entries,
-                &mut total_bytes,
+                (&mut remaining, &mut remaining_entries, &mut total_bytes),
                 &mut warnings,
             );
         }
@@ -298,11 +294,10 @@ impl FontCatalog {
         source: FontSource,
         report_invalid: bool,
         seen_paths: &mut std::collections::HashSet<PathBuf>,
-        remaining: &mut usize,
-        remaining_entries: &mut usize,
-        total_bytes: &mut usize,
+        budget: (&mut usize, &mut usize, &mut usize),
         warnings: &mut Vec<String>,
     ) {
+        let (remaining, remaining_entries, total_bytes) = budget;
         if !directory.is_dir() || *remaining == 0 {
             return;
         }
@@ -476,9 +471,13 @@ impl FontCatalog {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 const MAX_FONT_FILE_BYTES: u64 = 32 * 1024 * 1024;
+#[cfg(not(target_arch = "wasm32"))]
 const MAX_TOTAL_FONT_BYTES: usize = 256 * 1024 * 1024;
+#[cfg(not(target_arch = "wasm32"))]
 const MAX_DISCOVERED_FONT_FILES: usize = 512;
+#[cfg(not(target_arch = "wasm32"))]
 const MAX_SCANNED_FONT_ENTRIES: usize = 8192;
 
 #[cfg(not(target_arch = "wasm32"))]

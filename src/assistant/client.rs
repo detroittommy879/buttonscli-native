@@ -158,12 +158,12 @@ pub(crate) fn stream_completion(
     transport: &dyn HttpTransport,
     provider: &ProviderProfile,
     key: Option<Zeroizing<String>>,
-    system_prompt: &str,
-    prompt: &str,
+    prompts: (&str, &str),
     history: &[(bool, String)],
     cancelled: &AtomicBool,
     on_delta: &mut dyn FnMut(&str),
 ) -> Result<String, ClientError> {
+    let (system_prompt, prompt) = prompts;
     validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
     if provider.model.trim().is_empty() {
         return Err(ClientError::Model);
@@ -246,7 +246,6 @@ pub(crate) fn stream_completion(
         key,
     };
     let response = transport.execute_stream(request, cancelled, &mut on_head, &mut on_chunk);
-    drop(on_chunk);
     if let Some(error) = parser_error {
         return Err(ClientError::Reply(error));
     }
@@ -571,8 +570,7 @@ mod tests {
             &transport,
             &provider,
             None,
-            "You are a test assistant.",
-            "Say hello.",
+            ("You are a test assistant.", "Say hello."),
             &[],
             &AtomicBool::new(false),
             &mut |delta| deltas.push(delta.to_owned()),

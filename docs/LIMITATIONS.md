@@ -25,8 +25,8 @@ not a backlog disguised as release notes.
   status bar. Fedora GUI resizing and PTY behavior still need direct review.
 - Dividers paint continuously and inherit color/width from the active app theme;
   Settings can save a custom color and width. Personal theme documents may set
-  `theme.app.shell.paneDivider`. There is no personal-theme editor/export flow
-  for this field yet, and contrast/drag behavior needs GUI review.
+  `theme.app.shell.paneDivider`; the personal-theme editor and export preserve
+  its color and thickness. Contrast/drag behavior still needs GUI review.
 - Theme Settings saves a 0–16 point corner radius for tabs, controls, menus,
   cards and Settings. It does not round terminal cells. Visuals at different DPI
   scales and keyboard focus outlines still need desktop review.
@@ -34,6 +34,15 @@ not a backlog disguised as release notes.
   terminal or all open terminals, including hidden tabs. App chrome stays
   global. Per-terminal choices are session-only and reset on restart; the
   global default persists. Fedora GUI/PTY theme-switch behavior is unverified.
+- Theme favorites persist by theme ID in each native profile. Pane menus apply
+  to their own session, and hover labels have independent font/size/opacity.
+  Pointer/menu and stable-target tests pass; broader interactive DPI and
+  full-screen-terminal application review remains open.
+- Windows shells are launched atomically inside per-pane kill-on-close jobs.
+  Rapid-close tests cover eight immediate CMD closures and a busy PowerShell
+  shell with a CMD descendant. Closing a pane also ends its descendants;
+  unusual programs that use external services to launch detached processes
+  are outside that process-tree guarantee.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
   screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior

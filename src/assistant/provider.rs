@@ -1,6 +1,7 @@
 //! Provider metadata only. API keys never belong in this serializable model.
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -42,6 +43,7 @@ impl Default for ProviderSettings {
 }
 
 impl ProviderSettings {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn from_legacy(assistant: &Value) -> (Self, Vec<String>) {
         let mut warnings = Vec::new();
         let source = assistant
@@ -161,6 +163,7 @@ impl ProviderSettings {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn active(&self) -> Option<&ProviderProfile> {
         self.providers
             .iter()
@@ -180,6 +183,7 @@ pub(crate) fn sanitize_endpoint(raw: &str) -> Option<String> {
     Some(endpoint.to_string())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_endpoint(raw: &str) -> Result<(), &'static str> {
     let endpoint =
         url::Url::parse(raw).map_err(|_| "Enter a complete HTTP or HTTPS endpoint URL")?;

@@ -1128,10 +1128,9 @@ fn preset_summary(preset: PresetInfo) -> PresetSummary {
     }
 }
 
-fn resolve_payload(
-    text: Option<String>,
-    payload_base64: Option<String>,
-) -> Result<(Vec<u8>, &'static str), (StatusCode, Json<serde_json::Value>)> {
+type PayloadResult = Result<(Vec<u8>, &'static str), (StatusCode, Json<serde_json::Value>)>;
+
+fn resolve_payload(text: Option<String>, payload_base64: Option<String>) -> PayloadResult {
     match (text, payload_base64) {
         (Some(text), None) => {
             let bytes = text.into_bytes();

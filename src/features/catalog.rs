@@ -5,6 +5,9 @@ pub enum FeatureKey {
     StartupTabs,
     TabWrapping,
     ThemeSelection,
+    ThemeFavorites,
+    TerminalContextMenu,
+    PaneHoverLabel,
     TerminalScrollbar,
     PaneDivider,
     KeyboardShortcuts,
@@ -35,12 +38,15 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 35] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::StartupTabs,
         Self::TabWrapping,
         Self::ThemeSelection,
+        Self::ThemeFavorites,
+        Self::TerminalContextMenu,
+        Self::PaneHoverLabel,
         Self::TerminalScrollbar,
         Self::PaneDivider,
         Self::KeyboardShortcuts,
@@ -77,6 +83,9 @@ impl FeatureKey {
             Self::StartupTabs => "startupTabs",
             Self::TabWrapping => "tabWrapping",
             Self::ThemeSelection => "themeSelection",
+            Self::ThemeFavorites => "themeFavorites",
+            Self::TerminalContextMenu => "terminalContextMenu",
+            Self::PaneHoverLabel => "paneHoverLabel",
             Self::TerminalScrollbar => "terminalScrollbar",
             Self::PaneDivider => "paneDivider",
             Self::KeyboardShortcuts => "keyboardShortcuts",
@@ -118,14 +127,18 @@ impl FeatureKey {
             | K::TerminalScrollbar
             | K::PaneDivider => (T::Free, true, R::Active, "layout"),
             K::KeyboardShortcuts => (T::Free, true, R::Active, "shortcuts"),
-            K::TerminalSearch => (T::Free, true, R::Active, "terminal"),
+            K::TerminalSearch | K::TerminalContextMenu | K::PaneHoverLabel => {
+                (T::Free, true, R::Active, "terminal")
+            }
             K::WorkspaceControls | K::StartupTabs => (T::Free, true, R::Active, "workspace"),
             K::LocalizationSettings => (T::Free, true, R::Active, "localization"),
             K::ShellProfiles => (T::Free, true, R::Active, "terminal"),
             K::PersonalThemeEditor => (T::Free, true, R::Active, "themes"),
             K::CustomFonts => (T::Free, true, R::Active, "fonts"),
             K::CoolStuffInstallers => (T::Free, true, R::Active, "onboarding"),
-            K::ThemeSelection | K::CalmThemeApply => (T::Free, true, R::Active, "themes"),
+            K::ThemeSelection | K::ThemeFavorites | K::CalmThemeApply => {
+                (T::Free, true, R::Active, "themes")
+            }
             K::SettingsAppearance | K::OriginalSettingsImport => {
                 (T::Free, true, R::Active, "settings")
             }

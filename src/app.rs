@@ -65,6 +65,16 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use zeroize::{Zeroize, Zeroizing};
 
+fn local_feature_available(key: crate::features::catalog::FeatureKey) -> bool {
+    crate::features::access::resolve(
+        key,
+        &crate::features::access::RuntimeAccess::default(),
+        &None,
+        0,
+    )
+    .available
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_help_available() -> bool {
     ai_feature_available(crate::features::catalog::FeatureKey::AiHelp)
@@ -804,6 +814,22 @@ enum TabAction {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PaneAction {
+    Theme(String),
+    RandomTheme,
+    UseGlobal,
+    ToggleFavorite(String),
+    Copy,
+    SelectAll,
+    Clear,
+    Rename,
+    ToggleAutoTile,
+    Close,
+    ThemeSettings,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum PaneLayout {
     #[default]
@@ -1461,6 +1487,54 @@ impl ButtonsApp {
             return;
         };
         self.set_theme_for_tab(self.focused, &theme_id);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn perform_pane_action(&mut self, id: u64, action: PaneAction, ctx: &egui::Context) {
+        // Resolve again after drawing: a popup must never retarget after reorder/close.
+        let Some(index) = self.tabs.iter().position(|tab| tab.id == id) else {
+            return;
+        };
+        match action {
+            PaneAction::Theme(theme) => self.set_theme_for_tab(index, &theme),
+            PaneAction::RandomTheme => {
+                if let Some(theme) = self.random_theme_id(self.theme_for_tab(index)) {
+                    self.set_theme_for_tab(index, &theme);
+                }
+            }
+            PaneAction::UseGlobal => {
+                self.theme_overrides.remove(&id);
+            }
+            PaneAction::ToggleFavorite(theme) => {
+                if local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites)
+                    && self
+                        .themes
+                        .all()
+                        .iter()
+                        .any(|candidate| candidate.id == theme)
+                {
+                    self.preferences.toggle_favorite_theme(&theme);
+                }
+            }
+            PaneAction::Copy => {
+                let text = self.tabs[index].backend.selectable_content();
+                if !text.is_empty() {
+                    ctx.copy_text(text);
+                }
+            }
+            PaneAction::SelectAll => self.tabs[index].backend.select_all(),
+            PaneAction::Clear => self.tabs[index].backend.clear_screen(),
+            PaneAction::Rename => self.open_tab_rename(index),
+            PaneAction::ToggleAutoTile => self.toggle_auto_tile(index),
+            PaneAction::Close => {
+                self.dispatch_ui_or_notice(Some(Target::Id(id)), Action::Close, ctx)
+            }
+            PaneAction::ThemeSettings => {
+                self.focused = index;
+                self.settings_tab = SettingsTab::Themes;
+                self.show_settings = true;
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2351,6 +2425,17 @@ impl ButtonsApp {
             || self.show_tab_rename
             || self.show_localization_onboarding;
         let mut clicked = None;
+        let mut pane_action = None;
+        let favorites: Vec<_> = self
+            .preferences
+            .favorite_theme_ids
+            .iter()
+            .filter_map(|id| self.themes.all().iter().find(|theme| &theme.id == id))
+            .map(|theme| (theme.id.clone(), theme.name.clone()))
+            .collect();
+        let hover_font = self
+            .font_catalog
+            .font_id(&self.preferences.pane_hover_label.font, false);
         let mut visible = self.visible_panes.clone();
         visible.retain(|index| *index < self.tabs.len());
         if visible.is_empty() {
@@ -2421,11 +2506,20 @@ impl ButtonsApp {
             divider_style,
             clicked: &mut clicked,
             latest_activity_at_ms,
+            locale: &self.locale,
+            favorites: &favorites,
+            auto_tile: &self.auto_tile,
+            action: &mut pane_action,
+            hover_label: &self.preferences.pane_hover_label,
+            hover_font: &hover_font,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
 
         if let Some(index) = clicked {
             self.focused = index;
+        }
+        if let Some((id, action)) = pane_action {
+            self.perform_pane_action(id, action, context);
         }
     }
 
@@ -3642,6 +3736,22 @@ impl ButtonsApp {
                     );
                     #[cfg(not(target_arch = "wasm32"))]
                     {
+                        let favorites: Vec<_> = self.preferences.favorite_theme_ids.iter()
+                            .filter_map(|id| self.themes.all().iter().find(|theme| &theme.id == id))
+                            .map(|theme| (theme.id.clone(), theme.name.clone())).collect();
+                        let target = self.tabs.get(self.focused).map(|tab| tab.id);
+                        let current = self.theme_for_tab(self.focused).to_owned();
+                        let mut action = None;
+                        ui.add_enabled_ui(target.is_some(), |ui| {
+                            ui.menu_button(crate::i18n::literal(&self.locale, "Favorite themes"), |ui| {
+                                favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
+                            });
+                            if ui.button(crate::i18n::literal(&self.locale, "Random theme"))
+                                .on_hover_text(crate::i18n::text(&self.locale, crate::i18n::MessageKey::RandomCurrent, &[])).clicked() {
+                                action = Some(PaneAction::RandomTheme);
+                            }
+                        });
+                        if let (Some(id), Some(action)) = (target, action) { self.perform_pane_action(id, action, ctx); }
                         ui.separator();
                         ui.label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
@@ -6161,8 +6271,7 @@ impl ButtonsApp {
                                 &crate::assistant::transport::ReqwestTransport,
                                 &provider,
                                 key,
-                                &system_prompt,
-                                &prompt,
+                                (&system_prompt, &prompt),
                                 &history,
                                 &cancel,
                                 &mut |delta| {
@@ -6303,6 +6412,50 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.divider_settings(ui);
         ui.separator();
+        ui.heading(crate::i18n::literal(&self.locale, "Favorite themes"));
+        let favorites: Vec<_> = self
+            .preferences
+            .favorite_theme_ids
+            .iter()
+            .filter_map(|id| self.themes.all().iter().find(|theme| &theme.id == id))
+            .map(|theme| (theme.id.clone(), theme.name.clone()))
+            .collect();
+        if favorites.is_empty() {
+            ui.label(crate::i18n::literal(
+                &self.locale,
+                "No favorite themes yet. Star a theme in Settings → Themes.",
+            ));
+        }
+        let mut remove = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut favorite_apply = None;
+        ui.horizontal_wrapped(|ui| {
+            for (id, name) in &favorites {
+                ui.push_id(("favorite", id), |ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if ui.button(name).clicked() {
+                        favorite_apply = Some(id.clone());
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    ui.label(name);
+                    if ui
+                        .small_button("★")
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Remove from favorites"))
+                        .clicked()
+                    {
+                        remove = Some(id.clone());
+                    }
+                });
+            }
+        });
+        if let Some(id) = remove {
+            self.preferences.toggle_favorite_theme(&id);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(id) = favorite_apply {
+            self.set_theme_for_tab(self.focused, &id);
+        }
+        ui.separator();
         ui.label(crate::i18n::text(
             &self.locale,
             crate::i18n::MessageKey::ChromeCornerRadius,
@@ -6345,6 +6498,7 @@ impl ButtonsApp {
         );
 
         let mut apply = None;
+        let mut toggle_favorite = None;
         #[cfg(not(target_arch = "wasm32"))]
         let mut per_tab_theme = None;
         #[cfg(not(target_arch = "wasm32"))]
@@ -6422,6 +6576,12 @@ impl ButtonsApp {
                                         });
                                         ui.add_space(5.0);
                                         ui.horizontal(|ui| {
+                                            let favorite = self.preferences.favorite_theme_ids.contains(&theme.id);
+                                            if ui.add_enabled(local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites),
+                                                egui::Button::new(if favorite { "★" } else { "☆" }).selected(favorite))
+                                                .on_hover_text(crate::i18n::literal(&self.locale, if favorite { "Remove from favorites" } else { "Add to favorites" })).clicked() {
+                                                toggle_favorite = Some(theme.id.clone());
+                                            }
                                             if ui
                                                 .add_sized(
                                                     [78.0, 26.0],
@@ -6481,6 +6641,9 @@ impl ButtonsApp {
                     });
             });
 
+        if let Some(id) = toggle_favorite {
+            self.preferences.toggle_favorite_theme(&id);
+        }
         if let Some((index, calm)) = apply {
             self.apply_theme(index, calm);
         }
@@ -6937,9 +7100,7 @@ impl ButtonsApp {
                             &mut document,
                             label,
                             pointer,
-                            0.0,
-                            100.0,
-                            fallback,
+                            (0.0, 100.0, fallback),
                             "%",
                         );
                     }
@@ -6994,9 +7155,7 @@ impl ButtonsApp {
                             &mut document,
                             "Simple noise amount",
                             "/effects/simpleNoiseAmount",
-                            0.0,
-                            100.0,
-                            24.0,
+                            (0.0, 100.0, 24.0),
                             "%",
                         );
                         theme_document_bounded_slider(
@@ -7005,9 +7164,7 @@ impl ButtonsApp {
                             &mut document,
                             "Noise resolution",
                             "/effects/simpleNoiseResolution",
-                            8.0,
-                            100.0,
-                            50.0,
+                            (8.0, 100.0, 50.0),
                             "%",
                         );
                         theme_document_bounded_slider(
@@ -7016,9 +7173,7 @@ impl ButtonsApp {
                             &mut document,
                             "Noise frame rate",
                             "/effects/simpleNoiseFps",
-                            1.0,
-                            60.0,
-                            24.0,
+                            (1.0, 60.0, 24.0),
                             " FPS",
                         );
                         theme_document_bounded_slider(
@@ -7027,9 +7182,7 @@ impl ButtonsApp {
                             &mut document,
                             "Minimum noise brightness",
                             "/effects/simpleNoiseMinBrightness",
-                            0.0,
-                            100.0,
-                            32.0,
+                            (0.0, 100.0, 32.0),
                             "%",
                         );
                         theme_document_bounded_slider(
@@ -7038,9 +7191,7 @@ impl ButtonsApp {
                             &mut document,
                             "Maximum noise brightness",
                             "/effects/simpleNoiseMaxBrightness",
-                            0.0,
-                            100.0,
-                            68.0,
+                            (0.0, 100.0, 68.0),
                             "%",
                         );
                         theme_document_toggle(
@@ -7057,9 +7208,7 @@ impl ButtonsApp {
                                 &mut document,
                                 "Idle noise amount",
                                 "/effects/simpleNoiseIdleAmount",
-                                0.0,
-                                100.0,
-                                50.0,
+                                (0.0, 100.0, 50.0),
                                 "%",
                             );
                             theme_document_bounded_slider(
@@ -7068,9 +7217,7 @@ impl ButtonsApp {
                                 &mut document,
                                 "Idle delay",
                                 "/effects/simpleNoiseIdleDelaySeconds",
-                                0.0,
-                                300.0,
-                                60.0,
+                                (0.0, 300.0, 60.0),
                                 " s",
                             );
                             theme_document_bounded_slider(
@@ -7079,9 +7226,7 @@ impl ButtonsApp {
                                 &mut document,
                                 "Idle ramp duration",
                                 "/effects/simpleNoiseIdleRampSeconds",
-                                1.0,
-                                60.0,
-                                6.0,
+                                (1.0, 60.0, 6.0),
                                 " s",
                             );
                         }
@@ -7811,6 +7956,8 @@ impl ButtonsApp {
     }
 
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        #[cfg(target_arch = "wasm32")]
+        let _ = ctx;
         ui.heading(crate::i18n::literal(&self.locale, "Fonts"));
         #[cfg(not(target_arch = "wasm32"))]
         ui.label(crate::i18n::literal(&self.locale, "Bundled and installed fonts are loaded locally. Each area can use its own family, real file weight, and size."));
@@ -8367,6 +8514,24 @@ impl ButtonsApp {
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.push_id("settings-workspace", |ui| {
+            ui.checkbox(
+                &mut self.preferences.pane_hover_label.enabled,
+                crate::i18n::literal(&self.locale, "Show terminal name on hover"),
+            );
+            if self.preferences.pane_hover_label.enabled {
+                ui.add(
+                    egui::Slider::new(&mut self.preferences.pane_hover_label.opacity, 0.0..=1.0)
+                        .text(crate::i18n::literal(&self.locale, "Hover label opacity")),
+                );
+                font_zone_editor(
+                    ui,
+                    &self.locale,
+                    &self.font_catalog,
+                    "Terminal hover label",
+                    &mut self.preferences.pane_hover_label.font,
+                    false,
+                );
+            }
             ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
             ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
             ui.checkbox(
@@ -9455,7 +9620,7 @@ fn font_zone_editor(
         .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_min_width((ui.available_width() - 24.0).max(420.0));
-            ui.label(RichText::new(label).strong().font(catalog.font_id(zone, monospace_only)));
+            ui.label(RichText::new(crate::i18n::literal(locale, label)).strong().font(catalog.font_id(zone, monospace_only)));
             if !catalog.is_available(&zone.family) {
                 ui.label(crate::i18n::literal(
                     locale,
@@ -9543,15 +9708,14 @@ fn terminal_surface(
     ui: &mut egui::Ui,
     tab: &mut TerminalTab,
     focused: bool,
-    terminal_font_id: FontId,
-    terminal_bold_font_id: FontId,
+    terminal_fonts: (FontId, FontId),
     draw_bold_bright: bool,
     theme: &ThemeDefinition,
     latest_activity_at_ms: u64,
-) -> bool {
+) -> (bool, egui::Response) {
     let terminal_font = TerminalFont::new(FontSettings {
-        font_type: terminal_font_id,
-        bold_font_type: Some(terminal_bold_font_id),
+        font_type: terminal_fonts.0,
+        bold_font_type: Some(terminal_fonts.1),
     });
     let time = ui.input(|input| input.time) as f32;
     let gradient = theme
@@ -9638,7 +9802,7 @@ fn terminal_surface(
     } else {
         false
     };
-    response.clicked() || scrollbar_clicked
+    (response.clicked() || scrollbar_clicked, response)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -9946,6 +10110,12 @@ struct PaneRenderState<'a> {
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
     latest_activity_at_ms: u64,
+    locale: &'a str,
+    favorites: &'a [(String, String)],
+    auto_tile: &'a crate::autotile::AutoTile,
+    action: &'a mut Option<(u64, PaneAction)>,
+    hover_label: &'a crate::settings::PaneHoverLabel,
+    hover_font: &'a FontId,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -9966,17 +10136,57 @@ fn render_pane_tree(
                     .layout(Layout::top_down(Align::Min)),
             );
             pane.set_clip_rect(rect);
-            if terminal_surface(
+            let (clicked, response) = terminal_surface(
                 &mut pane,
                 tab,
                 state.focused == *index && !state.modal_open,
-                state.terminal_font.clone(),
-                state.terminal_bold_font.clone(),
+                (
+                    state.terminal_font.clone(),
+                    state.terminal_bold_font.clone(),
+                ),
                 state.draw_bold_bright,
                 state.override_themes.get(&tab.id).unwrap_or(state.theme),
                 state.latest_activity_at_ms,
-            ) {
+            );
+            if clicked {
                 *state.clicked = Some(*index);
+            }
+            let theme = state.override_themes.get(&tab.id).unwrap_or(state.theme);
+            if !state.modal_open
+                && local_feature_available(
+                    crate::features::catalog::FeatureKey::TerminalContextMenu,
+                )
+            {
+                response.context_menu(|ui| {
+                    ui.strong(&tab.title);
+                    ui.label(&theme.name);
+                    let mut action = None;
+                    pane_action_menu(
+                        ui,
+                        state.locale,
+                        &theme.id,
+                        state.favorites,
+                        state.auto_tile.includes(tab.id),
+                        &mut action,
+                    );
+                    if let Some(action) = action {
+                        *state.action = Some((tab.id, action));
+                    }
+                });
+            }
+            if state.hover_label.enabled
+                && local_feature_available(crate::features::catalog::FeatureKey::PaneHoverLabel)
+                && !state.modal_open
+                && response.hovered()
+            {
+                paint_pane_hover_label(
+                    &pane,
+                    rect,
+                    &tab.title,
+                    state.hover_font,
+                    theme.colors.text,
+                    state.hover_label.opacity,
+                );
             }
         }
         PaneTree::Split {
@@ -10181,6 +10391,124 @@ fn pane_state_after_close(
         }
     }
     (next_visible, next_focused)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn paint_pane_hover_label(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    title: &str,
+    font: &FontId,
+    color: Color32,
+    opacity: f32,
+) {
+    let position = egui::pos2(rect.center().x, rect.top() + 16.0);
+    let painter = ui.painter().with_clip_rect(rect.shrink(4.0));
+    painter.text(
+        position + egui::vec2(1.0, 1.0),
+        egui::Align2::CENTER_TOP,
+        title,
+        font.clone(),
+        Color32::from_black_alpha((opacity * 200.0) as u8),
+    );
+    painter.text(
+        position,
+        egui::Align2::CENTER_TOP,
+        title,
+        font.clone(),
+        Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), (opacity * 255.0) as u8),
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn favorite_theme_menu(
+    ui: &mut egui::Ui,
+    locale: &str,
+    current: &str,
+    favorites: &[(String, String)],
+    action: &mut Option<PaneAction>,
+) {
+    if favorites.is_empty() {
+        ui.label(crate::i18n::literal(
+            locale,
+            "No favorite themes yet. Star a theme in Settings → Themes.",
+        ));
+    } else {
+        egui::ScrollArea::vertical()
+            .id_salt("favorite-themes-menu")
+            .max_height(320.0)
+            .show(ui, |ui| {
+                for (id, name) in favorites {
+                    if ui.selectable_label(id == current, name).clicked() {
+                        *action = Some(PaneAction::Theme(id.clone()));
+                        ui.close_menu();
+                    }
+                }
+            });
+    }
+    ui.separator();
+    let label = if favorites.iter().any(|(id, _)| id == current) {
+        "Remove current theme from favorites"
+    } else {
+        "Favorite current theme"
+    };
+    if ui.button(crate::i18n::literal(locale, label)).clicked() {
+        *action = Some(PaneAction::ToggleFavorite(current.to_owned()));
+        ui.close_menu();
+    }
+    if ui
+        .button(crate::i18n::literal(locale, "Theme settings"))
+        .clicked()
+    {
+        *action = Some(PaneAction::ThemeSettings);
+        ui.close_menu();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_action_menu(
+    ui: &mut egui::Ui,
+    locale: &str,
+    current: &str,
+    favorites: &[(String, String)],
+    included: bool,
+    action: &mut Option<PaneAction>,
+) {
+    ui.menu_button(crate::i18n::literal(locale, "Favorite themes"), |ui| {
+        favorite_theme_menu(ui, locale, current, favorites, action);
+    });
+    for (label, operation) in [
+        ("Random theme", PaneAction::RandomTheme),
+        ("Use global theme", PaneAction::UseGlobal),
+        ("Copy selection", PaneAction::Copy),
+        ("Select all", PaneAction::SelectAll),
+        ("Clear screen", PaneAction::Clear),
+        ("Rename", PaneAction::Rename),
+    ] {
+        if ui.button(crate::i18n::literal(locale, label)).clicked() {
+            *action = Some(operation);
+            ui.close_menu();
+        }
+    }
+    let mut include = included;
+    if ui
+        .checkbox(
+            &mut include,
+            crate::i18n::literal(locale, "Include in auto-tile"),
+        )
+        .changed()
+    {
+        *action = Some(PaneAction::ToggleAutoTile);
+        ui.close_menu();
+    }
+    ui.separator();
+    if ui
+        .button(crate::i18n::literal(locale, "Close terminal"))
+        .clicked()
+    {
+        *action = Some(PaneAction::Close);
+        ui.close_menu();
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10432,11 +10760,10 @@ fn theme_document_bounded_slider(
     document: &mut Value,
     label: &str,
     pointer: &str,
-    minimum: f32,
-    maximum: f32,
-    default: f32,
+    bounds: (f32, f32, f32),
     suffix: &str,
 ) {
+    let (minimum, maximum, default) = bounds;
     let mut value = document
         .pointer(pointer)
         .and_then(Value::as_f64)
@@ -10543,6 +10870,8 @@ impl eframe::App for ButtonsApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(target_arch = "wasm32")]
+        let _ = frame;
         self.refresh_locale();
         #[cfg(not(target_arch = "wasm32"))]
         self.apply_window_opacity(frame);
@@ -10750,6 +11079,72 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
+    fn pane_context_menu_exposes_theme_controls_and_returns_random_action() {
+        let ctx = egui::Context::default();
+        let mut action = None;
+        let favorites = vec![("basic2".to_owned(), "Favorite palette".to_owned())];
+        let mut render = |events| {
+            ctx.run(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        ui.button("Pane").context_menu(|ui| {
+                            pane_action_menu(ui, "en", "basic2", &favorites, true, &mut action)
+                        });
+                    });
+                },
+            )
+        };
+        let output = render(vec![]);
+        let pos = text_position(&output, "Pane").unwrap();
+        render(pointer_events(pos, egui::PointerButton::Secondary, true));
+        render(pointer_events(pos, egui::PointerButton::Secondary, false));
+        let menu = render(vec![]);
+        assert!(text_position(&menu, "Favorite themes").is_some());
+        assert!(text_position(&menu, "Close terminal").is_some());
+        let random = text_position(&menu, "Random theme").unwrap();
+        render(pointer_events(random, egui::PointerButton::Primary, true));
+        render(pointer_events(random, egui::PointerButton::Primary, false));
+        assert_eq!(action, Some(PaneAction::RandomTheme));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn favorite_menu_returns_saved_theme_id() {
+        let ctx = egui::Context::default();
+        let favorites = vec![(
+            "personal:default:sample".to_owned(),
+            "Saved palette".to_owned(),
+        )];
+        let mut action = None;
+        let mut render = |events| {
+            ctx.run(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        favorite_theme_menu(ui, "en", "basic2", &favorites, &mut action);
+                    });
+                },
+            )
+        };
+        let output = render(vec![]);
+        let pos = text_position(&output, "Saved palette").unwrap();
+        render(pointer_events(pos, egui::PointerButton::Primary, true));
+        render(pointer_events(pos, egui::PointerButton::Primary, false));
+        assert_eq!(
+            action,
+            Some(PaneAction::Theme("personal:default:sample".to_owned()))
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
     fn status_bar_ai_help_button_opens_the_window_without_requiring_access() {
         let mut app = ButtonsApp::empty(Preferences::default());
         let ctx = egui::Context::default();
@@ -10804,8 +11199,52 @@ mod tests {
         }
         assert_eq!(app.tabs.len(), 4);
         let ids = app.tab_ids();
+        app.focused = 0;
+        let theme_id = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| theme.id != app.theme_for_tab(0))
+            .unwrap()
+            .id
+            .clone();
+        app.perform_pane_action(ids[1], PaneAction::Theme(theme_id.clone()), &ctx);
+        assert_eq!(app.theme_for_tab(1), theme_id);
+        assert!(!app.theme_overrides.contains_key(&ids[0]));
+        app.perform_pane_action(ids[1], PaneAction::ToggleFavorite(theme_id.clone()), &ctx);
+        assert!(app.preferences.favorite_theme_ids.contains(&theme_id));
         app.show_all_auto_tiles();
         assert_eq!(app.visible_panes.len(), 4);
+        fonts::install(&ctx, &app.font_catalog);
+        let title = app.tabs[0].title.clone();
+        let mut render_hover = |enabled| {
+            app.preferences.pane_hover_label.enabled = enabled;
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 700.0),
+                    )),
+                    events: vec![egui::Event::PointerMoved(egui::pos2(80.0, 80.0))],
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            )
+        };
+        render_hover(true);
+        let output = render_hover(true);
+        assert!(
+            text_position(&output, &title).is_some(),
+            "hover identifies the actual pane's tab"
+        );
+        let output = render_hover(false);
+        assert!(
+            text_position(&output, &title).is_none(),
+            "disabled hover label paints no name"
+        );
+        assert_eq!(app.tab_ids(), ids, "hover must not replace sessions");
         app.set_pane_layout(PaneLayout::Single, &ctx);
         app.set_pane_layout(PaneLayout::Rows, &ctx);
         assert_eq!(app.visible_panes.len(), 4);
@@ -10813,6 +11252,11 @@ mod tests {
         app.toggle_auto_tile(1);
         app.move_tab(1, 0);
         assert_eq!(app.tabs[0].id, ids[1]);
+        assert_eq!(app.theme_for_tab(0), theme_id);
+        app.perform_pane_action(ids[1], PaneAction::RandomTheme, &ctx);
+        assert_ne!(app.theme_for_tab(0), theme_id);
+        app.perform_pane_action(ids[1], PaneAction::UseGlobal, &ctx);
+        assert!(!app.theme_overrides.contains_key(&ids[1]));
         assert!(!app.auto_tile.includes(ids[1]));
         assert!(!app.visible_panes.contains(&0));
         app.activate_tab(0);
@@ -10829,6 +11273,12 @@ mod tests {
         assert_eq!(app.visible_panes.len(), 2);
         assert!(!app.visible_panes.contains(&0));
         app.close_tab(0);
+        let overrides = app.theme_overrides.clone();
+        app.perform_pane_action(ids[1], PaneAction::Theme(theme_id), &ctx);
+        assert_eq!(
+            app.theme_overrides, overrides,
+            "closed popup target cannot change another terminal"
+        );
         app.reopen_closed_tab(ctx.clone());
         let restored = app.tabs.last().unwrap().id;
         assert_ne!(restored, ids[1]);

@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-use crate::fonts::{FontZone, Typography};
+use crate::fonts::FontZone;
 use crate::storage::store::{NativeStore, StoreError};
 use crate::theme::{to_hex, validate_personal_document, GradientGeometry, ThemeDefinition};
 
@@ -177,7 +177,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
         .gradient
         .map(|colors| colors.map(to_hex).to_vec())
         .unwrap_or_default();
-    let typography = theme.typography.clone().unwrap_or_else(Typography::default);
+    let typography = theme.typography.clone().unwrap_or_default();
     json!({
         "version": 1,
         "metadata": {

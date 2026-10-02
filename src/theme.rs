@@ -212,6 +212,7 @@ impl ThemeCatalog {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
     let valid_metadata = |key: &str| {
         document["metadata"][key]

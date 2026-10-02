@@ -1534,9 +1534,8 @@ mod tests {
         for locale in SUPPORTED_LOCALES {
             for english in strings {
                 let translated = literal(locale, english);
-                assert_eq!(
+                assert!(
                     locale == "en" || translated != english,
-                    true,
                     "missing translation for {locale}: {english}"
                 );
             }

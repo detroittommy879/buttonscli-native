@@ -15,6 +15,7 @@ mod display;
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]
 mod distribution;
+#[cfg(not(target_arch = "wasm32"))]
 mod dock;
 pub mod features;
 #[cfg(not(target_arch = "wasm32"))]
