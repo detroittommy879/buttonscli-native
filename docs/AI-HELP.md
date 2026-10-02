@@ -10,6 +10,23 @@ completion paths are preserved. Model discovery uses the same normalized base.
 
 The provider editor can test a selected model with a short request and discover model IDs when the provider exposes a compatible models endpoint. Each operation starts only after you click its button. The response is bounded and failures do not include response bodies or credentials.
 
+Pasted API keys are trimmed before saving and before sending, including keys
+saved by earlier builds with surrounding line breaks. Embedded control characters
+produce an explicit invalid-key error. HTTP 429 is reported as a provider rate
+limit or quota rejection. On 2026-10-02, the configured second provider's OS key
+was readable; trimming its pasted line break fixed the invalid-header failure,
+then the server returned HTTP 429. Real AI Help/theme acceptance remains blocked
+by that response. A replacement test key was saved in the OS vault; completion
+still returned 429, while native model discovery succeeded. Further provider
+testing is paused at the user's request. No key value was logged and no terminal
+contents were sent.
+
+The later Mistral test on the same day succeeded using exactly
+`https://api.mistral.ai/v1/chat/completions` and `codestral-latest` for minimal
+completion and streaming. Mistral was saved as a separate active provider, with
+its key in OS storage. These backend checks do not replace the remaining GUI,
+context-review, suggestion-quality and platform acceptance work.
+
 Open **AI Help** in the status bar or **Help → AI Help** for a separate conversation window. The window can open while requests are locked, with an access explanation and a link to provider settings. With access available, enter a question and send it to the active provider. Answer text streams into the window without showing the response envelope, and recent successful turns stay available there until the app closes. If a request fails, **Retry last request** repeats it. Closing the AI Help window keeps the conversation and any in-flight request; closing the app cancels the request.
 
 Terminal context is optional and off by default. Turn on **Include a terminal output snapshot**, preview it, and review the terminal title, shell and text before sending. The preview comes from the terminal's current screen and scrollback grid, not a raw command transcript. It is limited to 200,000 characters. The app masks the configured API key and a few obvious secret patterns, but redaction is best effort; review the exact preview before sending it to your provider.

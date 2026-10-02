@@ -3,6 +3,41 @@
 Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
 
+## 2026-10-02 pane fonts and theme-editor follow-up
+
+- Started `codex/pane-fonts-theme-editor` from merged `origin/main`; the new
+  GitHub README was preserved.
+- Full native suite: 239 library tests and two import fixtures pass; eight
+  explicitly optional tests are ignored. Strict Clippy and desktop/browser
+  compile checks pass. Final native color round-trip coverage includes separate
+  shell/control, tab, dock/button, Settings and status-bar fields.
+- Font regressions cover two themes with different families/sizes, terminal-only
+  legacy font metadata, manual overrides and the Fonts apply scope. The explicit
+  Windows ConPTY lifecycle check passes with font retention across reorder,
+  random-theme reset, close and recovery, and stale popup targeting checks.
+- Fake-time editor checks verify the 500 ms debounce, held-mouse suppression,
+  all-section preview despite unchecked card scopes, animated-gradient state,
+  disabling preview without losing draft edits, and excluding an unsaved preview
+  from autosave. Existing minimum-window/footer and menu-pointer tests pass.
+- Windows isolated GUI startup/capture passes. The captured 1296×859 frame was
+  inspected: **★ Favorites** and **Random theme** are visible in the status bar.
+  This does not replace interactive acceptance of every editor/scrollbar control.
+- Five CLI deadline regressions and the MCP fake-API contract pass. The isolated
+  live CLI/PTY matrix and official SDK smoke pass; the SDK lists 14 tools and calls
+  status/tabs. The full real MCP tool matrix remains open.
+- Provider 2's originally pasted line break caused an invalid header; trimming
+  fixed transport construction. Both original/replacement credentials then got
+  HTTP 429 on completion. Native `/v1/models` discovery succeeded with the bounded
+  500-ID list. Further Provider 2 testing stopped at the user's request.
+- The user-supplied Mistral endpoint and exactly `codestral-latest` passed a real
+  completion, streamed AI Help response and generated palette schema/contrast
+  validation. Prompts were synthetic and no terminal context or keys were logged.
+  Mistral was saved as a separate active provider with its key in the OS vault.
+  No generated theme was written by the test. Full AI GUI acceptance remains open.
+- Existing bin/lib PDB naming and unavailable Vulkan-driver/validation-layer
+  messages remain; startup/rendering and functional assertions pass using the
+  available graphics backend.
+
 ## 2026-10-02 README and integration checks
 
 - Formatting, strict native Clippy, desktop build and `git diff --check` pass.

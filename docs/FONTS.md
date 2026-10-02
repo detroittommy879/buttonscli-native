@@ -16,6 +16,15 @@ terminal cell sizing. Missing fonts fall back to the bundled UI or terminal
 font and keep the saved selection so it can be restored if the font becomes
 available again.
 
+Each live terminal has independent font family, weight and size. Open its
+right-click menu → **Terminal font**, or **Settings → Fonts → Current terminal
+font**, to edit it. **Use theme / default font** removes the manual override.
+Applying or randomizing a pane theme uses that theme's terminal font when the
+Themes **Fonts** apply scope is checked; missing font metadata uses the workspace
+default. Randomizing all panes resolves each theme separately. Zoom controls
+affect the focused terminal. Pane fonts follow stable session IDs through tab
+reordering and closed-tab recovery, and are session-only, like pane themes.
+
 To add a font for this ButtonsCLI profile, enter the path to a `.ttf` or `.otf`
 file and choose **Import local font**. The app validates the font before
 copying it into

@@ -137,6 +137,7 @@ impl<'a> RuntimeConfigClient<'a> {
                     RuntimeConfigError::ResponseTooLarge
                 }
                 crate::assistant::transport::TransportError::Network
+                | crate::assistant::transport::TransportError::InvalidCredential
                 | crate::assistant::transport::TransportError::Cancelled => {
                     RuntimeConfigError::Network
                 }

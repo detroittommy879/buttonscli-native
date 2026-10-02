@@ -168,7 +168,9 @@ fn submit_feedback_with(
         .map_err(|error| match error {
             TransportError::InvalidEndpoint => FeedbackError::Endpoint,
             TransportError::ResponseTooLarge => FeedbackError::ResponseTooLarge,
-            TransportError::Network | TransportError::Cancelled => FeedbackError::Network,
+            TransportError::Network
+            | TransportError::InvalidCredential
+            | TransportError::Cancelled => FeedbackError::Network,
         })?;
     if !(200..300).contains(&response.status) {
         return Err(FeedbackError::Http(response.status));

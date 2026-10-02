@@ -35,6 +35,7 @@ pub(crate) struct ResponseHead {
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum TransportError {
     InvalidEndpoint,
+    InvalidCredential,
     Network,
     ResponseTooLarge,
     Cancelled,
@@ -44,6 +45,9 @@ impl std::fmt::Display for TransportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::InvalidEndpoint => "invalid provider endpoint",
+            Self::InvalidCredential => {
+                "API key contains invalid characters; paste only the key and save it again"
+            }
             Self::Network => "provider connection failed or timed out",
             Self::ResponseTooLarge => "provider response exceeded 1 MiB",
             Self::Cancelled => "provider request was cancelled",
@@ -78,6 +82,17 @@ pub(crate) trait HttpTransport: Send + Sync {
 
 pub(crate) struct ReqwestTransport;
 
+fn bearer_header(key: &str) -> Result<reqwest::header::HeaderValue, TransportError> {
+    let key = key.trim();
+    if key.is_empty() || key.chars().any(char::is_control) {
+        return Err(TransportError::InvalidCredential);
+    }
+    let mut value = reqwest::header::HeaderValue::from_str(&format!("Bearer {key}"))
+        .map_err(|_| TransportError::InvalidCredential)?;
+    value.set_sensitive(true);
+    Ok(value)
+}
+
 impl HttpTransport for ReqwestTransport {
     fn execute(&self, request: Request) -> Result<Response, TransportError> {
         let parsed = url::Url::parse(&request.url).map_err(|_| TransportError::InvalidEndpoint)?;
@@ -103,7 +118,7 @@ impl HttpTransport for ReqwestTransport {
         .header("Accept", "application/json")
         .header("X-Title", "ButtonsCLI Native");
         if let Some(key) = request.key.as_deref() {
-            builder = builder.bearer_auth(key);
+            builder = builder.header(reqwest::header::AUTHORIZATION, bearer_header(key)?);
         }
         if let Some(body) = request.body {
             builder = builder.json(&body);
@@ -166,7 +181,7 @@ impl HttpTransport for ReqwestTransport {
         .header("Accept", "application/json, text/event-stream")
         .header("X-Title", "ButtonsCLI Native");
         if let Some(key) = request.key.as_deref() {
-            builder = builder.bearer_auth(key);
+            builder = builder.header(reqwest::header::AUTHORIZATION, bearer_header(key)?);
         }
         if let Some(body) = request.body {
             builder = builder.json(&body);
@@ -206,5 +221,23 @@ impl HttpTransport for ReqwestTransport {
             on_chunk(&buffer[..read])?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pasted_key_whitespace_is_trimmed_and_embedded_controls_are_rejected() {
+        let value = bearer_header("  FAKE-KEY\r\n ").unwrap();
+        assert_eq!(value.to_str().unwrap(), "Bearer FAKE-KEY");
+        assert!(value.is_sensitive());
+        for invalid in ["\r\n ", "FAKE\nKEY", "FAKE\0KEY"] {
+            assert_eq!(
+                bearer_header(invalid).unwrap_err(),
+                TransportError::InvalidCredential
+            );
+        }
     }
 }

@@ -193,6 +193,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
                 "shell": {
                     "background": to_hex(theme.colors.canvas),
                     "backgroundSecondary": to_hex(theme.colors.panel),
+                    "buttonBackground": to_hex(theme.colors.raised),
                     "textMain": to_hex(theme.colors.text),
                     "textDim": to_hex(theme.colors.muted),
                     "accent": to_hex(theme.colors.accent),
@@ -212,6 +213,9 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
                 "presetDock": {
                     "background": to_hex(theme.colors.dock_background),
                     "accent": to_hex(theme.colors.accent_alt),
+                    "buttonBackground": to_hex(theme.colors.dock_button),
+                    "buttonHover": to_hex(theme.colors.dock_button_hover),
+                    "buttonText": to_hex(theme.colors.dock_button_text),
                 },
                 "settings": { "background": to_hex(theme.colors.settings_background) },
                 "statusBar": {

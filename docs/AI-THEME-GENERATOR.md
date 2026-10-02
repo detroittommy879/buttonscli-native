@@ -24,5 +24,8 @@ release builds. A configured endpoint and model are required. Provider requests
 may include your brief and the selected palette, so review the provider you
 have selected before generating.
 
-The candidate flow and validation have Windows source tests. Live provider
-requests and interactive Windows GUI behavior have not yet been certified.
+The candidate flow and validation have Windows source tests. On 2026-10-02,
+Mistral's `https://api.mistral.ai/v1/chat/completions` endpoint with exactly
+`codestral-latest` produced a real palette candidate that passed native schema
+and contrast validation. The acceptance test did not save a theme. Interactive
+Windows GUI behavior and broader provider/platform acceptance remain open.

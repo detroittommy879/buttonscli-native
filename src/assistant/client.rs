@@ -28,6 +28,7 @@ impl std::fmt::Display for ClientError {
         match self {
             Self::Endpoint => f.write_str("configure a valid chat completions endpoint"),
             Self::Model => f.write_str("enter a model ID"),
+            Self::Http(429) => f.write_str("provider returned HTTP 429 (rate limit or quota); wait or check the provider account"),
             Self::Http(status) => write!(f, "provider returned HTTP {status}"),
             Self::Transport(error) => write!(f, "{error}"),
             Self::InvalidReply => f.write_str("provider returned an invalid response"),
@@ -301,6 +302,189 @@ fn completion_content(body: &[u8]) -> Result<String, ClientError> {
 
 #[cfg(test)]
 mod tests {
+    fn configured_provider_two() -> (super::super::provider::ProviderProfile, Zeroizing<String>) {
+        use super::super::credentials::{CredentialStore, SystemCredentialStore};
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_PROVIDER_TWO").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        let document: Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let settings: super::super::provider::ProviderSettings =
+            serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
+        let provider = settings
+            .providers
+            .get(1)
+            .expect("Provider 2 is missing")
+            .clone();
+        let expected = super::super::credentials::reference(&profile, &provider.id);
+        assert_eq!(provider.credential_ref.as_deref(), Some(expected.as_str()));
+        let key = SystemCredentialStore
+            .get(&expected)
+            .expect("Provider 2 key is unavailable");
+        (provider, key)
+    }
+
+    #[test]
+    #[ignore = "explicit real-provider model discovery; no completion request"]
+    fn configured_provider_two_live_models() {
+        let (provider, key) = configured_provider_two();
+        let models = super::discover_models(
+            &super::super::transport::ReqwestTransport,
+            &provider,
+            Some(key),
+        )
+        .expect("Provider 2 model discovery failed");
+        println!(
+            "Provider 2 models: {} returned; configured model present: {}",
+            models.len(),
+            models.contains(&provider.model)
+        );
+        assert!(models.contains(&provider.model));
+    }
+
+    #[test]
+    #[ignore = "explicit Mistral codestral-latest request; API key supplied only in process memory"]
+    fn mistral_codestral_live_ai_flows() {
+        let key = Zeroizing::new(
+            std::env::var("BUTTONSCLI_TEST_MISTRAL_KEY").expect("Supply the test key explicitly"),
+        );
+        let provider = super::super::provider::ProviderProfile {
+            id: "mistral-codestral".into(),
+            name: "Mistral".into(),
+            endpoint: "https://api.mistral.ai/v1/chat/completions".into(),
+            model: "codestral-latest".into(),
+            credential_ref: None,
+        };
+        let transport = super::super::transport::ReqwestTransport;
+        super::test_connection(&transport, &provider, Some(Zeroizing::new(key.to_string())))
+            .expect("Mistral codestral-latest minimal completion failed");
+        println!("Mistral codestral-latest minimal completion passed.");
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+        let mut received_delta = false;
+        let answer = super::stream_completion(
+            &transport,
+            &provider,
+            Some(Zeroizing::new(key.to_string())),
+            ("You are a concise assistant.", "Reply with OK."),
+            &[],
+            &cancelled,
+            &mut |_| {
+                received_delta = true;
+            },
+        )
+        .expect("Mistral codestral-latest AI Help streaming failed");
+        assert!(!answer.trim().is_empty() && received_delta);
+        println!("Mistral codestral-latest AI Help streaming passed without terminal context.");
+        let themes = crate::theme::ThemeCatalog::load();
+        let base = crate::theme_files::document_from_theme(themes.get("aurora"), "Provider test");
+        let seed = crate::theme_generation::seed_palette(&base);
+        let candidate = crate::theme_generation::generate_candidate(
+            &transport,
+            &provider,
+            Some(key),
+            "A readable dark navy terminal with teal accents.",
+            &seed,
+            &base,
+            &cancelled,
+        )
+        .expect("Mistral codestral-latest AI theme generation or native validation failed");
+        crate::theme::validate_personal_document(&candidate.document).unwrap();
+        println!("Mistral codestral-latest AI theme generation and native validation passed; no theme saved.");
+    }
+    #[test]
+    #[ignore = "explicit real-provider request using the active native profile's Provider 2"]
+    fn configured_provider_two_live_connection() {
+        use super::super::credentials::{CredentialStore, SystemCredentialStore};
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_PROVIDER_TWO").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        let document: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let settings: super::super::provider::ProviderSettings =
+            serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
+        let provider = settings.providers.get(1).expect("Provider 2 is missing");
+        let expected = super::super::credentials::reference(&profile, &provider.id);
+        assert_eq!(provider.credential_ref.as_deref(), Some(expected.as_str()));
+        let key = SystemCredentialStore
+            .get(&expected)
+            .expect("Provider 2 key is unavailable");
+        let result = super::test_connection(
+            &super::super::transport::ReqwestTransport,
+            provider,
+            Some(Zeroizing::new(key.to_string())),
+        );
+        if result.is_err() {
+            // A credential-free TLS probe diagnoses transport failures without exposing keys.
+            if let Err(error) = reqwest::blocking::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap()
+                .get(&provider.endpoint)
+                .send()
+            {
+                println!(
+                    "Credential-free transport diagnostic: {:?}",
+                    error.without_url()
+                );
+            }
+        }
+        result.expect("Provider 2 minimal connection request failed");
+        println!(
+            "Provider 2: saved credential and configured model passed minimal completion request."
+        );
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+        let mut received_delta = false;
+        let answer = super::stream_completion(
+            &super::super::transport::ReqwestTransport,
+            provider,
+            Some(Zeroizing::new(key.to_string())),
+            ("You are a concise assistant.", "Reply with OK."),
+            &[],
+            &cancelled,
+            &mut |_| {
+                received_delta = true;
+            },
+        )
+        .expect("Provider 2 streamed AI Help request failed");
+        assert!(!answer.trim().is_empty());
+        assert!(received_delta);
+        println!(
+            "Provider 2: AI Help streaming passed with synthetic text and no terminal context."
+        );
+        let themes = crate::theme::ThemeCatalog::load();
+        let base = crate::theme_files::document_from_theme(themes.get("aurora"), "Provider test");
+        let seed = crate::theme_generation::seed_palette(&base);
+        let candidate = crate::theme_generation::generate_candidate(
+            &super::super::transport::ReqwestTransport,
+            provider,
+            Some(key),
+            "A readable dark navy terminal with teal accents.",
+            &seed,
+            &base,
+            &cancelled,
+        )
+        .expect("Provider 2 AI theme generation or contrast validation failed");
+        crate::theme::validate_personal_document(&candidate.document).unwrap();
+        println!("Provider 2: AI theme candidate generation and native validation passed; no theme was saved.");
+    }
     #[test]
     fn base_urls_expand_without_changing_custom_completion_paths() {
         for (input, expected) in [

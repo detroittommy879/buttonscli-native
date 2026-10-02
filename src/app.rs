@@ -328,6 +328,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_confirm_delete: bool,
     #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_preview_due: Option<f64>,
+    #[cfg(not(target_arch = "wasm32"))]
     theme_generation_prompt: String,
     #[cfg(not(target_arch = "wasm32"))]
     theme_generation_busy: bool,
@@ -546,6 +548,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
+    pane_fonts: std::collections::BTreeMap<u64, fonts::PaneFont>,
+    #[cfg(not(target_arch = "wasm32"))]
     detected_shells: Vec<DetectedShell>,
     #[cfg(not(target_arch = "wasm32"))]
     recently_closed: Vec<ClosedTab>,
@@ -612,12 +616,41 @@ struct SettingsSnapshot {
     preferences: Preferences,
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pane_fonts: std::collections::BTreeMap<u64, fonts::PaneFont>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 struct ThemePreviewSnapshot {
     preferences: Preferences,
     applied_preferences: Preferences,
+    theme_overrides: std::collections::BTreeMap<u64, String>,
+    pane_fonts: std::collections::BTreeMap<u64, fonts::PaneFont>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePreviewSnapshot) {
+    if preferences.theme_id == snapshot.applied_preferences.theme_id {
+        preferences.theme_id = snapshot.preferences.theme_id.clone();
+    }
+    if preferences.app_theme_id == snapshot.applied_preferences.app_theme_id {
+        preferences.app_theme_id = snapshot.preferences.app_theme_id.clone();
+    }
+    if preferences.terminal_theme_id == snapshot.applied_preferences.terminal_theme_id {
+        preferences.terminal_theme_id = snapshot.preferences.terminal_theme_id.clone();
+    }
+    if preferences.gradient_theme_id == snapshot.applied_preferences.gradient_theme_id {
+        preferences.gradient_theme_id = snapshot.preferences.gradient_theme_id.clone();
+    }
+    if preferences.effects_theme_id == snapshot.applied_preferences.effects_theme_id {
+        preferences.effects_theme_id = snapshot.preferences.effects_theme_id.clone();
+    }
+    if preferences.typography == snapshot.applied_preferences.typography {
+        preferences.typography = snapshot.preferences.typography.clone();
+    }
+    if preferences.calm_mode == snapshot.applied_preferences.calm_mode {
+        preferences.calm_mode = snapshot.preferences.calm_mode;
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -793,12 +826,13 @@ enum PresetAction {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ClosedTab {
     title: String,
     had_custom_title: bool,
     profile_id: String,
     theme_override: Option<String>,
+    font_override: Option<fonts::PaneFont>,
     excluded_from_auto_tile: bool,
 }
 
@@ -814,9 +848,11 @@ enum TabAction {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 enum PaneAction {
     Theme(String),
+    Font(fonts::PaneFont),
+    UseThemeFont,
     RandomTheme,
     UseGlobal,
     ToggleFavorite(String),
@@ -1042,6 +1078,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_confirm_delete: false,
             #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_preview_due: None,
+            #[cfg(not(target_arch = "wasm32"))]
             theme_generation_prompt: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_generation_busy: false,
@@ -1261,6 +1299,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            pane_fonts: std::collections::BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             detected_shells: crate::terminal::detected_shells(),
             #[cfg(not(target_arch = "wasm32"))]
             recently_closed: Vec::new(),
@@ -1322,7 +1362,7 @@ impl ButtonsApp {
         visuals.widgets.inactive.weak_bg_fill = colors.raised;
         visuals.widgets.inactive.fg_stroke.color = colors.text;
         visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, colors.border);
-        visuals.widgets.hovered.bg_fill = colors.border;
+        visuals.widgets.hovered.bg_fill = colors.accent_hover;
         visuals.widgets.hovered.fg_stroke.color = Color32::WHITE;
         visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, colors.accent);
         visuals.widgets.active.bg_fill = colors.accent;
@@ -1439,6 +1479,33 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn font_for_pane(&self, id: u64) -> fonts::PaneFont {
+        if let Some(font) = self.pane_fonts.get(&id) {
+            return font.clone();
+        }
+        if self.preferences.theme_apply.fonts {
+            if let Some(typography) = self
+                .theme_overrides
+                .get(&id)
+                .and_then(|theme| self.themes.get(theme).typography.as_ref())
+            {
+                return fonts::PaneFont::from(typography);
+            }
+        }
+        fonts::PaneFont::from(&self.preferences.typography)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn zoom_focused_terminal(&mut self, action: crate::dock::ZoomAction) {
+        if let Some(tab) = self.tabs.get(self.focused) {
+            let id = tab.id;
+            let mut font = self.font_for_pane(id);
+            font.zone.size = crate::dock::next_terminal_font_size(font.zone.size, action);
+            self.pane_fonts.insert(id, font);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn theme_for_tab(&self, index: usize) -> &str {
         self.tabs
             .get(index)
@@ -1456,6 +1523,7 @@ impl ButtonsApp {
             return;
         }
         self.theme_overrides.insert(tab.id, theme_id.to_owned());
+        self.pane_fonts.remove(&tab.id);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1468,6 +1536,12 @@ impl ButtonsApp {
         self.preferences.gradient_theme_id = theme_id.to_owned();
         self.preferences.effects_theme_id = theme_id.to_owned();
         self.theme_overrides.clear();
+        self.pane_fonts.clear();
+        if self.preferences.theme_apply.fonts {
+            if let Some(typography) = self.themes.get(theme_id).typography.clone() {
+                self.preferences.typography = typography;
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1497,6 +1571,12 @@ impl ButtonsApp {
         };
         match action {
             PaneAction::Theme(theme) => self.set_theme_for_tab(index, &theme),
+            PaneAction::Font(font) => {
+                self.pane_fonts.insert(id, font);
+            }
+            PaneAction::UseThemeFont => {
+                self.pane_fonts.remove(&id);
+            }
             PaneAction::RandomTheme => {
                 if let Some(theme) = self.random_theme_id(self.theme_for_tab(index)) {
                     self.set_theme_for_tab(index, &theme);
@@ -2044,6 +2124,7 @@ impl ButtonsApp {
             had_custom_title: tab.custom_title.is_some(),
             profile_id: tab.profile_id.clone(),
             theme_override: self.theme_overrides.remove(&tab.id),
+            font_override: self.pane_fonts.remove(&tab.id),
             excluded_from_auto_tile: self.auto_tile.forget(tab.id),
         };
         tab.request_exit();
@@ -2085,6 +2166,9 @@ impl ButtonsApp {
             if let Some(index) = self.tabs.len().checked_sub(1) {
                 self.toggle_auto_tile(index);
             }
+        }
+        if let (Some(font), Some(tab)) = (closed.font_override, self.tabs.last()) {
+            self.pane_fonts.insert(tab.id, font);
         }
         if let (Some(theme_id), Some(tab)) = (closed.theme_override, self.tabs.last()) {
             if self.themes.all().iter().any(|theme| theme.id == theme_id) {
@@ -2409,13 +2493,21 @@ impl ButtonsApp {
         }
 
         let focused = self.focused;
-        let terminal_font = self
-            .font_catalog
-            .font_id(&self.preferences.typography.terminal, true);
-        let mut bold_zone = self.preferences.typography.terminal.clone();
-        bold_zone.weight = self.preferences.typography.terminal_bold_weight;
-        let terminal_bold_font = self.font_catalog.font_id(&bold_zone, true);
-        let draw_bold_bright = self.preferences.typography.draw_bold_bright;
+        let pane_fonts: std::collections::BTreeMap<_, _> = self
+            .tabs
+            .iter()
+            .map(|tab| (tab.id, self.font_for_pane(tab.id)))
+            .collect();
+        let maximum_font_size = self
+            .visible_panes
+            .iter()
+            .filter_map(|index| self.tabs.get(*index))
+            .filter_map(|tab| pane_fonts.get(&tab.id))
+            .map(|font| font.zone.size)
+            .fold(
+                self.font_for_pane(self.tabs[focused].id).zone.size,
+                f32::max,
+            );
         let theme = self.terminal_presentation();
         let divider_style =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
@@ -2459,7 +2551,7 @@ impl ButtonsApp {
                 width: rect.width(),
                 height: rect.height(),
             },
-            layout::minimum_for_font(terminal_font.size),
+            layout::minimum_for_font(maximum_font_size),
             self.grid_column_override,
         );
         self.layout_window_start = plan.window_start;
@@ -2498,9 +2590,8 @@ impl ButtonsApp {
             tabs: &mut self.tabs,
             focused,
             modal_open,
-            terminal_font: &terminal_font,
-            terminal_bold_font: &terminal_bold_font,
-            draw_bold_bright,
+            pane_fonts: &pane_fonts,
+            font_catalog: &self.font_catalog,
             theme: &theme,
             override_themes: &override_themes,
             divider_style,
@@ -3565,6 +3656,12 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn command_dock_contents(&mut self, ui: &mut egui::Ui, controls_available: bool) {
         let colors = self.colors();
+        ui.visuals_mut().widgets.inactive.bg_fill = colors.dock_button;
+        ui.visuals_mut().widgets.inactive.weak_bg_fill = colors.dock_button;
+        ui.visuals_mut().widgets.hovered.bg_fill = colors.dock_button_hover;
+        ui.visuals_mut().widgets.inactive.fg_stroke.color = colors.dock_button_text;
+        ui.visuals_mut().widgets.hovered.fg_stroke.color = colors.dock_button_text;
+        ui.visuals_mut().override_text_color = Some(colors.dock_button_text);
         apply_zone_style(
             ui,
             &self.font_catalog,
@@ -3701,6 +3798,13 @@ impl ButtonsApp {
 
     fn status_bar(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
+        let terminal_size = self.preferences.typography.terminal.size;
+        #[cfg(not(target_arch = "wasm32"))]
+        let terminal_size = self
+            .tabs
+            .get(self.focused)
+            .map(|tab| self.font_for_pane(tab.id).zone.size)
+            .unwrap_or(terminal_size);
         egui::TopBottomPanel::bottom("status")
             // Let egui size the panel from its tallest control and selected
             // font; the fixed height clipped controls after frame margins.
@@ -3729,7 +3833,7 @@ impl ButtonsApp {
                     ui.label(
                         RichText::new(format!(
                             "{} px",
-                            self.preferences.typography.terminal.size as i32
+                            terminal_size as i32
                         ))
                         .small()
                         .color(colors.muted),
@@ -3743,7 +3847,7 @@ impl ButtonsApp {
                         let current = self.theme_for_tab(self.focused).to_owned();
                         let mut action = None;
                         ui.add_enabled_ui(target.is_some(), |ui| {
-                            ui.menu_button(crate::i18n::literal(&self.locale, "Favorite themes"), |ui| {
+                            ui.menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
                             if ui.button(crate::i18n::literal(&self.locale, "Random theme"))
@@ -3875,11 +3979,7 @@ impl ButtonsApp {
                                     &[],
                                 ));
                             if zoom_in.clicked() {
-                                self.preferences.typography.terminal.size =
-                                    crate::dock::next_terminal_font_size(
-                                        self.preferences.typography.terminal.size,
-                                        crate::dock::ZoomAction::In,
-                                    );
+                                self.zoom_focused_terminal(crate::dock::ZoomAction::In);
                             }
                             let zoom_out = ui
                                 .add_enabled(controls_enabled, egui::Button::new(crate::i18n::literal(&self.locale, "−")))
@@ -3888,14 +3988,11 @@ impl ButtonsApp {
                                     &[],
                                 ));
                             if zoom_out.clicked() {
-                                self.preferences.typography.terminal.size =
-                                    crate::dock::next_terminal_font_size(
-                                        self.preferences.typography.terminal.size,
-                                        crate::dock::ZoomAction::Out,
-                                    );
+                                self.zoom_focused_terminal(crate::dock::ZoomAction::Out);
                             }
                             let zoom = crate::dock::terminal_zoom_percent(
-                                self.preferences.typography.terminal.size,
+                                self.tabs.get(self.focused).map(|tab| self.font_for_pane(tab.id).zone.size)
+                                    .unwrap_or(self.preferences.typography.terminal.size),
                             );
                             let zoom_reset = if controls_enabled {
                                 ui.small_button(format!("{zoom}%"))
@@ -3907,11 +4004,7 @@ impl ButtonsApp {
                                     &[],
                                 ));
                             if controls_enabled && zoom_reset.clicked() {
-                                self.preferences.typography.terminal.size =
-                                    crate::dock::next_terminal_font_size(
-                                        self.preferences.typography.terminal.size,
-                                        crate::dock::ZoomAction::Reset,
-                                    );
+                                self.zoom_focused_terminal(crate::dock::ZoomAction::Reset);
                             }
                         }
                     });
@@ -3924,6 +4017,8 @@ impl ButtonsApp {
             preferences: self.preferences.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: self.theme_overrides.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
+            pane_fonts: self.pane_fonts.clone(),
         }
     }
 
@@ -3932,6 +4027,7 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         {
             self.theme_overrides = snapshot.theme_overrides;
+            self.pane_fonts = snapshot.pane_fonts;
         }
     }
 
@@ -3943,6 +4039,7 @@ impl ButtonsApp {
             self.settings_snapshot = Some(self.capture_settings_snapshot());
         }
         let old_app_theme = self.preferences.app_theme_id.clone();
+        let old_app_colors = self.colors();
         let old_typography = self.preferences.typography.clone();
         let title = crate::i18n::text(&self.locale, crate::i18n::MessageKey::SettingsTitle, &[]);
         let mut close_action = None;
@@ -4003,6 +4100,10 @@ impl ButtonsApp {
         );
         if let Some(action) = close_action {
             #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.theme_editor_preview_due = None;
+            }
+            #[cfg(not(target_arch = "wasm32"))]
             if self.theme_editor_preview_snapshot.is_some() {
                 self.cancel_personal_theme_draft();
             }
@@ -4016,9 +4117,11 @@ impl ButtonsApp {
             self.show_settings = false;
         }
         if old_app_theme != self.preferences.app_theme_id
+            || old_app_colors != self.colors()
             || old_typography != self.preferences.typography
         {
             self.apply_style(ctx);
+            ctx.request_repaint();
         }
     }
 
@@ -4028,6 +4131,7 @@ impl ButtonsApp {
         ctx: &egui::Context,
         close_action: &mut Option<SettingsCloseAction>,
     ) {
+        ui.spacing_mut().scroll = settings_scroll_style();
         apply_zone_style(
             ui,
             &self.font_catalog,
@@ -4129,6 +4233,8 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Import => self.import_settings(ui, ctx),
             });
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_theme_editor_preview(ctx);
         ui.separator();
         ui.scope_builder(
             egui::UiBuilder::new()
@@ -4858,9 +4964,9 @@ impl ButtonsApp {
             self.credential_busy = true;
             std::thread::spawn(move || {
                 let result = if session_only {
-                    session.put(&reference, &value)
+                    session.put(&reference, value.trim())
                 } else {
-                    SystemCredentialStore.put(&reference, &value)
+                    SystemCredentialStore.put(&reference, value.trim())
                 };
                 let _ = tx.send(CredentialEvent::Saved {
                     provider_id,
@@ -6806,6 +6912,19 @@ impl ButtonsApp {
             .small()
             .color(self.colors().muted),
         );
+        if ui
+            .checkbox(
+                &mut self.preferences.theme_editor_live_preview,
+                "Apply edits automatically (500 ms after changes)",
+            )
+            .changed()
+        {
+            if self.preferences.theme_editor_live_preview {
+                self.queue_theme_editor_preview(ui.ctx());
+            } else {
+                self.restore_personal_theme_preview();
+            }
+        }
         let selected_label = self
             .theme_editor_file_name
             .as_deref()
@@ -6834,6 +6953,7 @@ impl ButtonsApp {
             });
         if let Some(id) = selected_profile {
             self.load_personal_theme_draft(&id);
+            self.queue_theme_editor_preview(ui.ctx());
         }
 
         ui.horizontal_wrapped(|ui| {
@@ -6874,46 +6994,35 @@ impl ButtonsApp {
             return;
         };
 
+        let before_edits = document.clone();
         edit_theme_metadata(ui, &locale, &mut document);
-        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "App colors"))
-            .default_open(true)
-            .show(ui, |ui| {
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Background",
-                    "/theme/app/shell/background",
-                );
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Panel background",
-                    "/theme/app/shell/backgroundSecondary",
-                );
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Accent",
-                    "/theme/app/shell/accent",
-                );
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Main text",
-                    "/theme/app/shell/textMain",
-                );
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Dim text",
-                    "/theme/app/shell/textDim",
-                );
+        let resolved_document = ThemeDefinition::editor_document(&document)
+            .map(|theme| crate::theme_files::document_from_theme(&theme, &theme.name))
+            .unwrap_or(Value::Null);
+        for (section, fields) in APP_THEME_COLOR_GROUPS {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                egui::CollapsingHeader::new(crate::i18n::literal(&locale, section))
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        for (label, pointer) in *fields {
+                            let fallback = resolved_document
+                                .pointer(pointer)
+                                .and_then(Value::as_str)
+                                .and_then(crate::theme::parse_color)
+                                .unwrap_or(Color32::GRAY);
+                            theme_color_setting_with_fallback(
+                                ui,
+                                &locale,
+                                &mut document,
+                                label,
+                                pointer,
+                                fallback,
+                            );
+                        }
+                    });
             });
+            ui.add_space(6.0);
+        }
         egui::CollapsingHeader::new(crate::i18n::literal(&locale, "Terminal colors"))
             .default_open(true)
             .show(ui, |ui| {
@@ -6969,7 +7078,10 @@ impl ButtonsApp {
                 if ui
                     .checkbox(
                         &mut theme_effects_enabled,
-                        crate::i18n::literal(&locale, "Enable noise and scanline effects"),
+                        crate::i18n::literal(
+                            &locale,
+                            "Enable animated effects (gradient, noise and scanlines)",
+                        ),
                     )
                     .changed()
                 {
@@ -7290,7 +7402,11 @@ impl ButtonsApp {
             },
         );
 
+        let changed = document != before_edits;
         self.theme_editor_document = Some(document);
+        if changed {
+            self.queue_theme_editor_preview(ui.ctx());
+        }
         ui.horizontal_wrapped(|ui| {
             if ui
                 .button(crate::i18n::literal(&locale, "Preview"))
@@ -7610,7 +7726,32 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn queue_theme_editor_preview(&mut self, ctx: &egui::Context) {
+        if self.preferences.theme_editor_live_preview && self.theme_editor_document.is_some() {
+            self.theme_editor_preview_due = Some(ctx.input(|input| input.time) + 0.5);
+            ctx.request_repaint_after(Duration::from_millis(500));
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_theme_editor_preview(&mut self, ctx: &egui::Context) {
+        if let Some(due) = self.theme_editor_preview_due {
+            if !self.preferences.theme_editor_live_preview {
+                self.theme_editor_preview_due = None;
+                return;
+            }
+            let (now, down) = ctx.input(|input| (input.time, input.pointer.any_down()));
+            if now >= due && !down {
+                self.preview_personal_theme_draft();
+            } else {
+                ctx.request_repaint_after(Duration::from_secs_f64((due - now).max(0.016)));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn preview_personal_theme_draft(&mut self) {
+        self.theme_editor_preview_due = None;
         if !personal_theme_editor_available() {
             return;
         }
@@ -7631,9 +7772,22 @@ impl ButtonsApp {
                     .get_or_insert_with(|| ThemePreviewSnapshot {
                         preferences: self.preferences.clone(),
                         applied_preferences: self.preferences.clone(),
+                        theme_overrides: self.theme_overrides.clone(),
+                        pane_fonts: self.pane_fonts.clone(),
                     });
                 if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
-                    self.apply_theme(index, false);
+                    let theme = self.themes.all()[index].clone();
+                    self.preferences.theme_id = id.clone();
+                    self.preferences.app_theme_id = id.clone();
+                    self.preferences.terminal_theme_id = id.clone();
+                    self.preferences.gradient_theme_id = id.clone();
+                    self.preferences.effects_theme_id = id;
+                    if let Some(typography) = theme.typography {
+                        self.preferences.typography = typography;
+                    }
+                    self.preferences.calm_mode = false;
+                    self.theme_overrides.clear();
+                    self.pane_fonts.clear();
                     if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
                         snapshot.applied_preferences = self.preferences.clone();
                     }
@@ -7654,30 +7808,28 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn preferences_to_save(&self) -> Preferences {
+        let mut preferences = self.preferences.clone();
+        if let Some(snapshot) = &self.theme_editor_preview_snapshot {
+            restore_preview_preferences(&mut preferences, snapshot);
+        }
+        preferences
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn restore_personal_theme_preview(&mut self) {
+        self.theme_editor_preview_due = None;
         if let Some(snapshot) = self.theme_editor_preview_snapshot.take() {
-            if self.preferences.theme_id == snapshot.applied_preferences.theme_id {
-                self.preferences.theme_id = snapshot.preferences.theme_id;
+            restore_preview_preferences(&mut self.preferences, &snapshot);
+            for (id, theme) in snapshot.theme_overrides {
+                if self.tabs.iter().any(|tab| tab.id == id) {
+                    self.theme_overrides.entry(id).or_insert(theme);
+                }
             }
-            if self.preferences.app_theme_id == snapshot.applied_preferences.app_theme_id {
-                self.preferences.app_theme_id = snapshot.preferences.app_theme_id;
-            }
-            if self.preferences.terminal_theme_id == snapshot.applied_preferences.terminal_theme_id
-            {
-                self.preferences.terminal_theme_id = snapshot.preferences.terminal_theme_id;
-            }
-            if self.preferences.gradient_theme_id == snapshot.applied_preferences.gradient_theme_id
-            {
-                self.preferences.gradient_theme_id = snapshot.preferences.gradient_theme_id;
-            }
-            if self.preferences.effects_theme_id == snapshot.applied_preferences.effects_theme_id {
-                self.preferences.effects_theme_id = snapshot.preferences.effects_theme_id;
-            }
-            if self.preferences.typography == snapshot.applied_preferences.typography {
-                self.preferences.typography = snapshot.preferences.typography;
-            }
-            if self.preferences.calm_mode == snapshot.applied_preferences.calm_mode {
-                self.preferences.calm_mode = snapshot.preferences.calm_mode;
+            for (id, font) in snapshot.pane_fonts {
+                if self.tabs.iter().any(|tab| tab.id == id) {
+                    self.pane_fonts.entry(id).or_insert(font);
+                }
             }
             self.reload_personal_themes();
         }
@@ -7685,6 +7837,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn save_personal_theme_draft(&mut self) {
+        self.theme_editor_preview_due = None;
         if !personal_theme_editor_available() {
             return;
         }
@@ -7998,6 +8151,31 @@ impl ButtonsApp {
         if let Some(status) = &self.custom_font_status {
             ui.label(status);
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        egui::CollapsingHeader::new("Current terminal font")
+            .default_open(true)
+            .show(ui, |ui| {
+                if let Some(tab) = self.tabs.get(self.focused) {
+                    let id = tab.id;
+                    ui.label(&tab.title);
+                    let original = self.font_for_pane(id);
+                    let mut edited = original.clone();
+                    font_zone_editor(
+                        ui,
+                        &self.locale,
+                        &self.font_catalog,
+                        "This terminal",
+                        &mut edited.zone,
+                        true,
+                    );
+                    if edited != original {
+                        self.pane_fonts.insert(id, edited);
+                    }
+                    if ui.button("Use theme / default font").clicked() {
+                        self.pane_fonts.remove(&id);
+                    }
+                }
+            });
         ui.horizontal_wrapped(|ui| {
             if ui
                 .button(crate::i18n::literal(
@@ -9588,6 +9766,16 @@ fn sync_zone(source: &FontZone, target: &mut FontZone) {
     target.size = size;
 }
 
+fn settings_scroll_style() -> egui::style::ScrollStyle {
+    egui::style::ScrollStyle {
+        bar_width: 18.0,
+        handle_min_length: 48.0,
+        bar_inner_margin: 8.0,
+        bar_outer_margin: 6.0,
+        ..egui::style::ScrollStyle::solid()
+    }
+}
+
 fn apply_zone_style(ui: &mut egui::Ui, catalog: &fonts::FontCatalog, zone: &FontZone) {
     for (text_style, scale) in [
         (TextStyle::Heading, 1.35),
@@ -10102,9 +10290,8 @@ struct PaneRenderState<'a> {
     tabs: &'a mut [TerminalTab],
     focused: usize,
     modal_open: bool,
-    terminal_font: &'a FontId,
-    terminal_bold_font: &'a FontId,
-    draw_bold_bright: bool,
+    pane_fonts: &'a std::collections::BTreeMap<u64, fonts::PaneFont>,
+    font_catalog: &'a fonts::FontCatalog,
     theme: &'a ThemeDefinition,
     override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
     divider_style: PaneDividerTheme,
@@ -10136,15 +10323,18 @@ fn render_pane_tree(
                     .layout(Layout::top_down(Align::Min)),
             );
             pane.set_clip_rect(rect);
+            let font = &state.pane_fonts[&tab.id];
+            let mut bold_zone = font.zone.clone();
+            bold_zone.weight = font.bold_weight;
             let (clicked, response) = terminal_surface(
                 &mut pane,
                 tab,
                 state.focused == *index && !state.modal_open,
                 (
-                    state.terminal_font.clone(),
-                    state.terminal_bold_font.clone(),
+                    state.font_catalog.font_id(&font.zone, true),
+                    state.font_catalog.font_id(&bold_zone, true),
                 ),
-                state.draw_bold_bright,
+                font.draw_bold_bright,
                 state.override_themes.get(&tab.id).unwrap_or(state.theme),
                 state.latest_activity_at_ms,
             );
@@ -10161,6 +10351,30 @@ fn render_pane_tree(
                     ui.strong(&tab.title);
                     ui.label(&theme.name);
                     let mut action = None;
+                    ui.menu_button(crate::i18n::literal(state.locale, "Terminal font"), |ui| {
+                        let mut edited = font.clone();
+                        font_zone_editor(
+                            ui,
+                            state.locale,
+                            state.font_catalog,
+                            "This terminal",
+                            &mut edited.zone,
+                            true,
+                        );
+                        if edited != *font {
+                            action = Some(PaneAction::Font(edited));
+                        }
+                        if ui
+                            .button(crate::i18n::literal(
+                                state.locale,
+                                "Use theme / default font",
+                            ))
+                            .clicked()
+                        {
+                            action = Some(PaneAction::UseThemeFont);
+                            ui.close_menu();
+                        }
+                    });
                     pane_action_menu(
                         ui,
                         state.locale,
@@ -10685,6 +10899,61 @@ fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+const APP_THEME_COLOR_GROUPS: &[(&str, &[(&str, &str)])] = &[
+    (
+        "App shell / top bar",
+        &[
+            ("Background", "/theme/app/shell/background"),
+            ("Panel background", "/theme/app/shell/backgroundSecondary"),
+            (
+                "Control / button background",
+                "/theme/app/shell/buttonBackground",
+            ),
+            ("Border", "/theme/app/shell/border"),
+            ("Accent", "/theme/app/shell/accent"),
+            ("Accent hover", "/theme/app/shell/accentHover"),
+            ("Main text", "/theme/app/shell/textMain"),
+            ("Dim text", "/theme/app/shell/textDim"),
+        ],
+    ),
+    (
+        "Terminal tabs",
+        &[
+            ("Tab strip background", "/theme/app/tabs/background"),
+            ("Inactive tab", "/theme/app/tabs/idleBackground"),
+            ("Active tab", "/theme/app/tabs/activeBackground"),
+            ("Active tab border", "/theme/app/tabs/activeBorder"),
+        ],
+    ),
+    (
+        "Left command dock",
+        &[
+            ("Dock background", "/theme/app/presetDock/background"),
+            ("Dock accent", "/theme/app/presetDock/accent"),
+            (
+                "Button background",
+                "/theme/app/presetDock/buttonBackground",
+            ),
+            ("Button hover", "/theme/app/presetDock/buttonHover"),
+            ("Button text", "/theme/app/presetDock/buttonText"),
+        ],
+    ),
+    (
+        "Settings window",
+        &[("Settings background", "/theme/app/settings/background")],
+    ),
+    (
+        "Bottom status bar",
+        &[
+            ("Status background", "/theme/app/statusBar/background"),
+            ("Status text", "/theme/app/statusBar/text"),
+            ("Status border", "/theme/app/statusBar/border"),
+            ("Warning / highlight", "/theme/app/statusBar/warning"),
+        ],
+    ),
+];
+
+#[cfg(not(target_arch = "wasm32"))]
 fn theme_color_setting(
     ui: &mut egui::Ui,
     locale: &str,
@@ -10692,11 +10961,30 @@ fn theme_color_setting(
     label: &str,
     pointer: &str,
 ) {
+    theme_color_setting_with_fallback(
+        ui,
+        locale,
+        document,
+        label,
+        pointer,
+        Color32::from_rgb(100, 116, 139),
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_color_setting_with_fallback(
+    ui: &mut egui::Ui,
+    locale: &str,
+    document: &mut Value,
+    label: &str,
+    pointer: &str,
+    fallback: Color32,
+) {
     let mut color = document
         .pointer(pointer)
         .and_then(Value::as_str)
         .and_then(crate::theme::parse_color)
-        .unwrap_or(Color32::from_rgb(100, 116, 139));
+        .unwrap_or(fallback);
     ui.horizontal(|ui| {
         ui.label(crate::i18n::literal(locale, label));
         if ui.color_edit_button_srgba(&mut color).changed() {
@@ -10855,7 +11143,7 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if !self.native_save_blocked {
             if let Some(store) = &self.native_store {
-                match store.save(self.native_revision, &self.preferences) {
+                match store.save(self.native_revision, &self.preferences_to_save()) {
                     Ok(revision) => self.native_revision = Some(revision),
                     Err(error) => {
                         tracing::error!("Native settings save failed: {error}");
@@ -10891,6 +11179,7 @@ impl eframe::App for ButtonsApp {
         self.sync_control_server(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_generation_events();
+
         #[cfg(not(target_arch = "wasm32"))]
         self.process_quick_secrets_events();
         #[cfg(not(target_arch = "wasm32"))]
@@ -11007,6 +11296,172 @@ impl eframe::App for ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pane_fonts_follow_distinct_theme_fonts_and_allow_manual_override() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        for (id, stem, family, size) in [
+            (42, "font-a", "Fira Code Bundled", 18.0),
+            (7, "font-b", "JetBrains Mono Bundled", 24.0),
+        ] {
+            let mut document =
+                crate::theme_files::document_from_theme(app.themes.get("aurora"), stem);
+            // Legacy themes may declare only terminal font fields, without typography.
+            document["theme"]
+                .as_object_mut()
+                .unwrap()
+                .remove("typography");
+            document["theme"]["terminal"]["fontFamily"] = json!(family);
+            document["theme"]["terminal"]["fontSize"] = json!(size);
+            let theme = app
+                .themes
+                .preview_personal_document("default", stem, &document)
+                .unwrap();
+            app.theme_overrides.insert(id, theme);
+        }
+        assert_eq!(app.font_for_pane(42).zone.family, "Fira Code Bundled");
+        assert_eq!(app.font_for_pane(42).zone.size, 18.0);
+        assert_eq!(app.font_for_pane(7).zone.size, 24.0);
+        let mut manual = app.font_for_pane(42);
+        manual.zone.size = 32.0;
+        app.pane_fonts.insert(42, manual);
+        assert_eq!(app.font_for_pane(42).zone.size, 32.0);
+        assert_eq!(app.font_for_pane(7).zone.size, 24.0);
+        app.pane_fonts.remove(&42);
+        assert_eq!(app.font_for_pane(42).zone.size, 18.0);
+        app.preferences.theme_apply.fonts = false;
+        assert_eq!(
+            app.font_for_pane(7),
+            fonts::PaneFont::from(&app.preferences.typography)
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn draft_preview_debounces_waits_for_release_and_applies_all_sections() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-preview-debounce-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.preferences.theme_apply = ThemeApplyScopes {
+            app: false,
+            terminal: false,
+            fonts: false,
+            gradient: false,
+            effects: false,
+        };
+        app.preferences.calm_mode = true;
+        let original = app.preferences.theme_id.clone();
+        app.start_personal_theme_draft();
+        let mut document = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(&mut document, "/theme/terminal/useGradient", json!(true));
+        set_theme_document_value(
+            &mut document,
+            "/theme/terminal/gradientAnimation",
+            json!(true),
+        );
+        set_theme_document_value(&mut document, "/effects/masterDisabled", json!(false));
+        app.theme_editor_document = Some(document.clone());
+        let ctx = egui::Context::default();
+        let frame = |app: &mut ButtonsApp, time, events| {
+            let _ = ctx.run(
+                egui::RawInput {
+                    time: Some(time),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.process_theme_editor_preview(ctx);
+                },
+            );
+        };
+        frame(&mut app, 0.0, vec![]);
+        app.queue_theme_editor_preview(&ctx);
+        assert!(app.theme_editor_preview_due.is_none());
+        app.preferences.theme_editor_live_preview = true;
+        app.queue_theme_editor_preview(&ctx);
+        frame(&mut app, 0.499, vec![]);
+        assert_eq!(app.preferences.theme_id, original);
+        let pointer = |pressed| egui::Event::PointerButton {
+            pos: egui::pos2(20.0, 20.0),
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        frame(&mut app, 0.6, vec![pointer(true)]);
+        assert_eq!(app.preferences.theme_id, original);
+        frame(&mut app, 0.7, vec![pointer(false)]);
+        let preview = app.preferences.theme_id.clone();
+        assert_ne!(preview, original);
+        assert_eq!(app.preferences.app_theme_id, preview);
+        assert_eq!(app.preferences.terminal_theme_id, preview);
+        assert_eq!(app.preferences.gradient_theme_id, preview);
+        assert_eq!(app.preferences.effects_theme_id, preview);
+        assert!(app.terminal_presentation().effects.gradient_animation);
+        // Autosave must not retain an unsaved preview or disable the user's calm mode.
+        app.preferences.dock_width = 222.0;
+        let persisted = app.preferences_to_save();
+        assert_eq!(persisted.theme_id, original);
+        assert!(persisted.calm_mode);
+        assert_eq!(persisted.dock_width, 222.0);
+        // Disabling automatic preview restores appearance while retaining editable data.
+        app.preferences.theme_editor_live_preview = false;
+        app.restore_personal_theme_preview();
+        assert_eq!(app.preferences.theme_id, original);
+        assert!(app.preferences.calm_mode);
+        assert_eq!(app.theme_editor_document, Some(document));
+        assert!(app
+            .native_store
+            .as_ref()
+            .unwrap()
+            .profile_dir()
+            .join("themes")
+            .read_dir()
+            .map(|mut entries| entries.next().is_none())
+            .unwrap_or(true));
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn custom_app_color_groups_round_trip_every_native_region() {
+        let catalog = ThemeCatalog::load();
+        let mut document = crate::theme_files::document_from_theme(catalog.get("aurora"), "test");
+        for (_, fields) in APP_THEME_COLOR_GROUPS {
+            for (_, pointer) in *fields {
+                set_theme_document_value(&mut document, pointer, json!("#123456"));
+            }
+        }
+        let parsed = ThemeDefinition::editor_document(&document).unwrap();
+        let exported = crate::theme_files::document_from_theme(&parsed, "roundtrip");
+        for (_, fields) in APP_THEME_COLOR_GROUPS {
+            for (_, pointer) in *fields {
+                assert_eq!(
+                    exported.pointer(pointer).and_then(Value::as_str),
+                    Some("#123456"),
+                    "{pointer}"
+                );
+            }
+        }
+        assert_eq!(
+            parsed.colors.dock_button,
+            Color32::from_rgb(0x12, 0x34, 0x56)
+        );
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn text_position(output: &egui::FullOutput, label: &str) -> Option<egui::Pos2> {
@@ -11249,11 +11704,19 @@ mod tests {
         app.set_pane_layout(PaneLayout::Rows, &ctx);
         assert_eq!(app.visible_panes.len(), 4);
         assert_eq!(app.tab_ids(), ids);
+        let mut manual_font = app.font_for_pane(ids[1]);
+        manual_font.zone.size = 26.0;
+        app.perform_pane_action(ids[1], PaneAction::Font(manual_font.clone()), &ctx);
         app.toggle_auto_tile(1);
         app.move_tab(1, 0);
+        assert_eq!(app.font_for_pane(ids[1]), manual_font);
         assert_eq!(app.tabs[0].id, ids[1]);
         assert_eq!(app.theme_for_tab(0), theme_id);
         app.perform_pane_action(ids[1], PaneAction::RandomTheme, &ctx);
+        assert!(
+            !app.pane_fonts.contains_key(&ids[1]),
+            "random restores the new theme font"
+        );
         assert_ne!(app.theme_for_tab(0), theme_id);
         app.perform_pane_action(ids[1], PaneAction::UseGlobal, &ctx);
         assert!(!app.theme_overrides.contains_key(&ids[1]));
@@ -11272,7 +11735,9 @@ mod tests {
         app.close_tab(1);
         assert_eq!(app.visible_panes.len(), 2);
         assert!(!app.visible_panes.contains(&0));
+        app.perform_pane_action(ids[1], PaneAction::Font(manual_font.clone()), &ctx);
         app.close_tab(0);
+        assert!(!app.pane_fonts.contains_key(&ids[1]));
         let overrides = app.theme_overrides.clone();
         app.perform_pane_action(ids[1], PaneAction::Theme(theme_id), &ctx);
         assert_eq!(
@@ -11282,6 +11747,7 @@ mod tests {
         app.reopen_closed_tab(ctx.clone());
         let restored = app.tabs.last().unwrap().id;
         assert_ne!(restored, ids[1]);
+        assert_eq!(app.font_for_pane(restored), manual_font);
         assert!(!app.auto_tile.includes(restored));
         app.show_all_auto_tiles();
         assert_eq!(app.visible_panes.len(), 2);

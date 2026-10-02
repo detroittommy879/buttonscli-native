@@ -40,6 +40,11 @@ pub struct PaneDividerTheme {
 
 impl ThemeDefinition {
     #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn editor_document(document: &Value) -> Result<Self, serde_json::Error> {
+        parse_legacy_value("editor", document, ThemeSource::Personal)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn terminal(&self) -> TerminalTheme {
         TerminalTheme::new(Box::new(self.terminal_colors.palette()))
     }
@@ -230,7 +235,7 @@ pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String>
     Ok(())
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AppColors {
     pub canvas: Color32,
     pub panel: Color32,
@@ -247,6 +252,9 @@ pub struct AppColors {
     pub tabs_active: Color32,
     pub tabs_border: Color32,
     pub dock_background: Color32,
+    pub dock_button: Color32,
+    pub dock_button_hover: Color32,
+    pub dock_button_text: Color32,
     pub settings_background: Color32,
     pub status_background: Color32,
     pub status_text: Color32,
@@ -448,6 +456,9 @@ fn native_themes() -> Vec<ThemeDefinition> {
             tabs_active: canvas,
             tabs_border: accent,
             dock_background: panel,
+            dock_button: mix(panel, Color32::WHITE, 0.08),
+            dock_button_hover: mix(panel, Color32::WHITE, 0.16),
+            dock_button_text: Color32::from_rgb(218, 226, 242),
             settings_background: panel,
             status_background: mix(panel, Color32::WHITE, 0.06),
             status_text: Color32::from_rgb(139, 151, 171),
@@ -507,7 +518,15 @@ fn parse_legacy_value(
     let colors = AppColors {
         canvas,
         panel,
-        raised: color(tabs, &["idleBackground", "background"], &to_hex(panel)),
+        raised: color(
+            shell,
+            &["buttonBackground"],
+            &to_hex(color(
+                tabs,
+                &["idleBackground", "background"],
+                &to_hex(panel),
+            )),
+        ),
         border: color(shell, &["border", "borderColor"], "#37486c"),
         text,
         muted,
@@ -532,6 +551,21 @@ fn parse_legacy_value(
             &to_hex(accent),
         ),
         dock_background: color(dock, &["background"], &to_hex(panel)),
+        dock_button: color(
+            dock,
+            &["buttonBackground"],
+            &to_hex(color(
+                tabs,
+                &["idleBackground", "background"],
+                &to_hex(panel),
+            )),
+        ),
+        dock_button_hover: color(
+            dock,
+            &["buttonHover"],
+            &to_hex(color(shell, &["border", "borderColor"], "#37486c")),
+        ),
+        dock_button_text: color(dock, &["buttonText"], &to_hex(text)),
         settings_background: color(settings, &["background"], &to_hex(panel)),
         status_background: color(status, &["background", "backgroundColor"], &to_hex(panel)),
         status_text: color(status, &["text", "foreground"], &to_hex(muted)),
@@ -765,7 +799,17 @@ fn parse_gradient_center(value: &str) -> [f32; 2] {
 }
 
 fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography> {
-    if !value.is_object() {
+    if !value.is_object()
+        && ![
+            "fontFamily",
+            "fontSize",
+            "fontWeight",
+            "fontWeightBold",
+            "drawBoldTextInBrightColors",
+        ]
+        .iter()
+        .any(|key| terminal_theme.get(key).is_some())
+    {
         return None;
     }
     let defaults = Typography::default();

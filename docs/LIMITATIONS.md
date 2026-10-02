@@ -74,8 +74,9 @@ not a backlog disguised as release notes.
   callback with a bounded fallback. One-pane adapter/visual review passed;
   multi-pane frame-cost and wider DPI review remain open. HSync warp and standalone wallpaper
   drawing are not rendered. The AI theme generator has a review-first source
-  path but remains Pro-gated until entitlement integration is available; live
-  provider and GUI checks remain open.
+  path but remains Pro-gated until production entitlement/rollout acceptance is
+  available. Mistral backend palette generation passed on 2026-10-02; full GUI
+  and broader provider checks remain open.
   Glow math belongs to Shader Lab presets rather than a standalone effect.
   HSync needs an offscreen renderer path; see
   [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). The remaining
@@ -121,7 +122,9 @@ not a backlog disguised as release notes.
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
   release builds stay locked until entitlement integration exists. The
   `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
-  real-provider or OS-credential interaction is certified. Partial Windows
+  complete real-provider GUI interaction is certified. Mistral completion and
+  streaming backend checks passed on 2026-10-02, and native provider keys were
+  read/saved through Windows Credential Manager. Partial Windows
   window/stream/context/retry review used a loopback fake provider. The preserved
   Agent Mode prototype is outside migration scope and requires a separate debug
   opt-in; it is unavailable in release builds.
