@@ -344,16 +344,8 @@ impl TerminalBackend {
     }
 
     pub fn selectable_content(&self) -> String {
-        let content = self.last_content();
-        let mut result = String::new();
-        if let Some(range) = content.selectable_range {
-            for indexed in content.grid.display_iter() {
-                if range.contains(indexed.point) {
-                    result.push(indexed.c);
-                }
-            }
-        }
-        result
+        // Alacritty preserves line breaks, wrapped lines and selections in history.
+        self.term.lock().selection_to_string().unwrap_or_default()
     }
 
     /// Search this terminal's retained grid, including wrapped lines and scrollback.
@@ -520,8 +512,9 @@ impl TerminalBackend {
             .div_ceil(columns)
             .saturating_add(1)
             .min(history.saturating_add(screen));
-        let first =
-            -(history.saturating_add(screen).saturating_sub(rows) as i32);
+        // Grid lines run from -history through screen - 1. Count backwards
+        // from the end, rather than subtracting history a second time.
+        let first = screen as i32 - rows as i32;
         let mut output =
             String::with_capacity(limit.min(rows.saturating_mul(columns)));
         for row in first..screen as i32 {

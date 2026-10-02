@@ -5,6 +5,9 @@ personal theme editing, favorites, system/local fonts, presets, search and revie
 AI/control paths are implemented. This follow-up adds independent pane typography,
 complete native app-color controls, wider separated scrollbars, and delayed optional
 full-draft preview with cancellation/autosave protection.
+The pane-interaction follow-up fixes independent selection/scrolling, adds optional
+direct right-click copying, and supplies a compact, sortable theme browser with
+separate native/legacy collections and native authoring versions.
 
 ## AI and automation
 
@@ -15,7 +18,7 @@ full-draft preview with cancellation/autosave protection.
 | CLI / MCP control | Authenticated exact-instance loopback API, Node CLI, 14-tool stdio MCP bridge | Broader real MCP-client tool matrix and platform acceptance |
 | Autonomous Agent Mode | An explicit debug-only prototype exists | Outside the accepted core migration scope; no production readiness claim |
 
-Provider 2 is selected in the user's native profile and has an OS-stored key.
+Provider 2 remains in the user's native profile and has an OS-stored key.
 Its pasted trailing newline previously made the HTTP header invalid. Request-time
 trimming fixes that, and new saves trim the key as well. The subsequent live
 minimal completion returned **HTTP 429**. That prevents certifying successful
@@ -64,7 +67,18 @@ Use **★ Favorites** in the bottom status bar. Star theme cards in
 **Settings → Themes**, or favorite the current theme from a pane's right-click
 menu. The library shows favorites ahead of the full catalog. Pane menus also
 contain favorites, random theme, use-global-theme and terminal-font controls.
-The status-bar random button targets the focused pane; Themes settings retains
-its independent random-all operation.
+The status-bar Favorites and Random theme buttons apply the complete theme to the
+whole app and every terminal. Pane-menu versions affect only that terminal;
+Themes settings retains its independent random-all operation. Favorites and fonts
+in the pane menu expand on click and the menu scrolls when needed.
+
+Choose **Compact rows** in the theme library for palette swatches in smaller rows.
+Sort by name, favorites first or native version, and filter/collapse the native
+and legacy collections. New native copies and AI candidates carry a native theme
+version; the personal-theme editor lets you change the collection and version.
+Original untagged themes remain legacy, including imported personal themes.
+
+**Settings → Workspace → Right-click copies selected terminal text** defaults on.
+With a selection, right-click copies immediately; otherwise it opens the pane menu.
 
 See [verification](VERIFICATION.md) for checks and their limits.

@@ -15,6 +15,8 @@ pub struct ThemeDefinition {
     pub name: String,
     pub description: String,
     pub source: ThemeSource,
+    /// Native authoring generation; absent for original legacy documents.
+    pub native_version: Option<u64>,
     pub colors: AppColors,
     pub pane_divider: PaneDividerTheme,
     pub terminal_colors: TerminalColors,
@@ -469,6 +471,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
             name: name.into(),
             description: "Native ButtonsCLI foundation theme".into(),
             source: ThemeSource::Native,
+            native_version: Some(1),
             terminal_colors: terminal_from_app(&colors),
             legacy_shader_requested: false,
             effects: TerminalEffects::default(),
@@ -616,6 +619,9 @@ fn parse_legacy_value(
             .unwrap_or("Bundled legacy ButtonsCLI theme")
             .to_owned(),
         source,
+        native_version: document["metadata"]["nativeThemeVersion"]
+            .as_u64()
+            .filter(|version| *version > 0),
         colors,
         pane_divider: divider,
         terminal_colors,

@@ -37,6 +37,7 @@ mod shortcuts;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod startup;
 pub mod theme;
+mod theme_browser;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;
 #[cfg(not(target_arch = "wasm32"))]

@@ -3,6 +3,34 @@
 Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
 
+## 2026-10-02 pane interaction and compact theme browser
+
+- Created checkpoint `0dd74df` before the requested changes on
+  `codex/pane-fonts-theme-editor`.
+- Full library suite: 242 pass, nine optional tests ignored; both legacy import
+  fixtures pass. Strict native Clippy, formatting and desktop/browser compile
+  checks pass. Five CLI deadline checks and the MCP stdio contract pass.
+- Explicit Windows `three_panes_select_copy_scroll_and_route_keyboard_independently`
+  passes with three finite, test-owned ConPTY sessions: selection on the first
+  drag, independent selection state, direct right-click clipboard commands,
+  wheel/scrollbar routing without changing other panes, keyboard input with the
+  pointer outside the focused pane, and releasing a drag outside the window.
+  Multiline copy preserves line breaks. Turning direct copy off restores the
+  menu; hovering font controls does not expand them, and open pane menus block
+  terminal keyboard input. All test shells are closed.
+- The deeper-history fixture also exposed an invalid grid index in bounded
+  terminal text snapshots. Tail reads now count backwards from the final screen
+  line correctly; short reads stay bounded and larger reads include history.
+- Pointer tests verify that hovering the favorites section does not open it,
+  and status Favorites/Random apply every theme zone while clearing pane theme
+  and font overrides, even with the editor's Apply scopes unchecked.
+- Compact-browser UI tests render palette swatches and click a native theme;
+  search/filter/sort tests cover name order, favorites, legacy separation and
+  newer native versions. Native authoring versions survive export/parse.
+- Isolated native startup and status-bar capture pass. The compact browser is
+  covered by headless egui interaction tests; full manual visual acceptance
+  remains open. Existing bin/lib PDB and graphics-driver notices remain.
+
 ## 2026-10-02 pane fonts and theme-editor follow-up
 
 - Started `codex/pane-fonts-theme-editor` from merged `origin/main`; the new

@@ -1556,6 +1556,35 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn perform_global_theme_action(&mut self, action: PaneAction) {
+        let id = match action {
+            PaneAction::Theme(id) => Some(id),
+            PaneAction::RandomTheme => self.random_theme_id(&self.preferences.theme_id),
+            PaneAction::ToggleFavorite(id) => {
+                self.preferences.toggle_favorite_theme(&id);
+                None
+            }
+            PaneAction::ThemeSettings => {
+                self.settings_tab = SettingsTab::Themes;
+                self.show_settings = true;
+                None
+            }
+            _ => None,
+        };
+        if let Some(id) = id {
+            if !self.themes.all().iter().any(|theme| theme.id == id) {
+                return;
+            }
+            self.set_theme_all(&id);
+            self.preferences.app_theme_id = id.clone();
+            // Status controls always apply the complete theme, regardless of editor scopes.
+            if let Some(typography) = self.themes.get(&id).typography.clone() {
+                self.preferences.typography = typography;
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn random_theme_current(&mut self) {
         let Some(theme_id) = self.random_theme_id(self.theme_for_tab(self.focused)) else {
             return;
@@ -2603,6 +2632,7 @@ impl ButtonsApp {
             action: &mut pane_action,
             hover_label: &self.preferences.pane_hover_label,
             hover_font: &hover_font,
+            right_click_copies_selection: self.preferences.right_click_copies_selection,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
 
@@ -3843,19 +3873,18 @@ impl ButtonsApp {
                         let favorites: Vec<_> = self.preferences.favorite_theme_ids.iter()
                             .filter_map(|id| self.themes.all().iter().find(|theme| &theme.id == id))
                             .map(|theme| (theme.id.clone(), theme.name.clone())).collect();
-                        let target = self.tabs.get(self.focused).map(|tab| tab.id);
-                        let current = self.theme_for_tab(self.focused).to_owned();
+                        let current = self.preferences.theme_id.clone();
                         let mut action = None;
-                        ui.add_enabled_ui(target.is_some(), |ui| {
+                        ui.scope(|ui| {
                             ui.menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
                             if ui.button(crate::i18n::literal(&self.locale, "Random theme"))
-                                .on_hover_text(crate::i18n::text(&self.locale, crate::i18n::MessageKey::RandomCurrent, &[])).clicked() {
+                                .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
                         });
-                        if let (Some(id), Some(action)) = (target, action) { self.perform_pane_action(id, action, ctx); }
+                        if let Some(action) = action { self.perform_global_theme_action(action); }
                         ui.separator();
                         ui.label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
@@ -6583,20 +6612,43 @@ impl ButtonsApp {
                 .desired_width(f32::INFINITY),
         );
 
-        let needle = self.theme_search.trim().to_ascii_lowercase();
-        let matches: Vec<usize> = self
-            .themes
-            .all()
-            .iter()
-            .enumerate()
-            .filter(|(_, theme)| {
-                needle.is_empty()
-                    || theme.name.to_ascii_lowercase().contains(&needle)
-                    || theme.id.to_ascii_lowercase().contains(&needle)
-                    || theme.description.to_ascii_lowercase().contains(&needle)
-            })
-            .map(|(index, _)| index)
-            .collect();
+        ui.horizontal_wrapped(|ui| {
+            ui.selectable_value(&mut self.preferences.theme_browser_compact, false, "Cards");
+            ui.selectable_value(
+                &mut self.preferences.theme_browser_compact,
+                true,
+                "Compact rows",
+            );
+            egui::ComboBox::from_id_salt("theme-browser-sort")
+                .selected_text(self.preferences.theme_browser_sort.label())
+                .show_ui(ui, |ui| {
+                    for sort in crate::theme_browser::ThemeSort::ALL {
+                        ui.selectable_value(
+                            &mut self.preferences.theme_browser_sort,
+                            sort,
+                            sort.label(),
+                        );
+                    }
+                });
+            egui::ComboBox::from_id_salt("theme-browser-collection")
+                .selected_text(self.preferences.theme_browser_collection.label())
+                .show_ui(ui, |ui| {
+                    for collection in crate::theme_browser::ThemeCollection::ALL {
+                        ui.selectable_value(
+                            &mut self.preferences.theme_browser_collection,
+                            collection,
+                            collection.label(),
+                        );
+                    }
+                });
+        });
+        let matches = crate::theme_browser::matches(
+            self.themes.all(),
+            &self.theme_search,
+            self.preferences.theme_browser_collection,
+            self.preferences.theme_browser_sort,
+            &self.preferences.favorite_theme_ids,
+        );
         ui.label(
             RichText::new(format!("{} results", matches.len()))
                 .small()
@@ -6614,16 +6666,62 @@ impl ButtonsApp {
             .max_height(400.0)
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                let columns = (ui.available_width() / 284.0).floor().clamp(1.0, 3.0) as usize;
+                for (native, label) in [(true, "Native themes"), (false, "Legacy themes")] {
+                let group: Vec<_> = matches.iter().copied().filter(|&index| self.themes.all()[index].native_version.is_some() == native).collect();
+                if group.is_empty() { continue; }
+                egui::CollapsingHeader::new(format!("{label} ({})", group.len()))
+                    .id_salt(("theme-collection", native))
+                    .default_open(true)
+                    .show(ui, |ui| {
+                let compact = self.preferences.theme_browser_compact;
+                let columns = if compact { 1 } else { (ui.available_width() / 284.0).floor().clamp(1.0, 3.0) as usize };
                 let card_width = ((ui.available_width() - 8.0 * (columns - 1) as f32) / columns as f32)
                     .clamp(140.0, 276.0);
-                egui::Grid::new("theme-card-grid")
+                egui::Grid::new(("theme-card-grid", native))
                     .num_columns(columns)
                     .spacing([8.0, 8.0])
                     .show(ui, |ui| {
-                        for (position, index) in matches.into_iter().enumerate() {
+                        for (position, index) in group.into_iter().enumerate() {
                             let theme = &self.themes.all()[index];
                             let selected = theme.id == self.preferences.theme_id;
+                            if compact {
+                                ui.push_id(&theme.id, |ui| {
+                                    egui::Frame::new().fill(colors.raised)
+                                        .stroke(Stroke::new(1.0_f32, if selected { colors.accent } else { colors.border }))
+                                        .inner_margin(6.0).show(ui, |ui| {
+                                        ui.set_width((ui.available_width() - 12.0).max(100.0));
+                                        ui.horizontal_wrapped(|ui| {
+                                            let favorite = self.preferences.favorite_theme_ids.contains(&theme.id);
+                                            if ui.add_enabled(local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites),
+                                                egui::Button::new(if favorite { "★" } else { "☆" }).selected(favorite))
+                                                .on_hover_text(if favorite { "Remove from favorites" } else { "Add to favorites" }).clicked() {
+                                                toggle_favorite = Some(theme.id.clone());
+                                            }
+                                            if ui.selectable_label(selected, &theme.name).on_hover_text(&theme.description).clicked() {
+                                                apply = Some((index, false));
+                                            }
+                                            for swatch in [theme.colors.canvas, theme.colors.panel, theme.colors.accent,
+                                                parse_terminal_swatch(&theme.terminal_colors.red), parse_terminal_swatch(&theme.terminal_colors.green),
+                                                parse_terminal_swatch(&theme.terminal_colors.blue), parse_terminal_swatch(&theme.terminal_colors.magenta)] {
+                                                let (rect, _) = ui.allocate_exact_size(Vec2::splat(12.0), egui::Sense::hover());
+                                                ui.painter().rect_filled(rect, 2.0, swatch);
+                                            }
+                                            if let Some(version) = theme.native_version { ui.weak(format!("Native v{version}")); }
+                                            if ui.small_button("Calm").clicked() { apply = Some((index, true)); }
+                                            #[cfg(not(target_arch = "wasm32"))]
+                                            if ui.add_enabled(!self.tabs.is_empty(), egui::Button::new("This terminal").small()).clicked() {
+                                                per_tab_theme = Some(theme.id.clone());
+                                            }
+                                            #[cfg(not(target_arch = "wasm32"))]
+                                            if ui.add_enabled(!self.tabs.is_empty(), egui::Button::new("All terminals").small()).clicked() {
+                                                all_theme = Some(theme.id.clone());
+                                            }
+                                        });
+                                    });
+                                });
+                                ui.end_row();
+                                continue;
+                            }
                             let frame = egui::Frame::new()
                                 .fill(theme.colors.settings_background)
                                 .stroke(Stroke::new(
@@ -6745,6 +6843,8 @@ impl ButtonsApp {
                             }
                         }
                     });
+                    });
+                }
             });
 
         if let Some(id) = toggle_favorite {
@@ -8693,6 +8793,10 @@ impl ButtonsApp {
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.push_id("settings-workspace", |ui| {
             ui.checkbox(
+                &mut self.preferences.right_click_copies_selection,
+                "Right-click copies selected terminal text",
+            ).on_hover_text("Copy immediately when text is selected. With no selection, right-click opens the pane menu.");
+            ui.checkbox(
                 &mut self.preferences.pane_hover_label.enabled,
                 crate::i18n::literal(&self.locale, "Show terminal name on hover"),
             );
@@ -9892,10 +9996,16 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+struct TerminalInteraction {
+    focused: bool,
+    enabled: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn terminal_surface(
     ui: &mut egui::Ui,
     tab: &mut TerminalTab,
-    focused: bool,
+    interaction: TerminalInteraction,
     terminal_fonts: (FontId, FontId),
     draw_bold_bright: bool,
     theme: &ThemeDefinition,
@@ -9957,7 +10067,8 @@ fn terminal_surface(
     let available = ui.available_size();
     let scrollbar_width = if available.x >= 80.0 { 14.0 } else { 0.0 };
     let terminal = TerminalView::new(ui, &mut tab.backend)
-        .set_focus(focused)
+        .set_focus(interaction.focused)
+        .set_interactive(interaction.enabled)
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
@@ -9986,11 +10097,17 @@ fn terminal_surface(
             egui::pos2(response.rect.right(), response.rect.top()),
             egui::vec2(scrollbar_width, response.rect.height()),
         );
-        paint_terminal_scrollbar(ui, &mut tab.backend, tab.id, track, theme)
+        ui.add_enabled_ui(interaction.enabled, |ui| {
+            paint_terminal_scrollbar(ui, &mut tab.backend, tab.id, track, theme)
+        })
+        .inner
     } else {
         false
     };
-    (response.clicked() || scrollbar_clicked, response)
+    (
+        response.clicked() || response.is_pointer_button_down_on() || scrollbar_clicked,
+        response,
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10286,6 +10403,7 @@ fn build_pane_sequence(mut panes: Vec<PaneTree>, axis: SplitAxis, key: String) -
 
 #[cfg(not(target_arch = "wasm32"))]
 struct PaneRenderState<'a> {
+    right_click_copies_selection: bool,
     ratios: &'a mut std::collections::BTreeMap<String, f32>,
     tabs: &'a mut [TerminalTab],
     focused: usize,
@@ -10319,6 +10437,7 @@ fn render_pane_tree(
             };
             let mut pane = ui.new_child(
                 egui::UiBuilder::new()
+                    .id_salt(("terminal-pane", tab.id))
                     .max_rect(rect)
                     .layout(Layout::top_down(Align::Min)),
             );
@@ -10329,7 +10448,10 @@ fn render_pane_tree(
             let (clicked, response) = terminal_surface(
                 &mut pane,
                 tab,
-                state.focused == *index && !state.modal_open,
+                TerminalInteraction {
+                    focused: state.focused == *index && !state.modal_open,
+                    enabled: !state.modal_open,
+                },
                 (
                     state.font_catalog.font_id(&font.zone, true),
                     state.font_catalog.font_id(&bold_zone, true),
@@ -10347,46 +10469,64 @@ fn render_pane_tree(
                     crate::features::catalog::FeatureKey::TerminalContextMenu,
                 )
             {
-                response.context_menu(|ui| {
-                    ui.strong(&tab.title);
-                    ui.label(&theme.name);
-                    let mut action = None;
-                    ui.menu_button(crate::i18n::literal(state.locale, "Terminal font"), |ui| {
-                        let mut edited = font.clone();
-                        font_zone_editor(
-                            ui,
-                            state.locale,
-                            state.font_catalog,
-                            "This terminal",
-                            &mut edited.zone,
-                            true,
-                        );
-                        if edited != *font {
-                            action = Some(PaneAction::Font(edited));
-                        }
-                        if ui
-                            .button(crate::i18n::literal(
-                                state.locale,
-                                "Use theme / default font",
-                            ))
-                            .clicked()
-                        {
-                            action = Some(PaneAction::UseThemeFont);
-                            ui.close_menu();
+                let copy_directly = state.right_click_copies_selection
+                    && tab.backend.last_content().selectable_range.is_some();
+                if copy_directly && response.secondary_clicked() {
+                    ui.ctx().copy_text(tab.backend.selectable_content());
+                }
+                if !copy_directly {
+                    response.context_menu(|ui| {
+                        let mut action = None;
+                        ui.set_max_width(420.0);
+                        egui::ScrollArea::vertical()
+                            .id_salt(("pane-action-scroll", tab.id))
+                            .max_height((ui.ctx().screen_rect().height() - 64.0).max(150.0))
+                            .show(ui, |ui| {
+                                ui.strong(&tab.title);
+                                ui.label(&theme.name);
+                                pane_action_menu(
+                                    ui,
+                                    state.locale,
+                                    &theme.id,
+                                    state.favorites,
+                                    state.auto_tile.includes(tab.id),
+                                    &mut action,
+                                );
+                                ui.separator();
+                                egui::CollapsingHeader::new(crate::i18n::literal(
+                                    state.locale,
+                                    "Terminal font",
+                                ))
+                                .show(ui, |ui| {
+                                    let mut edited = font.clone();
+                                    font_zone_editor(
+                                        ui,
+                                        state.locale,
+                                        state.font_catalog,
+                                        "This terminal",
+                                        &mut edited.zone,
+                                        true,
+                                    );
+                                    if edited != *font {
+                                        action = Some(PaneAction::Font(edited));
+                                    }
+                                    if ui
+                                        .button(crate::i18n::literal(
+                                            state.locale,
+                                            "Use theme / default font",
+                                        ))
+                                        .clicked()
+                                    {
+                                        action = Some(PaneAction::UseThemeFont);
+                                        ui.close_menu();
+                                    }
+                                });
+                            });
+                        if let Some(action) = action {
+                            *state.action = Some((tab.id, action));
                         }
                     });
-                    pane_action_menu(
-                        ui,
-                        state.locale,
-                        &theme.id,
-                        state.favorites,
-                        state.auto_tile.includes(tab.id),
-                        &mut action,
-                    );
-                    if let Some(action) = action {
-                        *state.action = Some((tab.id, action));
-                    }
-                });
+                }
             }
             if state.hover_label.enabled
                 && local_feature_available(crate::features::catalog::FeatureKey::PaneHoverLabel)
@@ -10688,7 +10828,7 @@ fn pane_action_menu(
     included: bool,
     action: &mut Option<PaneAction>,
 ) {
-    ui.menu_button(crate::i18n::literal(locale, "Favorite themes"), |ui| {
+    egui::CollapsingHeader::new(crate::i18n::literal(locale, "Favorite themes")).show(ui, |ui| {
         favorite_theme_menu(ui, locale, current, favorites, action);
     });
     for (label, operation) in [
@@ -10864,6 +11004,36 @@ fn preset_action_menu(
 
 #[cfg(not(target_arch = "wasm32"))]
 fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
+    ui.horizontal_wrapped(|ui| {
+        let mut native = document["metadata"]["nativeThemeVersion"]
+            .as_u64()
+            .is_some_and(|version| version > 0);
+        if ui
+            .checkbox(&mut native, "Native theme collection")
+            .on_hover_text(
+                "Keep this theme in the native collection, separate from older legacy themes.",
+            )
+            .changed()
+        {
+            set_theme_document_value(
+                document,
+                "/metadata/nativeThemeVersion",
+                if native { json!(1) } else { Value::Null },
+            );
+        }
+        if native {
+            let mut version = document["metadata"]["nativeThemeVersion"]
+                .as_u64()
+                .unwrap_or(1);
+            ui.label("Version");
+            if ui
+                .add(egui::DragValue::new(&mut version).range(1..=999))
+                .changed()
+            {
+                set_theme_document_value(document, "/metadata/nativeThemeVersion", json!(version));
+            }
+        }
+    });
     let mut name = document["metadata"]["name"]
         .as_str()
         .unwrap_or_default()
@@ -11560,6 +11730,11 @@ mod tests {
         let menu = render(vec![]);
         assert!(text_position(&menu, "Favorite themes").is_some());
         assert!(text_position(&menu, "Close terminal").is_some());
+        let favorites_pos = text_position(&menu, "Favorite themes").unwrap();
+        // Crossing the theme section on the way to actions must not open it.
+        render(vec![egui::Event::PointerMoved(favorites_pos)]);
+        let hovered = render(vec![egui::Event::PointerMoved(favorites_pos)]);
+        assert!(text_position(&hovered, "Favorite palette").is_none());
         let random = text_position(&menu, "Random theme").unwrap();
         render(pointer_events(random, egui::PointerButton::Primary, true));
         render(pointer_events(random, egui::PointerButton::Primary, false));
@@ -11619,6 +11794,448 @@ mod tests {
         render(pointer_events(pos, egui::PointerButton::Primary, false));
         assert!(app.ai_help_state.lock().unwrap().open);
         assert!(app.ai_help_state.lock().unwrap().target.is_none());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn status_theme_controls_apply_all_zones_even_with_editor_scopes_disabled() {
+        let mut preferences = Preferences::default();
+        preferences.normalize_theme_sources();
+        preferences.favorite_theme_ids = vec!["aurora".into()];
+        preferences.theme_apply = crate::settings::ThemeApplyScopes {
+            app: false,
+            terminal: false,
+            gradient: false,
+            effects: false,
+            fonts: false,
+        };
+        let mut app = ButtonsApp::empty(preferences);
+        let default_typography = app.preferences.typography.clone();
+        app.theme_overrides.insert(42, "basic2".into());
+        app.pane_fonts
+            .insert(42, fonts::PaneFont::from(&app.preferences.typography));
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        fn render(
+            app: &mut ButtonsApp,
+            ctx: &egui::Context,
+            events: Vec<egui::Event>,
+        ) -> egui::FullOutput {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1400.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| app.status_bar(ctx),
+            )
+        }
+        let output = render(&mut app, &ctx, vec![]);
+        let pos = text_position(&output, "★ Favorites").unwrap();
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        let menu = render(&mut app, &ctx, vec![]);
+        let pos = text_position(&menu, &app.themes.get("aurora").name).unwrap();
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert_eq!(app.preferences.app_theme_id, "aurora");
+        assert_eq!(app.preferences.terminal_theme_id, "aurora");
+        assert_eq!(app.preferences.gradient_theme_id, "aurora");
+        assert_eq!(app.preferences.effects_theme_id, "aurora");
+        assert!(app.theme_overrides.is_empty());
+        assert!(app.pane_fonts.is_empty());
+        assert_eq!(app.preferences.typography, default_typography);
+        let output = render(&mut app, &ctx, vec![]);
+        let pos = text_position(&output, "Random theme").unwrap();
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        let id = &app.preferences.theme_id;
+        assert_ne!(id, "aurora");
+        assert_eq!(&app.preferences.app_theme_id, id);
+        assert_eq!(&app.preferences.terminal_theme_id, id);
+        assert_eq!(&app.preferences.gradient_theme_id, id);
+        assert_eq!(&app.preferences.effects_theme_id, id);
+        let mut document =
+            crate::theme_files::document_from_theme(app.themes.get("aurora"), "Global font test");
+        document["theme"]["typography"]["terminal"]["fontSize"] = json!(24);
+        document["theme"]["terminal"]["fontSize"] = json!(24);
+        let id = app
+            .themes
+            .preview_personal_document("test", "font", &document)
+            .unwrap();
+        app.perform_global_theme_action(PaneAction::Theme(id));
+        assert_eq!(
+            app.preferences.typography.terminal.size, 24.0,
+            "status applies fonts with editor Fonts scope off"
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn compact_theme_browser_renders_swatches_and_applies_native_theme() {
+        let mut app = ButtonsApp::empty(Preferences {
+            theme_browser_compact: true,
+            theme_browser_collection: crate::theme_browser::ThemeCollection::Native,
+            ..Default::default()
+        });
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let mut render = |events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1000.0, 1400.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.theme_settings(ui));
+                },
+            )
+        };
+        render(vec![]);
+        let output = render(vec![]);
+        assert!(text_position(&output, "Compact rows").is_some());
+        assert!(text_position(&output, "Native v1").is_some());
+        let swatches = output.shapes.iter().filter(|shape| matches!(&shape.shape, egui::Shape::Rect(rect) if rect.rect.size() == Vec2::splat(12.0))).count();
+        assert!(swatches >= 7, "compact rows retain palette previews");
+        let name = ThemeCatalog::load().get("aurora").name.clone();
+        let pos = text_position(&output, &name).unwrap();
+        render(pointer_events(pos, egui::PointerButton::Primary, true));
+        render(pointer_events(pos, egui::PointerButton::Primary, false));
+        assert_eq!(app.preferences.app_theme_id, "aurora");
+        assert_eq!(app.preferences.terminal_theme_id, "aurora");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens three finite test-owned ConPTY sessions; run explicitly on Windows"]
+    fn three_panes_select_copy_scroll_and_route_keyboard_independently() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let preferences = Preferences {
+            default_shell_id: "test-output".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "test-output".into(), label: "Test output".into(),
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Start-Sleep -Milliseconds 750; 1..200 | ForEach-Object { Write-Output ('pane-line-{0:D3}' -f $_); Start-Sleep -Milliseconds 8 }; Start-Sleep -Seconds 30\"".into(),
+                working_directory: String::new(),
+            }], ..Default::default()
+        };
+        let mut workspace = Workspace(ButtonsApp::empty(preferences));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        for _ in 0..3 {
+            app.open_tab(ctx.clone());
+        }
+        app.set_pane_layout(PaneLayout::Columns, &ctx);
+        app.show_all_auto_tiles();
+        assert_eq!(app.visible_panes.len(), 3);
+        app.visible_panes = vec![0, 1, 2];
+        app.focused = 0;
+        app.show_localization_onboarding = false;
+        fn render(
+            app: &mut ButtonsApp,
+            ctx: &egui::Context,
+            events: Vec<egui::Event>,
+        ) -> egui::FullOutput {
+            app.process_terminal_events();
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1800.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            )
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(25);
+        let output = loop {
+            let output = render(app, &ctx, vec![]);
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            if app.tabs.iter().all(|tab| {
+                tab.backend.scrollback_state().history_lines > 50
+                    && tab.backend.plain_text_tail(800).contains("pane-line-200")
+                    && tab
+                        .output
+                        .snapshot()
+                        .last_output_at_ms
+                        .is_some_and(|last| now_ms.saturating_sub(last) >= 200)
+            }) {
+                break output;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "three shells produced scrollback"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        };
+        let border = app.terminal_presentation().colors.border;
+        for tab in &app.tabs {
+            let tail = tab.backend.plain_text_tail(80);
+            assert!(tail.chars().count() <= 80);
+            assert!(
+                tail.contains("pane-line-200"),
+                "short grid tails remain bounded with deep history"
+            );
+            assert!(
+                tab.backend
+                    .plain_text_tail(200_000)
+                    .contains("pane-line-100"),
+                "large grid tails include retained history"
+            );
+        }
+        let mut tracks: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| {
+                if let egui::Shape::Rect(rect) = &shape.shape {
+                    if rect.fill == border
+                        && (rect.rect.width() - 6.0).abs() < 0.1
+                        && rect.rect.height() > 200.0
+                    {
+                        return Some(rect.rect);
+                    }
+                }
+                None
+            })
+            .collect();
+        tracks.sort_by(|a, b| a.left().total_cmp(&b.left()));
+        assert_eq!(tracks.len(), 3, "each pane has its own visible scrollbar");
+        let mut selections = Vec::new();
+        for (index, track) in tracks.iter().enumerate() {
+            // Start a drag in an unfocused pane, without a preliminary click.
+            let before: Vec<_> = app
+                .tabs
+                .iter()
+                .map(|tab| tab.backend.selectable_content())
+                .collect();
+            let left = if index == 0 {
+                8.0
+            } else {
+                tracks[index - 1].center().x + 17.0
+            };
+            let start = egui::pos2(left + 3.0, track.top() + 35.0);
+            let end = start + egui::vec2(105.0, 0.0);
+            render(app, &ctx, vec![egui::Event::PointerMoved(start)]);
+            render(
+                app,
+                &ctx,
+                pointer_events(start, egui::PointerButton::Primary, true),
+            );
+            render(app, &ctx, vec![egui::Event::PointerMoved(end)]);
+            render(
+                app,
+                &ctx,
+                pointer_events(end, egui::PointerButton::Primary, false),
+            );
+            assert_eq!(app.focused, index);
+            let selected = app.tabs[index].backend.selectable_content();
+            for (other, tab) in app.tabs.iter().enumerate() {
+                if other != index {
+                    assert_eq!(
+                        tab.backend.selectable_content(),
+                        before[other],
+                        "drag changes only its own pane"
+                    );
+                }
+            }
+            assert!(
+                !selected.trim().is_empty(),
+                "pane {index} selects on the first drag"
+            );
+            selections.push(selected.clone());
+            render(
+                app,
+                &ctx,
+                pointer_events(end, egui::PointerButton::Secondary, true),
+            );
+            let copied = render(
+                app,
+                &ctx,
+                pointer_events(end, egui::PointerButton::Secondary, false),
+            );
+            assert!(copied.platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &selected)), "pane {index} copies on right-click");
+            assert!(
+                text_position(&render(app, &ctx, vec![]), "Copy selection").is_none(),
+                "copy opens no context menu"
+            );
+        }
+        for (tab, selected) in app.tabs.iter().zip(&selections) {
+            assert_eq!(&tab.backend.selectable_content(), selected);
+        }
+        let start = egui::pos2(tracks[1].center().x + 20.0, tracks[2].top() + 35.0);
+        let outside = egui::pos2(1900.0, 200.0);
+        render(app, &ctx, vec![egui::Event::PointerMoved(start)]);
+        render(
+            app,
+            &ctx,
+            pointer_events(start, egui::PointerButton::Primary, true),
+        );
+        render(app, &ctx, vec![egui::Event::PointerMoved(outside)]);
+        render(
+            app,
+            &ctx,
+            pointer_events(outside, egui::PointerButton::Primary, false),
+        );
+        let multiline = app.tabs[2].backend.selectable_content();
+        assert!(multiline.contains('\n'), "copy retains line breaks");
+        render(
+            app,
+            &ctx,
+            vec![egui::Event::PointerMoved(egui::pos2(40.0, 80.0))],
+        );
+        assert_eq!(
+            app.tabs[2].backend.selectable_content(),
+            multiline,
+            "release outside ends the drag"
+        );
+        // Keyboard input continues to reach the focused pane when the pointer leaves it.
+        let previous: Vec<_> = app
+            .tabs
+            .iter()
+            .map(|tab| tab.output.snapshot().input_sequence)
+            .collect();
+        render(
+            app,
+            &ctx,
+            vec![
+                egui::Event::PointerMoved(egui::pos2(-10.0, -10.0)),
+                egui::Event::Text("x".into()),
+            ],
+        );
+        for (index, tab) in app.tabs.iter().enumerate() {
+            assert_eq!(
+                tab.output.snapshot().input_sequence,
+                previous[index] + u64::from(index == 2)
+            );
+        }
+        for (index, track) in tracks.iter().enumerate() {
+            let before: Vec<_> = app
+                .tabs
+                .iter()
+                .map(|tab| tab.backend.scrollback_state().display_offset)
+                .collect();
+            let pos = egui::pos2(track.center().x - 180.0, track.center().y);
+            render(app, &ctx, vec![egui::Event::PointerMoved(pos)]);
+            render(
+                app,
+                &ctx,
+                vec![egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Line,
+                    delta: egui::vec2(0.0, 5.0),
+                    modifiers: egui::Modifiers::NONE,
+                }],
+            );
+            render(app, &ctx, vec![]);
+            assert!(
+                app.tabs[index].backend.scrollback_state().display_offset > 0,
+                "wheel scrolls pane {index}, including unfocused panes"
+            );
+            let pos = egui::pos2(track.center().x, track.top() + 30.0);
+            render(
+                app,
+                &ctx,
+                pointer_events(pos, egui::PointerButton::Primary, true),
+            );
+            render(
+                app,
+                &ctx,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+            render(app, &ctx, vec![]);
+            assert!(
+                app.tabs[index].backend.scrollback_state().display_offset > 30,
+                "scrollbar moves pane {index}"
+            );
+            for (other, tab) in app.tabs.iter().enumerate() {
+                if other != index {
+                    assert_eq!(
+                        tab.backend.scrollback_state().display_offset,
+                        before[other],
+                        "wheel and scrollbar leave other panes alone"
+                    );
+                }
+            }
+        }
+        // Disabling direct copy restores access to the menu even with a selection.
+        app.preferences.right_click_copies_selection = false;
+        let pos = egui::pos2(tracks[0].center().x - 180.0, tracks[0].center().y);
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Secondary, true),
+        );
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Secondary, false),
+        );
+        assert!(text_position(&render(app, &ctx, vec![]), "Copy selection").is_some());
+        let menu = render(app, &ctx, vec![]);
+        let font = text_position(&menu, "Terminal font").unwrap();
+        let hovered = render(app, &ctx, vec![egui::Event::PointerMoved(font)]);
+        assert!(
+            text_position(&hovered, "Use theme / default font").is_none(),
+            "font section never expands on hover"
+        );
+        let before: Vec<_> = app
+            .tabs
+            .iter()
+            .map(|tab| tab.output.snapshot().input_sequence)
+            .collect();
+        render(app, &ctx, vec![egui::Event::Text("menu-input".into())]);
+        assert_eq!(
+            app.tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect::<Vec<_>>(),
+            before,
+            "open pane menus own keyboard input"
+        );
     }
 
     #[cfg(windows)]

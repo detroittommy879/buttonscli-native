@@ -41,6 +41,7 @@ pub struct TerminalViewState {
 pub struct TerminalView<'a> {
     widget_id: Id,
     has_focus: bool,
+    interactive: bool,
     size: Vec2,
     backend: &'a mut TerminalBackend,
     font: TerminalFont,
@@ -83,8 +84,10 @@ pub enum BackgroundGradient {
 
 impl Widget for TerminalView<'_> {
     fn ui(self, ui: &mut egui::Ui) -> Response {
-        let (layout, painter) =
-            ui.allocate_painter(self.size, egui::Sense::click());
+        let (_, rect) = ui.allocate_space(self.size);
+        let layout =
+            ui.interact(rect, self.widget_id, egui::Sense::click_and_drag());
+        let painter = ui.painter_at(rect);
 
         let widget_id = self.widget_id;
         let mut state = ui.memory(|m| {
@@ -113,6 +116,7 @@ impl<'a> TerminalView<'a> {
         Self {
             widget_id,
             has_focus: false,
+            interactive: true,
             size: ui.available_size(),
             backend,
             font: TerminalFont::default(),
@@ -167,6 +171,12 @@ impl<'a> TerminalView<'a> {
         self
     }
 
+    /// Disable all input while a modal owns the workspace.
+    pub fn set_interactive(mut self, interactive: bool) -> Self {
+        self.interactive = interactive;
+        self
+    }
+
     #[inline]
     pub fn set_size(mut self, size: Vec2) -> Self {
         self.size = size;
@@ -183,7 +193,10 @@ impl<'a> TerminalView<'a> {
     }
 
     fn focus(self, layout: &Response) -> Self {
-        if self.has_focus {
+        if self.has_focus
+            && !layout.context_menu_opened()
+            && !layout.ctx.memory(|memory| memory.any_popup_open())
+        {
             layout.request_focus();
         } else {
             layout.surrender_focus();
@@ -206,7 +219,8 @@ impl<'a> TerminalView<'a> {
         layout: &Response,
         state: &mut TerminalViewState,
     ) -> Self {
-        if !layout.has_focus() || !layout.contains_pointer() {
+        if !self.interactive {
+            state.is_dragged = false;
             return self;
         }
 
@@ -219,7 +233,14 @@ impl<'a> TerminalView<'a> {
                 egui::Event::Text(_)
                 | egui::Event::Key { .. }
                 | egui::Event::Copy
-                | egui::Event::Paste(_) => {
+                | egui::Event::Paste(_)
+                    if self.has_focus
+                        && layout.has_focus()
+                        && !layout.context_menu_opened()
+                        && !layout
+                            .ctx
+                            .memory(|memory| memory.any_popup_open()) =>
+                {
                     input_actions.push(process_keyboard_event(
                         event,
                         self.backend,
@@ -227,30 +248,46 @@ impl<'a> TerminalView<'a> {
                         modifiers,
                     ))
                 },
-                egui::Event::MouseWheel { unit, delta, .. } => input_actions
-                    .push(process_mouse_wheel(
+                egui::Event::MouseWheel { unit, delta, .. }
+                    if layout.contains_pointer() =>
+                {
+                    input_actions.push(process_mouse_wheel(
                         state,
                         self.font.font_type().size,
                         unit,
                         delta,
-                    )),
+                    ))
+                },
                 egui::Event::PointerButton {
                     button,
                     pressed,
                     modifiers,
                     pos,
                     ..
-                } => input_actions.push(process_button_click(
-                    state,
-                    layout,
-                    self.backend,
-                    &self.bindings_layout,
-                    button,
-                    pos,
-                    &modifiers,
-                    pressed,
-                )),
-                egui::Event::PointerMoved(pos) => {
+                } if ((layout.contains_pointer()
+                    || layout.is_pointer_button_down_on())
+                    && layout.rect.contains(pos))
+                    || (button == PointerButton::Primary
+                        && !pressed
+                        && state.is_dragged) =>
+                {
+                    if pressed && button == PointerButton::Primary {
+                        layout.request_focus();
+                    }
+                    input_actions.push(process_button_click(
+                        state,
+                        layout,
+                        self.backend,
+                        &self.bindings_layout,
+                        button,
+                        pos,
+                        &modifiers,
+                        pressed,
+                    ));
+                },
+                egui::Event::PointerMoved(pos)
+                    if layout.contains_pointer() || state.is_dragged =>
+                {
                     input_actions = process_mouse_move(
                         state,
                         layout,
@@ -939,7 +976,8 @@ fn process_left_button(
     pressed: bool,
 ) -> InputAction {
     let terminal_mode = backend.last_content().terminal_mode;
-    if terminal_mode.intersects(TermMode::MOUSE_MODE) {
+    if terminal_mode.intersects(TermMode::MOUSE_MODE) && !modifiers.shift {
+        state.is_dragged = pressed;
         InputAction::BackendCall(BackendCommand::MouseReport(
             MouseButton::LeftButton,
             *modifiers,

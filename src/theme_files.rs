@@ -181,6 +181,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
     json!({
         "version": 1,
         "metadata": {
+            "nativeThemeVersion": theme.native_version.unwrap_or(1),
             "id": suggested_file_name(&name).trim_end_matches(".json"),
             "name": name,
             "description": theme.description,
@@ -420,12 +421,22 @@ mod tests {
             .preview_personal_document("test-profile", "my-copy", &document)
             .unwrap();
         let parsed = catalog.get(&id);
+        assert_eq!(parsed.native_version, Some(1));
         assert_eq!(
             parsed.terminal_colors.background,
             theme.terminal_colors.background
         );
         assert_eq!(parsed.terminal_colors.red, theme.terminal_colors.red);
         assert_eq!(parsed.pane_divider.thickness, theme.pane_divider.thickness);
+        let mut future = parsed.clone();
+        future.native_version = Some(2);
+        let future_document = document_from_theme(&future, "Native v2");
+        assert_eq!(
+            crate::theme::ThemeDefinition::editor_document(&future_document)
+                .unwrap()
+                .native_version,
+            Some(2)
+        );
         let bytes = encoded_theme(&mut document).unwrap();
         let round_trip: Value = serde_json::from_slice(&bytes).unwrap();
         assert!(round_trip["metadata"]["createdAt"]

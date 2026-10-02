@@ -223,6 +223,11 @@ pub(crate) fn candidate_from_response(
     result["metadata"]["id"] =
         json!(crate::theme_files::suggested_file_name(name).trim_end_matches(".json"));
     result["metadata"]["name"] = json!(name);
+    result["metadata"]["nativeThemeVersion"] = json!(base_document["metadata"]
+        ["nativeThemeVersion"]
+        .as_u64()
+        .unwrap_or(1)
+        .max(1));
     result["metadata"]["description"] = json!(description);
     result["metadata"]["createdAt"] = Value::Null;
     result["metadata"]["updatedAt"] = Value::Null;
