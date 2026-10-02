@@ -1,5 +1,25 @@
 # Reconstruction journal
 
+## 2026-10-02 — GitHub README and integration follow-through
+
+Rebuilt the README around the usable terminal workspace: centered title/badges,
+feature table, source-build quick start, four user-supplied October screenshots,
+and explicit AI Help/CLI/MCP access and remaining-work sections. Originals are
+unchanged; the import screenshot with a private provider endpoint was excluded.
+Public documentation images are now distinguished from diagnostic captures in
+CONTRIBUTING.md. The first README patch failed because delete/add targeted the
+same file; writing the complete UTF-8 document succeeded.
+
+PR #1's Linux CI fails on five platform-specific warnings in `terminal.rs`.
+Scoped Windows-only helpers/imports to Windows, retained WSL decoding under
+tests on other hosts, and made the shell collection mutable only where it is
+extended. Local Rust 1.96 also caught a boolean simplification in theme metadata;
+the equivalent `is_none_or` form passes strict native Clippy. No CI gate was
+relaxed. Incremental-cache finalization reported Windows access errors on the
+first check; a process-local `CARGO_INCREMENTAL=0` avoids that cache issue.
+Five CLI deadline tests and the 14-tool MCP fake-API contract pass. Full native,
+live CLI/MCP and GitHub checks are being rerun before integration.
+
 ## 2026-10-01 — Theme favorites, pane controls and migration gate repairs
 
 Free `themeFavorites`, `terminalContextMenu` and `paneHoverLabel` features are

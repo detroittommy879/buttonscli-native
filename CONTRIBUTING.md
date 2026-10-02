@@ -44,7 +44,9 @@ profiles. See [verification](docs/VERIFICATION.md) for platform evidence and
 known lint failures; a local Windows pass does not certify other platforms.
 
 Keep credentials, runtime descriptors, signing keys, private competitive
-research, customer data, release tokens, compiler output and screenshots out of
-commits. Local-only material belongs under the ignored `.private/` directory.
+research, customer data, release tokens, compiler output and diagnostic
+screenshots out of commits. Reviewed public documentation screenshots belong
+under `docs/images/`; check their visible content before publishing.
+Local-only material belongs under the ignored `.private/` directory.
 The original Tauri checkout is a read-only migration
 reference. Native release artifacts and settings use their separate namespace.

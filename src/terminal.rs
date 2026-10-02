@@ -225,7 +225,7 @@ pub fn detected_shells() -> Vec<DetectedShell> {
     }
 
     let mut seen = HashSet::new();
-    let mut shells: Vec<_> = commands
+    let shells: Vec<_> = commands
         .into_iter()
         .filter(|command| seen.insert(shell_command_key(command)))
         .map(|command| DetectedShell {
@@ -239,7 +239,11 @@ pub fn detected_shells() -> Vec<DetectedShell> {
         .collect();
 
     #[cfg(windows)]
-    shells.extend(wsl_distribution_shells(wsl_distributions));
+    let shells = {
+        let mut shells = shells;
+        shells.extend(wsl_distribution_shells(wsl_distributions));
+        shells
+    };
 
     shells
 }
@@ -259,6 +263,7 @@ fn shell_command_key(command: &str) -> String {
     }
 }
 
+#[cfg(windows)]
 fn detected_shell_id(command: &str, args: &[String]) -> String {
     if args.is_empty() {
         format!("detected:{command}")
@@ -303,6 +308,7 @@ fn detect_wsl_distributions() -> Vec<String> {
     parse_wsl_distribution_output(&output.stdout)
 }
 
+#[cfg(any(windows, test))]
 fn parse_wsl_distribution_output(bytes: &[u8]) -> Vec<String> {
     let decoded = decode_wsl_output(bytes);
     let mut seen = HashSet::new();
@@ -320,6 +326,7 @@ fn parse_wsl_distribution_output(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
+#[cfg(any(windows, test))]
 fn decode_wsl_output(bytes: &[u8]) -> String {
     let (encoding, payload) = if bytes.starts_with(&[0xff, 0xfe]) {
         (Some(false), &bytes[2..])
@@ -600,9 +607,11 @@ mod tests {
             "shell descendant survived PTY teardown"
         );
     }
+    #[cfg(windows)]
+    use super::detected_shell_id;
     use super::{
-        detected_shell_id, detected_shells, next_available_title, parse_wsl_distribution_output,
-        shell_title, split_command_line,
+        detected_shells, next_available_title, parse_wsl_distribution_output, shell_title,
+        split_command_line,
     };
 
     #[test]

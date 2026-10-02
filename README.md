@@ -1,164 +1,176 @@
+<div align="center">
+
 # ButtonsCLI Native
 
-ButtonsCLI Native is a fast terminal workspace written in Rust. It uses a
-native GPU-rendered UI and a production terminal state machine—no Tauri,
-browser engine, DOM, or webview.
+**Your shells, your shortcuts, your workspace.**
 
-![ButtonsCLI Native with stacked shells](docs/images/native-stacked.png)
+A native terminal workspace built in Rust, with tiled shells, command buttons,
+and hundreds of themes.
 
-The desktop target is the product; the WebAssembly target is an intentionally
-sandboxed interactive demo and never exposes a visitor's local shell.
+[![CI](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml/badge.svg)](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml)
+![Rust](https://img.shields.io/badge/built_with-Rust-e06c75?style=flat-square)
+![UI](https://img.shields.io/badge/native_UI-egui_%2B_wgpu-9b87f5?style=flat-square)
+[![License](https://img.shields.io/badge/license-MIT_%2F_Apache--2.0-66c2a5?style=flat-square)](#license)
 
-Current desktop features include:
+[Get started](#get-started) · [Features](#what-you-can-do-today) · [Screenshots](#make-it-your-own) · [Current status](#current-status) · [Documentation](#documentation)
 
-- real local shell sessions with production VT parsing, scrollback, and a
-  draggable per-terminal scrollbar when retained history exists;
-- native GPU-rendered tabs that wrap into more rows, and draggable COL, ROW,
-  and GRID layouts for up to ten terminal panes; panes wrap when space is tight,
-  with the focused session visible and all tabs reachable from the strip;
-- always visible pane dividers with theme inheritance or a saved custom color
-  and painted width, plus a saved corner-radius control for tabs and chrome;
-- new tabs named `term1`, `term2`, and so on, with rename, reorder, and
-  recent-close recovery with pane-safe index updates;
-- detected and custom shell profiles with persisted default/per-tab selection,
-  quoted arguments, working directories, and Windows WSL distribution choices;
-- keyboard input, live PTY resize, selection, copy, paste, and hyperlinks;
-- focused-terminal regex search across wrapped text and scrollback, plus
-  select-all and clear-screen actions that leave the shell running;
-- a resizable compact command dock with auto-hide and a status-bar terminal
-  zoom readout, reset action, and quick calm-effects switch;
-- detached Settings with live preview and a Revert & Close action, with an
-  in-window fallback when the platform cannot create another viewport;
-- separate command and SSH docks, editable persisted presets with type/run
-  behavior, all 555 bundled legacy theme selections, and a free personal theme
-  library with a non-AI editor plus JSON import/export;
-- editable AI provider endpoints and model IDs, plus a separate AI Help window
-  with streamed answers, previewed optional terminal context, and explicitly
-  reviewed suggestions; the Pro gate is still closed in release builds until
-  native entitlement integration exists;
-- a read-only Guides window with bundled offline Quick Start and AI Help
-  guides, plus an opt-in bounded fetch from the trusted ButtonsCLI guide path;
-- a free, explicit Send Feedback form with best-effort masking and no attached
-  terminal data or routine product analytics; see
-  [Privacy and feedback](docs/PRIVACY-AND-FEEDBACK.md);
-- an authenticated, loopback-only agent control API with an **Agent Inst.**
-  handoff, optional Node CLI, and optional stdio MCP server; it supports tab
-  creation, rename, layouts, presets, bounded output reads, and raw, bracketed,
-  or paced input, but is still Pro-gated and not enabled in release builds;
-- 26 bundled scalable font faces plus an emoji face across 20 families, offline system-font discovery
-  and local `.ttf` / `.otf` import; each UI area has its own typography, and the
-  terminal has separate regular and bold faces;
-- Windows main-window opacity control with platform capability reporting;
-- bundled Cool Stuff installers with copy/type-only setup commands and provider links;
-- theme-driven linear, radial, and conic terminal gradients, animated color
-  drift, static, and scanline overlays rendered natively;
-- per-terminal theme choices plus **Theme all**, **Random current**, and
-  **Random all** in Theme Settings; the tab hover shows its current theme;
-- saved theme favorites at the top of Themes and in the status bar, a quick
-  random-theme button, pane right-click menus, and configurable translucent
-  tab-name labels when hovering over panes;
-- persistent appearance preferences and clean child-process shutdown.
+</div>
 
-## Development
+![ButtonsCLI Native with five live terminals, separate command and SSH docks, and individually themed panes](docs/images/workspace-october-2026.png)
+
+ButtonsCLI Native brings your terminal sessions and frequently used commands
+into one configurable desktop workspace. Keep a local shell, remote SSH
+sessions, build output, and a system monitor visible together; give each pane
+its own theme and turn repeated commands into buttons. The UI uses egui/wgpu
+and the terminal engine uses Alacritty through a vendored egui adapter.
+
+**Usable as a terminal today, with more work ahead.** This is the native Rust
+rebuild of [ButtonsCLI](https://buttonscli.com). AI Help is not ready for normal
+use yet, and CLI/MCP agent control is currently available only through a debug
+development override. See [current status](#current-status) for the details.
+
+## What you can do today
+
+| | In the app |
+| --- | --- |
+| **Work across shells** | Real local PTYs, shell profiles, working directories, PowerShell/CMD and Windows WSL choices. SSH runs through your chosen shell. |
+| **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. |
+| **Put commands on buttons** | Separate command and SSH docks with editable presets. Choose whether a button types the command or also sends Enter. Docks resize, collapse, and auto-hide. |
+| **Use the terminal normally** | Scrollback and scrollbars, selection, copy/paste, hyperlinks, regex search, select-all, clear-screen, and live PTY resizing. |
+| **Make every pane recognizable** | 555 bundled legacy theme choices, per-terminal themes, Theme all, favorites, and random-theme controls. Edit, import, and export personal theme JSON. |
+| **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. Calm effects pauses motion; window opacity works on Windows. |
+| **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Preview an import from the original app into a separate native profile. Provider keys transfer only when selected explicitly. |
+| **Launch a workspace** | Start multiple tabs with a chosen shell/directory and optional commands for specific tabs. Startup options are available without AI or agent-control access. |
+
+Right-click tabs, panes, or presets for their actions. Detached Settings previews
+changes in the workspace and offers **Revert and Close**.
+
+## Make it your own
+
+The same workspace can use quiet solid colors, gradients, or supported terminal
+effects. Each pane can keep a different theme.
+
+![The five-pane workspace with dark chrome, mixed terminal palettes, gradients and static effects](docs/images/workspace-effects-october-2026.png)
+
+<table>
+  <tr>
+    <th align="left">Personal themes</th>
+    <th align="left">Fonts for each part of the app</th>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/theme-editor-october-2026.png" alt="Dark theme settings with the personal theme editor and ANSI palette controls" width="100%"></td>
+    <td width="50%"><img src="docs/images/font-settings-october-2026.png" alt="Dark font settings with independent family, weight and size controls for the UI, tabs, docks and terminal" width="100%"></td>
+  </tr>
+</table>
+
+<sub>Screenshots captured on Windows in October 2026. They show customized
+settings and live shell sessions; visible commands and remote connections are
+examples from that workspace.</sub>
+
+## Get started
+
+Install a Rust toolchain and your platform's build prerequisites, then build
+from source:
 
 ```sh
-cargo run
+git clone https://github.com/detroittommy879/buttonscli-native.git
+cd buttonscli-native
+cargo run --locked --bin buttonscli
 ```
 
-The first build downloads and compiles the Rust dependency graph. Linux needs
-the usual X11 or Wayland development packages. See `docs/BUILDING.md` for the
-full platform notes.
+For an optimized desktop build:
 
-Default shortcuts are `Primary+Shift+T` (new tab), `Primary+Shift+W` (close),
-`Primary+Shift+U` (reopen), `Primary+Shift+C/V` (copy/paste),
-`Primary+Shift+,` (Settings), and `Primary+Shift+Q` (quit). Primary means Ctrl
-on Windows/Linux and Command on macOS. Edit or clear these under
-**Settings → Shortcuts**; see [Keyboard shortcuts](docs/SHORTCUTS.md).
+```sh
+cargo build --release --locked --bin buttonscli
+```
 
-See [Terminal search and buffer actions](docs/TERMINAL-SEARCH.md) for search,
-select-all, and clear-screen behavior.
+Run `target/release/buttonscli.exe` on Windows, or
+`./target/release/buttonscli` on Linux/macOS. The first build compiles the Rust
+dependencies. The desktop app does not need Node; Node is used by the optional
+CLI/MCP helpers. See [building notes](docs/BUILDING.md) for Linux packages and
+the separate browser demo. Signed releases and automatic updates are still
+unfinished.
 
-See [Workspace controls](docs/WORKSPACE-CONTROLS.md) for dock auto-hide,
-terminal zoom, and the calm-effects toggle.
+**Open three PowerShell tabs and run a command in the first:**
 
-See [Settings preview](docs/SETTINGS-PREVIEW.md) for the detached window,
-rollback behavior, and current platform checks.
+```powershell
+.\target\release\buttonscli.exe --tabs 3 --shell "pwsh -NoLogo -NoProfile" --command 1 "git status"
+```
 
-See [Window appearance](docs/WINDOW-APPEARANCE.md) for opacity controls and
-platform support.
+More shell, directory, and command options: [Launching a workspace](docs/STARTUP.md).
 
-See [Cool Stuff](docs/COOL-STUFF.md) for the bundled installer preview,
-copy/type behavior, and external provider links.
+**Default shortcuts** — Primary is Ctrl on Windows/Linux and Command on macOS.
 
-See [Read-only guides](docs/READ-ONLY-GUIDES.md) for the offline guide window,
-online fetch limits, and browser-opening rules.
+| Action | Shortcut |
+| --- | --- |
+| New / close / reopen tab | `Primary+Shift+T` / `Primary+Shift+W` / `Primary+Shift+U` |
+| Copy / paste | `Primary+Shift+C` / `Primary+Shift+V` |
+| Settings | `Primary+Shift+,` |
+| Quit | `Primary+Shift+Q` |
 
-See [Privacy and feedback](docs/PRIVACY-AND-FEEDBACK.md) for what a feedback
-submission contains and how the native app handles failures.
+Bindings can be edited or cleared in **Settings → Shortcuts**.
 
-New tab numbers increase within each app run. Closing or reopening a tab does
-not reuse its number; restarting begins at `term1` because sessions are not
-restored. A custom tab name survives reorder and recent-close recovery. Shell
-names and terminal-reported titles do not replace the tab name automatically.
+## Current status
 
-Desktop preferences now save under `~/.buttonscli-native/`. If no native settings
-document exists, the app reads its earlier eframe preferences once and writes a
-native copy on the next save. The original Tauri app's `~/.buttonscli/` folder is
-not changed. On desktop, open **Settings → Import from original ButtonsCLI** to
-preview the active original profile or select another listed profile. Confirming
-creates a separate native profile with settings, command and SSH presets, and
-valid personal themes. Repeating the same snapshot preserves native edits;
-changed source data creates another profile. Import never runs saved commands.
-API keys, runtime/auth files and session history are excluded. Provider names,
-endpoints and models are retained as inert compatibility data and can be edited
-under **Settings → AI providers**. Keys can be saved in the operating system's
-credential store or kept for the current session.
+The terminal workspace is the useful part of this build. Some optional features
+have implementation and test coverage but are still locked or unfinished.
 
-Personal themes are read when the desktop app starts. A broken theme file is
-skipped without removing other themes. Imported files are copied only after
-confirmation; unsupported effect fields are retained for later export but are
-not rendered.
+| Area | Status |
+| --- | --- |
+| **Terminal workspace** | Available now. Windows has live PTY/CLI checks; earlier Linux/X11 desktop evidence is recorded. Broader clipboard, focus, DPI, accessibility and platform review remains. |
+| **AI Help** | **Not ready for normal use.** Provider settings, streaming, optional terminal context and reviewed suggestions exist, with partial testing against a local fake provider. Release builds keep requests locked pending entitlement integration; real-provider and full interaction acceptance remain open. |
+| **CLI / MCP agent control** | **Implemented, with development tests; locked in release builds.** The local API and installed Node CLI have Windows live-app checks. All 14 MCP tools have fake-API contract coverage; the official MCP client smoke covers tool discovery and live status/tabs. This does not certify every tool in every agent client. |
+| **AI theme generation** | Source implementation and mock-provider tests exist. Locked in release builds; live-provider and GUI acceptance remain. |
+| **Effects / Shader Lab** | Supported gradients, scanlines, noise and analog static render natively. Legacy GLSL shaders do not run; Shader Lab, HSync warp and remaining effect work are unfinished. |
+| **Accounts / distribution** | Hosted entitlement integration, production signing trust, updater activation and rollback still need work. The old feedback/runtime-config production paths are disabled pending a new native service. |
 
-Create, edit, preview, import, export, and delete personal theme files under
-**Settings → Themes → Custom Theme Library**. See
-[`docs/PERSONAL-THEMES.md`](docs/PERSONAL-THEMES.md) for save, preview, and file
-collision behavior.
+### Can an agent control it yet?
 
-In Theme Settings, **This terminal** pins a theme to the focused session;
-**Use global** returns it to the saved default. **Theme all** changes that
-default and replaces every open session's override, including hidden tabs.
-Random controls avoid repeating a terminal's current theme when another is
-available. Per-terminal choices survive tab reorder and recent-close recovery,
-but reset after app restart because terminal sessions are not restored.
+**In a debug build, yes, for the paths covered by the tests. In a normal release
+build, access is currently locked.** Agent control uses an authenticated API
+bound to `127.0.0.1`, with an instance-specific connection file. Helpers can
+create/rename tabs, arrange layouts, read output, send text or keys, and run
+presets. **Agent Inst.** copies the connection instructions when control is enabled.
 
-Architecture decisions, verified behavior, and honest remaining gaps live in
-`docs/ARCHITECTURE.md`, `docs/VERIFICATION.md`, and `docs/LIMITATIONS.md`.
+For development on Windows:
 
-See [`docs/AI-HELP.md`](docs/AI-HELP.md) for provider and review behavior, and
-[`docs/CONTROL-API.md`](docs/CONTROL-API.md) for the native agent-control
-handoff, supported routes, and current access limits.
+```powershell
+$env:BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL = "1"
+cargo run --locked --bin buttonscli
+```
 
-See [launching a workspace](docs/STARTUP.md) for one-shot startup tabs,
-commands, shell and working-directory options. Development follows the
-[branch and pull-request workflow](CONTRIBUTING.md).
+The override works only in debug builds. The API can send commands to real
+shells, so connect a client you trust. Full setup, supported routes, and testing
+limits are in [Native agent control](docs/CONTROL-API.md).
 
-The [feature migration plan](docs/migration/README.md) compares the original
-Tauri app with this native implementation, records source/build evidence for
-completed work, and tracks remaining platform and acceptance checks.
+### What still needs to be done?
 
-The bundled theme and font catalogs are embedded into the executable. System
-fonts are discovered from local folders and custom fonts stay in the native
-profile; font discovery and selection do not make network requests.
+- Finish AI Help's real-provider, credential, focus/target and reviewed-action
+  checks, plus the hosted access integration that unlocks release builds.
+- Finish agent-control GUI handoff and broader MCP-client/tool acceptance,
+  including Linux and macOS runtime checks.
+- Complete signed release/update activation and rollback.
+- Continue keyboard, clipboard, DPI, accessibility, IME and performance review
+  across platforms; finish the remaining native effects and Shader Lab work.
 
-Choose a display language or follow the operating system in **Settings →
-Language & Region**. A first-run chooser appears only for a new install. See
-[`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) for supported languages and
-current font and layout limits.
+Sessions are **not restored after an app restart**. Settings, presets, personal
+themes and favorites persist; live shells and session-only theme choices do not.
+For detailed boundaries, see [Current limitations](docs/LIMITATIONS.md) and the
+[Verification record](docs/VERIFICATION.md).
 
-See [`docs/FONTS.md`](docs/FONTS.md) for system-font discovery, local font
-import, missing-font fallback, and supported file formats.
+## Documentation
+
+| Start here | Customize and develop |
+| --- | --- |
+| [Native guide](docs/NATIVE-GUIDE.md) | [Personal themes](docs/PERSONAL-THEMES.md) · [Fonts](docs/FONTS.md) |
+| [Workspace controls](docs/WORKSPACE-CONTROLS.md) | [Settings preview](docs/SETTINGS-PREVIEW.md) · [Window appearance](docs/WINDOW-APPEARANCE.md) |
+| [Shell profiles](docs/SHELL-PROFILES.md) · [Startup](docs/STARTUP.md) | [AI Help](docs/AI-HELP.md) · [Control API / CLI / MCP](docs/CONTROL-API.md) |
+| [Shortcuts](docs/SHORTCUTS.md) · [Terminal search](docs/TERMINAL-SEARCH.md) | [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) |
+| [Limitations](docs/LIMITATIONS.md) | [Verification](docs/VERIFICATION.md) · [Progress log](docs/PROGRESS.md) |
+
+The separate WebAssembly demo uses a scripted terminal and cannot access a
+visitor's local shell. The desktop build is the main app.
 
 ## License
 
-Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
-option.
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

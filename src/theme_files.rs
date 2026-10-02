@@ -326,10 +326,10 @@ fn update_metadata_times(document: &mut Value) {
     let metadata = document["metadata"]
         .as_object_mut()
         .expect("validated metadata");
-    if !metadata
+    if metadata
         .get("createdAt")
         .and_then(Value::as_str)
-        .is_some_and(|value| !value.trim().is_empty())
+        .is_none_or(|value| value.trim().is_empty())
     {
         metadata.insert("createdAt".into(), Value::String(now.clone()));
     }
