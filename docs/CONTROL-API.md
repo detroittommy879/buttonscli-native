@@ -135,5 +135,10 @@ output checks. The 2026-10-01 run retained every one of 200 Unicode lines per
 terminal, kept output isolated by target, and verified child-shell cleanup.
 The probe waits for the PowerShell prompt; API `ready` means the PTY is live,
 not that its shell has finished startup. It does not measure frame rate.
-No external MCP-client launch, direct GUI handoff, provider request, or
-cross-platform runtime acceptance is claimed yet.
+On 2026-10-02, `scripts/test-control-live.ps1 -SkipBuild -WithMcpSdk` passed
+against the current Windows debug build. The official MCP TypeScript client
+connected over stdio, listed all 14 tools, and successfully called status/tabs
+against the live app. The installed CLI matrix, targeted startup commands,
+visible/background output, paced-exit cancellation and shell cleanup also
+passed. Full live coverage of every MCP tool, direct Agent Inst. clipboard
+handoff, provider requests and cross-platform runtime acceptance remain open.

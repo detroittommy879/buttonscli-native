@@ -17,8 +17,15 @@ extended. Local Rust 1.96 also caught a boolean simplification in theme metadata
 the equivalent `is_none_or` form passes strict native Clippy. No CI gate was
 relaxed. Incremental-cache finalization reported Windows access errors on the
 first check; a process-local `CARGO_INCREMENTAL=0` avoids that cache issue.
-Five CLI deadline tests and the 14-tool MCP fake-API contract pass. Full native,
-live CLI/MCP and GitHub checks are being rerun before integration.
+Five CLI deadline tests and the 14-tool MCP fake-API contract pass. Full Windows
+tests pass 235 library tests plus two fixtures, with five optional tests ignored;
+formatting, strict native Clippy and the desktop build pass. The isolated live
+CLI/startup matrix with `-WithMcpSdk` passes, including official-client discovery
+of 14 tools and live status/tabs calls, output targeting, paced cancellation and
+child-shell cleanup. Shutdown emitted existing ended-pipe diagnostics; cleanup
+assertions passed. No personal terminals or settings were used.
+README local links resolve, copied images match their originals, and the public
+GitHub render was visually checked. GitHub CI is rerunning before integration.
 
 ## 2026-10-01 — Theme favorites, pane controls and migration gate repairs
 

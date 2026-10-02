@@ -1,7 +1,26 @@
 # Verification record
 
-Last run: 2026-10-01 on Windows 11, Rust 1.98.1. Earlier Linux-only checks
+Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-02 README and integration checks
+
+- Formatting, strict native Clippy, desktop build and `git diff --check` pass.
+- Full native suite: 235 library tests and two import fixtures pass; five
+  optional library tests remain ignored. WSL decoding coverage still runs on
+  non-Windows test hosts; Windows-only discovery helpers now compile only there.
+- Five Node CLI deadline regressions and the 14-tool MCP fake-API contract pass.
+- `pwsh -NoProfile -File scripts/test-control-live.ps1 -SkipBuild -WithMcpSdk`
+  passes against isolated test state. The official client lists 14 tools and
+  calls status/tabs on the live app; the installed CLI matrix checks targeted
+  startup, input formats, layouts, visible/background output, paced cancellation
+  and child-shell cleanup. No full live MCP tool matrix or GUI handoff is claimed.
+- The desktop build retains the existing bin/lib PDB naming warning. Vulkan
+  validation-layer warnings and ended-pipe messages appeared during the live
+  smoke; functional and cleanup assertions pass.
+- The README's local links resolve; its four public screenshots were inspected,
+  copied without modification, and checked in the GitHub render. The private
+  provider import capture was excluded. GitHub CI is pending at this checkpoint.
 
 ## 2026-10-01 favorites and migration checks
 
