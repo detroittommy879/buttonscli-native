@@ -218,17 +218,15 @@ pub(crate) fn noise_image(
 }
 
 pub(crate) fn bounded_noise_dimensions(width: usize, height: usize) -> [usize; 2] {
-    let width = width.clamp(1, MAX_NOISE_DIMENSION);
-    let height = height.clamp(1, MAX_NOISE_DIMENSION);
-    let pixels = width.saturating_mul(height);
-    if pixels <= MAX_NOISE_PIXELS {
-        return [width, height];
-    }
-
-    let scale = (MAX_NOISE_PIXELS as f64 / pixels as f64).sqrt();
+    let width = width.max(1) as f64;
+    let height = height.max(1) as f64;
+    // Apply one scale to both axes; independent caps stretch square texels.
+    let scale = (MAX_NOISE_DIMENSION as f64 / width.max(height))
+        .min((MAX_NOISE_PIXELS as f64 / (width * height)).sqrt())
+        .min(1.0);
     [
-        ((width as f64 * scale).floor() as usize).max(1),
-        ((height as f64 * scale).floor() as usize).max(1),
+        ((width * scale).floor() as usize).max(1),
+        ((height * scale).floor() as usize).max(1),
     ]
 }
 
@@ -292,5 +290,20 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.size, [100, 50]);
         assert!(first.pixels.len() <= MAX_NOISE_PIXELS);
+    }
+
+    #[test]
+    fn bounded_noise_keeps_square_grain_in_wide_tall_and_hidpi_panes() {
+        for (width, height) in [(2400, 600), (600, 2400), (7680, 2160), (2160, 7680)] {
+            let [w, h] = bounded_noise_dimensions(width, height);
+            assert!(w <= MAX_NOISE_DIMENSION && h <= MAX_NOISE_DIMENSION);
+            assert!(w * h <= MAX_NOISE_PIXELS);
+            let cell_x = width as f64 / w as f64;
+            let cell_y = height as f64 / h as f64;
+            assert!(
+                (cell_x / cell_y - 1.0).abs() < 0.01,
+                "stretched noise {width}x{height}: {w}x{h}"
+            );
+        }
     }
 }

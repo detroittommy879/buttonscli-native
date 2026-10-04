@@ -351,6 +351,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     window_opacity_error: Option<String>,
     settings_tab: SettingsTab,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_source_id: Option<String>,
     settings_snapshot: Option<SettingsSnapshot>,
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
@@ -604,7 +606,7 @@ pub struct ButtonsApp {
     demo_input: String,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 enum SettingsTab {
     #[default]
     Themes,
@@ -613,6 +615,7 @@ enum SettingsTab {
     Workspace,
     Language,
     Shortcuts,
+    Keyboard,
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1119,6 +1122,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             window_opacity_error: None,
             settings_tab: SettingsTab::Themes,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_source_id: None,
             settings_snapshot: None,
             shortcut_capture: None,
             shortcut_feedback: None,
@@ -1549,6 +1554,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn set_theme_for_tab(&mut self, index: usize, theme_id: &str) {
+        self.restore_personal_theme_preview();
         let Some(tab) = self.tabs.get(index) else {
             return;
         };
@@ -1561,6 +1567,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn set_theme_all(&mut self, theme_id: &str) {
+        self.restore_personal_theme_preview();
         if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
             return;
         }
@@ -2673,6 +2680,9 @@ impl ButtonsApp {
             hover_font: &hover_font,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
+            keyboard: &self.preferences.keyboard,
+            row_brightness: self.preferences.row_banding_brightness,
+            animation_fps: self.preferences.animation_fps,
             keyboard_navigation: self.keyboard_navigation,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
@@ -4115,6 +4125,9 @@ impl ButtonsApp {
                         });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
                         ui.separator();
+                        ui.label("Row banding");
+                        ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
+                        ui.separator();
                         ui.label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
                         if ui
@@ -4289,6 +4302,25 @@ impl ButtonsApp {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn persist_native_preferences(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if !self.native_save_blocked {
+            if let Some(store) = &self.native_store {
+                match store.save(self.native_revision, &self.preferences_to_save()) {
+                    Ok(revision) => self.native_revision = Some(revision),
+                    Err(error) => {
+                        tracing::error!("Native settings save failed: {error}");
+                        self.notice = Some(format!("Native settings could not save: {error}"));
+                        if matches!(error, crate::storage::store::StoreError::StaleRevision) {
+                            self.native_save_blocked = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn settings_window(&mut self, ctx: &egui::Context) {
         if !self.show_settings {
             return;
@@ -4301,14 +4333,33 @@ impl ButtonsApp {
         let old_typography = self.preferences.typography.clone();
         let title = crate::i18n::text(&self.locale, crate::i18n::MessageKey::SettingsTitle, &[]);
         let mut close_action = None;
+        let layout = self.preferences.settings_layout.clone();
+        let mut builder = egui::ViewportBuilder::default()
+            .with_title(title.clone())
+            .with_inner_size(layout.size)
+            .with_min_inner_size([720.0, 520.0]);
+        if let Some(position) = layout.position {
+            builder = builder.with_position(position);
+        }
         ctx.show_viewport_immediate(
             egui::ViewportId::from_hash_of("buttonscli-settings"),
-            egui::ViewportBuilder::default()
-                .with_title(title.clone())
-                .with_inner_size([980.0, 760.0])
-                .with_min_inner_size([720.0, 520.0]),
+            builder,
             |child_ctx, class| {
                 self.apply_style(child_ctx);
+                if class != egui::ViewportClass::Embedded {
+                    child_ctx.input(|input| {
+                        if let Some(rect) = input.viewport().inner_rect {
+                            if rect.width() >= 720.0 && rect.height() >= 520.0 {
+                                self.preferences.settings_layout.size =
+                                    [rect.width(), rect.height()];
+                            }
+                        }
+                        if let Some(rect) = input.viewport().outer_rect {
+                            self.preferences.settings_layout.position =
+                                Some([rect.left(), rect.top()]);
+                        }
+                    });
+                }
                 if child_ctx.input(|input| input.viewport().close_requested()) {
                     close_action = Some(SettingsCloseAction::Keep);
                     child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -4322,7 +4373,7 @@ impl ButtonsApp {
                     let mut window_open = true;
                     egui::Window::new(title.clone())
                         .open(&mut window_open)
-                        .default_size([980.0, 760.0])
+                        .default_size(layout.size)
                         .min_width(720.0)
                         .resizable(true)
                         .collapsible(false)
@@ -4365,6 +4416,7 @@ impl ButtonsApp {
             if self.theme_editor_preview_snapshot.is_some() {
                 self.cancel_personal_theme_draft();
             }
+            let layout = self.preferences.settings_layout.clone();
             if action == SettingsCloseAction::Revert {
                 if let Some(snapshot) = self.settings_snapshot.take() {
                     self.restore_settings_snapshot(snapshot);
@@ -4372,6 +4424,9 @@ impl ButtonsApp {
             } else {
                 self.settings_snapshot = None;
             }
+            self.preferences.settings_layout = layout;
+            #[cfg(not(target_arch = "wasm32"))]
+            self.persist_native_preferences();
             self.show_settings = false;
         }
         if old_app_theme != self.preferences.app_theme_id
@@ -4390,74 +4445,83 @@ impl ButtonsApp {
         close_action: &mut Option<SettingsCloseAction>,
     ) {
         ui.spacing_mut().scroll = settings_scroll_style();
+        let contrast = if self.colors().settings_background.r() as u16
+            + self.colors().settings_background.g() as u16
+            + self.colors().settings_background.b() as u16
+            > 384
+        {
+            Color32::BLACK
+        } else {
+            Color32::WHITE
+        };
+        ui.visuals_mut().widgets.inactive.bg_fill = contrast.gamma_multiply(0.55);
+        ui.visuals_mut().widgets.hovered.bg_fill = contrast.gamma_multiply(0.75);
         apply_zone_style(
             ui,
             &self.font_catalog,
             &self.preferences.typography.settings,
         );
-        egui::ScrollArea::horizontal()
-            .id_salt("settings-tab-strip")
-            .auto_shrink([false, true])
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
+        ui.scope(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Themes,
+                    crate::i18n::literal(&self.locale, "Themes"),
+                );
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Fonts,
+                    crate::i18n::literal(&self.locale, "Fonts"),
+                );
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Commands,
+                    crate::i18n::literal(&self.locale, "Commands"),
+                );
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Workspace,
+                    crate::i18n::literal(&self.locale, "Workspace"),
+                );
+                if localization_settings_available() {
                     ui.selectable_value(
                         &mut self.settings_tab,
-                        SettingsTab::Themes,
-                        crate::i18n::literal(&self.locale, "Themes"),
+                        SettingsTab::Language,
+                        crate::i18n::literal(&self.locale, "Language & Region"),
                     );
+                }
+                ui.selectable_value(&mut self.settings_tab, SettingsTab::Keyboard, "Keyboard");
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Shortcuts,
+                    crate::i18n::text(&self.locale, crate::i18n::MessageKey::Shortcuts, &[]),
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Providers,
+                    crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                if account_signin_available() {
                     ui.selectable_value(
                         &mut self.settings_tab,
-                        SettingsTab::Fonts,
-                        crate::i18n::literal(&self.locale, "Fonts"),
+                        SettingsTab::Account,
+                        crate::i18n::literal(&self.locale, "Account"),
                     );
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Commands,
-                        crate::i18n::literal(&self.locale, "Commands"),
-                    );
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Workspace,
-                        crate::i18n::literal(&self.locale, "Workspace"),
-                    );
-                    if localization_settings_available() {
-                        ui.selectable_value(
-                            &mut self.settings_tab,
-                            SettingsTab::Language,
-                            crate::i18n::literal(&self.locale, "Language & Region"),
-                        );
-                    }
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Shortcuts,
-                        crate::i18n::text(&self.locale, crate::i18n::MessageKey::Shortcuts, &[]),
-                    );
-                    #[cfg(not(target_arch = "wasm32"))]
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Providers,
-                        crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
-                    );
-                    #[cfg(not(target_arch = "wasm32"))]
-                    if account_signin_available() {
-                        ui.selectable_value(
-                            &mut self.settings_tab,
-                            SettingsTab::Account,
-                            crate::i18n::literal(&self.locale, "Account"),
-                        );
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    ui.selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Import,
-                        crate::i18n::text(
-                            &self.locale,
-                            crate::i18n::MessageKey::ImportFromOriginal,
-                            &[],
-                        ),
-                    );
-                });
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Import,
+                    crate::i18n::text(
+                        &self.locale,
+                        crate::i18n::MessageKey::ImportFromOriginal,
+                        &[],
+                    ),
+                );
             });
+        });
         ui.separator();
         let settings_bounds = ui.available_rect_before_wrap();
         let footer_height =
@@ -4467,7 +4531,7 @@ impl ButtonsApp {
                 + 4.0;
         let body_height = (ui.available_height() - footer_height).max(1.0);
         egui::ScrollArea::vertical()
-            .id_salt("settings-body")
+            .id_salt(("settings-body", self.settings_tab))
             .max_height(body_height)
             .auto_shrink([false, false])
             .show(ui, |ui| match self.settings_tab {
@@ -4480,6 +4544,7 @@ impl ButtonsApp {
                 }
                 SettingsTab::Language => self.theme_settings(ui),
                 SettingsTab::Shortcuts => self.shortcut_settings(ui),
+                SettingsTab::Keyboard => self.keyboard_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Providers => self.provider_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
@@ -6908,9 +6973,17 @@ impl ButtonsApp {
         let mut per_tab_theme = None;
         #[cfg(not(target_arch = "wasm32"))]
         let mut all_theme = None;
+        let browser_height = self
+            .preferences
+            .settings_layout
+            .section_heights
+            .get("themes")
+            .copied()
+            .unwrap_or(400.0)
+            .clamp(100.0, 1000.0);
         egui::ScrollArea::vertical()
             .id_salt("settings-themes")
-            .max_height(400.0)
+            .max_height(browser_height)
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for (native, label) in [(true, "Native themes"), (false, "Legacy themes")] {
@@ -6953,7 +7026,7 @@ impl ButtonsApp {
                                                 let (rect, _) = ui.allocate_exact_size(Vec2::splat(12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, swatch);
                                             }
-                                            if let Some(version) = theme.native_version { ui.weak(format!("Native v{version}")); }
+        if let Some(version) = theme.native_version { ui.weak(format!("Native v{version}")); }
                                             if ui.small_button("Calm").clicked() { apply = Some((index, true)); }
                                             #[cfg(not(target_arch = "wasm32"))]
                                             if ui.add_enabled(!self.tabs.is_empty(), egui::Button::new("This terminal").small()).clicked() {
@@ -7094,6 +7167,12 @@ impl ButtonsApp {
                 }
             });
 
+        settings_section_divider(
+            ui,
+            &mut self.preferences.settings_layout.section_heights,
+            "themes",
+            400.0,
+        );
         if let Some(id) = toggle_favorite {
             self.preferences.toggle_favorite_theme(&id);
         }
@@ -7109,9 +7188,44 @@ impl ButtonsApp {
             self.set_theme_all(&id);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        self.theme_generator(ui);
-        #[cfg(not(target_arch = "wasm32"))]
-        self.personal_theme_editor(ui);
+        {
+            let height = self
+                .preferences
+                .settings_layout
+                .section_heights
+                .get("theme-generator")
+                .copied()
+                .unwrap_or(180.0);
+            egui::ScrollArea::vertical()
+                .id_salt("theme-generator-section")
+                .max_height(height)
+                .auto_shrink([false, true])
+                .show(ui, |ui| self.theme_generator(ui));
+            settings_section_divider(
+                ui,
+                &mut self.preferences.settings_layout.section_heights,
+                "theme-generator",
+                180.0,
+            );
+            let height = self
+                .preferences
+                .settings_layout
+                .section_heights
+                .get("theme-editor")
+                .copied()
+                .unwrap_or(600.0);
+            egui::ScrollArea::vertical()
+                .id_salt("theme-editor-section")
+                .max_height(height)
+                .auto_shrink([false, true])
+                .show(ui, |ui| self.personal_theme_editor(ui));
+            settings_section_divider(
+                ui,
+                &mut self.preferences.settings_layout.section_heights,
+                "theme-editor",
+                600.0,
+            );
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -7238,6 +7352,7 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
+        self.sync_theme_editor_to_current();
         let locale = self.locale.clone();
         let mut selected_profile = None;
         let personal_profiles: Vec<(String, String)> = self
@@ -7299,6 +7414,8 @@ impl ButtonsApp {
                 }
             });
         if let Some(id) = selected_profile {
+            self.restore_personal_theme_preview();
+            self.perform_global_theme_action(PaneAction::Theme(id.clone()));
             self.load_personal_theme_draft(&id);
             self.queue_theme_editor_preview(ui.ctx());
         }
@@ -7537,7 +7654,7 @@ impl ButtonsApp {
                     ui,
                     &locale,
                     &mut document,
-                    "Static effect",
+                    "Analog TV effect",
                     "/effects/staticEnabled",
                 );
                 if document["effects"]["staticEnabled"] == true {
@@ -7694,7 +7811,7 @@ impl ButtonsApp {
                         ui,
                         &locale,
                         &mut document,
-                        "Row banding",
+                        "Row banding (for readability)",
                         "/effects/rowBandingEnabled",
                     );
                     if document["effects"]["rowBandingEnabled"] == true {
@@ -7935,6 +8052,7 @@ impl ButtonsApp {
             .unwrap_or("Generated theme")
             .to_owned();
         let file_name = crate::theme_files::unique_file_name(&themes_directory, &name);
+        self.theme_editor_source_id = Some(self.theme_for_tab(self.focused).to_owned());
         self.theme_editor_document = Some(candidate.document.clone());
         self.theme_editor_original_document = Some(candidate.document);
         self.theme_editor_file_name = Some(file_name);
@@ -7959,6 +8077,14 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
+        let source_document = if self.theme_editor_preview_snapshot.is_some()
+            || self.theme_editor_source_id.as_deref() == Some(self.theme_for_tab(self.focused))
+        {
+            self.theme_editor_document.clone()
+        } else {
+            None
+        };
+        let source_theme = self.themes.get(self.theme_for_tab(self.focused)).clone();
         self.restore_personal_theme_preview();
         let Some(store) = self.native_store.as_ref() else {
             self.theme_editor_status = Some(crate::i18n::literal(
@@ -7968,12 +8094,11 @@ impl ButtonsApp {
             return;
         };
         let theme_id = self.theme_for_tab(self.focused).to_owned();
-        let theme = self.themes.get(&theme_id).clone();
+        let theme = source_theme;
+        self.theme_editor_source_id = Some(theme_id.clone());
         let name = format!("{} Copy", theme.name);
-        let mut document = self
-            .themes
-            .personal_document(&theme_id)
-            .cloned()
+        let mut document = source_document
+            .or_else(|| self.themes.personal_document(&theme_id).cloned())
             .unwrap_or_else(|| crate::theme_files::document_from_theme(&theme, &name));
         document["metadata"]["name"] = Value::String(name.clone());
         document["metadata"]["id"] = Value::String(
@@ -8012,6 +8137,7 @@ impl ButtonsApp {
         let Some(stem) = id.rsplit(':').next() else {
             return;
         };
+        self.theme_editor_source_id = Some(id.to_owned());
         self.theme_editor_document = Some(document.clone());
         self.theme_editor_original_document = Some(document);
         self.theme_editor_file_name = Some(format!("{stem}.json"));
@@ -8052,6 +8178,7 @@ impl ButtonsApp {
             Ok((file_name, document)) => {
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
+                self.theme_editor_source_id = Some(self.theme_for_tab(self.focused).to_owned());
                 self.theme_editor_document = Some(document.clone());
                 self.theme_editor_original_document = Some(document);
                 self.theme_editor_file_name = Some(file_name);
@@ -8241,6 +8368,15 @@ impl ButtonsApp {
                 self.theme_editor_preview_snapshot = None;
                 self.theme_editor_confirm_delete = false;
                 self.reload_personal_themes();
+                let id = format!(
+                    "personal:{profile_name}:{}",
+                    self.theme_editor_file_name
+                        .as_deref()
+                        .unwrap()
+                        .trim_end_matches(".json")
+                );
+                self.perform_global_theme_action(PaneAction::Theme(id.clone()));
+                self.theme_editor_source_id = Some(id);
                 self.theme_editor_status = Some(crate::i18n::literal(
                     &self.locale,
                     "Theme saved to the active native profile.",
@@ -8381,6 +8517,8 @@ impl ButtonsApp {
 
     fn apply_theme(&mut self, index: usize, calm: bool) {
         let theme = self.themes.all()[index].clone();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.restore_personal_theme_preview();
         let id = theme.id.clone();
         self.preferences.theme_id = id.clone();
         if self.preferences.theme_apply.app {
@@ -9036,10 +9174,58 @@ impl ButtonsApp {
         }
     }
 
+    fn keyboard_settings(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Keyboard & clipboard");
+        ui.label("Copy: Ctrl+Shift+C, or Cmd+C on macOS. Paste: Ctrl+Shift+V, or Cmd+V on macOS. Custom bindings are in Shortcuts.");
+        ui.checkbox(
+            &mut self.preferences.keyboard.ctrl_c_copies_selection,
+            "Ctrl+C copies when terminal text is selected",
+        );
+        ui.label("With no selection, Ctrl+C interrupts the shell. Disable this option to always interrupt with Ctrl+C on Windows/Linux.");
+        ui.checkbox(
+            &mut self.preferences.right_click_copies_selection,
+            "Right-click copies selected terminal text",
+        );
+        ui.checkbox(
+            &mut self.preferences.keyboard.copy_on_selection,
+            "Copy automatically when mouse selection ends",
+        );
+        ui.checkbox(
+            &mut self.preferences.keyboard.bracketed_paste,
+            "Use bracketed paste when the terminal application requests it",
+        );
+        ui.checkbox(
+            &mut self.preferences.keyboard.option_as_meta,
+            "macOS: use Option as Meta (Escape prefix)",
+        );
+        ui.label("Leave Option as Meta off to type accented and alternate characters with Option on Mac keyboards.");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn sync_theme_editor_to_current(&mut self) {
+        if self.theme_editor_preview_snapshot.is_some() {
+            return;
+        }
+        let id = self.theme_for_tab(self.focused).to_owned();
+        if self.theme_editor_source_id.as_deref() == Some(&id) {
+            return;
+        }
+        if self.themes.personal_document(&id).is_some() {
+            self.load_personal_theme_draft(&id);
+        } else {
+            self.start_personal_theme_draft();
+        }
+    }
+
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
         #[cfg(not(target_arch = "wasm32"))]
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
+        ui.label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
+        ui.add(
+            egui::Slider::new(&mut self.preferences.animation_fps, 1..=60)
+                .text("Effect animation FPS limit"),
+        );
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
                 let label = ui.label("Left panel name");
@@ -9049,7 +9235,7 @@ impl ButtonsApp {
                 &mut self.preferences.right_click_copies_selection,
                 "Right-click copies selected terminal text",
             ).on_hover_text("Copy immediately when text is selected. With no selection, right-click opens the pane menu.");
-            ui.label("Drag to select terminal text, then right-click or press Ctrl+Shift+C (Cmd+Shift+C on macOS). Ctrl+C interrupts the shell.");
+            ui.label("Copy and paste behavior is configured in the Keyboard tab.");
             #[cfg(not(target_arch = "wasm32"))]
             {
                 let label = ui.label("Retained scrollback lines per terminal (0–100,000)");
@@ -9081,7 +9267,7 @@ impl ButtonsApp {
                         if result.is_err() { self.notice = Some("Could not open the history folder.".into()); }
                     }
                 }
-                ui.checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU analog static)");
+                ui.checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU Analog TV effect)");
                 ui.label("Turn off for standard texture-based static. Calm mode disables motion and noise.");
             }
             ui.checkbox(
@@ -10123,6 +10309,18 @@ impl ButtonsApp {
             return;
         };
 
+        if let Some((key, modifiers)) = pressed {
+            ctx.input_mut(|input| {
+                // Alt shortcuts may have a companion composed Text event.
+                if let Some(index) = input.events.windows(2).position(|events| {
+                    matches!(&events[0], egui::Event::Key { key: event_key, modifiers: event_modifiers, pressed: true, .. } if *event_key == key && *event_modifiers == modifiers)
+                        && matches!(&events[1], egui::Event::Text(_))
+                }) {
+                    input.events.remove(index + 1);
+                }
+                input.consume_key(modifiers, key);
+            });
+        }
         #[cfg(not(target_arch = "wasm32"))]
         match action {
             ShortcutAction::NewTab => self.dispatch_ui_or_notice(
@@ -10177,6 +10375,30 @@ fn sync_zone(source: &FontZone, target: &mut FontZone) {
     let size = target.size;
     *target = source.clone();
     target.size = size;
+}
+
+fn settings_section_divider(
+    ui: &mut egui::Ui,
+    heights: &mut std::collections::BTreeMap<String, f32>,
+    key: &str,
+    default: f32,
+) {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 12.0), egui::Sense::drag());
+    let response = response
+        .on_hover_cursor(egui::CursorIcon::ResizeVertical)
+        .on_hover_text("Drag to resize this section; its height is remembered.");
+    let color = if response.hovered() || response.dragged() {
+        ui.visuals().text_color()
+    } else {
+        ui.visuals().text_color().gamma_multiply(0.55)
+    };
+    ui.painter()
+        .hline(rect.x_range(), rect.center().y, Stroke::new(2.0, color));
+    if response.dragged() {
+        let height = heights.entry(key.to_owned()).or_insert(default);
+        *height = (*height + ui.input(|input| input.pointer.delta().y)).clamp(100.0, 1000.0);
+    }
 }
 
 fn settings_scroll_style() -> egui::style::ScrollStyle {
@@ -10306,6 +10528,9 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 
 #[cfg(not(target_arch = "wasm32"))]
 struct TerminalInteraction {
+    keyboard: crate::settings::KeyboardPreferences,
+    row_brightness: u8,
+    animation_fps: u32,
     focused: bool,
     enabled: bool,
     advanced_effects: bool,
@@ -10382,6 +10607,17 @@ fn terminal_surface(
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
+        .set_keyboard_options(
+            interaction.keyboard.ctrl_c_copies_selection,
+            interaction.keyboard.copy_on_selection,
+            interaction.keyboard.bracketed_paste,
+            interaction.keyboard.option_as_meta,
+        )
+        .set_row_brightness(if theme.effects.master_disabled {
+            0
+        } else {
+            interaction.row_brightness
+        })
         .set_row_banding(if effects_master_switch_available() {
             crate::plugins::effects::row_banding::overlay_color(&theme.effects)
         } else {
@@ -10411,7 +10647,11 @@ fn terminal_surface(
         theme,
         tab.id,
         latest_activity_at_ms,
-        (time, interaction.advanced_effects),
+        (
+            time,
+            interaction.advanced_effects,
+            interaction.animation_fps,
+        ),
         &mut tab.effect_textures,
     );
     let scrollbar_clicked = if scrollbar_width > 0.0 {
@@ -10499,12 +10739,12 @@ fn paint_terminal_effects(
     theme: &ThemeDefinition,
     terminal_id: u64,
     latest_activity_at_ms: u64,
-    rendering: (f32, bool),
+    rendering: (f32, bool, u32),
     textures: &mut crate::plugins::effects::simple_noise::NoiseTextures,
 ) {
     use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
-    let (time, advanced) = rendering;
+    let (time, advanced, animation_fps) = rendering;
     if effects.master_disabled {
         *textures = Default::default();
         return;
@@ -10556,7 +10796,8 @@ fn paint_terminal_effects(
             24
         } else {
             effects.simple_noise_fps.clamp(1, 60)
-        };
+        }
+        .min(animation_fps.clamp(1, 60));
         let interval = (1000.0_f32 / fps as f32).round().max(1.0) as u64;
         paint_noise(
             ui,
@@ -10574,7 +10815,7 @@ fn paint_terminal_effects(
         textures.simple = None;
     }
     let mut repaint_after_ms = if static_active {
-        Some(16)
+        Some(34)
     } else {
         crate::dock::effects_need_repaint(effects.gradient_animation, 0.0).then_some(80)
     };
@@ -10584,7 +10825,9 @@ fn paint_terminal_effects(
     }
     if let Some(delay) = repaint_after_ms {
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(delay));
+            .request_repaint_after(std::time::Duration::from_millis(
+                delay.max(1000_u64.div_ceil(animation_fps.clamp(1, 60) as u64)),
+            ));
     }
 }
 
@@ -10731,6 +10974,9 @@ fn build_pane_sequence(mut panes: Vec<PaneTree>, axis: SplitAxis, key: String) -
 
 #[cfg(not(target_arch = "wasm32"))]
 struct PaneRenderState<'a> {
+    keyboard: &'a crate::settings::KeyboardPreferences,
+    row_brightness: u8,
+    animation_fps: u32,
     right_click_copies_selection: bool,
     advanced_effects: bool,
     keyboard_navigation: bool,
@@ -10779,6 +11025,9 @@ fn render_pane_tree(
                 &mut pane,
                 tab,
                 TerminalInteraction {
+                    keyboard: state.keyboard.clone(),
+                    row_brightness: state.row_brightness,
+                    animation_fps: state.animation_fps,
                     focused: state.focused == *index
                         && !state.modal_open
                         && !state.keyboard_navigation,
@@ -11644,20 +11893,7 @@ impl eframe::App for ButtonsApp {
         #[cfg(target_arch = "wasm32")]
         eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
         #[cfg(not(target_arch = "wasm32"))]
-        if !self.native_save_blocked {
-            if let Some(store) = &self.native_store {
-                match store.save(self.native_revision, &self.preferences_to_save()) {
-                    Ok(revision) => self.native_revision = Some(revision),
-                    Err(error) => {
-                        tracing::error!("Native settings save failed: {error}");
-                        self.notice = Some(format!("Native settings could not save: {error}"));
-                        if matches!(error, crate::storage::store::StoreError::StaleRevision) {
-                            self.native_save_blocked = true;
-                        }
-                    }
-                }
-            }
-        }
+        self.persist_native_preferences();
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
@@ -12713,6 +12949,21 @@ mod tests {
                 "pane {index} selects on the first drag"
             );
             selections.push(selected.clone());
+            let before_inputs: Vec<_> = app
+                .tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect();
+            let copied_by_keyboard = render(app, &ctx, vec![egui::Event::Copy]);
+            assert!(copied_by_keyboard.platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &selected)), "keyboard copy works after modifiers have been released in pane {index}");
+            assert_eq!(
+                app.tabs
+                    .iter()
+                    .map(|tab| tab.output.snapshot().input_sequence)
+                    .collect::<Vec<_>>(),
+                before_inputs,
+                "copy does not write an interrupt or letter to a PTY"
+            );
             render(
                 app,
                 &ctx,
@@ -12732,6 +12983,46 @@ mod tests {
         for (tab, selected) in app.tabs.iter().zip(&selections) {
             assert_eq!(&tab.backend.selectable_content(), selected);
         }
+        let before_ime: Vec<_> = app
+            .tabs
+            .iter()
+            .map(|tab| tab.output.snapshot().input_sequence)
+            .collect();
+        render(
+            app,
+            &ctx,
+            vec![
+                egui::Event::Ime(egui::ImeEvent::Preedit("compose".into())),
+                egui::Event::Text("premature".into()),
+            ],
+        );
+        assert_eq!(
+            app.tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect::<Vec<_>>(),
+            before_ime,
+            "IME preedit must not reach the shell"
+        );
+        let committed = render(
+            app,
+            &ctx,
+            vec![egui::Event::Ime(egui::ImeEvent::Commit(
+                "\u{65e5}\u{672c}".into(),
+            ))],
+        );
+        assert!(
+            committed.platform_output.ime.is_some(),
+            "terminal exposes a composition cursor to the platform"
+        );
+        assert_eq!(app.tabs[2].output.snapshot().last_input, "\u{65e5}\u{672c}");
+        assert_eq!(
+            app.tabs[2].output.snapshot().input_sequence,
+            before_ime[2] + 1,
+            "IME commit writes once to the focused pane"
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before_ime[0]);
+        assert_eq!(app.tabs[1].output.snapshot().input_sequence, before_ime[1]);
         let start = egui::pos2(tracks[1].center().x + 20.0, tracks[2].top() + 35.0);
         let outside = egui::pos2(1900.0, 200.0);
         render(app, &ctx, vec![egui::Event::PointerMoved(start)]);
@@ -13550,6 +13841,120 @@ mod tests {
             assert_ne!(candidate, "basic2");
             assert!(app.themes.all().iter().any(|theme| theme.id == candidate));
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn editor_tracks_new_active_theme_and_variant_keeps_preview_edits() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-settings-regression-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.sync_theme_editor_to_current();
+        let original_source = app.theme_editor_source_id.clone();
+        app.perform_global_theme_action(PaneAction::RandomTheme);
+        let random = app.preferences.theme_id.clone();
+        assert_ne!(original_source.as_deref(), Some(random.as_str()));
+        app.sync_theme_editor_to_current();
+        assert_eq!(app.theme_editor_source_id.as_deref(), Some(random.as_str()));
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
+        draft["futureRoot"] = json!({"preserve": "variant"});
+        app.theme_editor_document = Some(draft);
+        app.preview_personal_theme_draft();
+        assert!(app.theme_editor_preview_snapshot.is_some());
+        app.start_personal_theme_draft();
+        assert_eq!(
+            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            "#123456"
+        );
+        assert_eq!(
+            app.theme_editor_document.as_ref().unwrap()["futureRoot"]["preserve"],
+            "variant"
+        );
+        app.save_personal_theme_draft();
+        let saved = app.preferences.theme_id.clone();
+        assert!(saved.starts_with("personal:"));
+        assert_eq!(app.theme_editor_source_id.as_deref(), Some(saved.as_str()));
+        app.sync_theme_editor_to_current();
+        assert_eq!(
+            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            "#123456"
+        );
+        app.perform_global_theme_action(PaneAction::Theme("basic2".into()));
+        app.load_personal_theme_draft(&saved);
+        app.perform_global_theme_action(PaneAction::Theme(saved.clone()));
+        app.preview_personal_theme_draft();
+        app.start_personal_theme_draft();
+        assert_eq!(
+            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            "#123456"
+        );
+        app.perform_global_theme_action(PaneAction::Theme("aurora".into()));
+        app.sync_theme_editor_to_current();
+        assert_eq!(app.preferences.theme_id, "aurora");
+        assert!(app.theme_editor_preview_snapshot.is_none());
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn settings_tabs_wrap_without_clipping_import_at_large_font_size() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.preferences.typography.settings.size = 24.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        app.apply_style(&ctx);
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(720.0, 520.0));
+        let output = ctx.run(
+            egui::RawInput {
+                screen_rect: Some(screen),
+                ..Default::default()
+            },
+            |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    app.settings_contents(ui, ctx, &mut None);
+                });
+            },
+        );
+        let mut rows = std::collections::BTreeSet::new();
+        let mut found = 0;
+        for clipped in &output.shapes {
+            if let egui::Shape::Text(text) = &clipped.shape {
+                if [
+                    "Themes",
+                    "Fonts",
+                    "Commands",
+                    "Workspace",
+                    "Keyboard",
+                    "Shortcuts",
+                    "Import from original",
+                ]
+                .contains(&text.galley.job.text.as_str())
+                {
+                    let rect = clipped.shape.visual_bounding_rect();
+                    assert!(
+                        screen.contains_rect(rect) && clipped.clip_rect.contains_rect(rect),
+                        "clipped tab: {}",
+                        text.galley.job.text
+                    );
+                    rows.insert(rect.top().round() as i32);
+                    found += 1;
+                }
+            }
+        }
+        assert!(found >= 6);
+        assert!(rows.len() >= 2, "tabs should flow onto another row");
     }
 
     #[test]

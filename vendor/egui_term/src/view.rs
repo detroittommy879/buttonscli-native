@@ -34,6 +34,7 @@ enum InputAction {
 #[derive(Clone, Default)]
 pub struct TerminalViewState {
     is_dragged: bool,
+    ime_composing: bool,
     scroll_pixels: f32,
     current_mouse_position_on_grid: TerminalGridPoint,
 }
@@ -48,6 +49,11 @@ pub struct TerminalView<'a> {
     theme: TerminalTheme,
     background_gradient: Option<BackgroundGradient>,
     row_banding_color: Option<Color32>,
+    row_brightness: u8,
+    ctrl_c_copies_selection: bool,
+    copy_on_selection: bool,
+    bracketed_paste: bool,
+    option_as_meta: bool,
     draw_bold_bright: bool,
     bindings_layout: BindingsLayout,
 }
@@ -123,6 +129,11 @@ impl<'a> TerminalView<'a> {
             theme: TerminalTheme::default(),
             background_gradient: None,
             row_banding_color: None,
+            row_brightness: 0,
+            ctrl_c_copies_selection: true,
+            copy_on_selection: false,
+            bracketed_paste: true,
+            option_as_meta: false,
             draw_bold_bright: false,
             bindings_layout: BindingsLayout::new(),
         }
@@ -150,6 +161,25 @@ impl<'a> TerminalView<'a> {
     #[inline]
     pub fn set_row_banding(mut self, color: Option<Color32>) -> Self {
         self.row_banding_color = color;
+        self
+    }
+
+    pub fn set_row_brightness(mut self, amount: u8) -> Self {
+        self.row_brightness = amount;
+        self
+    }
+
+    pub fn set_keyboard_options(
+        mut self,
+        ctrl_copy: bool,
+        auto_copy: bool,
+        bracketed: bool,
+        option_meta: bool,
+    ) -> Self {
+        self.ctrl_c_copies_selection = ctrl_copy;
+        self.copy_on_selection = auto_copy;
+        self.bracketed_paste = bracketed;
+        self.option_as_meta = option_meta;
         self
     }
 
@@ -224,15 +254,63 @@ impl<'a> TerminalView<'a> {
     ) -> Self {
         if !self.interactive {
             state.is_dragged = false;
+            state.ime_composing = false;
             return self;
+        }
+        if !self.has_focus || !layout.has_focus() {
+            state.ime_composing = false;
         }
 
         let modifiers = layout.ctx.input(|i| i.modifiers);
+        let mut text_modifiers = modifiers;
         let events = layout.ctx.input(|i| i.events.clone());
         for event in events {
+            if let egui::Event::Key {
+                pressed: true,
+                modifiers,
+                ..
+            } = &event
+            {
+                text_modifiers = *modifiers;
+            }
+            let selection_finished = self.copy_on_selection
+                && state.is_dragged
+                && matches!(
+                    &event,
+                    egui::Event::PointerButton {
+                        button: PointerButton::Primary,
+                        pressed: false,
+                        ..
+                    }
+                );
             let mut input_actions = vec![];
 
             match event {
+                egui::Event::Ime(event)
+                    if self.has_focus
+                        && layout.has_focus()
+                        && !layout
+                            .ctx
+                            .memory(|memory| memory.any_popup_open()) =>
+                {
+                    match event {
+                        egui::ImeEvent::Enabled => {},
+                        egui::ImeEvent::Preedit(text) => {
+                            state.ime_composing = !text.is_empty()
+                        },
+                        egui::ImeEvent::Commit(text) => {
+                            state.ime_composing = false;
+                            if !text.is_empty() {
+                                input_actions.push(InputAction::BackendCall(
+                                    BackendCommand::Write(text.into_bytes()),
+                                ));
+                            }
+                        },
+                        egui::ImeEvent::Disabled => state.ime_composing = false,
+                    }
+                },
+                egui::Event::Text(_) | egui::Event::Key { .. }
+                    if state.ime_composing => {},
                 egui::Event::Text(_)
                 | egui::Event::Key { .. }
                 | egui::Event::Copy
@@ -248,7 +326,10 @@ impl<'a> TerminalView<'a> {
                         event,
                         self.backend,
                         &self.bindings_layout,
-                        modifiers,
+                        text_modifiers,
+                        self.ctrl_c_copies_selection,
+                        self.bracketed_paste,
+                        self.option_as_meta,
                     ))
                 },
                 egui::Event::MouseWheel { unit, delta, .. }
@@ -313,6 +394,12 @@ impl<'a> TerminalView<'a> {
                     InputAction::Ignore => {},
                 }
             }
+            if selection_finished {
+                let selected = self.backend.selectable_content();
+                if !selected.is_empty() {
+                    layout.ctx.copy_text(selected);
+                }
+            }
         }
 
         self
@@ -329,6 +416,28 @@ impl<'a> TerminalView<'a> {
         let layout_max = layout.rect.max;
         let cell_height = content.terminal_size.cell_height as f32;
         let cell_width = content.terminal_size.cell_width as f32;
+        if self.interactive
+            && self.has_focus
+            && layout.has_focus()
+            && !layout.ctx.memory(|memory| memory.any_popup_open())
+        {
+            let cursor = content.grid.cursor.point;
+            let origin = layout_min
+                + egui::vec2(
+                    cursor.column.0 as f32 * cell_width,
+                    cursor.line.0.max(0) as f32 * cell_height,
+                );
+            layout.ctx.output_mut(|output| {
+                output.ime = Some(egui::output::IMEOutput {
+                    rect: layout.rect,
+                    cursor_rect: Rect::from_min_size(
+                        origin,
+                        egui::vec2(cell_width, cell_height),
+                    )
+                    .intersect(layout.rect),
+                })
+            });
+        }
         let global_bg =
             self.theme.get_color(Color::Named(NamedColor::Background));
 
@@ -345,6 +454,15 @@ impl<'a> TerminalView<'a> {
             ))
         };
         let mut shapes = vec![background];
+        if self.row_brightness > 0 {
+            shapes.extend(brightness_banding_shapes(
+                layout.rect,
+                cell_height,
+                global_bg,
+                self.row_brightness,
+                self.background_gradient,
+            ));
+        }
 
         for indexed in content.grid.display_iter() {
             let flags = indexed.cell.flags;
@@ -475,6 +593,138 @@ impl<'a> TerminalView<'a> {
         }
 
         painter.extend(shapes);
+    }
+}
+
+fn brightness_banding_shapes(
+    rect: Rect,
+    cell_height: f32,
+    base: Color32,
+    amount: u8,
+    gradient: Option<BackgroundGradient>,
+) -> Vec<Shape> {
+    if !cell_height.is_finite() || cell_height <= 0.0 || amount == 0 {
+        return Vec::new();
+    }
+    if let Some(gradient) = gradient {
+        let original = background_gradient_mesh(rect, gradient);
+        let mut mesh = Mesh::default();
+        for row in 0..(rect.height() / cell_height).ceil() as usize {
+            let top = rect.top() + row as f32 * cell_height;
+            let bottom = (top + cell_height).min(rect.bottom());
+            for indices in original.indices.chunks_exact(3) {
+                let triangle: Vec<_> = indices
+                    .iter()
+                    .map(|&i| original.vertices[i as usize])
+                    .collect();
+                let clipped = clip_background_polygon(
+                    &clip_background_polygon(&triangle, top, true),
+                    bottom,
+                    false,
+                );
+                if clipped.len() < 3 {
+                    continue;
+                }
+                let offset = mesh.vertices.len() as u32;
+                for mut vertex in clipped {
+                    let channel = |v: u8| {
+                        if row % 2 == 0 {
+                            v.saturating_add(amount)
+                        } else {
+                            v.saturating_sub(amount)
+                        }
+                    };
+                    vertex.color = Color32::from_rgb(
+                        channel(vertex.color.r()),
+                        channel(vertex.color.g()),
+                        channel(vertex.color.b()),
+                    );
+                    mesh.vertices.push(vertex);
+                }
+                for i in 1..(mesh.vertices.len() as u32 - offset - 1) {
+                    mesh.indices.extend([offset, offset + i, offset + i + 1]);
+                }
+            }
+        }
+        return vec![Shape::mesh(mesh)];
+    }
+    (0..(rect.height() / cell_height).ceil() as usize)
+        .map(|row| {
+            let channel = |v: u8| {
+                if row % 2 == 0 {
+                    v.saturating_add(amount)
+                } else {
+                    v.saturating_sub(amount)
+                }
+            };
+            Shape::Rect(RectShape::filled(
+                Rect::from_min_max(
+                    Pos2::new(
+                        rect.left(),
+                        rect.top() + row as f32 * cell_height,
+                    ),
+                    Pos2::new(
+                        rect.right(),
+                        (rect.top() + (row + 1) as f32 * cell_height)
+                            .min(rect.bottom()),
+                    ),
+                ),
+                CornerRadius::ZERO,
+                Color32::from_rgb(
+                    channel(base.r()),
+                    channel(base.g()),
+                    channel(base.b()),
+                ),
+            ))
+        })
+        .collect()
+}
+
+fn clip_background_polygon(
+    vertices: &[egui::epaint::Vertex],
+    y: f32,
+    above: bool,
+) -> Vec<egui::epaint::Vertex> {
+    let mut result = Vec::new();
+    for i in 0..vertices.len() {
+        let a = vertices[i];
+        let b = vertices[(i + 1) % vertices.len()];
+        let inside = |v: egui::epaint::Vertex| {
+            if above {
+                v.pos.y >= y
+            } else {
+                v.pos.y <= y
+            }
+        };
+        if inside(a) {
+            result.push(a);
+        }
+        if inside(a) != inside(b) {
+            let t = (y - a.pos.y) / (b.pos.y - a.pos.y);
+            let channel = |x: u8, z: u8| {
+                (x as f32 + (z as f32 - x as f32) * t).round() as u8
+            };
+            result.push(egui::epaint::Vertex {
+                pos: egui::pos2(a.pos.x + (b.pos.x - a.pos.x) * t, y),
+                uv: a.uv + (b.uv - a.uv) * t,
+                color: Color32::from_rgba_premultiplied(
+                    channel(a.color.r(), b.color.r()),
+                    channel(a.color.g(), b.color.g()),
+                    channel(a.color.b(), b.color.b()),
+                    channel(a.color.a(), b.color.a()),
+                ),
+            });
+        }
+    }
+    result
+}
+
+fn paste_payload(text: &str, bracketed: bool) -> Vec<u8> {
+    if bracketed {
+        // Escape cannot be allowed to terminate the application's paste envelope.
+        format!("\x1b[200~{}\x1b[201~", text.replace('\x1b', "")).into_bytes()
+    } else {
+        text.replace("\r\n", "\n").replace('\n', "\r").into_bytes()
     }
 }
 
@@ -818,9 +1068,21 @@ fn process_keyboard_event(
     backend: &TerminalBackend,
     bindings_layout: &BindingsLayout,
     modifiers: Modifiers,
+    ctrl_c_copies_selection: bool,
+    bracketed_paste: bool,
+    option_as_meta: bool,
 ) -> InputAction {
     match event {
         egui::Event::Text(text) => {
+            if cfg!(target_os = "macos") && modifiers.alt && !option_as_meta {
+                return InputAction::BackendCall(BackendCommand::Write(
+                    text.into_bytes(),
+                ));
+            }
+            if cfg!(target_os = "macos") && modifiers.alt && option_as_meta {
+                // Key bindings emitted Escape + key; skip their composed Text companion.
+                return InputAction::Ignore;
+            }
             process_text_event(&text, modifiers, backend, bindings_layout)
         },
         // A Paste event already contains text explicitly requested from the
@@ -828,36 +1090,64 @@ fn process_keyboard_event(
         // state here is racy because clipboard delivery can arrive on a later
         // frame, after Ctrl/Command and Shift have been released.
         egui::Event::Paste(text) => {
-            InputAction::BackendCall(BackendCommand::Write(text.into_bytes()))
+            InputAction::BackendCall(BackendCommand::Write(paste_payload(
+                &text,
+                bracketed_paste
+                    && backend
+                        .last_content()
+                        .terminal_mode
+                        .contains(TermMode::BRACKETED_PASTE),
+            )))
         },
-        egui::Event::Copy => {
-            #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-            if modifiers.contains(Modifiers::COMMAND | Modifiers::SHIFT) {
-                let content = backend.selectable_content();
-                InputAction::WriteToClipboard(content)
-            } else {
-                // Hotfix - Send ^C when there's not selection on view.
-                InputAction::BackendCall(BackendCommand::Write([0x3].to_vec()))
-            }
-            #[cfg(any(target_os = "ios", target_os = "macos"))]
-            {
-                let content = backend.selectable_content();
-                InputAction::WriteToClipboard(content)
-            }
-        },
+        egui::Event::Copy => copy_action(
+            backend.selectable_content(),
+            modifiers,
+            ctrl_c_copies_selection,
+            cfg!(target_os = "macos"),
+        ),
         egui::Event::Key {
             key,
             pressed,
             modifiers,
             ..
-        } => process_keyboard_key(
-            backend,
-            bindings_layout,
-            key,
-            modifiers,
-            pressed,
-        ),
+        } => {
+            if cfg!(target_os = "macos")
+                && modifiers.alt
+                && !option_as_meta
+                && !modifiers.ctrl
+                && !modifiers.command
+                && (key.name().chars().count() == 1 || key == Key::Space)
+            {
+                // Let composed Text (including non-US Option characters) own typing.
+                InputAction::Ignore
+            } else {
+                process_keyboard_key(
+                    backend,
+                    bindings_layout,
+                    key,
+                    modifiers,
+                    pressed,
+                )
+            }
+        },
         _ => InputAction::Ignore,
+    }
+}
+
+fn copy_action(
+    content: String,
+    modifiers: Modifiers,
+    ctrl_copy: bool,
+    macos: bool,
+) -> InputAction {
+    if !content.is_empty()
+        && (macos || ctrl_copy || modifiers.shift || !modifiers.ctrl)
+    {
+        InputAction::WriteToClipboard(content)
+    } else if !macos && !modifiers.shift {
+        InputAction::BackendCall(BackendCommand::Write(vec![0x3]))
+    } else {
+        InputAction::Ignore
     }
 }
 
@@ -1112,6 +1402,99 @@ fn process_mouse_move(
 #[cfg(test)]
 mod background_gradient_tests {
     use super::*;
+
+    #[test]
+    fn copy_survives_released_modifiers_and_keeps_mac_command_separate_from_interrupt(
+    ) {
+        assert!(
+            matches!(copy_action("selected".into(), Modifiers::NONE, true, false), InputAction::WriteToClipboard(text) if text == "selected")
+        );
+        assert!(
+            matches!(copy_action("selected".into(), Modifiers::CTRL, false, false), InputAction::BackendCall(BackendCommand::Write(bytes)) if bytes == [3])
+        );
+        assert!(
+            matches!(copy_action(String::new(), Modifiers::CTRL, true, false), InputAction::BackendCall(BackendCommand::Write(bytes)) if bytes == [3])
+        );
+        assert!(matches!(
+            copy_action(String::new(), Modifiers::NONE, true, true),
+            InputAction::Ignore
+        ));
+        assert!(matches!(
+            copy_action(
+                "Mac selection".into(),
+                Modifiers::MAC_CMD,
+                false,
+                true
+            ),
+            InputAction::WriteToClipboard(_)
+        ));
+        assert!(matches!(
+            copy_action(
+                String::new(),
+                Modifiers::CTRL | Modifiers::SHIFT,
+                true,
+                false
+            ),
+            InputAction::Ignore
+        ));
+    }
+
+    #[test]
+    fn paste_wraps_requested_mode_and_normalizes_shell_line_endings() {
+        assert_eq!(
+            paste_payload("one\ntwo", true),
+            b"\x1b[200~one\ntwo\x1b[201~"
+        );
+        assert_eq!(paste_payload("one\r\ntwo\n", false), b"one\rtwo\r");
+        assert_eq!(
+            paste_payload("a\x1b[201~b", true),
+            b"\x1b[200~a[201~b\x1b[201~"
+        );
+    }
+
+    #[test]
+    fn brightness_bands_center_hex_channels_and_keep_gradient_geometry() {
+        let rect = Rect::from_min_size(Pos2::ZERO, egui::vec2(100.0, 40.0));
+        let shapes = brightness_banding_shapes(
+            rect,
+            20.0,
+            Color32::from_rgb(0x55, 0x55, 0x55),
+            16,
+            None,
+        );
+        for (shape, expected) in shapes.iter().zip([0x65, 0x45]) {
+            let Shape::Rect(shape) = shape else {
+                panic!("solid band");
+            };
+            assert_eq!(
+                shape.fill,
+                Color32::from_rgb(expected, expected, expected)
+            );
+        }
+        let gradient = BackgroundGradient::Linear {
+            colors: [
+                Color32::from_rgb(60, 60, 60),
+                Color32::from_rgb(80, 80, 80),
+                Color32::from_rgb(100, 100, 100),
+                Color32::from_rgb(120, 120, 120),
+            ],
+            angle_degrees: 0.0,
+        };
+        let bands = brightness_banding_shapes(
+            rect,
+            20.0,
+            Color32::BLACK,
+            1,
+            Some(gradient),
+        );
+        let Shape::Mesh(mesh) = &bands[0] else {
+            panic!("gradient mesh");
+        };
+        assert!(mesh.is_valid());
+        assert!(mesh.vertices.iter().all(|v| rect.contains(v.pos)));
+        assert!(mesh.vertices.iter().any(|v| v.color.r() == 61));
+        assert!(mesh.vertices.iter().any(|v| v.color.r() == 59));
+    }
 
     fn colors() -> [Color32; 4] {
         [Color32::RED, Color32::GREEN, Color32::BLUE, Color32::WHITE]

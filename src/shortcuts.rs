@@ -97,7 +97,9 @@ impl ShortcutChord {
     }
 
     pub(crate) fn is_reserved_terminal_interrupt(&self) -> bool {
-        self.key == "C" && !self.shift && (self.primary || self.ctrl)
+        self.key == "C"
+            && !self.shift
+            && (self.ctrl || (self.primary && !cfg!(target_os = "macos")))
     }
 
     pub(crate) fn matches(&self, key: Key, modifiers: Modifiers) -> bool {
@@ -174,7 +176,11 @@ impl Default for ShortcutSettings {
                             primary: true,
                             ctrl: false,
                             alt: false,
-                            shift: true,
+                            shift: !(cfg!(target_os = "macos")
+                                && matches!(
+                                    action,
+                                    ShortcutAction::CopySelection | ShortcutAction::Paste
+                                )),
                         }),
                     )
                 })
@@ -407,7 +413,11 @@ mod tests {
                     shift: false,
                 }
             ),
-            Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            if cfg!(target_os = "macos") {
+                Ok(())
+            } else {
+                Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            }
         );
         assert_eq!(
             settings.assign(
@@ -420,7 +430,11 @@ mod tests {
                     shift: false,
                 }
             ),
-            Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            if cfg!(target_os = "macos") {
+                Ok(())
+            } else {
+                Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            }
         );
     }
 

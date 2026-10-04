@@ -7,6 +7,8 @@ param(
     [switch]$WithThemeControls,
     [switch]$WithAbruptExit,
     [switch]$WithAccessibility,
+    [switch]$WithSettingsLayout,
+    [string]$SettingsCapturePath,
     [string]$CapturePath,
     [ValidateRange(5, 120)]
     [int]$StartupTimeoutSeconds = 30
@@ -25,7 +27,7 @@ $trackedShells = @()
 
 New-Item -ItemType Directory -Path $roaming, $local -Force | Out-Null
 
-if ($WithThemeControls -or $WithAccessibility -or $WithLocalFeatureFlags) {
+if ($WithThemeControls -or $WithAccessibility -or $WithLocalFeatureFlags -or $WithSettingsLayout) {
     # Seed only the test-owned profile; leave the user's settings untouched.
     $fixtureProfile = Join-Path $smokeHome '.buttonscli-native\profiles\default'
     New-Item -ItemType Directory -Path $fixtureProfile -Force | Out-Null
@@ -180,6 +182,12 @@ public static class ButtonsCliSmokeWindow {
         $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'probe-accessibility.ps1') -WindowHandle $windowHandle.ToInt64()
         if ($LASTEXITCODE -ne 0) { throw 'Native Windows UI Automation acceptance failed.' }
+    }
+
+    if ($WithSettingsLayout) {
+        $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'probe-settings-layout.ps1') -WindowHandle $windowHandle.ToInt64() -AppProcessId $process.Id -ProfilePath (Join-Path $fixtureProfile 'native.json') -CapturePath $SettingsCapturePath
+        if ($LASTEXITCODE -ne 0) { throw 'Native Settings layout acceptance failed.' }
     }
 
     if (-not [string]::IsNullOrWhiteSpace($CapturePath)) {

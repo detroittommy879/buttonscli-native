@@ -106,6 +106,10 @@ pub(crate) struct Preferences {
     pub(crate) theme_apply: ThemeApplyScopes,
     pub(crate) favorite_theme_ids: Vec<String>,
     pub(crate) theme_editor_live_preview: bool,
+    pub(crate) settings_layout: SettingsLayout,
+    pub(crate) keyboard: KeyboardPreferences,
+    pub(crate) row_banding_brightness: u8,
+    pub(crate) animation_fps: u32,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -153,6 +157,10 @@ impl Default for Preferences {
             theme_apply: ThemeApplyScopes::default(),
             favorite_theme_ids: Vec::new(),
             theme_editor_live_preview: false,
+            settings_layout: SettingsLayout::default(),
+            keyboard: KeyboardPreferences::default(),
+            row_banding_brightness: 0,
+            animation_fps: 30,
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -186,6 +194,44 @@ impl Default for Preferences {
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
             quick_secrets_auto_lock_minutes: 15,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct SettingsLayout {
+    pub(crate) size: [f32; 2],
+    pub(crate) position: Option<[f32; 2]>,
+    pub(crate) section_heights: std::collections::BTreeMap<String, f32>,
+}
+
+impl Default for SettingsLayout {
+    fn default() -> Self {
+        Self {
+            size: [980.0, 760.0],
+            position: None,
+            section_heights: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct KeyboardPreferences {
+    pub(crate) ctrl_c_copies_selection: bool,
+    pub(crate) copy_on_selection: bool,
+    pub(crate) bracketed_paste: bool,
+    pub(crate) option_as_meta: bool,
+}
+
+impl Default for KeyboardPreferences {
+    fn default() -> Self {
+        Self {
+            ctrl_c_copies_selection: true,
+            copy_on_selection: false,
+            bracketed_paste: true,
+            option_as_meta: false,
         }
     }
 }
@@ -241,6 +287,29 @@ impl Preferences {
     }
 
     pub(crate) fn normalize_theme_sources(&mut self) {
+        for (dimension, minimum, default) in [(0, 720.0, 980.0), (1, 520.0, 760.0)] {
+            let value = &mut self.settings_layout.size[dimension];
+            *value = if value.is_finite() {
+                value.clamp(minimum, 8192.0)
+            } else {
+                default
+            };
+        }
+        if self
+            .settings_layout
+            .position
+            .is_some_and(|pos| !pos.iter().all(|v| v.is_finite()))
+        {
+            self.settings_layout.position = None;
+        }
+        self.settings_layout
+            .section_heights
+            .retain(|_, v| v.is_finite());
+        for height in self.settings_layout.section_heights.values_mut() {
+            *height = height.clamp(100.0, 1000.0);
+        }
+        self.row_banding_brightness = self.row_banding_brightness.min(64);
+        self.animation_fps = self.animation_fps.clamp(1, 60);
         let mut seen = std::collections::HashSet::new();
         self.favorite_theme_ids
             .retain(|id| !id.is_empty() && seen.insert(id.clone()));
@@ -508,5 +577,36 @@ mod tests {
         imported.normalize_theme_sources();
         assert_eq!(imported.localization.manual_locale, "pt-BR");
         assert!(!imported.localization.first_run_language_confirmed);
+    }
+    #[test]
+    fn settings_layout_keyboard_and_band_brightness_persist_and_migrate() {
+        let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
+        assert_eq!(prefs.row_banding_brightness, 0);
+        assert_eq!(prefs.animation_fps, 30);
+        assert!(prefs.keyboard.bracketed_paste);
+        prefs.settings_layout.size = [1200.0, 900.0];
+        prefs.settings_layout.position = Some([-900.0, 120.0]);
+        prefs
+            .settings_layout
+            .section_heights
+            .insert("themes".into(), 560.0);
+        prefs.keyboard.copy_on_selection = true;
+        prefs.keyboard.option_as_meta = true;
+        prefs.row_banding_brightness = 16;
+        let saved: Preferences =
+            serde_json::from_str(&serde_json::to_string(&prefs).unwrap()).unwrap();
+        assert_eq!(saved.settings_layout, prefs.settings_layout);
+        assert_eq!(saved.keyboard, prefs.keyboard);
+        assert_eq!(saved.row_banding_brightness, 16);
+        prefs.settings_layout.size = [f32::NAN, 2.0];
+        prefs.settings_layout.position = Some([f32::INFINITY, 0.0]);
+        prefs
+            .settings_layout
+            .section_heights
+            .insert("bad".into(), f32::NAN);
+        prefs.normalize_theme_sources();
+        assert_eq!(prefs.settings_layout.size, [980.0, 520.0]);
+        assert!(prefs.settings_layout.position.is_none());
+        assert!(!prefs.settings_layout.section_heights.contains_key("bad"));
     }
 }

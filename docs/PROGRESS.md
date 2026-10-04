@@ -1,5 +1,37 @@
 # Reconstruction journal
 
+## 2026-10-04 — Settings, theme drafts, clipboard and readability
+
+Wrapped Settings tabs; made scrollbar contrast independent of theme; saved native
+window size/position on close and added remembered section dividers below the
+theme list/generator/editor. Explicit Keep/Close now writes preferences immediately.
+Theme drafts follow external theme switches, dropdown selection establishes the
+new source, and variants retain current edits instead of restoring an old theme.
+Noise texture bounds now share one scale across both axes. Renamed static to
+Analog TV effect. Added zero-default ±RGB status row banding behind terminal
+text/ANSI backgrounds, including clipped gradient geometry.
+
+Keyboard settings add selection-aware Ctrl+C, optional copy on selection,
+bracketed paste and macOS Option/Meta behavior. Native Copy/Paste delivery no
+longer requires a held modifier; custom shortcuts are consumed once. Added IME
+cursor output and committed-text delivery, suppressing preedit and duplicate
+Option Key/Text writes. macOS defaults use Cmd+C/V and preserve Ctrl+C for the
+shell. Checked Apple Terminal guidance and pinned egui-winit source; see
+[keyboard/settings notes](KEYBOARD-AND-SETTINGS.md) for sources and Mac acceptance.
+The app already repainted on demand; added a 30 FPS default animation cap instead
+of changing its event-driven input/output scheduling.
+
+Validation: 251 library tests plus two fixtures pass (11 optional tests ignored),
+strict native/WASM Clippy pass, and the explicit three-ConPTY selection/copy/IME/
+scroll/focus test passes. The terminal widget's 19 tests include brightness math,
+gradient clipping and bracketed-paste envelopes. Native Settings move/resize,
+title-bar close/save and reopen geometry pass with an isolated profile; its
+capture shows the second tab row and visible scrollbars. Probe initially searched
+for the button label rather than the window title; corrected to ButtonsCLI Settings.
+One intermediate edit used the Windows text encoding; corrected to UTF-8 before
+checks. Existing incremental-cache/PDB diagnostics do not fail builds. macOS
+runtime and GPU-power measurement remain unverified. No legacy settings edited.
+
 ## 2026-10-04 — SSH/htop blank screen from inherited TERM=dumb
 
 Reproduced the reported empty htop screen with only misplaced, uncolored bottom
