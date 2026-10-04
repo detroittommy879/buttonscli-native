@@ -220,6 +220,12 @@ impl TerminalBackend {
         let pty_config = tty::Options {
             shell: Some(tty::Shell::new(settings.shell, settings.args)),
             working_directory: settings.working_directory,
+            // Advertise this emulator's capabilities, not those of its launcher.
+            // Inheriting TERM=dumb makes SSH/ncurses omit color and cursor motion.
+            env: std::collections::HashMap::from([
+                ("TERM".into(), "xterm-256color".into()),
+                ("COLORTERM".into(), "truecolor".into()),
+            ]),
             ..tty::Options::default()
         };
         let config = term::Config::default();

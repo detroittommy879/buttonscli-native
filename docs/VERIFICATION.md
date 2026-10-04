@@ -3,6 +3,23 @@
 Last run: 2026-10-04 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
 
+## 2026-10-04 SSH/htop terminal-capability regression
+
+- Before the change, real local WSL htop reproduces a blank screen with only
+  uncolored bottom menus when given the launcher's `TERM=dumb`. The same saved
+  theme/typography shows full colored meters/process rows with xterm-256color.
+  Passing the actual Windows child shell's TERM through to WSL reproduces it too.
+- The new ignored ConPTY check passes from a dumb parent: its spawned shell has
+  xterm-256color/truecolor, the parent remains dumb, and parsed standard ANSI,
+  indexed 256-color and explicit RGB cells resolve to the expected colors.
+- `cargo test --locked`: 247 library tests and two import fixtures pass, with 11
+  optional tests ignored. Strict native Clippy, formatting/diff and PowerShell
+  parsing checks pass. The optimized release rebuild passes. Inspected before/
+  after captures of the identical Windows-child-to-WSL fixture: blank uncolored
+  menus before, full colored CPU/memory meters, process rows and menu after.
+- The fixture is local only; no remote SSH login, package install or server
+  configuration change is involved. Owned htop sessions terminate on app close.
+
 ## 2026-10-04 local JSON access and release testing
 
 - `cargo build --release --locked --bin buttonscli` builds the standalone Windows

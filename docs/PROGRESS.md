@@ -1,5 +1,29 @@
 # Reconstruction journal
 
+## 2026-10-04 — SSH/htop blank screen from inherited TERM=dumb
+
+Reproduced the reported empty htop screen with only misplaced, uncolored bottom
+menus using local WSL htop and `TERM=dumb`. The same app/theme displays the full
+colored screen with `xterm-256color`. Native PTYs inherited the launcher's terminal
+capabilities; the normal release opened by the coding tools inherited `dumb`.
+Changed only the child PTY environment to advertise `TERM=xterm-256color` and
+`COLORTERM=truecolor` on Windows/Linux/macOS, keeping the parent and user settings
+untouched. Added a ConPTY regression that starts under a dumb parent, verifies
+the child's capability values, and checks actual standard/indexed/RGB grid colors.
+That check passes. Added an isolated real-htop capture helper using the installed
+WSL environment and optionally a read-only copy of the current theme. No server
+connections, packages or SSH configuration are changed.
+
+Strict native Clippy and the full suite pass (247 library tests, two fixtures,
+11 optional tests ignored). The optimized release rebuild passes. The exact
+same Windows-shell-to-WSL htop fixture is blank before the fix and fully colored
+after it; both captures were inspected with the current personal theme copied
+into the isolated profile. No owned htop processes survive cleanup. Reopened the
+corrected standalone release with the normal native profile for manual SSH
+comparison. Existing remote sessions need a new connection, or the temporary
+`TERM=xterm-256color htop` command. Existing PDB/incremental-cache and ended-pipe
+cleanup diagnostics remain nonfatal.
+
 ## 2026-10-04 — Local JSON access and ordinary release testing
 
 Added `.buttonscli-native/feature-flags.json` with explicit `enable_all` access
