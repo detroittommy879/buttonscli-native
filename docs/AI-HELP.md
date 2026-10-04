@@ -49,6 +49,11 @@ Terminal context is optional and off by default. Turn on **Include a terminal ou
 
 AI Help can suggest up to two commands or supported terminal keys. Suggestions are inert until you choose **Insert**, **Insert + Enter**, or **Send reviewed key**. Each action targets the terminal selected when AI Help opened or the terminal shown in the context preview. The app checks that target again before sending. There is no automatic execution, file access, clipboard collection, or background terminal watcher. Large requests are limited to 1 MiB.
 
+Reopening AI Help while a request or reviewed suggestions exist preserves their
+original target even if you have focused another terminal. A closed target is
+rejected. Previewing a new terminal and sending a new question explicitly binds
+that new request to its previewed target.
+
 The draft migration branch preserves an unfinished Agent Mode prototype outside
 the core migration scope. It is unavailable in release builds and requires
 both `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` and

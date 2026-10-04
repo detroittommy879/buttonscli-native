@@ -36,6 +36,30 @@ mixed renderer and added its existing texture fallback as the standard option.
 integration; neither is needed for this WGPU/eframe app. Shader Lab/HSync still
 need an offscreen terminal rendering stage, separately from noise overlays.
 
+Final follow-up: Windows UI Automation now passes terminal name/focus, menu
+Invoke, reader TextPattern/ValuePattern, read-only metadata and actual nonempty
+text selection. Native GUI startup and a target-owned capture pass; the capture
+was inspected. The first selection probe read too early; focus plus a bounded
+selection wait fixed it. Initial screenshots also exposed unused blank screen
+rows pushing the reader to its end; the reader trims those rows and initially
+focuses its text. NVDA/Narrator and other-platform screen-reader acceptance remain
+open. Existing Vulkan validation/PDB and ended-pipe diagnostics remain.
+
+Extended three-pane ConPTY checks pass live Find focus/highlights, no search/F6
+bytes sent to the shell, independent history truncation, zero-history limits,
+and three real output snapshots saved in an isolated profile. AI Help also passes
+reviewed Insert + Enter. Review exposed that reopening AI Help reset old
+suggestions to the newly focused terminal; reopening now preserves both in-flight
+and completed action targets, including an absent target. The regression passes.
+Native full suite passes 245 library tests and two fixtures (10 optional tests
+ignored); explicit AI Help and three-pane tests pass. Strict native/WASM checks,
+desktop and optimized WASM builds, formatting, six Node checks and the MCP
+contract pass. Changes are committed locally; no production activation or new
+renderer dependency was introduced.
+
+Successful settings import drains and resets the old profile's history writer
+before switching stores, preventing subsequent snapshots from using its folder.
+
 ## 2026-10-02 — GitHub README and integration follow-through
 
 Rebuilt the README around the usable terminal workspace: centered title/badges,

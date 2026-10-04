@@ -34,6 +34,10 @@ F6 moves between terminal input and app control navigation; Tab/Shift+Tab moves
 among controls. Calm effects suppress animated noise; font and opacity controls
 remain independently adjustable.
 
-AccessKit tree tests do not certify every screen reader. Windows UI Automation
-and NVDA/Narrator, Linux Orca and macOS VoiceOver each require their own acceptance.
-The WASM demo has no native accessibility adapter.
+Windows UI Automation acceptance passes named/focusable terminal discovery,
+menu invocation, reader TextPattern/ValuePattern, its read-only attribute and
+text selection. Run `pwsh -NoProfile -File scripts/native-smoke.ps1 -WithAccessibility`
+to repeat this against an isolated workspace (add `-SkipBuild` after building).
+AccessKit tree and UI Automation checks do not certify every screen reader;
+NVDA/Narrator, Linux Orca and macOS VoiceOver acceptance remains open. The WASM
+demo has no native accessibility adapter.

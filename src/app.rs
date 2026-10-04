@@ -397,6 +397,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     terminal_reader: Option<(u64, String, String)>,
     #[cfg(not(target_arch = "wasm32"))]
+    terminal_reader_focus: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     history_writer: Option<crate::terminal_history::HistoryWriter>,
     #[cfg(not(target_arch = "wasm32"))]
     history_last_tick: Option<std::time::Instant>,
@@ -1158,6 +1160,8 @@ impl ButtonsApp {
             terminal_search_focus: false,
             #[cfg(not(target_arch = "wasm32"))]
             terminal_reader: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            terminal_reader_focus: false,
             #[cfg(not(target_arch = "wasm32"))]
             history_writer: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2939,11 +2943,15 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn open_terminal_reader(&mut self) {
         if let Some(tab) = self.tabs.get_mut(self.focused) {
+            self.terminal_reader_focus = true;
             tab.backend.sync();
             self.terminal_reader = Some((
                 tab.id,
                 tab.title.clone(),
-                tab.backend.plain_text_tail(200_000),
+                tab.backend
+                    .plain_text_tail(200_000)
+                    .trim_end_matches('\n')
+                    .to_owned(),
             ));
         }
     }
@@ -2967,8 +2975,12 @@ impl ButtonsApp {
                 egui::ScrollArea::both().id_salt("terminal-reader-scroll").show(ui, |ui| {
                     let label = ui.label("Terminal output");
                     let mut read_only = text.as_str();
-                    let response = ui.add(egui::TextEdit::multiline(&mut read_only).font(egui::TextStyle::Monospace).desired_width(f32::INFINITY))
+                    let response = ui.add(egui::TextEdit::multiline(&mut read_only).font(egui::TextStyle::Monospace).cursor_at_end(false).desired_width(f32::INFINITY))
                         .labelled_by(label.id);
+                    if self.terminal_reader_focus {
+                        response.request_focus();
+                        self.terminal_reader_focus = false;
+                    }
                     ui.ctx().accesskit_node_builder(response.id, |node| node.set_read_only());
                 });
                 if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
@@ -2978,7 +2990,11 @@ impl ButtonsApp {
         if refresh {
             if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == *id) {
                 tab.backend.sync();
-                *text = tab.backend.plain_text_tail(200_000);
+                *text = tab
+                    .backend
+                    .plain_text_tail(200_000)
+                    .trim_end_matches('\n')
+                    .to_owned();
                 title.clone_from(&tab.title);
             }
         }
@@ -3066,6 +3082,7 @@ impl ButtonsApp {
         } else if let Some(store) = &self.native_store {
             let folder = store.profile_dir().join("terminal-history");
             if folder.exists() {
+                ctx.request_repaint_after(Duration::from_secs(60));
                 if self.history_writer.is_none() {
                     self.history_writer =
                         store.prepare_history_profile().ok().and_then(|profile| {
@@ -5913,10 +5930,14 @@ impl ButtonsApp {
     fn open_ai_help(&mut self) {
         if let Ok(mut state) = self.ai_help_state.lock() {
             state.open = true;
-            state.target = self
-                .tabs
-                .get(self.focused)
-                .map(|tab| (tab.id, tab.title.clone()));
+            // Keep in-flight/completed suggestions bound to the request's target.
+            // A reopened window must never reinterpret them for the focused pane.
+            if !state.busy && state.reviewed_actions.is_empty() {
+                state.target = self
+                    .tabs
+                    .get(self.focused)
+                    .map(|tab| (tab.id, tab.title.clone()));
+            }
         }
     }
 
@@ -8894,6 +8915,8 @@ impl ButtonsApp {
                             self.preferences = preferences;
                             self.refresh_locale();
                             self.theme_overrides.clear();
+                            self.history_writer.take();
+                            self.history_last_tick = None;
                             self.native_store = Some(store);
                             self.native_revision = Some(
                                 transfer
@@ -12345,9 +12368,17 @@ mod tests {
         let mut workspace = Workspace(ButtonsApp::empty(preferences));
         let app = &mut workspace.0;
         let ctx = egui::Context::default();
+        app.open_ai_help();
+        app.ai_help_state.lock().unwrap().busy = true;
         app.open_tab(ctx.clone());
         app.open_tab(ctx.clone());
         app.focused = 0;
+        app.open_ai_help();
+        assert!(
+            app.ai_help_state.lock().unwrap().target.is_none(),
+            "an in-flight request without a terminal cannot acquire a newly opened terminal"
+        );
+        app.ai_help_state.lock().unwrap().busy = false;
         let first = app.tabs[0].id;
         let second = app.tabs[1].id;
         app.open_ai_help();
@@ -12406,6 +12437,13 @@ mod tests {
         assert_eq!(app.tabs[0].output.snapshot().input_sequence, 0);
         assert_eq!(app.tabs[1].output.snapshot().input_sequence, 0);
         app.focused = 1;
+        app.ai_help_state.lock().unwrap().open = false;
+        app.open_ai_help();
+        assert_eq!(
+            app.ai_help_state.lock().unwrap().target.as_ref().unwrap().0,
+            first,
+            "reopened suggestions retain the original target after focus changes"
+        );
         app.ai_help_tx
             .send(AiHelpCommand::Deliver {
                 target_id: Some(first),
@@ -12417,6 +12455,20 @@ mod tests {
         assert_eq!(
             app.tabs[0].output.snapshot().last_input,
             "echo ButtonsCLI-local-test"
+        );
+        assert_eq!(app.tabs[1].output.snapshot().input_sequence, 0);
+        app.tabs[0].write(b"\x1b"); // CMD clears the inserted draft before the separate run check.
+        app.ai_help_tx
+            .send(AiHelpCommand::Deliver {
+                target_id: Some(first),
+                action: action.clone(),
+                press_enter: true,
+            })
+            .unwrap();
+        app.process_ai_help_commands(&ctx);
+        assert_eq!(
+            app.tabs[0].output.snapshot().last_input,
+            "echo ButtonsCLI-local-test\r"
         );
         assert_eq!(app.tabs[1].output.snapshot().input_sequence, 0);
         let context = crate::session::context::TerminalContext {
@@ -12787,6 +12839,138 @@ mod tests {
             before,
             "open pane menus own keyboard input"
         );
+
+        ctx.memory_mut(|memory| memory.close_popup());
+        ctx.enable_accesskit();
+        app.focused = 0;
+        let render_controls = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1800.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.shortcuts(ctx);
+                    app.terminal_search_bar(ctx);
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            )
+        };
+        let tree = render_controls(app, vec![])
+            .platform_output
+            .accesskit_update
+            .unwrap();
+        assert_eq!(
+            tree.nodes
+                .iter()
+                .filter(|(_, node)| node.role() == egui::accesskit::Role::Terminal)
+                .count(),
+            3
+        );
+        assert!(tree
+            .nodes
+            .iter()
+            .any(|(_, node)| node.role() == egui::accesskit::Role::Terminal
+                && node.value().is_some_and(|text| text.contains("pane-line-"))));
+        render_controls(
+            app,
+            vec![egui::Event::Key {
+                key: egui::Key::F,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+            }],
+        );
+        assert!(app.show_terminal_search);
+        render_controls(app, vec![egui::Event::Text("pane-line-100".into())]);
+        assert_eq!(app.terminal_search_query, "pane-line-100");
+        assert_eq!(app.tabs[0].backend.search_status(), (1, Some(1)));
+        assert!(!app.tabs[0]
+            .backend
+            .last_content()
+            .current_search_highlights
+            .is_empty());
+        assert_eq!(
+            app.tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect::<Vec<_>>(),
+            before,
+            "search owns its text instead of sending it to the shell"
+        );
+        render_controls(
+            app,
+            vec![egui::Event::Key {
+                key: egui::Key::Escape,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert!(!app.show_terminal_search);
+        render_controls(
+            app,
+            vec![egui::Event::Key {
+                key: egui::Key::F6,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert!(app.keyboard_navigation);
+        assert_eq!(
+            app.tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect::<Vec<_>>(),
+            before,
+            "F6 stays in app navigation"
+        );
+        let other_history = app.tabs[1].backend.scrollback_state().history_lines;
+        app.tabs[0].backend.set_scrollback_lines(12);
+        assert_eq!(app.tabs[0].backend.scrollback_state().history_lines, 12);
+        assert_eq!(
+            app.tabs[1].backend.scrollback_state().history_lines,
+            other_history
+        );
+        app.preferences.scrollback_lines = 0;
+        app.maintain_terminal_history(&ctx);
+        assert!(app
+            .tabs
+            .iter()
+            .all(|tab| tab.backend.scrollback_state().history_lines == 0));
+        let test_home = std::env::temp_dir().join(format!(
+            "buttonscli-history-live-{:032x}",
+            fastrand::u128(..)
+        ));
+        let native_root = crate::storage::paths::NativeDataRoot::from_home(&test_home);
+        let history_folder = native_root.0.join("profiles/default/terminal-history");
+        app.native_store = Some(NativeStore::open(native_root, test_home.join("legacy")).unwrap());
+        app.preferences.terminal_history.auto_save = true;
+        app.save_terminal_history(None);
+        app.history_writer.take(); // Drain queued disk writes before checking results.
+        let date_folder = std::fs::read_dir(&history_folder)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let saved: Vec<_> = std::fs::read_dir(date_folder)
+            .unwrap()
+            .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
+            .collect();
+        assert_eq!(saved.len(), 3);
+        assert!(saved.iter().all(|text| text.contains("pane-line-200")));
+        app.preferences.terminal_history.auto_save = false;
+        app.native_store.take();
+        std::fs::remove_dir_all(test_home).unwrap();
     }
 
     #[cfg(windows)]

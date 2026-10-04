@@ -10,6 +10,11 @@ terminal area while hidden; moving over the rail or the nearby peek area opens
 the dock as an overlay. It closes after four seconds by default. The delay,
 peek-rail opacity, and peek distance are adjustable in the same section.
 
+The same page now saves the **Left panel name**, scrollback line limit, optional
+dated terminal text snapshots and retention, and **Advanced effects (GPU analog
+static)**. Turning advanced effects off uses standard pixel-texture static;
+Calm effects still disables motion/noise. See [history and accessibility](TERMINAL-HISTORY-ACCESSIBILITY.md).
+
 Right-click a terminal tab, a command preset, or an SSH preset to open its
 action menu. **Settings → Workspace → Show menu buttons on tabs and presets**
 adds the three-dot buttons alongside the right-click menus. The default hides

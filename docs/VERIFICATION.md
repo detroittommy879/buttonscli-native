@@ -1,7 +1,31 @@
 # Verification record
 
-Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
+Last run: 2026-10-03 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-03 terminal accessibility, history and AI Help fixture
+
+- Full native suite: 245 library tests and two import fixtures pass; 10 optional
+  library tests are ignored by default. Strict native/WASM checks, desktop and
+  optimized WASM builds, formatting and diff checks pass.
+- The explicit three-pane ConPTY check now also verifies the Find shortcut and
+  text focus, live match highlights, absence of shell input from search/F6,
+  independent history truncation, zero scrollback and three dated text files
+  containing real test output. Selection/right-click copy and keyboard/scroll
+  routing continue to pass.
+- `cargo test ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery --lib -- --ignored --test-threads=1`
+  passes against the reusable Node fixture with test-owned CMD sessions. It
+  covers visible streaming, context off/on, inert suggestions, reviewed Insert
+  and Insert + Enter, focus/reopen target retention, retry, cancel and closed
+  target rejection. The debug launcher uses an isolated temporary profile.
+- `pwsh -NoProfile -File scripts/native-smoke.ps1 -SkipBuild -WithAccessibility`
+  passes Windows UI Automation discovery, menu Invoke, reader TextPattern and
+  ValuePattern, read-only metadata and nonempty text selection. The startup
+  capture was inspected. A headless AccessKit tree check also passes.
+- Six Node CLI/fake-provider checks and the MCP contract pass. Real-provider
+  GUI acceptance, NVDA/Narrator and Linux/macOS screen readers remain open.
+  Existing PDB/graphics-driver and ended-pipe diagnostics remain; they did not
+  fail the functional checks.
 
 ## 2026-10-02 pane interaction and compact theme browser
 

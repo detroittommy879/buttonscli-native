@@ -3,6 +3,7 @@ param(
     [switch]$SkipBuild,
     [switch]$WithThemeControls,
     [switch]$WithAbruptExit,
+    [switch]$WithAccessibility,
     [string]$CapturePath,
     [ValidateRange(5, 120)]
     [int]$StartupTimeoutSeconds = 30
@@ -20,7 +21,7 @@ $trackedShells = @()
 
 New-Item -ItemType Directory -Path $roaming, $local -Force | Out-Null
 
-if ($WithThemeControls) {
+if ($WithThemeControls -or $WithAccessibility) {
     # Seed only the test-owned profile; leave the user's settings untouched.
     $fixtureProfile = Join-Path $smokeHome '.buttonscli-native\profiles\default'
     New-Item -ItemType Directory -Path $fixtureProfile -Force | Out-Null
@@ -152,6 +153,12 @@ public static class ButtonsCliSmokeWindow {
     }
 
     Start-Sleep -Seconds 2
+
+    if ($WithAccessibility) {
+        $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'probe-accessibility.ps1') -WindowHandle $windowHandle.ToInt64()
+        if ($LASTEXITCODE -ne 0) { throw 'Native Windows UI Automation acceptance failed.' }
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($CapturePath)) {
         $appsnap = Get-Command appsnap.exe -ErrorAction SilentlyContinue
