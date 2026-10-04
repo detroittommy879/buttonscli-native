@@ -1,5 +1,41 @@
 # Reconstruction journal
 
+## 2026-10-03 — Terminal usability, accessibility and local AI fixture
+
+Continued on `codex/pane-fonts-theme-editor`; the unrelated `.aicp/` folder was
+left alone. Added native AccessKit adapters, named terminal nodes with viewport
+text, a frozen read-only terminal text reader, F6 chrome navigation, labelled
+provider/composer controls, and focus preservation for text fields. Search now
+has an editable Ctrl/Cmd+Shift+F shortcut, live matching, Shift+Enter backwards,
+Escape close, and a wrapping strip. Existing right-click copy defaults on and
+its three-pane ConPTY selection/copy/scroll/input regression passes.
+
+Workspace saves a 0–100,000-line scrollback cap, custom left-panel name, and
+standard/advanced static switch. Optional history defaults off and writes bounded
+200,000-character grid snapshots to profile-local UTC date folders every five
+seconds and on close. A bounded background writer expires only recognized
+snapshot files while the app runs; foreign files and nested folders survive.
+Manual save and opening the history folder are available. These are retained
+text snapshots, not a complete raw output recorder or restorable shell sessions.
+
+Added a reusable Node loopback provider and isolated Windows debug launcher.
+No real credentials/providers or personal settings are used. Fixture checks pass
+for Unicode/SSE, failure/retry, quota, malformed events, disconnect and cancel.
+The explicit AI Help app/PTY test passes streaming, context off/on, inert actions,
+insertion into the original target after focus changes, retry, cancel, retained
+conversation on reopen, and closed-target rejection. Reader AccessKit and history
+replacement/expiry tests pass. The initial history test exposed Windows canonical
+path-prefix mismatch; keeping the guarded lexical path fixed it. egui 0.31 does
+not mark immutable text inputs read-only itself; the reader now sets that native
+attribute explicitly. Full gates and live Windows UI Automation checks follow.
+
+Analog static already uses a WGSL GPU overlay; simple noise uses bounded CPU
+pixel textures, scanlines/banding use shapes, and gradients use meshes. Kept this
+mixed renderer and added its existing texture fallback as the standard option.
+`three-d` would introduce an OpenGL renderer and `bevy_egui` a game-engine
+integration; neither is needed for this WGPU/eframe app. Shader Lab/HSync still
+need an offscreen terminal rendering stage, separately from noise overlays.
+
 ## 2026-10-02 — GitHub README and integration follow-through
 
 Rebuilt the README around the usable terminal workspace: centered title/badges,

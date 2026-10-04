@@ -393,6 +393,18 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     terminal_search_query: String,
     #[cfg(not(target_arch = "wasm32"))]
+    terminal_search_focus: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    terminal_reader: Option<(u64, String, String)>,
+    #[cfg(not(target_arch = "wasm32"))]
+    history_writer: Option<crate::terminal_history::HistoryWriter>,
+    #[cfg(not(target_arch = "wasm32"))]
+    history_last_tick: Option<std::time::Instant>,
+    #[cfg(not(target_arch = "wasm32"))]
+    scrollback_applied: Option<usize>,
+    #[cfg(not(target_arch = "wasm32"))]
+    keyboard_navigation: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     terminal_search_status: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     dock_auto_hide_state: crate::dock::AutoHideState,
@@ -1142,6 +1154,18 @@ impl ButtonsApp {
             show_terminal_search: false,
             #[cfg(not(target_arch = "wasm32"))]
             terminal_search_query: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            terminal_search_focus: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            terminal_reader: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            history_writer: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            history_last_tick: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            scrollback_applied: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            keyboard_navigation: false,
             #[cfg(not(target_arch = "wasm32"))]
             terminal_search_status: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -1966,7 +1990,9 @@ impl ButtonsApp {
         let taken: Vec<String> = self.tabs.iter().map(|tab| tab.title.clone()).collect();
         let (title, next_title_number) = next_available_title(self.next_title_number, &taken);
         match TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch) {
-            Ok(tab) => {
+            Ok(mut tab) => {
+                tab.backend
+                    .set_scrollback_lines(self.preferences.scrollback_lines);
                 self.next_title_number = next_title_number;
                 self.tabs.push(tab);
                 let index = self.tabs.len() - 1;
@@ -2017,6 +2043,8 @@ impl ButtonsApp {
             TerminalTab::spawn(id, fallback_title, context, self.events_tx.clone(), launch)
                 .map_err(|_| ActionError::LaunchFailed)?;
         tab.rename(name.trim().to_owned());
+        tab.backend
+            .set_scrollback_lines(self.preferences.scrollback_lines);
         self.next_id = self.next_id.saturating_add(1);
         self.next_title_number = next_title_number;
         self.tabs.push(tab);
@@ -2147,6 +2175,7 @@ impl ButtonsApp {
         if index >= self.tabs.len() {
             return;
         }
+        self.save_terminal_history(Some(index));
         let mut tab = self.tabs.remove(index);
         let closed = ClosedTab {
             title: tab.title.clone(),
@@ -2541,6 +2570,7 @@ impl ButtonsApp {
         let divider_style =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
         let modal_open = self.show_settings
+            || self.terminal_reader.is_some()
             || self.show_about
             || self.show_preset_editor
             || self.show_tab_rename
@@ -2633,11 +2663,14 @@ impl ButtonsApp {
             hover_label: &self.preferences.pane_hover_label,
             hover_font: &hover_font,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
+            advanced_effects: self.preferences.advanced_effects,
+            keyboard_navigation: self.keyboard_navigation,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
 
         if let Some(index) = clicked {
             self.focused = index;
+            self.keyboard_navigation = false;
         }
         if let Some((id, action)) = pane_action {
             self.perform_pane_action(id, action, context);
@@ -2812,14 +2845,14 @@ impl ButtonsApp {
         let mut clear_search = false;
         let mut close = false;
         egui::TopBottomPanel::top("terminal-search")
-            .exact_height(40.0)
+            .min_height(40.0)
             .frame(
                 egui::Frame::new()
                     .fill(colors.panel)
                     .inner_margin(egui::Margin::symmetric(9, 4)),
             )
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut self.terminal_search_query)
                             .hint_text(crate::i18n::text(
@@ -2829,12 +2862,23 @@ impl ButtonsApp {
                             ))
                             .desired_width(260.0),
                     );
+                    response.widget_info(|| {
+                        egui::WidgetInfo::labeled(
+                            egui::WidgetType::TextEdit,
+                            true,
+                            "Find in terminal",
+                        )
+                    });
+                    if self.terminal_search_focus {
+                        response.request_focus();
+                        self.terminal_search_focus = false;
+                    }
                     if response.changed() {
-                        self.terminal_search_status = None;
+                        action = Some(true);
                     }
                     if response.has_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter))
                     {
-                        action = Some(true);
+                        action = Some(!ui.input(|input| input.modifiers.shift));
                     }
                     if ui
                         .button(crate::i18n::text(
@@ -2876,6 +2920,10 @@ impl ButtonsApp {
                         close = true;
                     }
                 });
+                if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+                {
+                    close = true;
+                }
             });
 
         if close {
@@ -2885,6 +2933,149 @@ impl ButtonsApp {
             self.clear_terminal_search();
         } else if let Some(forward) = action {
             self.search_active_terminal(forward);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_terminal_reader(&mut self) {
+        if let Some(tab) = self.tabs.get_mut(self.focused) {
+            tab.backend.sync();
+            self.terminal_reader = Some((
+                tab.id,
+                tab.title.clone(),
+                tab.backend.plain_text_tail(200_000),
+            ));
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn terminal_reader_window(&mut self, ctx: &egui::Context) {
+        let Some((id, title, text)) = &mut self.terminal_reader else {
+            return;
+        };
+        let mut open = true;
+        let mut refresh = false;
+        let mut close = false;
+        egui::Window::new("Read terminal text")
+            .id(egui::Id::new("terminal-reader"))
+            .open(&mut open)
+            .default_size([760.0, 500.0])
+            .show(ctx, |ui| {
+                ui.label(format!("{title} — retained text snapshot"));
+                ui.label("Select and copy text here. Refresh to read new output; this view stays still while you read.");
+                refresh = ui.button("Refresh snapshot").clicked();
+                egui::ScrollArea::both().id_salt("terminal-reader-scroll").show(ui, |ui| {
+                    let label = ui.label("Terminal output");
+                    let mut read_only = text.as_str();
+                    let response = ui.add(egui::TextEdit::multiline(&mut read_only).font(egui::TextStyle::Monospace).desired_width(f32::INFINITY))
+                        .labelled_by(label.id);
+                    ui.ctx().accesskit_node_builder(response.id, |node| node.set_read_only());
+                });
+                if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+                    close = true;
+                }
+            });
+        if refresh {
+            if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == *id) {
+                tab.backend.sync();
+                *text = tab.backend.plain_text_tail(200_000);
+                title.clone_from(&tab.title);
+            }
+        }
+        if !open || close {
+            self.terminal_reader = None;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_terminal_history(&mut self, only: Option<usize>) {
+        if !self.preferences.terminal_history.auto_save {
+            return;
+        }
+        self.queue_terminal_history(only);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn queue_terminal_history(&mut self, only: Option<usize>) {
+        let Some(store) = &self.native_store else {
+            return;
+        };
+        if self.history_writer.is_none() {
+            match store
+                .prepare_history_profile()
+                .map_err(|error| error.to_string())
+                .and_then(|profile| crate::terminal_history::HistoryWriter::new(&profile))
+            {
+                Ok(writer) => self.history_writer = Some(writer),
+                Err(error) => {
+                    self.notice = Some(format!("Terminal history could not open: {error}"));
+                    return;
+                }
+            }
+        }
+        let snapshots = self
+            .tabs
+            .iter_mut()
+            .enumerate()
+            .filter(|(index, _)| only.is_none_or(|only| only == *index))
+            .map(|(_, tab)| {
+                tab.backend.sync();
+                crate::terminal_history::Snapshot {
+                    id: tab.id,
+                    title: tab.title.clone(),
+                    text: tab
+                        .backend
+                        .plain_text_tail(crate::terminal_history::SNAPSHOT_CHARS),
+                }
+            })
+            .collect();
+        if let Some(writer) = &self.history_writer {
+            if !writer.save(snapshots, self.preferences.terminal_history.retention_days) {
+                self.notice =
+                    Some("Terminal history storage is busy; the next autosave will retry.".into());
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn maintain_terminal_history(&mut self, ctx: &egui::Context) {
+        let lines = self.preferences.scrollback_lines.min(100_000);
+        if self.scrollback_applied != Some(lines) {
+            for tab in &mut self.tabs {
+                tab.backend.set_scrollback_lines(lines);
+            }
+            self.scrollback_applied = Some(lines);
+        }
+        if let Some(error) = self
+            .history_writer
+            .as_ref()
+            .and_then(|writer| writer.error())
+        {
+            self.notice = Some(format!("Terminal history could not save: {error}"));
+        }
+        if self
+            .history_last_tick
+            .is_some_and(|tick| tick.elapsed() < Duration::from_secs(5))
+        {
+            return;
+        }
+        self.history_last_tick = Some(std::time::Instant::now());
+        if self.preferences.terminal_history.auto_save {
+            self.save_terminal_history(None);
+            ctx.request_repaint_after(Duration::from_secs(5));
+        } else if let Some(store) = &self.native_store {
+            let folder = store.profile_dir().join("terminal-history");
+            if folder.exists() {
+                if self.history_writer.is_none() {
+                    self.history_writer =
+                        store.prepare_history_profile().ok().and_then(|profile| {
+                            crate::terminal_history::HistoryWriter::new(&profile).ok()
+                        });
+                }
+                if let Some(writer) = &self.history_writer {
+                    writer.save(Vec::new(), self.preferences.terminal_history.retention_days);
+                }
+            }
         }
     }
 
@@ -3029,6 +3220,18 @@ impl ButtonsApp {
                             .clicked()
                         {
                             self.show_terminal_search = true;
+                            self.terminal_search_focus = true;
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui
+                            .add_enabled(
+                                !self.tabs.is_empty(),
+                                egui::Button::new("Read terminal text…"),
+                            )
+                            .clicked()
+                        {
+                            self.open_terminal_reader();
                             ui.close_menu();
                         }
                         #[cfg(not(target_arch = "wasm32"))]
@@ -3698,7 +3901,11 @@ impl ButtonsApp {
             &self.preferences.typography.preset_dock,
         );
         ui.horizontal(|ui| {
-            ui.label(RichText::new("SSH DOCK").strong().color(colors.accent_alt));
+            ui.label(
+                RichText::new(&self.preferences.dock_title)
+                    .strong()
+                    .color(colors.accent_alt),
+            );
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
                     .small_button(crate::i18n::literal(&self.locale, "‹"))
@@ -4837,16 +5044,19 @@ impl ButtonsApp {
         };
         let provider = &mut settings.providers[index];
         ui.horizontal(|ui| {
-            ui.label(text(&self.locale, M::ProviderName, &[]));
-            ui.text_edit_singleline(&mut provider.name);
+            let label = ui.label(text(&self.locale, M::ProviderName, &[]));
+            ui.text_edit_singleline(&mut provider.name)
+                .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            ui.label(text(&self.locale, M::ProviderEndpoint, &[]));
-            ui.text_edit_singleline(&mut provider.endpoint);
+            let label = ui.label(text(&self.locale, M::ProviderEndpoint, &[]));
+            ui.text_edit_singleline(&mut provider.endpoint)
+                .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            ui.label(text(&self.locale, M::ProviderModel, &[]));
-            ui.text_edit_singleline(&mut provider.model);
+            let label = ui.label(text(&self.locale, M::ProviderModel, &[]));
+            ui.text_edit_singleline(&mut provider.model)
+                .labelled_by(label.id);
         });
         if validate_endpoint(&provider.endpoint).is_err() {
             ui.colored_label(
@@ -6021,11 +6231,14 @@ impl ButtonsApp {
                                 ui.small(text(&locale, MessageKey::AiHelpContextSentPrivacy, &[]));
                             }
                         }
+                        let question_label =
+                            ui.label(text(&locale, MessageKey::AiHelpQuestionHint, &[]));
                         ui.add(
                             egui::TextEdit::multiline(&mut state.input)
                                 .desired_rows(3)
                                 .hint_text(text(&locale, MessageKey::AiHelpQuestionHint, &[])),
-                        );
+                        )
+                        .labelled_by(question_label.id);
                         let context_ready = (!state.include_context && !state.agent_mode)
                             || state.context_preview.is_some();
                         if ui
@@ -8792,10 +9005,49 @@ impl ButtonsApp {
         use crate::i18n::{text, MessageKey as M};
         ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.push_id("settings-workspace", |ui| {
+            ui.horizontal(|ui| {
+                let label = ui.label("Left panel name");
+                ui.add(egui::TextEdit::singleline(&mut self.preferences.dock_title).char_limit(60)).labelled_by(label.id);
+            });
             ui.checkbox(
                 &mut self.preferences.right_click_copies_selection,
                 "Right-click copies selected terminal text",
             ).on_hover_text("Copy immediately when text is selected. With no selection, right-click opens the pane menu.");
+            ui.label("Drag to select terminal text, then right-click or press Ctrl+Shift+C (Cmd+Shift+C on macOS). Ctrl+C interrupts the shell.");
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let label = ui.label("Retained scrollback lines per terminal (0–100,000)");
+                if ui.add(egui::DragValue::new(&mut self.preferences.scrollback_lines).range(0..=100_000)).labelled_by(label.id).changed() {
+                    for tab in &mut self.tabs {
+                        tab.backend.set_scrollback_lines(self.preferences.scrollback_lines);
+                    }
+                    self.terminal_search_status = None;
+                }
+                ui.label("Lowering the limit immediately discards older lines. Terminal → Read terminal text opens a selectable text snapshot for assistive tools.");
+                ui.checkbox(&mut self.preferences.terminal_history.auto_save, "Automatically save terminal text snapshots");
+                let label = ui.label("Delete saved snapshots after days");
+                ui.add(egui::DragValue::new(&mut self.preferences.terminal_history.retention_days).range(1..=365)).labelled_by(label.id);
+                ui.label("Saved locally in dated UTC folders; snapshots can contain anything printed by your shell. Autosave runs every 5 seconds and on close, up to 200,000 characters per terminal. Expiry runs while the app is open.");
+                if ui.button("Save current terminal snapshot now").clicked() {
+                    self.queue_terminal_history(Some(self.focused));
+                }
+                if let Some(store) = &self.native_store {
+                    let folder = self.history_writer.as_ref().map_or_else(|| store.profile_dir().join("terminal-history"), |writer| writer.root.clone());
+                    ui.label(format!("History folder: {}", folder.display()));
+                    if ui.add_enabled(folder.exists(), egui::Button::new("Open saved history folder")).clicked() {
+                        #[cfg(windows)]
+                        let result = std::process::Command::new("explorer.exe").arg(&folder).spawn();
+                        #[cfg(target_os = "linux")]
+                        let result = std::process::Command::new("xdg-open").arg(&folder).spawn();
+                        #[cfg(target_os = "macos")]
+                        let result = std::process::Command::new("open").arg(&folder).spawn();
+                        #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+                        if result.is_err() { self.notice = Some("Could not open the history folder.".into()); }
+                    }
+                }
+                ui.checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU analog static)");
+                ui.label("Turn off for standard texture-based static. Calm mode disables motion and noise.");
+            }
             ui.checkbox(
                 &mut self.preferences.pane_hover_label.enabled,
                 crate::i18n::literal(&self.locale, "Show terminal name on hover"),
@@ -9747,6 +9999,17 @@ impl ButtonsApp {
         if self.show_localization_onboarding {
             return;
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        if !self.show_settings
+            && self.terminal_reader.is_none()
+            && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F6))
+        {
+            self.keyboard_navigation = !self.keyboard_navigation;
+            if let Some(id) = ctx.memory(|memory| memory.focused()) {
+                ctx.memory_mut(|memory| memory.surrender_focus(id));
+            }
+            return;
+        }
         let pressed = ctx.input(|input| {
             input.events.iter().find_map(|event| match event {
                 egui::Event::Key {
@@ -9845,6 +10108,16 @@ impl ButtonsApp {
                         ctx.copy_text(selected);
                     }
                 }
+            }
+            ShortcutAction::FindTerminal => {
+                self.show_terminal_search = true;
+                self.terminal_search_focus = true;
+                ctx.input_mut(|input| {
+                    input.consume_key(
+                        egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                        egui::Key::F,
+                    )
+                });
             }
             ShortcutAction::Paste => ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste),
             ShortcutAction::OpenSettings | ShortcutAction::Quit => {}
@@ -9999,6 +10272,7 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 struct TerminalInteraction {
     focused: bool,
     enabled: bool,
+    advanced_effects: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10083,13 +10357,25 @@ fn terminal_surface(
             available.y,
         ));
     let response = ui.add(terminal);
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(
+            egui::WidgetType::Other,
+            interaction.enabled,
+            format!("Terminal {}", tab.title),
+        )
+    });
+    ui.ctx().accesskit_node_builder(response.id, |node| {
+        node.set_role(egui::accesskit::Role::Terminal);
+        node.set_value(tab.backend.visible_text());
+        node.set_description("Use Terminal menu, Read terminal text, to navigate and copy retained output as text. Ctrl+Shift+F searches; Ctrl+Shift+C copies selection.");
+    });
     paint_terminal_effects(
         ui,
         response.rect,
         theme,
         tab.id,
         latest_activity_at_ms,
-        time,
+        (time, interaction.advanced_effects),
         &mut tab.effect_textures,
     );
     let scrollbar_clicked = if scrollbar_width > 0.0 {
@@ -10105,7 +10391,10 @@ fn terminal_surface(
         false
     };
     (
-        response.clicked() || response.is_pointer_button_down_on() || scrollbar_clicked,
+        response.clicked()
+            || response.gained_focus()
+            || response.is_pointer_button_down_on()
+            || scrollbar_clicked,
         response,
     )
 }
@@ -10174,11 +10463,12 @@ fn paint_terminal_effects(
     theme: &ThemeDefinition,
     terminal_id: u64,
     latest_activity_at_ms: u64,
-    time: f32,
+    rendering: (f32, bool),
     textures: &mut crate::plugins::effects::simple_noise::NoiseTextures,
 ) {
     use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
+    let (time, advanced) = rendering;
     if effects.master_disabled {
         *textures = Default::default();
         return;
@@ -10196,7 +10486,9 @@ fn paint_terminal_effects(
     }
     let static_active = effects.static_opacity > 0.0 && effects.static_intensity > 0.0;
     if static_active {
-        if crate::plugins::effects::analog_static::paint(ui, rect, effects, terminal_id, time) {
+        if advanced
+            && crate::plugins::effects::analog_static::paint(ui, rect, effects, terminal_id, time)
+        {
             textures.analog = None;
         } else {
             paint_noise(
@@ -10404,6 +10696,8 @@ fn build_pane_sequence(mut panes: Vec<PaneTree>, axis: SplitAxis, key: String) -
 #[cfg(not(target_arch = "wasm32"))]
 struct PaneRenderState<'a> {
     right_click_copies_selection: bool,
+    advanced_effects: bool,
+    keyboard_navigation: bool,
     ratios: &'a mut std::collections::BTreeMap<String, f32>,
     tabs: &'a mut [TerminalTab],
     focused: usize,
@@ -10449,8 +10743,11 @@ fn render_pane_tree(
                 &mut pane,
                 tab,
                 TerminalInteraction {
-                    focused: state.focused == *index && !state.modal_open,
+                    focused: state.focused == *index
+                        && !state.modal_open
+                        && !state.keyboard_navigation,
                     enabled: !state.modal_open,
+                    advanced_effects: state.advanced_effects,
                 },
                 (
                     state.font_catalog.font_id(&font.zone, true),
@@ -11364,6 +11661,8 @@ impl eframe::App for ButtonsApp {
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.maintain_terminal_history(ctx);
         self.shortcuts(ctx);
         self.top_menu(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -11431,6 +11730,8 @@ impl eframe::App for ButtonsApp {
         self.preset_editor_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_rename_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.terminal_reader_window(ctx);
         self.about_window(ctx);
         self.localization_onboarding(ctx);
         self.refresh_locale();
@@ -11438,6 +11739,8 @@ impl eframe::App for ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
+        self.save_terminal_history(None);
+        self.history_writer.take();
         #[cfg(not(target_arch = "wasm32"))]
         self.control_server.take();
         #[cfg(not(target_arch = "wasm32"))]
@@ -11934,6 +12237,254 @@ mod tests {
         render(pointer_events(pos, egui::PointerButton::Primary, false));
         assert_eq!(app.preferences.app_theme_id, "aurora");
         assert_eq!(app.preferences.terminal_theme_id, "aurora");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn reader_exposes_named_read_only_text_and_settings_round_trip_new_controls() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.terminal_reader = Some((9, "term9".into(), "line one\nline two 🦇".into()));
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp| {
+            ctx.run(egui::RawInput::default(), |ctx| {
+                app.terminal_reader_window(ctx)
+            })
+        };
+        render(&mut app);
+        let output = render(&mut app);
+        let tree = output.platform_output.accesskit_update.unwrap();
+        assert!(tree.nodes.iter().any(|(_, node)| node.role()
+            == egui::accesskit::Role::MultilineTextInput
+            && node.is_read_only()));
+        assert!(tree.nodes.iter().any(|(_, node)| node
+            .value()
+            .is_some_and(|text| text.contains("line one"))
+            || node.label().is_some_and(|text| text.contains("line one"))));
+        let mut preferences: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(!preferences.terminal_history.auto_save);
+        assert!(preferences.right_click_copies_selection);
+        preferences.scrollback_lines = usize::MAX;
+        preferences.terminal_history.retention_days = 0;
+        preferences.dock_title = "  My hosts\n  ".into();
+        preferences.advanced_effects = false;
+        preferences.normalize_theme_sources();
+        let round_trip: Preferences =
+            serde_json::from_value(serde_json::to_value(&preferences).unwrap()).unwrap();
+        assert_eq!(round_trip.scrollback_lines, 100_000);
+        assert_eq!(round_trip.terminal_history.retention_days, 1);
+        assert_eq!(round_trip.dock_title, "My hosts");
+        assert!(!round_trip.advanced_effects);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "uses test-owned ConPTY sessions and a Node loopback provider; run explicitly with one test thread"]
+    fn ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery() {
+        use std::io::BufRead;
+        struct Provider(std::process::Child);
+        impl Drop for Provider {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        struct Override(Option<String>);
+        impl Drop for Override {
+            fn drop(&mut self) {
+                if let Some(value) = &self.0 {
+                    std::env::set_var("BUTTONSCLI_NATIVE_DEV_AI_HELP", value);
+                } else {
+                    std::env::remove_var("BUTTONSCLI_NATIVE_DEV_AI_HELP");
+                }
+            }
+        }
+        let _override = Override(std::env::var("BUTTONSCLI_NATIVE_DEV_AI_HELP").ok());
+        std::env::set_var("BUTTONSCLI_NATIVE_DEV_AI_HELP", "1");
+        let mut provider = Provider(
+            std::process::Command::new("node")
+                .arg("scripts/fake-ai-provider.mjs")
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        let mut ready = String::new();
+        std::io::BufReader::new(provider.0.stdout.take().unwrap())
+            .read_line(&mut ready)
+            .unwrap();
+        let ready: Value = serde_json::from_str(&ready).unwrap();
+        let mut preferences = Preferences::default();
+        let fixture = ProviderProfile {
+            id: "fixture".into(),
+            name: "Local fixture".into(),
+            endpoint: ready["endpoint"].as_str().unwrap().into(),
+            model: "fake-ok".into(),
+            credential_ref: None,
+        };
+        preferences
+            .provider_settings
+            .active_provider_id
+            .clone_from(&fixture.id);
+        preferences.provider_settings.providers = vec![fixture];
+        preferences.default_shell_id = "fixture-shell".into();
+        preferences.custom_shell_profiles = vec![ShellProfile {
+            id: "fixture-shell".into(),
+            label: "Fixture CMD".into(),
+            command: "cmd.exe /D /K".into(),
+            working_directory: String::new(),
+        }];
+        let mut workspace = Workspace(ButtonsApp::empty(preferences));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        app.open_tab(ctx.clone());
+        app.open_tab(ctx.clone());
+        app.focused = 0;
+        let first = app.tabs[0].id;
+        let second = app.tabs[1].id;
+        app.open_ai_help();
+        let submit = |app: &mut ButtonsApp, context| {
+            app.ai_help_tx
+                .send(AiHelpCommand::Submit(
+                    "Explain this local fixture".into(),
+                    context,
+                    Some(first),
+                ))
+                .unwrap();
+            app.process_ai_help_commands(&ctx);
+            assert!(app.ai_help_state.lock().unwrap().busy);
+        };
+        let wait = |app: &ButtonsApp| {
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while app.ai_help_state.lock().unwrap().busy {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "fixture request finished before deadline"
+                );
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        };
+        submit(app, None);
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let state = app.ai_help_state.lock().unwrap();
+            if state.busy
+                && state
+                    .messages
+                    .last()
+                    .is_some_and(|(_, text)| text.contains("Local test response"))
+            {
+                break;
+            }
+            assert!(
+                state.busy && std::time::Instant::now() < deadline,
+                "answer became visible while streaming"
+            );
+            drop(state);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        wait(app);
+        let action = {
+            let state = app.ai_help_state.lock().unwrap();
+            assert!(state.error.is_none(), "{:?}", state.error);
+            assert!(state
+                .messages
+                .last()
+                .unwrap()
+                .1
+                .contains("context detected: no"));
+            state.reviewed_actions[0].clone()
+        };
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, 0);
+        assert_eq!(app.tabs[1].output.snapshot().input_sequence, 0);
+        app.focused = 1;
+        app.ai_help_tx
+            .send(AiHelpCommand::Deliver {
+                target_id: Some(first),
+                action: action.clone(),
+                press_enter: false,
+            })
+            .unwrap();
+        app.process_ai_help_commands(&ctx);
+        assert_eq!(
+            app.tabs[0].output.snapshot().last_input,
+            "echo ButtonsCLI-local-test"
+        );
+        assert_eq!(app.tabs[1].output.snapshot().input_sequence, 0);
+        let context = crate::session::context::TerminalContext {
+            session_id: first,
+            title: "term1".into(),
+            shell: "fixture".into(),
+            output: "Synthetic context marker".into(),
+        };
+        submit(app, Some(context));
+        wait(app);
+        assert!(app
+            .ai_help_state
+            .lock()
+            .unwrap()
+            .messages
+            .last()
+            .unwrap()
+            .1
+            .contains("context detected: yes"));
+        app.preferences.provider_settings.providers[0].model = "fake-error-once".into();
+        submit(app, None);
+        wait(app);
+        assert!(app.ai_help_state.lock().unwrap().error.is_some());
+        let (question, context, target) = app
+            .ai_help_state
+            .lock()
+            .unwrap()
+            .last_request
+            .clone()
+            .unwrap();
+        app.ai_help_tx
+            .send(AiHelpCommand::Submit(question, context, target))
+            .unwrap();
+        app.process_ai_help_commands(&ctx);
+        wait(app);
+        assert!(app.ai_help_state.lock().unwrap().error.is_none());
+        app.preferences.provider_settings.providers[0].model = "fake-slow".into();
+        submit(app, None);
+        std::thread::sleep(Duration::from_millis(300));
+        app.ai_help_state
+            .lock()
+            .unwrap()
+            .cancel
+            .as_ref()
+            .unwrap()
+            .store(true, Ordering::Relaxed);
+        wait(app);
+        assert!(app.ai_help_state.lock().unwrap().error.is_some());
+        let messages = app.ai_help_state.lock().unwrap().messages.clone();
+        app.ai_help_state.lock().unwrap().open = false;
+        app.open_ai_help();
+        assert_eq!(app.ai_help_state.lock().unwrap().messages, messages);
+        assert_eq!(
+            app.ai_help_state.lock().unwrap().target.as_ref().unwrap().0,
+            second
+        );
+        app.close_tab(0);
+        app.ai_help_tx
+            .send(AiHelpCommand::Deliver {
+                target_id: Some(first),
+                action,
+                press_enter: true,
+            })
+            .unwrap();
+        app.process_ai_help_commands(&ctx);
+        assert!(app.ai_help_state.lock().unwrap().error.is_some());
+        assert_eq!(app.tabs[0].id, second);
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, 0);
     }
 
     #[cfg(windows)]

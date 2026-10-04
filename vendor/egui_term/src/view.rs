@@ -196,9 +196,12 @@ impl<'a> TerminalView<'a> {
         if self.has_focus
             && !layout.context_menu_opened()
             && !layout.ctx.memory(|memory| memory.any_popup_open())
+            && layout.ctx.memory(|memory| {
+                memory.focused().is_none() || memory.has_focus(layout.id)
+            })
         {
             layout.request_focus();
-        } else {
+        } else if !self.has_focus && !layout.gained_focus() {
             layout.surrender_focus();
         }
 

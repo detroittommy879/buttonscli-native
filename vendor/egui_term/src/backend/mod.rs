@@ -15,7 +15,10 @@ use alacritty_terminal::selection::{
 use alacritty_terminal::sync::FairMutex;
 use alacritty_terminal::term::search::{Match, RegexIter, RegexSearch};
 use alacritty_terminal::term::{
-    self, cell::Cell, test::TermSize, viewport_to_point, Term, TermMode,
+    self,
+    cell::{Cell, Flags},
+    test::TermSize,
+    viewport_to_point, Term, TermMode,
 };
 use alacritty_terminal::vte::ansi::Color;
 use alacritty_terminal::{tty, Grid};
@@ -494,6 +497,42 @@ impl TerminalBackend {
         ScrollbackState::from_content(self.last_content())
     }
 
+    /// Apply a bounded history limit to both normal and alternate-screen state.
+    /// Alacritty truncates older lines immediately when the limit shrinks.
+    pub fn set_scrollback_lines(&mut self, lines: usize) {
+        self.term.lock().set_options(term::Config {
+            scrolling_history: lines.min(100_000),
+            ..term::Config::default()
+        });
+        self.clear_search();
+        self.sync();
+    }
+
+    /// Accessible text for the currently displayed viewport, including scrolling.
+    pub fn visible_text(&self) -> String {
+        let grid = &self.last_content.grid;
+        let first = -(grid.display_offset() as i32);
+        let mut output = String::new();
+        for row in first..first + grid.screen_lines() as i32 {
+            let mut line = String::new();
+            for column in 0..grid.columns() {
+                let cell = &grid[Line(row)][Column(column)];
+                if !cell.flags.intersects(
+                    Flags::WIDE_CHAR_SPACER | Flags::LEADING_WIDE_CHAR_SPACER,
+                ) && cell.c != '\0'
+                {
+                    line.push(cell.c);
+                    for ch in cell.zerowidth().into_iter().flatten() {
+                        line.push(*ch);
+                    }
+                }
+            }
+            output.push_str(line.trim_end());
+            output.push('\n');
+        }
+        output
+    }
+
     /// Copy a bounded plain-text tail from the grid snapshot already owned by the UI.
     /// This does not read the PTY or acquire the terminal grid lock.
     pub fn plain_text_tail(&self, max_chars: usize) -> String {
@@ -520,9 +559,15 @@ impl TerminalBackend {
         for row in first..screen as i32 {
             let mut line = String::with_capacity(columns);
             for column in 0..columns {
-                let ch = grid.index(Point::new(Line(row), Column(column))).c;
-                if ch != '\0' {
-                    line.push(ch);
+                let cell = grid.index(Point::new(Line(row), Column(column)));
+                if !cell.flags.intersects(
+                    Flags::WIDE_CHAR_SPACER | Flags::LEADING_WIDE_CHAR_SPACER,
+                ) && cell.c != '\0'
+                {
+                    line.push(cell.c);
+                    for ch in cell.zerowidth().into_iter().flatten() {
+                        line.push(*ch);
+                    }
                 }
             }
             output.push_str(line.trim_end());

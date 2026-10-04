@@ -1,5 +1,21 @@
 # AI provider settings
 
+For local testing on Windows, run `pwsh -NoProfile -File scripts/start-ai-help-test.ps1`.
+This builds and opens an isolated debug workspace with a loopback fake provider
+selected and AI Help development access enabled. Open AI Help and send a question.
+No API key is needed. Its model list includes `fake-ok`, `fake-slow` (for Cancel),
+`fake-error-once` (for Retry), `fake-quota`, `fake-malformed` and `fake-disconnect`.
+The first line printed by `node scripts/fake-ai-provider.mjs` gives a standalone
+fixture endpoint if you prefer configuring a separate test workspace yourself.
+The server listens only on 127.0.0.1 and does not log prompts or contact providers.
+Closing the launcher-owned app stops its provider. Test settings remain in the
+printed temporary directory. `-SkipBuild` reuses the debug executable.
+
+Automated fixture checks: `node --test scripts/test-fake-ai-provider.mjs`.
+Windows app/PTY integration: `cargo test ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery --lib -- --ignored --test-threads=1`.
+The latter runs real AI Help request/state/target handling against the loopback
+server, without interacting with personal terminals or sending external requests.
+
 Open **Settings → AI providers** to add a provider, choose the active provider, and edit its chat completions endpoint and model ID. The endpoint must be an HTTP or HTTPS URL. You can save an API key in your operating system's credential store or keep it in memory for this app session. The key field is cleared after a save attempt; the key is never placed in native settings files.
 
 You can enter a compatible provider's origin or `/v1` base URL; the app appends

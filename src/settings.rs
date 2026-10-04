@@ -107,6 +107,10 @@ pub(crate) struct Preferences {
     pub(crate) favorite_theme_ids: Vec<String>,
     pub(crate) theme_editor_live_preview: bool,
     pub(crate) right_click_copies_selection: bool,
+    pub(crate) scrollback_lines: usize,
+    pub(crate) terminal_history: TerminalHistoryPreferences,
+    pub(crate) dock_title: String,
+    pub(crate) advanced_effects: bool,
     pub(crate) theme_browser_compact: bool,
     pub(crate) theme_browser_sort: crate::theme_browser::ThemeSort,
     pub(crate) theme_browser_collection: crate::theme_browser::ThemeCollection,
@@ -150,6 +154,10 @@ impl Default for Preferences {
             favorite_theme_ids: Vec::new(),
             theme_editor_live_preview: false,
             right_click_copies_selection: true,
+            scrollback_lines: 10_000,
+            terminal_history: TerminalHistoryPreferences::default(),
+            dock_title: "SSH DOCK".into(),
+            advanced_effects: true,
             theme_browser_compact: false,
             theme_browser_sort: Default::default(),
             theme_browser_collection: Default::default(),
@@ -237,6 +245,18 @@ impl Preferences {
         self.favorite_theme_ids
             .retain(|id| !id.is_empty() && seen.insert(id.clone()));
         self.pane_hover_label.normalize();
+        self.scrollback_lines = self.scrollback_lines.min(100_000);
+        self.terminal_history.retention_days = self.terminal_history.retention_days.clamp(1, 365);
+        self.dock_title = self
+            .dock_title
+            .trim()
+            .chars()
+            .filter(|ch| !ch.is_control())
+            .take(60)
+            .collect();
+        if self.dock_title.is_empty() {
+            self.dock_title = "SSH DOCK".into();
+        }
         self.localization.manual_locale =
             crate::i18n::resolve_locale(&self.localization.manual_locale).to_owned();
         self.chrome_corner_radius = self.chrome_corner_radius.min(16);
@@ -265,6 +285,22 @@ impl Preferences {
             if source.is_empty() {
                 source.clone_from(&self.theme_id);
             }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct TerminalHistoryPreferences {
+    pub(crate) auto_save: bool,
+    pub(crate) retention_days: u32,
+}
+
+impl Default for TerminalHistoryPreferences {
+    fn default() -> Self {
+        Self {
+            auto_save: false,
+            retention_days: 7,
         }
     }
 }

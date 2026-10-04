@@ -54,7 +54,7 @@ tokio = { version = "1.53.1", features = ["rt", "net", "time", "sync"] }
 fs2 = "0.4.3"
 sha2 = "0.10"
 home = "0.5.12"
-eframe = { version = "0.31.1", default-features = false, features = ["wgpu", "wayland", "x11"] }
+eframe = { version = "0.31.1", default-features = false, features = ["wgpu", "wayland", "x11", "accesskit"] }
 egui_term = { path = "vendor/egui_term" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
