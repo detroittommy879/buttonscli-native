@@ -17,8 +17,9 @@ Theme** in that editor to keep it. New generated themes use a collision-safe
 filename and never replace a saved theme. You can cancel the preview or discard
 the candidate without writing it.
 
-This is a Pro feature. The release build keeps it locked until entitlement
-integration is available. Debug builds can exercise it with
+This is a Pro feature. The [local JSON override](LOCAL-FEATURE-FLAGS.md) enables
+it in both debug and release builds. Without that flag, release access remains
+locked. Debug builds can also exercise it with
 `BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR=1`; that override does not work in
 release builds. A configured endpoint and model are required. Provider requests
 may include your brief and the selected palette, so review the provider you

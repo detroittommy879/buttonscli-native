@@ -35,6 +35,7 @@ impl EntitlementSource for Option<Entitlement> {
 
 #[derive(Default)]
 pub struct RuntimeAccess {
+    pub enable_all: bool,
     pub pro_enabled: bool,
     pub all_free: bool,
     pub killed: HashSet<FeatureKey>,
@@ -58,6 +59,7 @@ pub enum AccessReason {
     ExpiredGrant,
     InternalOnly,
     DevelopmentOverride,
+    LocalOverride,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -83,13 +85,17 @@ fn allowed(reason: AccessReason) -> AccessDecision {
     }
 }
 
-/// Resolve once at UI discovery and again at execution. Runtime kill switches always win.
+/// Resolve at discovery and execution. The explicit local override bypasses all gates.
 pub fn resolve(
     key: FeatureKey,
     runtime: &RuntimeAccess,
     entitlements: &impl EntitlementSource,
     now_unix: u64,
 ) -> AccessDecision {
+    #[cfg(not(target_arch = "wasm32"))]
+    if super::local::enabled() {
+        return allowed(AccessReason::LocalOverride);
+    }
     resolve_feature(key.definition(), runtime, entitlements, now_unix)
 }
 
@@ -99,6 +105,9 @@ fn resolve_feature(
     entitlements: &impl EntitlementSource,
     now_unix: u64,
 ) -> AccessDecision {
+    if runtime.enable_all {
+        return allowed(AccessReason::LocalOverride);
+    }
     if runtime.killed.contains(&feature.key) {
         return denied(AccessReason::KillSwitch, Discoverability::Hidden);
     }
@@ -143,6 +152,21 @@ fn resolve_feature(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_override_unlocks_every_catalog_gate_without_a_grant() {
+        let runtime = RuntimeAccess {
+            enable_all: true,
+            killed: FeatureKey::ALL.into_iter().collect(),
+            ..Default::default()
+        };
+        for key in FeatureKey::ALL {
+            let decision = resolve(key, &runtime, &None, 100);
+            assert!(decision.available, "{}", key.as_str());
+            assert_eq!(decision.reason, AccessReason::LocalOverride);
+        }
+        assert!(!resolve(FeatureKey::AiHelp, &RuntimeAccess::default(), &None, 100).available);
+    }
 
     #[test]
     fn free_and_internal_have_distinct_default_access() {

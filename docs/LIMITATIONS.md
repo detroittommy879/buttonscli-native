@@ -120,17 +120,21 @@ not a backlog disguised as release notes.
   preserved in compatibility data and are not activated by native import.
 - AI Help has editable providers, a separate-window source path, streaming,
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
-  release builds stay locked until entitlement integration exists. The
+  ordinary release access stays locked, but the explicit
+  [local JSON override](LOCAL-FEATURE-FLAGS.md) enables release testing. The
   `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
-  complete real-provider GUI interaction is certified. Mistral completion and
+  complete real-provider GUI interaction is certified. Separate AI Help viewport
+  controls currently expose a placeholder Windows UI Automation tree; main
+  terminal/reader checks do not certify assistant accessibility. Mistral completion and
   streaming backend checks passed on 2026-10-02, and native provider keys were
   read/saved through Windows Credential Manager. Partial Windows
   window/stream/context/retry review used a loopback fake provider. The preserved
-  Agent Mode prototype is outside migration scope and requires a separate debug
-  opt-in; it is unavailable in release builds.
+  Agent Mode prototype is outside migration scope; the local override enables
+  it in release builds, while ordinary debug access requires a separate opt-in.
 - Native agent control has an authenticated loopback API, exact-instance
   discovery, a Node helper and tab/layout/preset/input routes in source. It is
-  Pro-gated; release builds stay locked until entitlement integration exists.
+  Pro-gated; ordinary release access stays locked unless the local JSON override
+  is enabled.
   The `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1` override works only in debug
   builds. The isolated Windows HTTP/PTY and installed Node CLI matrix passes;
   direct Agent Inst. clipboard handoff and cross-platform runtime review remain

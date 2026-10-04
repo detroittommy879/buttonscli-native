@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
+    [switch]$Release,
+    [switch]$WithLocalFeatureFlags,
+    [string]$AiHelpCapturePath,
     [switch]$WithThemeControls,
     [switch]$WithAbruptExit,
     [switch]$WithAccessibility,
@@ -11,7 +14,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$binaryPath = Join-Path $repoRoot 'target\debug\buttonscli.exe'
+$buildProfile = if ($Release) { 'release' } else { 'debug' }
+$binaryPath = Join-Path $repoRoot "target\$buildProfile\buttonscli.exe"
 $smokeHome = Join-Path ([System.IO.Path]::GetTempPath()) "buttonscli-native-smoke-$([guid]::NewGuid().ToString('N'))"
 $appData = Join-Path $smokeHome 'AppData'
 $roaming = Join-Path $appData 'Roaming'
@@ -21,7 +25,7 @@ $trackedShells = @()
 
 New-Item -ItemType Directory -Path $roaming, $local -Force | Out-Null
 
-if ($WithThemeControls -or $WithAccessibility) {
+if ($WithThemeControls -or $WithAccessibility -or $WithLocalFeatureFlags) {
     # Seed only the test-owned profile; leave the user's settings untouched.
     $fixtureProfile = Join-Path $smokeHome '.buttonscli-native\profiles\default'
     New-Item -ItemType Directory -Path $fixtureProfile -Force | Out-Null
@@ -35,10 +39,17 @@ if ($WithThemeControls -or $WithAccessibility) {
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $fixtureProfile 'native.json') -Encoding utf8NoBOM
 }
 
+if ($WithLocalFeatureFlags) {
+    @{ enable_all = $true } | ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $smokeHome '.buttonscli-native\feature-flags.json') -Encoding utf8NoBOM
+}
+
 Push-Location $repoRoot
 try {
     if (-not $SkipBuild) {
-        & cargo build --bin buttonscli
+        $buildArguments = @('build', '--locked', '--bin', 'buttonscli')
+        if ($Release) { $buildArguments += '--release' }
+        & cargo @buildArguments
         if ($LASTEXITCODE -ne 0) {
             throw "cargo build --bin buttonscli failed with exit code $LASTEXITCODE"
         }
@@ -58,6 +69,11 @@ try {
     $startInfo.Environment['LOCALAPPDATA'] = $local
     $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG'] = '1'
     $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_ACCOUNT'] = '1'
+    if ($WithLocalFeatureFlags) {
+        foreach ($flagName in @('AI_HELP', 'AI_AGENT', 'THEME_GENERATOR', 'QUICK_SECRETS', 'REMOTE_CONTROL')) {
+            $startInfo.Environment.Remove("BUTTONSCLI_NATIVE_DEV_$flagName") | Out-Null
+        }
+    }
 
     if (-not ('ButtonsCliSmokeWindow' -as [type])) {
         Add-Type -TypeDefinition @'
@@ -153,6 +169,12 @@ public static class ButtonsCliSmokeWindow {
     }
 
     Start-Sleep -Seconds 2
+
+    if ($WithLocalFeatureFlags) {
+        $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'probe-local-feature-flags.ps1') -WindowHandle $windowHandle.ToInt64() -AppProcessId $process.Id -CapturePath $AiHelpCapturePath
+        if ($LASTEXITCODE -ne 0) { throw 'Native local feature flags UI acceptance failed.' }
+    }
 
     if ($WithAccessibility) {
         $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

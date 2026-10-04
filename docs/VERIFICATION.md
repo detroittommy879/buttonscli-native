@@ -1,7 +1,39 @@
 # Verification record
 
-Last run: 2026-10-03 on Windows, Rust 1.96.0. Earlier Linux-only checks
+Last run: 2026-10-04 on Windows, Rust 1.96.0. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-04 local JSON access and release testing
+
+- `cargo build --release --locked --bin buttonscli` builds the standalone Windows
+  executable. Native and WASM strict Clippy, formatting, diff checks and
+  PowerShell script parsing pass. Compiler incremental-cache access notes and
+  the pre-existing bin/lib PDB collision warning do not fail these checks.
+- `cargo test --release --locked --lib`: 247 pass, 10 optional tests ignored.
+  New tests cover every catalog key, explicit false/missing/invalid JSON,
+  unknown keys, oversized files and preservation of existing profile data.
+- `cargo test --release --locked --lib ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery -- --ignored --test-threads=1`
+  passes with a test-owned JSON flag, loopback provider and CMD sessions. No
+  debug-only access override is required. The app gates for AI Help, Agent Mode,
+  theme generation, Quick Secrets and remote control are available in optimized
+  builds. Streaming, context, review/target routing, retry and cancel pass.
+- `pwsh -NoProfile -File scripts/native-smoke.ps1 -SkipBuild -Release -WithLocalFeatureFlags`
+  passes startup, visible window bounds, enabled control handoff and opening AI
+  Help in a separate window. The probe removes development access flags and
+  uses an isolated profile. Optional `-AiHelpCapturePath` captures the chat.
+  Initial capture found Send clipping with the newly exposed Agent Mode row;
+  the reserved composer height was increased. The final rebuild/capture was
+  inspected: Agent Mode, context, composer and the full Send button are visible.
+- The separate assistant viewport currently exposes a placeholder UIA tree, so
+  this probe does not certify its composer accessibility. Main terminal/reader
+  accessibility remains covered by the earlier dedicated checks.
+- The user's normal native JSON flag was enabled independently of active-profile
+  settings; existing presets/providers and profile JSON were preserved. Normal
+  launch uses the standalone executable, with no temporary-home launcher.
+  The final normal-profile launch and AI Help window-opening check pass; the app
+  was left open for manual real-provider comparison. Its active Mistral model
+  field is empty, so a model must be selected before sending. No real provider
+  request or terminal action was triggered during these checks.
 
 ## 2026-10-03 terminal accessibility, history and AI Help fixture
 

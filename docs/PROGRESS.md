@@ -1,5 +1,47 @@
 # Reconstruction journal
 
+## 2026-10-04 — Local JSON access and ordinary release testing
+
+Added `.buttonscli-native/feature-flags.json` with explicit `enable_all` access
+in debug and release, read once at startup outside the normal profile settings.
+It overrides catalog/account/runtime gates and the separate Agent Mode debug
+restriction. Missing/false/invalid files retain ordinary access. The flag does
+not create absent implementations or restore disabled hosted services. Provider
+settings show when the override is enabled; existing provider keys, buttons,
+active profiles, terminal action review and CLI/MCP authentication are preserved.
+Updated the AI fixture/PTY integration to use an isolated JSON flag instead of
+the debug environment override, allowing the same checks in optimized builds.
+Added flag parsing/bounds/profile-preservation and all-catalog access checks.
+The fake-provider launcher still intentionally uses a temporary profile; normal
+testing now uses the release executable directly.
+
+The first optimized build and 247 library tests pass, plus the explicit optimized
+AI Help fixture/PTY test (stream/retry/cancel/context/reviewed target delivery).
+The release smoke confirms JSON access without development environment flags,
+enabled control handoff and opening the separate AI Help window. Its screenshot
+exposed Send clipping after the additional Agent Mode option was unlocked; the
+composer now reserves room for that option and its optional consent text. The
+new UIA probe initially tried to inspect chat controls, but the separate viewport
+exposes a placeholder tree; this is not full assistant accessibility acceptance.
+The probe now states its narrower handoff/window checks, with visual verification
+and app-level tests for chat. Native active-profile settings were preserved when
+creating the user's small flag file (11 presets and 10 providers). Final checks
+and normal-profile launch follow below.
+
+Final optimized rebuild and release-window capture pass; Send is now fully
+visible alongside the unlocked Agent Mode option. Native/WASM strict Clippy,
+formatting and script parsing pass. Existing PDB collision and incremental-cache
+access notes remain nonfatal. Real provider calls are left to the user's manual
+comparison; the saved active Mistral model field is empty and needs a choice in
+provider settings before chatting. The native settings hash remained unchanged
+through flag setup and isolated checks.
+
+Opened the final release executable directly with the user's normal native
+profile and left it running, with AI Help open. Control handoff/window-opening
+checks pass there too, without a temporary home or provider changes. The first
+normal-window probe ran before the actual titled window was ready; retrying the
+real handle passed, and the probe now waits for its initial accessibility tree.
+
 ## 2026-10-03 — Terminal usability, accessibility and local AI fixture
 
 Continued on `codex/pane-fonts-theme-editor`; the unrelated `.aicp/` folder was

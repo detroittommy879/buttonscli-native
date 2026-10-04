@@ -91,6 +91,10 @@ CLI/MCP helpers. See [building notes](docs/BUILDING.md) for Linux packages and
 the separate browser demo. Signed releases and automatic updates are still
 unfinished.
 
+To test gated features with your normal saved setup, use the
+[local JSON feature flag](docs/LOCAL-FEATURE-FLAGS.md) and launch the executable
+directly. This enables AI Help and other implemented gates in release builds.
+
 **Open three PowerShell tabs and run a command in the first:**
 
 ```powershell
@@ -118,16 +122,16 @@ have implementation and test coverage but are still locked or unfinished.
 | Area | Status |
 | --- | --- |
 | **Terminal workspace** | Available now. Windows has live PTY/CLI checks; earlier Linux/X11 desktop evidence is recorded. Broader clipboard, focus, DPI, accessibility and platform review remains. |
-| **AI Help** | **Not ready for normal use.** Provider settings, streaming, optional terminal context and reviewed suggestions exist, with partial testing against a local fake provider. Release builds keep requests locked pending entitlement integration; real-provider and full interaction acceptance remain open. |
-| **CLI / MCP agent control** | **Implemented, with development tests; locked in release builds.** The local API and installed Node CLI have Windows live-app checks. All 14 MCP tools have fake-API contract coverage; the official MCP client smoke covers tool discovery and live status/tabs. This does not certify every tool in every agent client. |
-| **AI theme generation** | Source implementation and mock-provider tests exist. Locked in release builds; live-provider and GUI acceptance remain. |
+| **AI Help** | Provider settings, streaming, optional terminal context and reviewed suggestions exist. An explicit local JSON override enables release testing with your normal profile. Broader real-provider and interaction acceptance remains open. |
+| **CLI / MCP agent control** | Implemented with Windows live-app and contract tests. The local JSON override enables release access. All 14 MCP tools have fake-API coverage; this does not certify every tool in every agent client. |
+| **AI theme generation** | Source implementation and provider tests exist. The local JSON override enables release access; interactive and broader provider/platform acceptance remains open. |
 | **Effects / Shader Lab** | Supported gradients, scanlines, noise and analog static render natively. Legacy GLSL shaders do not run; Shader Lab, HSync warp and remaining effect work are unfinished. |
 | **Accounts / distribution** | Hosted entitlement integration, production signing trust, updater activation and rollback still need work. The old feedback/runtime-config production paths are disabled pending a new native service. |
 
 ### Can an agent control it yet?
 
-**In a debug build, yes, for the paths covered by the tests. In a normal release
-build, access is currently locked.** Agent control uses an authenticated API
+**Yes, for the paths covered by the tests, with development access or the local
+JSON override enabled.** Agent control uses an authenticated API
 bound to `127.0.0.1`, with an instance-specific connection file. Helpers can
 create/rename tabs, arrange layouts, read output, send text or keys, and run
 presets. **Agent Inst.** copies the connection instructions when control is enabled.

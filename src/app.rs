@@ -82,8 +82,9 @@ fn ai_help_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_agent_available() -> bool {
-    cfg!(debug_assertions)
-        && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_AGENT").is_ok_and(|value| value == "1")
+    (crate::features::local::enabled()
+        || (cfg!(debug_assertions)
+            && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_AGENT").is_ok_and(|value| value == "1")))
         && ai_help_available()
         && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
 }
@@ -960,6 +961,10 @@ impl ButtonsApp {
         cc: &eframe::CreationContext<'_>,
         #[cfg(not(target_arch = "wasm32"))] startup: crate::startup::StartupOptions,
     ) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Ok((root, _)) = production_roots() {
+            crate::features::local::initialize(&root.0);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(render_state) = &cc.wgpu_render_state {
             crate::plugins::effects::analog_static::register(
@@ -5011,6 +5016,11 @@ impl ButtonsApp {
         let warning_color = self.colors().warning;
         ui.heading(text(&self.locale, M::Providers, &[]));
         ui.label(text(&self.locale, M::ProviderHelp, &[]));
+        if crate::features::local::enabled() {
+            ui.label(
+                "Local feature override is enabled. Restart after changing feature-flags.json.",
+            );
+        }
         let ai_unlocked = ai_help_available();
         if !ai_unlocked {
             ui.label(text(&self.locale, M::AiHelpLockedProvider, &[]));
@@ -6019,7 +6029,10 @@ impl ButtonsApp {
                     };
                     let transcript_height = (window_height
                         - (ui.cursor().top() - body_top)
-                        - composer_height * (assistant_font.size / 14.0).max(1.0)
+                        - (composer_height
+                            + if ai_agent_available() { 40.0 } else { 0.0 }
+                            + if state.agent_mode { 100.0 } else { 0.0 })
+                            * (assistant_font.size / 14.0).max(1.0)
                         - status_height)
                         .max(80.0);
                     egui::ScrollArea::vertical()
@@ -12321,18 +12334,27 @@ mod tests {
                 }
             }
         }
-        struct Override(Option<String>);
+        struct Override(std::path::PathBuf);
         impl Drop for Override {
             fn drop(&mut self) {
-                if let Some(value) = &self.0 {
-                    std::env::set_var("BUTTONSCLI_NATIVE_DEV_AI_HELP", value);
-                } else {
-                    std::env::remove_var("BUTTONSCLI_NATIVE_DEV_AI_HELP");
-                }
+                let _ = std::fs::remove_dir_all(&self.0);
             }
         }
-        let _override = Override(std::env::var("BUTTONSCLI_NATIVE_DEV_AI_HELP").ok());
-        std::env::set_var("BUTTONSCLI_NATIVE_DEV_AI_HELP", "1");
+        let override_root = Override(
+            std::env::temp_dir().join(format!("buttonscli-ai-flags-{:032x}", fastrand::u128(..))),
+        );
+        std::fs::create_dir_all(&override_root.0).unwrap();
+        std::fs::write(
+            override_root.0.join(crate::features::local::FILE_NAME),
+            r#"{"enable_all":true}"#,
+        )
+        .unwrap();
+        crate::features::local::initialize(&override_root.0);
+        assert!(ai_help_available());
+        assert!(ai_agent_available());
+        assert!(theme_generation_available());
+        assert!(quick_secrets_available());
+        assert!(remote_control_available());
         let mut provider = Provider(
             std::process::Command::new("node")
                 .arg("scripts/fake-ai-provider.mjs")

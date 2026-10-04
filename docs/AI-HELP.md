@@ -1,5 +1,9 @@
 # AI provider settings
 
+For normal testing with your saved buttons and providers, enable the
+[local JSON feature flag](LOCAL-FEATURE-FLAGS.md) and open the release executable
+directly. It uses the normal native active profile; no test launcher is required.
+
 For local testing on Windows, run `pwsh -NoProfile -File scripts/start-ai-help-test.ps1`.
 This builds and opens an isolated debug workspace with a loopback fake provider
 selected and AI Help development access enabled. Open AI Help and send a question.
@@ -55,11 +59,12 @@ rejected. Previewing a new terminal and sending a new question explicitly binds
 that new request to its previewed target.
 
 The draft migration branch preserves an unfinished Agent Mode prototype outside
-the core migration scope. It is unavailable in release builds and requires
-both `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` and
-`BUTTONSCLI_NATIVE_DEV_AI_AGENT=1` in a debug build. Its terminal execution is
+the core migration scope. The local `enable_all` JSON override makes it available
+in debug and release builds. Without that override, it requires both
+`BUTTONSCLI_NATIVE_DEV_AI_HELP=1` and `BUTTONSCLI_NATIVE_DEV_AI_AGENT=1` in a debug
+build. Its terminal execution is
 not part of ordinary AI Help, and its live provider/GUI acceptance is pending.
 
-AI provider requests are part of the Pro `aiHelp` feature. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Runtime flags therefore stay closed in production. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. The feature catalog still keeps AI Help's release rollout closed until it is explicitly verified. Development builds can exercise AI Help by setting `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` before launch. This explicit override has no effect in release builds.
+AI provider requests are part of the Pro `aiHelp` feature. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. Without the local JSON override, AI Help's release rollout remains closed. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
 
 An isolated Windows debug-build GUI pass confirmed the separate AI Help window, local model discovery, streamed fake-provider response, review-first command display, and explicit **Insert + Enter** delivery to a test terminal. This is partial M4 evidence; a later 2026-09-30 Windows pass also exercised context preview/transmission, cancellation, retry and window close/reopen using a loopback provider. Native theme selection and stable streaming control placement were repaired. Target switching, broader focus/DPI checks and cross-platform acceptance remain open. No real provider was contacted. Linux and macOS are not certified.
