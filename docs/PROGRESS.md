@@ -31,6 +31,10 @@ for the button label rather than the window title; corrected to ButtonsCLI Setti
 One intermediate edit used the Windows text encoding; corrected to UTF-8 before
 checks. Existing incremental-cache/PDB diagnostics do not fail builds. macOS
 runtime and GPU-power measurement remain unverified. No legacy settings edited.
+Final optimized Windows and WASM builds pass. The optimized Windows build also
+passes the separate Settings move/resize/close/reopen probe; final diagnostic
+capture is `target/settings-layout-release.png`. Implementation checkpoint:
+`09e7a5d` on `codex/pane-fonts-theme-editor`; no push or public release performed.
 
 ## 2026-10-04 — SSH/htop blank screen from inherited TERM=dumb
 
