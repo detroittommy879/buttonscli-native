@@ -709,6 +709,7 @@ dependencies = [
  "fs2",
  "getrandom 0.4.3",
  "home",
+ "image",
  "keyring",
  "log",
  "raw-window-handle",

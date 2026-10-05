@@ -1,7 +1,26 @@
 # Verification record
 
-Last run: 2026-10-04 on Windows, Rust 1.96.0. Earlier Linux-only checks
+Last run: 2026-10-05 on Windows. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-05 Settings / clipboard / selection follow-up
+
+- `cargo test --locked --lib`: 251 pass; 12 optional tests ignored. Two legacy
+  import fixtures pass. Explicit three-ConPTY selection test covers wheel/edge
+  scrolling in both directions, stationary pointer updates, copy on outside
+  release and stopping the selection scroll timer.
+- Explicit `native_clipboard_and_detached_settings_probe` checks exact selected
+  text in the real Windows clipboard for right-click and automatic copy, and
+  typing into a real terminal with detached Settings open. Test-owned windows,
+  shell and profile only; restores the prior text clipboard. Native captures
+  verify all 560 themes in Library and Edit padding/checkmark/import visibility.
+- Strict native/WASM Clippy and optimized Windows build pass. Existing
+  incremental-cache and bin/lib PDB diagnostics are nonfatal. No legacy profile
+  is edited. Local user `.aicp/` and Abyssal Bloom assets remain unstaged.
+- The hours-long freeze and transient three-theme state are not reproduced;
+  the identified detached-window input lock and catalog visibility are addressed.
+  Larger mixed-workspace save/default-slot/provider changes are documented
+  proposals. ImageGen concepts are separate from native acceptance captures.
 
 ## 2026-10-04 SSH/htop terminal-capability regression
 

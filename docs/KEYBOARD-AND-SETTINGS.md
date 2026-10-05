@@ -5,13 +5,14 @@ its size and screen position when closed, including the title-bar close button.
 Detached Settings leaves the main terminal interactive. Its selected status-bar
 button brings the existing window to the front, including from a minimized state.
 The embedded/web Settings fallback and true dialogs still own terminal input.
-Drag the horizontal rules below the theme list, generator and editor to resize
-those sections; their heights are stored in the native profile. Revert restores
-settings values while retaining window geometry and section heights.
+Themes has Library, Edit and Generate subtabs, each with its own scroll position
+in the ordinary Settings page. The stacked section-resize rules are removed.
+Previously saved section heights remain compatible but are unused. Revert
+restores settings values while retaining window geometry.
 
 The theme editor follows the focused terminal's current theme when an external
 theme change occurs. Picking a saved theme in its dropdown selects that theme
-before editing. Save Variant copies the current draft, including preview edits;
+before editing. New variant copies the current draft, including preview edits;
 Save Current Theme saves and selects the result. An external theme change ends
 the previous preview so its pending timer cannot switch back to an older draft.
 

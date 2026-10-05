@@ -1,5 +1,23 @@
 # Reconstruction journal
 
+## 2026-10-05 — Detached Settings, selection and theme navigation
+
+Detached Settings no longer disables the main terminal; its selected status
+button reveals the existing window. Fixed nested status wrapping that could
+consume the terminal height. Real Windows clipboard checks now cover right-click
+and automatic selection copy. Selection supports wheel and edge scrolling across
+history, including release outside the pane. Added Settings padding/contrast,
+catalog counts, Show all/reload and personal-theme warnings. Theme assets are
+embedded at build time; the user's valid Abyssal Bloom is included by this rebuild.
+
+Separate UI experiment replaces stacked resize dividers with Library / Edit /
+Generate subtabs, fixes clipped import/export actions and clarifies New variant.
+251 library tests, two fixtures, explicit native interaction probes, strict
+native/WASM Clippy and optimized Windows build pass. The transient three-theme
+state and hours-long freeze were not reproduced. See the concise
+[run log](BUGFIX-LOG-2026-10-05.md), [proposal](SETTINGS-UX-PLAN.md) and generated
+concepts; appearance presets, slot defaults and provider redesign are proposals.
+
 ## 2026-10-04 — Settings, theme drafts, clipboard and readability
 
 Wrapped Settings tabs; made scrollbar contrast independent of theme; saved native

@@ -4,7 +4,7 @@ The desktop app can create, edit, preview, import, export, and delete version 1
 theme files in the active native profile. This local feature is free and does
 not use AI.
 
-Open **Settings → Themes → Custom Theme Library**. **Save Variant** starts an
+Open **Settings → Themes → Edit**. **New variant** starts an
 unsaved copy of the theme used by the focused terminal. You can edit its name
 and description, app colors, terminal background and foreground, ANSI palette,
 pane divider, gradient, static effect, scanlines, row banding, and simple noise.
@@ -14,8 +14,10 @@ Noise rendering is capped at 1,024 cells per pane. Font choices and fields the
 editor does not recognize are kept when you save.
 
 The editor groups app shell/top-bar, tabs, left dock (including button colors),
-Settings and status-bar colors in separate boxes. The Settings and theme-library
-scrollbars reserve separate lanes, with 18-point tracks and at least 48-point handles.
+Settings and status-bar colors in separate boxes. Library, Edit and Generate
+use one Settings scrollbar with separate remembered scroll positions. Its track
+is 18 points wide with a handle of at least 48 points. **New from current theme**
+in Library opens an editable copy without applying a different saved theme.
 
 **Apply edits automatically** is off by default and saved per profile. When on,
 loading a saved theme or changing its fields previews the entire draft after

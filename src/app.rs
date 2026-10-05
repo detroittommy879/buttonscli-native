@@ -353,6 +353,7 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     window_opacity_error: Option<String>,
     settings_tab: SettingsTab,
+    theme_settings_tab: ThemeSettingsTab,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_source_id: Option<String>,
     settings_snapshot: Option<SettingsSnapshot>,
@@ -631,6 +632,15 @@ enum SettingsTab {
 enum SettingsCloseAction {
     Keep,
     Revert,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum ThemeSettingsTab {
+    Library,
+    #[cfg(not(target_arch = "wasm32"))]
+    Edit,
+    #[cfg(not(target_arch = "wasm32"))]
+    Generate,
 }
 
 struct SettingsSnapshot {
@@ -1127,6 +1137,7 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             window_opacity_error: None,
             settings_tab: SettingsTab::Themes,
+            theme_settings_tab: ThemeSettingsTab::Library,
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_source_id: None,
             settings_snapshot: None,
@@ -4471,13 +4482,20 @@ impl ButtonsApp {
         ui.spacing_mut().scroll = settings_scroll_style();
         // Scrollbars use foreground color, so improving their contrast no
         // longer washes out checkbox backgrounds and their checkmarks.
+        let settings_background = self.colors().settings_background;
+        let foreground = readable_on(settings_background);
         let visuals = ui.visuals_mut();
         for widget in [
             &mut visuals.widgets.inactive,
             &mut visuals.widgets.hovered,
             &mut visuals.widgets.active,
         ] {
-            widget.fg_stroke = Stroke::new(2.0, readable_on(widget.bg_fill));
+            // egui also uses the active foreground for bold labels. Keep it
+            // readable on the Settings surface and adjust bright icon fills.
+            if readable_on(widget.bg_fill) != foreground {
+                widget.bg_fill = settings_background;
+            }
+            widget.fg_stroke = Stroke::new(2.0, foreground);
         }
         apply_zone_style(
             ui,
@@ -4546,6 +4564,29 @@ impl ButtonsApp {
             });
         });
         ui.separator();
+        if self.settings_tab == SettingsTab::Themes {
+            ui.horizontal_wrapped(|ui| {
+                ui.selectable_value(
+                    &mut self.theme_settings_tab,
+                    ThemeSettingsTab::Library,
+                    "Library",
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    ui.selectable_value(
+                        &mut self.theme_settings_tab,
+                        ThemeSettingsTab::Edit,
+                        "Edit",
+                    );
+                    ui.selectable_value(
+                        &mut self.theme_settings_tab,
+                        ThemeSettingsTab::Generate,
+                        "Generate",
+                    );
+                }
+            });
+            ui.separator();
+        }
         let settings_bounds = ui.available_rect_before_wrap();
         let footer_height =
             ui.spacing().interact_size.y.max(
@@ -4554,7 +4595,7 @@ impl ButtonsApp {
                 + 4.0;
         let body_height = (ui.available_height() - footer_height).max(1.0);
         egui::ScrollArea::vertical()
-            .id_salt(("settings-body", self.settings_tab))
+            .id_salt(("settings-body", self.settings_tab, self.theme_settings_tab))
             .max_height(body_height)
             .auto_shrink([false, false])
             .show(ui, |ui| match self.settings_tab {
@@ -6811,6 +6852,16 @@ impl ButtonsApp {
     }
 
     fn theme_settings(&mut self, ui: &mut egui::Ui) {
+        match self.theme_settings_tab {
+            ThemeSettingsTab::Library => self.theme_library_settings(ui),
+            #[cfg(not(target_arch = "wasm32"))]
+            ThemeSettingsTab::Edit => self.personal_theme_editor(ui),
+            #[cfg(not(target_arch = "wasm32"))]
+            ThemeSettingsTab::Generate => self.theme_generator(ui),
+        }
+    }
+
+    fn theme_library_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
         ui.heading(crate::i18n::literal(&self.locale, "Theme Library"));
         ui.label(
@@ -6833,6 +6884,11 @@ impl ButtonsApp {
             ui.checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
             ui.checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        if ui.button("New from current theme").on_hover_text("Start an editable copy without switching the app or terminals to another saved theme.").clicked() {
+            self.start_personal_theme_draft();
+            self.theme_settings_tab = ThemeSettingsTab::Edit;
+        }
         #[cfg(not(target_arch = "wasm32"))]
         {
             use crate::i18n::{text, MessageKey};
@@ -7036,19 +7092,7 @@ impl ButtonsApp {
         let mut per_tab_theme = None;
         #[cfg(not(target_arch = "wasm32"))]
         let mut all_theme = None;
-        let browser_height = self
-            .preferences
-            .settings_layout
-            .section_heights
-            .get("themes")
-            .copied()
-            .unwrap_or(400.0)
-            .clamp(100.0, 1000.0);
-        egui::ScrollArea::vertical()
-            .id_salt("settings-themes")
-            .max_height(browser_height)
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
+        ui.scope(|ui| {
                 for (native, label) in [(true, "Native themes"), (false, "Legacy themes")] {
                 let group: Vec<_> = matches.iter().copied().filter(|&index| self.themes.all()[index].native_version.is_some() == native).collect();
                 if group.is_empty() { continue; }
@@ -7230,12 +7274,6 @@ impl ButtonsApp {
                 }
             });
 
-        settings_section_divider(
-            ui,
-            &mut self.preferences.settings_layout.section_heights,
-            "themes",
-            400.0,
-        );
         if let Some(id) = toggle_favorite {
             self.preferences.toggle_favorite_theme(&id);
         }
@@ -7249,45 +7287,6 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(id) = all_theme {
             self.set_theme_all(&id);
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let height = self
-                .preferences
-                .settings_layout
-                .section_heights
-                .get("theme-generator")
-                .copied()
-                .unwrap_or(180.0);
-            egui::ScrollArea::vertical()
-                .id_salt("theme-generator-section")
-                .max_height(height)
-                .auto_shrink([false, true])
-                .show(ui, |ui| self.theme_generator(ui));
-            settings_section_divider(
-                ui,
-                &mut self.preferences.settings_layout.section_heights,
-                "theme-generator",
-                180.0,
-            );
-            let height = self
-                .preferences
-                .settings_layout
-                .section_heights
-                .get("theme-editor")
-                .copied()
-                .unwrap_or(600.0);
-            egui::ScrollArea::vertical()
-                .id_salt("theme-editor-section")
-                .max_height(height)
-                .auto_shrink([false, true])
-                .show(ui, |ui| self.personal_theme_editor(ui));
-            settings_section_divider(
-                ui,
-                &mut self.preferences.settings_layout.section_heights,
-                "theme-editor",
-                600.0,
-            );
         }
     }
 
@@ -7485,7 +7484,7 @@ impl ButtonsApp {
 
         ui.horizontal_wrapped(|ui| {
             if ui
-                .button(crate::i18n::literal(&locale, "Save Variant"))
+                .button(crate::i18n::literal(&locale, "New variant"))
                 .clicked()
             {
                 self.start_personal_theme_draft();
@@ -7500,19 +7499,14 @@ impl ButtonsApp {
             );
         });
 
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::TextEdit::singleline(&mut self.theme_editor_import_path)
-                    .hint_text(crate::i18n::literal(&locale, "Path to a theme JSON file"))
-                    .desired_width(f32::INFINITY),
-            );
-            if ui
-                .button(crate::i18n::literal(&locale, "Import theme JSON"))
-                .clicked()
-            {
-                self.import_personal_theme_draft();
-            }
-        });
+        if theme_path_action(
+            ui,
+            &mut self.theme_editor_import_path,
+            &crate::i18n::literal(&locale, "Path to a theme JSON file"),
+            &crate::i18n::literal(&locale, "Import theme JSON"),
+        ) {
+            self.import_personal_theme_draft();
+        }
 
         let Some(mut document) = self.theme_editor_document.clone() else {
             if let Some(status) = &self.theme_editor_status {
@@ -7966,19 +7960,14 @@ impl ButtonsApp {
                 }
             }
         });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::TextEdit::singleline(&mut self.theme_editor_export_path)
-                    .hint_text(crate::i18n::literal(
-                        &locale,
-                        "Export path (choose a new .json file)",
-                    ))
-                    .desired_width(f32::INFINITY),
-            );
-            if ui.button(crate::i18n::literal(&locale, "Export")).clicked() {
-                self.export_personal_theme_draft();
-            }
-        });
+        if theme_path_action(
+            ui,
+            &mut self.theme_editor_export_path,
+            &crate::i18n::literal(&locale, "Export path (choose a new .json file)"),
+            &crate::i18n::literal(&locale, "Export"),
+        ) {
+            self.export_personal_theme_draft();
+        }
         if let Some(status) = &self.theme_editor_status {
             ui.label(status);
         }
@@ -8126,6 +8115,7 @@ impl ButtonsApp {
             "Generated theme loaded as a new draft. Saving creates a new file and will not replace an existing theme.",
         ));
         self.theme_generation_candidate = None;
+        self.theme_settings_tab = ThemeSettingsTab::Edit;
         self.theme_generation_message = Some(crate::i18n::literal(
             &self.locale,
             "Candidate opened in the custom theme editor. Use Save Current Theme to keep it.",
@@ -10446,6 +10436,63 @@ fn sync_zone(source: &FontZone, target: &mut FontZone) {
     target.size = size;
 }
 
+#[cfg(all(test, target_os = "windows"))]
+fn save_probe_screenshots(ctx: &egui::Context) {
+    ctx.input(|input| {
+        for event in &input.events {
+            if let egui::Event::Screenshot {
+                image, user_data, ..
+            } = event
+            {
+                if let Some(path) = user_data
+                    .data
+                    .as_ref()
+                    .and_then(|data| data.downcast_ref::<std::path::PathBuf>())
+                {
+                    let bytes: Vec<u8> = image
+                        .pixels
+                        .iter()
+                        .flat_map(|pixel| pixel.to_array())
+                        .collect();
+                    image::save_buffer_with_format(
+                        path,
+                        &bytes,
+                        image.width() as u32,
+                        image.height() as u32,
+                        image::ColorType::Rgba8,
+                        image::ImageFormat::Png,
+                    )
+                    .unwrap();
+                }
+            }
+        }
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_path_action(ui: &mut egui::Ui, path: &mut String, hint: &str, action: &str) -> bool {
+    ui.horizontal(|ui| {
+        let button_width = ui
+            .painter()
+            .layout_no_wrap(
+                action.to_owned(),
+                TextStyle::Button.resolve(ui.style()),
+                Color32::WHITE,
+            )
+            .size()
+            .x
+            + 2.0 * ui.spacing().button_padding.x;
+        let input_width =
+            (ui.available_width() - button_width - ui.spacing().item_spacing.x).max(80.0);
+        ui.add_sized(
+            [input_width, ui.spacing().interact_size.y],
+            egui::TextEdit::singleline(path).hint_text(hint),
+        );
+        ui.button(action).clicked()
+    })
+    .inner
+}
+
 fn readable_on(background: Color32) -> Color32 {
     // Pick the larger black/white contrast ratio using linear luminance.
     let linear = |channel: u8| {
@@ -10463,30 +10510,6 @@ fn readable_on(background: Color32) -> Color32 {
         Color32::BLACK
     } else {
         Color32::WHITE
-    }
-}
-
-fn settings_section_divider(
-    ui: &mut egui::Ui,
-    heights: &mut std::collections::BTreeMap<String, f32>,
-    key: &str,
-    default: f32,
-) {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::vec2(ui.available_width(), 12.0), egui::Sense::drag());
-    let response = response
-        .on_hover_cursor(egui::CursorIcon::ResizeVertical)
-        .on_hover_text("Drag to resize this section; its height is remembered.");
-    let color = if response.hovered() || response.dragged() {
-        ui.visuals().text_color()
-    } else {
-        ui.visuals().text_color().gamma_multiply(0.55)
-    };
-    ui.painter()
-        .hline(rect.x_range(), rect.center().y, Stroke::new(2.0, color));
-    if response.dragged() {
-        let height = heights.entry(key.to_owned()).or_insert(default);
-        *height = (*height + ui.input(|input| input.pointer.delta().y)).clamp(100.0, 1000.0);
     }
 }
 
@@ -12167,11 +12190,22 @@ mod tests {
                 input.events.append(&mut self.pending);
             }
             fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
                 let ready = self.step_at.elapsed() >= Duration::from_millis(150);
                 let mut events = Vec::new();
                 let result = (|| -> Result<(), String> {
-                    if self.started.elapsed() > Duration::from_secs(30) {
+                    if self.started.elapsed() > Duration::from_secs(85) {
                         return Err(format!("native probe timed out at step {}", self.step));
+                    }
+                    if matches!(self.step, 11 | 13 | 15 | 17) {
+                        let hold = std::env::var("BUTTONSCLI_NATIVE_PROBE_HOLD_SECS")
+                            .ok()
+                            .and_then(|value| value.parse::<u64>().ok())
+                            .unwrap_or(0)
+                            .min(12);
+                        if self.step_at.elapsed() < Duration::from_secs(hold) {
+                            return Ok(());
+                        }
                     }
                     if ready {
                         match self.step {
@@ -12269,11 +12303,29 @@ mod tests {
                                     return Err("detached Settings blocked terminal input".into());
                                 }
                                 self.app.settings_tab = SettingsTab::Providers;
+                                ctx.send_viewport_cmd_to(
+                                    egui::ViewportId::from_hash_of("buttonscli-settings"),
+                                    egui::ViewportCommand::Focus,
+                                );
                             }
                             11 => {
-                                self.app.settings_tab = SettingsTab::Themes;
+                                self.capture_workspace(ctx);
                             }
                             12 => {
+                                self.app.settings_tab = SettingsTab::Themes;
+                                self.app.theme_settings_tab = ThemeSettingsTab::Library;
+                            }
+                            13 => {}
+                            14 => {
+                                self.app.theme_settings_tab = ThemeSettingsTab::Edit;
+                                self.app.start_personal_theme_draft();
+                            }
+                            15 => {}
+                            16 => {
+                                self.app.theme_settings_tab = ThemeSettingsTab::Generate;
+                            }
+                            17 => {}
+                            18 => {
                                 println!("Native clipboard: right-click and automatic selection copy verified in the OS clipboard; detached Settings leaves the real terminal interactive.");
                                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                             }
@@ -12291,6 +12343,18 @@ mod tests {
                 self.pending.extend(events);
                 self.app.update(ctx, frame);
                 ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        impl Probe {
+            fn capture_workspace(&self, ctx: &egui::Context) {
+                if let Some(directory) = std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR") {
+                    let path = std::path::PathBuf::from(directory).join("workspace.png");
+                    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    ctx.send_viewport_cmd_to(
+                        egui::ViewportId::ROOT,
+                        egui::ViewportCommand::Screenshot(egui::UserData::new(path)),
+                    );
+                }
             }
         }
         let failure = std::sync::Arc::new(std::sync::Mutex::new(None));
@@ -12318,6 +12382,11 @@ mod tests {
                 show_sidebar: false, show_presets: false, ..Default::default()
             });
             app.show_localization_onboarding = false;
+            let fixture = std::env::temp_dir().join(format!("buttonscli-native-probe-{:032x}", fastrand::u128(..)));
+            std::fs::create_dir_all(&fixture).unwrap();
+            std::fs::write(fixture.join("feature-flags.json"), br#"{"enable_all":true}"#).unwrap();
+            crate::features::local::initialize(&fixture);
+            app.native_store = Some(NativeStore::open(crate::storage::paths::NativeDataRoot(fixture), std::env::temp_dir().join("buttonscli-probe-no-legacy")).unwrap());
             fonts::install(&cc.egui_ctx, &app.font_catalog);
             app.apply_style(&cc.egui_ctx);
             app.open_tab(cc.egui_ctx.clone());

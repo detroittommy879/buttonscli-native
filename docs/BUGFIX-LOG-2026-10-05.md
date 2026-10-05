@@ -37,4 +37,23 @@
   ignored by default. Native clipboard/Settings and three-ConPTY interaction
   probes pass explicitly. Existing incremental-cache/PDB warnings are nonfatal.
 - The exact transient three-theme view and hours-long state are not reproduced.
-  Subtabs, native captures, optimized build and final checks follow separately.
+- Separate layout experiment: Library / Edit / Generate subtabs use one ordinary
+  page scrollbar and retain independent positions. Removed the stacked resize
+  rules; old section-height profile data remains compatible. New from current
+  theme opens a draft without applying another theme; renamed Save Variant to
+  New variant to distinguish creating a draft from writing a file.
+- Native captures found import/export fields pushed their buttons outside the
+  window; reserved action width. Contrast changes initially darkened bold labels
+  because egui shares the active foreground; corrected foreground/fill contrast.
+  Final Edit capture shows padding, readable checks and the entire import action.
+- App screenshot events capture the root viewport; immediate child Settings
+  captures were unavailable through that path. Used read-only Computer Use for
+  actual Settings captures. A linker retry succeeded after the owned test window
+  exited; do not rebuild a running test executable.
+- Final checks: 251 library tests pass, 12 optional tests ignored by default;
+  two import fixtures and explicit native clipboard/Settings and three-ConPTY
+  probes pass. Strict native and WASM Clippy and optimized Windows build pass.
+  These checks do not certify a multi-hour soak or macOS/Linux runtime behavior.
+- Generated two dark Settings concepts with built-in ImageGen, saved exact prompts
+  and both images under `docs/design/settings-concepts-2026-10-05/`. Larger
+  appearance-preset/default-slot/provider changes remain proposals in the plan.
