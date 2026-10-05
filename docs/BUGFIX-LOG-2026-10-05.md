@@ -57,3 +57,8 @@
 - Generated two dark Settings concepts with built-in ImageGen, saved exact prompts
   and both images under `docs/design/settings-concepts-2026-10-05/`. Larger
   appearance-preset/default-slot/provider changes remain proposals in the plan.
+- Optimized native clipboard/Settings probe also passes (3.55 seconds). Actual
+  Edit/Providers captures are saved beside the concepts and labeled separately.
+  Rollback boundaries: `114dccd` plan, `54bec71` core bug fixes, `6a986cc` subtab
+  experiment, `6642a52` mockups/proposals. Reverting the subtab commit preserves
+  the core terminal fixes; later documentation may need context resolution.

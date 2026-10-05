@@ -17,6 +17,8 @@ are labeled by date in the sections below.
 - Strict native/WASM Clippy and optimized Windows build pass. Existing
   incremental-cache and bin/lib PDB diagnostics are nonfatal. No legacy profile
   is edited. Local user `.aicp/` and Abyssal Bloom assets remain unstaged.
+- The optimized native clipboard/Settings probe also passes: exact OS clipboard
+  content for both copy modes and main-terminal typing with detached Settings.
 - The hours-long freeze and transient three-theme state are not reproduced;
   the identified detached-window input lock and catalog visibility are addressed.
   Larger mixed-workspace save/default-slot/provider changes are documented

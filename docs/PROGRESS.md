@@ -17,6 +17,7 @@ native/WASM Clippy and optimized Windows build pass. The transient three-theme
 state and hours-long freeze were not reproduced. See the concise
 [run log](BUGFIX-LOG-2026-10-05.md), [proposal](SETTINGS-UX-PLAN.md) and generated
 concepts; appearance presets, slot defaults and provider redesign are proposals.
+The same native clipboard/Settings probe also passes in the optimized build.
 
 ## 2026-10-04 — Settings, theme drafts, clipboard and readability
 
