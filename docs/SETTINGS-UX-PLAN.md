@@ -22,6 +22,10 @@
    preset** represents this mixed workspace. Keep both concepts explicit. Saving
    opens a naming dialog; Apply and Replace are separate actions. An appearance
    preset stores stable pane slots rather than transient process/session IDs.
+   Snapshot resolved colors, effects, fonts and divider/chrome overrides, not
+   only theme names; later edits to a source theme must not change the preset.
+   Keep source IDs as provenance. This is the recommended way to save the
+   exact mixed appearance currently on screen.
 2. **Edit** should have a persistent draft, an explicit source, Save as new,
    Replace saved theme and Cancel. Loading a saved document should not apply it
    to terminals unless Preview or automatic preview is enabled. Warn before
@@ -30,8 +34,9 @@
 3. **Defaults**, saved per native profile: optional numbered terminal slots with
    theme and font dropdowns. Label slots as first/second/third terminal added,
    not visual tab order. Reordering tabs must not change defaults. Unconfigured
-   slots use a fallback. With slot defaults disabled, use the last terminal's
-   appearance; with no terminal yet, use the profile's first-terminal default.
+   slots use a fallback. With slot defaults disabled, inherit the currently
+   focused terminal's theme and font; with no terminal yet, use the profile's
+   first-terminal default.
    Decide separately whether restarting restores a workspace or creates fresh
    terminals. Existing terminals are only changed by an explicit Apply action.
 4. **AI Providers**: a provider list beside one selected provider's form. Group
@@ -50,6 +55,26 @@ optional for a solo developer. Image mockups explore appearance, while a small
 runnable prototype checks scrolling, resizing, focus and keyboard behavior. Keep
 one spacing scale and a short shared component checklist across your apps.
 
+Start with a few shared controls (button, field, checkbox, section header) and
+an 8-point spacing scale. Review one laptop-size screen plus empty/error/editing
+states before extending it to other apps. Figma's
+[auto layout](https://help.figma.com/hc/en-us/articles/360040451373-Guide-to-auto-layout-in-Figma)
+and [reusable components](https://help.figma.com/hc/en-us/articles/39635555294743-Components-collection-Components-fundamentals)
+help maintain that consistency; a coded prototype still validates real focus,
+scrolling and platform behavior.
+
+Example Defaults form, proposed only:
+
+| Terminal added | Theme | Font |
+| --- | --- | --- |
+| First | Abyssal Bloom | Use theme font |
+| Second | Midnight | JetBrains Mono |
+| Third | Aurora | Use theme font |
+| Later terminals | Inherit focused terminal | Inherit focused terminal |
+
+One toggle enables these per-profile slot rules. Changing them affects newly
+added terminals; applying them to the current workspace is a separate action.
+
 ## Checks before keeping the experiment
 
 - At 720×520 and a normal laptop size, tabs and the Keep/Revert footer fit.
@@ -63,5 +88,15 @@ one spacing scale and a short shared component checklist across your apps.
   in `~/.buttonscli-native/profiles/<active-profile>/themes/`; `assets/themes/`
   is embedded at build time and needs a rebuild.
 
-Generated mockups and the run log will be linked here after verification. Larger
-appearance-preset/default-slot/provider changes remain proposals for the user.
+## Mockups and actual captures
+
+- [Themes / appearance concept](design/settings-concepts-2026-10-05/themes-appearance.png)
+- [AI Providers concept](design/settings-concepts-2026-10-05/ai-providers.png)
+- [Exact ImageGen prompt set](design/settings-concepts-2026-10-05/PROMPTS.md)
+- [Implemented Edit subtab capture](design/settings-concepts-2026-10-05/current-settings-edit.png)
+- [Current Providers capture](design/settings-concepts-2026-10-05/current-settings-providers.png)
+- [Run log and verification limits](BUGFIX-LOG-2026-10-05.md)
+
+Concepts propose a left navigation rail, different save actions and provider
+grouping. They are not screenshots of shipped functionality. Only the scoped
+bug fixes and Library / Edit / Generate experiment are implemented in this run.
