@@ -979,7 +979,10 @@ mod tests {
     fn every_bundled_json_theme_loads() {
         let catalog = ThemeCatalog::load();
         assert_eq!(catalog.bundle_count(), BUNDLED_THEME_JSON.len());
-        assert_eq!(BUNDLED_THEME_JSON.len(), 127);
+        assert!(
+            BUNDLED_THEME_JSON.len() >= 127,
+            "retain the original bundle when adding themes"
+        );
     }
 
     #[test]
@@ -996,8 +999,16 @@ mod tests {
     #[test]
     fn complete_legacy_catalog_is_present() {
         let catalog = ThemeCatalog::load();
-        assert_eq!(catalog.legacy_count(), 555);
-        assert_eq!(catalog.all().len(), 559);
+        let legacy_code: Vec<Value> = serde_json::from_str(LEGACY_CODE_THEMES_JSON).unwrap();
+        assert_eq!(legacy_code.len(), 428);
+        assert_eq!(
+            catalog.legacy_count(),
+            BUNDLED_THEME_JSON.len() + legacy_code.len()
+        );
+        assert_eq!(
+            catalog.all().len(),
+            native_themes().len() + catalog.legacy_count()
+        );
         assert_eq!(catalog.get("v4-zenburn").name, "v4-Zenburn");
     }
 
@@ -1201,11 +1212,13 @@ mod tests {
         fs::write(themes.join("second.json"), second).unwrap();
         fs::write(themes.join("broken.json"), "{bad").unwrap();
         let mut catalog = ThemeCatalog::load();
+        let base_count = catalog.all().len();
+        let legacy_count = catalog.legacy_count();
         let warnings = catalog.load_personal("Work_Space", &profile);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("broken.json"));
-        assert_eq!(catalog.legacy_count(), 555);
-        assert_eq!(catalog.all().len(), 561);
+        assert_eq!(catalog.legacy_count(), legacy_count);
+        assert_eq!(catalog.all().len(), base_count + 2);
         assert_eq!(catalog.get("basic2").source, ThemeSource::LegacyBundle);
         assert_eq!(
             catalog.get("personal:Work_Space:first").source,
@@ -1235,7 +1248,7 @@ mod tests {
         let other_profile = profile.join("other");
         fs::create_dir(&other_profile).unwrap();
         assert!(catalog.load_personal("Other", &other_profile).is_empty());
-        assert_eq!(catalog.all().len(), 559);
+        assert_eq!(catalog.all().len(), base_count);
         assert!(catalog
             .personal_document("personal:Work_Space:first")
             .is_none());

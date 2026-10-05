@@ -697,6 +697,7 @@ dependencies = [
  "ab_glyph",
  "aes-gcm",
  "anyhow",
+ "arboard",
  "argon2",
  "axum",
  "base64 0.22.1",
@@ -725,6 +726,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.61.2",
+ "winit",
  "zeroize",
  "zip",
 ]

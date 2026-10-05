@@ -15,4 +15,26 @@
 - Native Computer Use inventory currently finds no ButtonsCLI window. Use an
   isolated, app-owned test fixture for runtime checks; preserve normal profiles.
 
-Implementation, verification and limitations will be appended as work proceeds.
+- Fixed detached Settings input blocking; shortcut recording is scoped to the
+  Settings viewport. The selected Settings button reveals its existing window.
+- Native clipboard probe exposed a second real bug: nested status-bar wrapping
+  consumed all terminal height at 1000-point width. Flattened wrapping and kept
+  the favorites group compact. The real terminal now retains its height.
+- Right-click and automatic selection copy now pass a native eframe/Windows OS
+  clipboard probe; a main-window click and text input work with Settings open.
+  The fixture restores the prior text clipboard and cleans up its own shell.
+- Added selection edge scrolling (20 ticks/sec, bounded speed), stationary-wheel
+  selection updates and release cleanup. The explicit three-ConPTY check passes
+  in both scroll directions, including copy on release outside the pane.
+- Added Settings padding and contrasting 2-point checkmarks; scrollbar contrast
+  uses foreground color, avoiding the previous checkbox-background override.
+- Theme browser shows filtered/total counts, Show all, active theme folder,
+  Reload personal themes and malformed-file warnings. Updated catalog tests to
+  accept extra assets while preserving all 127 original themes and 428 code
+  themes. Abyssal Bloom parses and is included by a rebuild; its legacy GLSL
+  shader remains inert, as the app already documents.
+- Validation so far: 251 library tests and two fixtures pass; 12 optional tests
+  ignored by default. Native clipboard/Settings and three-ConPTY interaction
+  probes pass explicitly. Existing incremental-cache/PDB warnings are nonfatal.
+- The exact transient three-theme view and hours-long state are not reproduced.
+  Subtabs, native captures, optimized build and final checks follow separately.

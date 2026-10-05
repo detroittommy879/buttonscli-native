@@ -2,6 +2,9 @@
 
 Settings tabs wrap onto additional rows. The native Settings window remembers
 its size and screen position when closed, including the title-bar close button.
+Detached Settings leaves the main terminal interactive. Its selected status-bar
+button brings the existing window to the front, including from a minimized state.
+The embedded/web Settings fallback and true dialogs still own terminal input.
 Drag the horizontal rules below the theme list, generator and editor to resize
 those sections; their heights are stored in the native profile. Revert restores
 settings values while retaining window geometry and section heights.
@@ -22,6 +25,9 @@ Settings → Keyboard controls these behaviors:
   reserved for the terminal interrupt. Settings → Shortcuts supports custom chords.
 - Right-click copy is enabled by default; automatic copy on mouse selection is
   optional and disabled by default.
+- While dragging a selection, scroll the wheel or hold the pointer near/past
+  the terminal's top or bottom edge to extend it through retained scrollback.
+  Releasing outside the pane ends scrolling and supports automatic copy.
 - Bracketed paste is enabled by default and used only when the terminal
   application requests it. The paste envelope strips embedded Escape characters;
   ordinary shell pastes normalize line endings. Paste delivery does not depend

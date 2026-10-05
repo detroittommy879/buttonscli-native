@@ -308,6 +308,8 @@ pub struct ButtonsApp {
     locale: String,
     show_localization_onboarding: bool,
     themes: ThemeCatalog,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_load_warnings: Vec<String>,
     font_catalog: fonts::FontCatalog,
     theme_search: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -357,6 +359,7 @@ pub struct ButtonsApp {
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
+    settings_embedded: bool,
     #[cfg(not(target_arch = "wasm32"))]
     show_guides: bool,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1015,10 +1018,10 @@ impl ButtonsApp {
             app.import_offer = app.native_revision.is_none()
                 && production_roots().is_ok_and(|(_, legacy)| legacy.0.exists());
             if let Some(store) = &app.native_store {
-                for warning in app
+                app.theme_load_warnings = app
                     .themes
-                    .load_personal(store.profile_name(), &store.profile_dir())
-                {
+                    .load_personal(store.profile_name(), &store.profile_dir());
+                for warning in &app.theme_load_warnings {
                     log::warn!("personal theme: {warning}");
                 }
             }
@@ -1079,6 +1082,8 @@ impl ButtonsApp {
             locale,
             show_localization_onboarding,
             themes: ThemeCatalog::load(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_load_warnings: Vec::new(),
             font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1128,6 +1133,7 @@ impl ButtonsApp {
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
+            settings_embedded: cfg!(target_arch = "wasm32"),
             #[cfg(not(target_arch = "wasm32"))]
             show_guides: false,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2585,7 +2591,7 @@ impl ButtonsApp {
         let theme = self.terminal_presentation();
         let divider_style =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
-        let modal_open = self.show_settings
+        let modal_open = (self.show_settings && self.settings_embedded)
             || self.terminal_reader.is_some()
             || self.show_about
             || self.show_preset_editor
@@ -4114,7 +4120,7 @@ impl ButtonsApp {
                             .map(|theme| (theme.id.clone(), theme.name.clone())).collect();
                         let current = self.preferences.theme_id.clone();
                         let mut action = None;
-                        ui.scope(|ui| {
+                        ui.horizontal(|ui| {
                             ui.menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
@@ -4195,7 +4201,6 @@ impl ButtonsApp {
                         .clicked() {
                         self.show_all_auto_tiles();
                     }
-                    ui.horizontal_wrapped(|ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.control_server.is_some()
                             && ui
@@ -4221,8 +4226,11 @@ impl ButtonsApp {
                         if ui.small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
                             self.open_ai_help();
                         }
-                        if ui.small_button(crate::i18n::literal(&self.locale, "Settings")).clicked() {
-                            self.show_settings = true;
+                        if ui.add(egui::Button::new(crate::i18n::literal(&self.locale, "Settings"))
+                            .small().selected(self.show_settings))
+                            .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
+                            .clicked() {
+                            self.open_settings(ctx);
                         }
                         #[cfg(not(target_arch = "wasm32"))]
                         {
@@ -4278,7 +4286,6 @@ impl ButtonsApp {
                                 self.zoom_focused_terminal(crate::dock::ZoomAction::Reset);
                             }
                         }
-                    });
                 });
             });
     }
@@ -4321,6 +4328,21 @@ impl ButtonsApp {
         }
     }
 
+    fn open_settings(&mut self, ctx: &egui::Context) {
+        self.show_settings = true;
+        if !self.settings_embedded {
+            let id = egui::ViewportId::from_hash_of("buttonscli-settings");
+            ctx.send_viewport_cmd_to(id, egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd_to(id, egui::ViewportCommand::Focus);
+        }
+    }
+
+    fn settings_owns_input(&self, ctx: &egui::Context) -> bool {
+        self.show_settings
+            && (self.settings_embedded
+                || ctx.viewport_id() == egui::ViewportId::from_hash_of("buttonscli-settings"))
+    }
+
     fn settings_window(&mut self, ctx: &egui::Context) {
         if !self.show_settings {
             return;
@@ -4345,6 +4367,7 @@ impl ButtonsApp {
             egui::ViewportId::from_hash_of("buttonscli-settings"),
             builder,
             |child_ctx, class| {
+                self.settings_embedded = class == egui::ViewportClass::Embedded;
                 self.apply_style(child_ctx);
                 if class != egui::ViewportClass::Embedded {
                     child_ctx.input(|input| {
@@ -4396,6 +4419,7 @@ impl ButtonsApp {
                         .frame(
                             egui::Frame::new()
                                 .fill(settings_colors.settings_background)
+                                .inner_margin(18.0)
                                 .stroke(Stroke::new(1.0_f32, settings_colors.accent_alt)),
                         )
                         .show(child_ctx, |ui| {
@@ -4445,17 +4469,16 @@ impl ButtonsApp {
         close_action: &mut Option<SettingsCloseAction>,
     ) {
         ui.spacing_mut().scroll = settings_scroll_style();
-        let contrast = if self.colors().settings_background.r() as u16
-            + self.colors().settings_background.g() as u16
-            + self.colors().settings_background.b() as u16
-            > 384
-        {
-            Color32::BLACK
-        } else {
-            Color32::WHITE
-        };
-        ui.visuals_mut().widgets.inactive.bg_fill = contrast.gamma_multiply(0.55);
-        ui.visuals_mut().widgets.hovered.bg_fill = contrast.gamma_multiply(0.75);
+        // Scrollbars use foreground color, so improving their contrast no
+        // longer washes out checkbox backgrounds and their checkmarks.
+        let visuals = ui.visuals_mut();
+        for widget in [
+            &mut visuals.widgets.inactive,
+            &mut visuals.widgets.hovered,
+            &mut visuals.widgets.active,
+        ] {
+            widget.fg_stroke = Stroke::new(2.0, readable_on(widget.bg_fill));
+        }
         apply_zone_style(
             ui,
             &self.font_catalog,
@@ -6962,11 +6985,51 @@ impl ButtonsApp {
             &self.preferences.favorite_theme_ids,
         );
         ui.label(
-            RichText::new(format!("{} results", matches.len()))
-                .small()
-                .color(colors.muted),
+            RichText::new(format!(
+                "Showing {} of {} themes",
+                matches.len(),
+                self.themes.all().len()
+            ))
+            .small()
+            .color(colors.muted),
         );
 
+        ui.horizontal_wrapped(|ui| {
+            if matches.len() != self.themes.all().len() && ui.button("Show all themes").clicked() {
+                self.theme_search.clear();
+                self.preferences.theme_browser_collection = crate::theme_browser::ThemeCollection::All;
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if ui.button("Reload personal themes").on_hover_text("Reload JSON files from the active native profile. Bundled assets require a rebuild.").clicked() {
+                self.restore_personal_theme_preview();
+                self.reload_personal_themes();
+            }
+        });
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Some(store) = &self.native_store {
+                ui.label(
+                    RichText::new(format!(
+                        "Personal theme folder: {}",
+                        store.profile_dir().join("themes").display()
+                    ))
+                    .small()
+                    .color(colors.muted),
+                );
+            }
+            if !self.theme_load_warnings.is_empty() {
+                egui::CollapsingHeader::new(format!(
+                    "{} theme files could not be loaded",
+                    self.theme_load_warnings.len()
+                ))
+                .default_open(true)
+                .show(ui, |ui| {
+                    for warning in &self.theme_load_warnings {
+                        ui.colored_label(colors.warning, warning);
+                    }
+                });
+            }
+        }
         let mut apply = None;
         let mut toggle_favorite = None;
         #[cfg(not(target_arch = "wasm32"))]
@@ -8155,7 +8218,8 @@ impl ButtonsApp {
         else {
             return;
         };
-        for warning in self.themes.load_personal(&profile, &profile_dir) {
+        self.theme_load_warnings = self.themes.load_personal(&profile, &profile_dir);
+        for warning in &self.theme_load_warnings {
             log::warn!("personal theme: {warning}");
         }
     }
@@ -10222,7 +10286,7 @@ impl ButtonsApp {
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if !self.show_settings
+        if !self.settings_owns_input(ctx)
             && self.terminal_reader.is_none()
             && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F6))
         {
@@ -10246,51 +10310,56 @@ impl ButtonsApp {
         });
 
         if let Some(action) = self.shortcut_capture {
-            if !self.show_settings {
-                self.shortcut_capture = None;
-                self.shortcut_feedback = Some(ShortcutFeedback::Cancelled);
-                return;
-            }
-            if let Some((egui::Key::Escape, modifiers)) = pressed {
-                if !modifiers.command && !modifiers.ctrl && !modifiers.alt && !modifiers.shift {
+            if self.show_settings && !self.settings_owns_input(ctx) {
+                // Recording a shortcut in the child window must not consume
+                // keys typed into the main terminal.
+            } else {
+                if !self.show_settings {
                     self.shortcut_capture = None;
                     self.shortcut_feedback = Some(ShortcutFeedback::Cancelled);
                     return;
                 }
-            }
-            if let Some((key, modifiers)) = pressed {
-                let Some(chord) = ShortcutChord::from_input(key, modifiers) else {
-                    self.shortcut_feedback = Some(ShortcutFeedback::Invalid);
-                    return;
-                };
-                if !chord.is_valid() {
-                    self.shortcut_feedback = Some(ShortcutFeedback::ModifierRequired);
-                    return;
-                }
-                match self.preferences.shortcuts.assign(action, chord) {
-                    Ok(()) => {
+                if let Some((egui::Key::Escape, modifiers)) = pressed {
+                    if !modifiers.command && !modifiers.ctrl && !modifiers.alt && !modifiers.shift {
                         self.shortcut_capture = None;
-                        self.shortcut_feedback = Some(ShortcutFeedback::Saved);
-                    }
-                    Err(ShortcutAssignError::Invalid) => {
-                        self.shortcut_feedback = Some(ShortcutFeedback::Invalid)
-                    }
-                    Err(ShortcutAssignError::ReservedTerminalInterrupt) => {
-                        self.shortcut_feedback = Some(ShortcutFeedback::UnsafeInterrupt)
-                    }
-                    Err(ShortcutAssignError::Conflict(other)) => {
-                        self.shortcut_feedback = Some(ShortcutFeedback::Conflict(other))
-                    }
-                    Err(ShortcutAssignError::UnknownConflict) => {
-                        self.shortcut_feedback = Some(ShortcutFeedback::UnknownConflict)
+                        self.shortcut_feedback = Some(ShortcutFeedback::Cancelled);
+                        return;
                     }
                 }
+                if let Some((key, modifiers)) = pressed {
+                    let Some(chord) = ShortcutChord::from_input(key, modifiers) else {
+                        self.shortcut_feedback = Some(ShortcutFeedback::Invalid);
+                        return;
+                    };
+                    if !chord.is_valid() {
+                        self.shortcut_feedback = Some(ShortcutFeedback::ModifierRequired);
+                        return;
+                    }
+                    match self.preferences.shortcuts.assign(action, chord) {
+                        Ok(()) => {
+                            self.shortcut_capture = None;
+                            self.shortcut_feedback = Some(ShortcutFeedback::Saved);
+                        }
+                        Err(ShortcutAssignError::Invalid) => {
+                            self.shortcut_feedback = Some(ShortcutFeedback::Invalid)
+                        }
+                        Err(ShortcutAssignError::ReservedTerminalInterrupt) => {
+                            self.shortcut_feedback = Some(ShortcutFeedback::UnsafeInterrupt)
+                        }
+                        Err(ShortcutAssignError::Conflict(other)) => {
+                            self.shortcut_feedback = Some(ShortcutFeedback::Conflict(other))
+                        }
+                        Err(ShortcutAssignError::UnknownConflict) => {
+                            self.shortcut_feedback = Some(ShortcutFeedback::UnknownConflict)
+                        }
+                    }
+                }
+                return;
             }
-            return;
         }
 
         // Do not trigger app commands while Settings and its text fields own input.
-        if self.show_settings || self.show_preset_editor {
+        if self.settings_owns_input(ctx) || self.show_preset_editor {
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -10358,13 +10427,13 @@ impl ButtonsApp {
         }
         #[cfg(target_arch = "wasm32")]
         match action {
-            ShortcutAction::OpenSettings => self.show_settings = true,
+            ShortcutAction::OpenSettings => self.open_settings(ctx),
             ShortcutAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
             _ => {}
         }
         #[cfg(not(target_arch = "wasm32"))]
         match action {
-            ShortcutAction::OpenSettings => self.show_settings = true,
+            ShortcutAction::OpenSettings => self.open_settings(ctx),
             ShortcutAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
             _ => {}
         }
@@ -10375,6 +10444,26 @@ fn sync_zone(source: &FontZone, target: &mut FontZone) {
     let size = target.size;
     *target = source.clone();
     target.size = size;
+}
+
+fn readable_on(background: Color32) -> Color32 {
+    // Pick the larger black/white contrast ratio using linear luminance.
+    let linear = |channel: u8| {
+        let value = channel as f32 / 255.0;
+        if value <= 0.04045 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let luminance = 0.2126 * linear(background.r())
+        + 0.7152 * linear(background.g())
+        + 0.0722 * linear(background.b());
+    if luminance > 0.179 {
+        Color32::BLACK
+    } else {
+        Color32::WHITE
+    }
 }
 
 fn settings_section_divider(
@@ -10403,6 +10492,7 @@ fn settings_section_divider(
 
 fn settings_scroll_style() -> egui::style::ScrollStyle {
     egui::style::ScrollStyle {
+        foreground_color: true,
         bar_width: 18.0,
         handle_min_length: 48.0,
         bar_inner_margin: 8.0,
@@ -12042,6 +12132,205 @@ impl eframe::App for ButtonsApp {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "opens test-owned native windows and temporarily uses the OS text clipboard"]
+    fn native_clipboard_and_detached_settings_probe() {
+        use std::time::Instant;
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter("egui_winit=warn,eframe=warn")
+            .try_init();
+        struct Probe {
+            app: ButtonsApp,
+            clipboard: arboard::Clipboard,
+            saved_clipboard: Option<String>,
+            started: Instant,
+            step_at: Instant,
+            step: usize,
+            pointer: egui::Pos2,
+            expected: String,
+            pending: Vec<egui::Event>,
+            failure: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+        }
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                if let Some(text) = self.saved_clipboard.take() {
+                    let _ = self.clipboard.set_text(text);
+                }
+                while !self.app.tabs.is_empty() {
+                    self.app.close_tab(0);
+                }
+            }
+        }
+        impl eframe::App for Probe {
+            fn raw_input_hook(&mut self, _ctx: &egui::Context, input: &mut egui::RawInput) {
+                input.events.append(&mut self.pending);
+            }
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                let ready = self.step_at.elapsed() >= Duration::from_millis(150);
+                let mut events = Vec::new();
+                let result = (|| -> Result<(), String> {
+                    if self.started.elapsed() > Duration::from_secs(30) {
+                        return Err(format!("native probe timed out at step {}", self.step));
+                    }
+                    if ready {
+                        match self.step {
+                            0 => {
+                                if !self.app.tabs[0]
+                                    .backend
+                                    .plain_text_tail(2000)
+                                    .contains("CLIPBOARD-PROBE-200")
+                                {
+                                    return Ok(());
+                                }
+                                self.app.tabs[0].backend.select_all();
+                                self.expected = self.app.tabs[0].backend.selectable_content();
+                                if self.expected.is_empty() {
+                                    return Err("fixture has no selection".into());
+                                }
+                                self.pointer = egui::pos2(30.0, 240.0);
+                                events.push(egui::Event::PointerMoved(self.pointer));
+                            }
+                            1 => events.extend(pointer_events(
+                                self.pointer,
+                                egui::PointerButton::Secondary,
+                                true,
+                            )),
+                            2 => events.extend(pointer_events(
+                                self.pointer,
+                                egui::PointerButton::Secondary,
+                                false,
+                            )),
+                            3 => {
+                                if self.clipboard.get_text().ok().as_deref()
+                                    != Some(self.expected.as_str())
+                                {
+                                    return Err("right-click did not reach the OS clipboard".into());
+                                }
+                                self.clipboard
+                                    .set_text("probe-sentinel")
+                                    .map_err(|e| e.to_string())?;
+                                self.app.preferences.keyboard.copy_on_selection = true;
+                                events.extend(pointer_events(
+                                    self.pointer,
+                                    egui::PointerButton::Primary,
+                                    true,
+                                ));
+                            }
+                            4 => {
+                                self.pointer.x += 100.0;
+                                events.push(egui::Event::PointerMoved(self.pointer));
+                            }
+                            5 => {
+                                self.expected = self.app.tabs[0].backend.selectable_content();
+                                if self.expected.trim().is_empty() {
+                                    return Err("mouse selection is empty".into());
+                                }
+                                events.extend(pointer_events(
+                                    self.pointer,
+                                    egui::PointerButton::Primary,
+                                    false,
+                                ));
+                            }
+                            6 => {
+                                if self.clipboard.get_text().ok().as_deref()
+                                    != Some(self.expected.as_str())
+                                {
+                                    return Err(
+                                        "automatic selection copy did not reach the OS clipboard"
+                                            .into(),
+                                    );
+                                }
+                                self.app.open_settings(ctx);
+                            }
+                            7 => {
+                                if self.app.settings_embedded {
+                                    return Err(
+                                        "Settings did not open as a detached viewport".into()
+                                    );
+                                }
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                                events.extend(pointer_events(
+                                    self.pointer,
+                                    egui::PointerButton::Primary,
+                                    true,
+                                ));
+                            }
+                            8 => events.extend(pointer_events(
+                                self.pointer,
+                                egui::PointerButton::Primary,
+                                false,
+                            )),
+                            9 => events.push(egui::Event::Text("settings-open-input".into())),
+                            10 => {
+                                if self.app.tabs[0].output.snapshot().last_input
+                                    != "settings-open-input"
+                                {
+                                    return Err("detached Settings blocked terminal input".into());
+                                }
+                                self.app.settings_tab = SettingsTab::Providers;
+                            }
+                            11 => {
+                                self.app.settings_tab = SettingsTab::Themes;
+                            }
+                            12 => {
+                                println!("Native clipboard: right-click and automatic selection copy verified in the OS clipboard; detached Settings leaves the real terminal interactive.");
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                            _ => return Ok(()),
+                        }
+                        self.step += 1;
+                        self.step_at = Instant::now();
+                    }
+                    Ok(())
+                })();
+                if let Err(error) = result {
+                    *self.failure.lock().unwrap() = Some(error);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                self.pending.extend(events);
+                self.app.update(ctx, frame);
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let failure = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let report = failure.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title("ButtonsCLI native interaction probe")
+                .with_inner_size([1000.0, 760.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI native interaction probe", options, Box::new(move |cc| {
+            let mut clipboard = arboard::Clipboard::new().unwrap();
+            let saved_clipboard = clipboard.get_text().ok();
+            let mut app = ButtonsApp::empty(Preferences {
+                default_shell_id: "probe".into(),
+                custom_shell_profiles: vec![ShellProfile { id: "probe".into(), label: "Probe".into(),
+                    command: "powershell.exe -NoLogo -NoProfile -Command \"1..200 | ForEach-Object { Write-Output ('CLIPBOARD-PROBE-{0:D3}' -f $_) }; Start-Sleep -Seconds 35\"".into(),
+                    working_directory: String::new() }],
+                show_sidebar: false, show_presets: false, ..Default::default()
+            });
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            app.open_tab(cc.egui_ctx.clone());
+            Ok(Box::new(Probe { app, clipboard, saved_clipboard, started: Instant::now(), step_at: Instant::now(), step: 0,
+                pointer: egui::Pos2::ZERO, expected: String::new(), pending: Vec::new(), failure: report }))
+        })).unwrap();
+        assert!(
+            failure.lock().unwrap().is_none(),
+            "{}",
+            failure.lock().unwrap().as_deref().unwrap_or("")
+        );
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn pane_fonts_follow_distinct_theme_fonts_and_allow_manual_override() {
@@ -12906,6 +13195,10 @@ mod tests {
             .collect();
         tracks.sort_by(|a, b| a.left().total_cmp(&b.left()));
         assert_eq!(tracks.len(), 3, "each pane has its own visible scrollbar");
+        // A detached Settings viewport must not disable any pane's input.
+        app.show_settings = true;
+        app.settings_embedded = false;
+        app.preferences.keyboard.copy_on_selection = true;
         let mut selections = Vec::new();
         for (index, track) in tracks.iter().enumerate() {
             // Start a drag in an unfocused pane, without a preliminary click.
@@ -13048,6 +13341,77 @@ mod tests {
             app.tabs[2].backend.selectable_content(),
             multiline,
             "release outside ends the drag"
+        );
+        // Extend selection beyond the visible page, including while the mouse
+        // stays still and while the wheel scrolls during a drag.
+        app.tabs[2]
+            .backend
+            .process_command(BackendCommand::Scroll(60));
+        render(app, &ctx, vec![]);
+        let edge_start = egui::pos2(tracks[1].center().x + 35.0, tracks[2].top() + 80.0);
+        let edge_bottom = egui::pos2(edge_start.x + 45.0, tracks[2].bottom() + 30.0);
+        render(app, &ctx, vec![egui::Event::PointerMoved(edge_start)]);
+        render(
+            app,
+            &ctx,
+            pointer_events(edge_start, egui::PointerButton::Primary, true),
+        );
+        let initial_offset = app.tabs[2].backend.scrollback_state().display_offset;
+        render(app, &ctx, vec![egui::Event::PointerMoved(edge_bottom)]);
+        let first_offset = app.tabs[2].backend.scrollback_state().display_offset;
+        assert!(
+            first_offset < initial_offset,
+            "dragging past the bottom scrolls toward newer lines"
+        );
+        for _ in 0..10 {
+            render(app, &ctx, vec![]);
+        }
+        let later_offset = app.tabs[2].backend.scrollback_state().display_offset;
+        assert!(
+            later_offset < first_offset,
+            "edge scrolling continues with a stationary pointer"
+        );
+        let before_wheel = app.tabs[2].backend.selectable_content();
+        render(
+            app,
+            &ctx,
+            vec![egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Line,
+                delta: egui::vec2(0.0, 12.0),
+                modifiers: egui::Modifiers::NONE,
+            }],
+        );
+        assert!(app.tabs[2].backend.scrollback_state().display_offset > later_offset);
+        assert_ne!(
+            app.tabs[2].backend.selectable_content(),
+            before_wheel,
+            "wheel scrolling extends selection without moving the pointer"
+        );
+        let edge_top = egui::pos2(edge_start.x + 45.0, tracks[2].top() - 30.0);
+        let before_top = app.tabs[2].backend.scrollback_state().display_offset;
+        render(app, &ctx, vec![egui::Event::PointerMoved(edge_top)]);
+        for _ in 0..10 {
+            render(app, &ctx, vec![]);
+        }
+        assert!(
+            app.tabs[2].backend.scrollback_state().display_offset > before_top,
+            "top edge scrolls toward older lines"
+        );
+        let selected = app.tabs[2].backend.selectable_content();
+        let release = render(
+            app,
+            &ctx,
+            pointer_events(edge_top, egui::PointerButton::Primary, false),
+        );
+        assert!(release.platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &selected)), "releasing outside automatically copies the extended selection");
+        let released_offset = app.tabs[2].backend.scrollback_state().display_offset;
+        for _ in 0..10 {
+            render(app, &ctx, vec![]);
+        }
+        assert_eq!(
+            app.tabs[2].backend.scrollback_state().display_offset,
+            released_offset,
+            "release stops auto-scrolling"
         );
         // Keyboard input continues to reach the focused pane when the pointer leaves it.
         let previous: Vec<_> = app

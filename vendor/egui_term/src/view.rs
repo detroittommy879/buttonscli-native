@@ -34,6 +34,8 @@ enum InputAction {
 #[derive(Clone, Default)]
 pub struct TerminalViewState {
     is_dragged: bool,
+    is_selecting: bool,
+    selection_scroll_at: Option<f64>,
     ime_composing: bool,
     scroll_pixels: f32,
     current_mouse_position_on_grid: TerminalGridPoint,
@@ -254,6 +256,8 @@ impl<'a> TerminalView<'a> {
     ) -> Self {
         if !self.interactive {
             state.is_dragged = false;
+            state.is_selecting = false;
+            state.selection_scroll_at = None;
             state.ime_composing = false;
             return self;
         }
@@ -264,6 +268,7 @@ impl<'a> TerminalView<'a> {
         let modifiers = layout.ctx.input(|i| i.modifiers);
         let mut text_modifiers = modifiers;
         let events = layout.ctx.input(|i| i.events.clone());
+        let mut wheel_scrolled = false;
         for event in events {
             if let egui::Event::Key {
                 pressed: true,
@@ -274,7 +279,7 @@ impl<'a> TerminalView<'a> {
                 text_modifiers = *modifiers;
             }
             let selection_finished = self.copy_on_selection
-                && state.is_dragged
+                && state.is_selecting
                 && matches!(
                     &event,
                     egui::Event::PointerButton {
@@ -333,14 +338,27 @@ impl<'a> TerminalView<'a> {
                     ))
                 },
                 egui::Event::MouseWheel { unit, delta, .. }
-                    if layout.contains_pointer() =>
+                    if layout.contains_pointer() || state.is_selecting =>
                 {
+                    wheel_scrolled = true;
                     input_actions.push(process_mouse_wheel(
                         state,
                         self.font.font_type().size,
                         unit,
                         delta,
-                    ))
+                    ));
+                    // Scrolling with a stationary pointer must extend the
+                    // selection to the newly visible line as well.
+                    if state.is_selecting {
+                        if let Some(pos) = layout.ctx.pointer_latest_pos() {
+                            input_actions.push(InputAction::BackendCall(
+                                BackendCommand::SelectUpdate(
+                                    pos.x - layout.rect.left(),
+                                    pos.y - layout.rect.top(),
+                                ),
+                            ));
+                        }
+                    }
                 },
                 egui::Event::PointerButton {
                     button,
@@ -400,6 +418,29 @@ impl<'a> TerminalView<'a> {
                     layout.ctx.copy_text(selected);
                 }
             }
+        }
+
+        if state.is_selecting && layout.ctx.input(|i| i.pointer.primary_down()) {
+            if let Some(pos) = layout.ctx.pointer_latest_pos() {
+                let delta = selection_edge_scroll(layout.rect, pos, self.font.font_type().size);
+                if delta != 0 {
+                    let now = layout.ctx.input(|i| i.time);
+                    if !wheel_scrolled && state.selection_scroll_at.is_none_or(|last| now - last >= 0.05) {
+                        self.backend.process_command(BackendCommand::Scroll(delta));
+                        self.backend.process_command(BackendCommand::SelectUpdate(
+                            pos.x - layout.rect.left(), pos.y - layout.rect.top(),
+                        ));
+                        state.selection_scroll_at = Some(now);
+                    }
+                    layout.ctx.request_repaint_after(std::time::Duration::from_millis(50));
+                } else {
+                    state.selection_scroll_at = None;
+                }
+            }
+        } else {
+            state.selection_scroll_at = None;
+            state.is_selecting = false;
+            state.is_dragged = false;
         }
 
         self
@@ -1235,6 +1276,17 @@ fn process_mouse_wheel(
     }
 }
 
+fn selection_edge_scroll(rect: Rect, pointer: Pos2, cell_height: f32) -> i32 {
+    let edge = cell_height.clamp(8.0, 24.0);
+    if pointer.y < rect.top() + edge {
+        (1.0 + (rect.top() + edge - pointer.y) / cell_height.max(1.0)).clamp(1.0, 8.0) as i32
+    } else if pointer.y > rect.bottom() - edge {
+        -((1.0 + (pointer.y - rect.bottom() + edge) / cell_height.max(1.0)).clamp(1.0, 8.0) as i32)
+    } else {
+        0
+    }
+}
+
 fn process_button_click(
     state: &mut TerminalViewState,
     layout: &Response,
@@ -1271,6 +1323,7 @@ fn process_left_button(
     let terminal_mode = backend.last_content().terminal_mode;
     if terminal_mode.intersects(TermMode::MOUSE_MODE) && !modifiers.shift {
         state.is_dragged = pressed;
+        state.is_selecting = false;
         InputAction::BackendCall(BackendCommand::MouseReport(
             MouseButton::LeftButton,
             *modifiers,
@@ -1297,6 +1350,8 @@ fn process_left_button_pressed(
     position: Pos2,
 ) -> InputAction {
     state.is_dragged = true;
+    state.is_selecting = true;
+    state.selection_scroll_at = None;
     InputAction::BackendCall(build_start_select_command(layout, position))
 }
 
@@ -1309,6 +1364,8 @@ fn process_left_button_released(
     modifiers: &Modifiers,
 ) -> InputAction {
     state.is_dragged = false;
+    state.is_selecting = false;
+    state.selection_scroll_at = None;
     if layout.double_clicked() || layout.triple_clicked() {
         InputAction::BackendCall(build_start_select_command(layout, position))
     } else {
