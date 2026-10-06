@@ -8,8 +8,10 @@ and Escape to the terminal and preserves that filter across frames, selection
 clicks and native-window focus changes. F6 still transfers input to UI controls.
 Added a full-chrome, two-ConPTY regression and expanded the native detached
 Settings/OS clipboard probe. Both pass; existing three-pane selection, IME,
-search and F6 coverage passes. See [run log](BUGFIX-LOG-2026-10-06.md) for final
-build/check results. Other-platform runtime acceptance remains separate.
+search and F6 coverage passes. 251 library tests, two fixtures, strict native
+Clippy, formatting, optimized Windows build and isolated release startup pass.
+See [run log](BUGFIX-LOG-2026-10-06.md) for details. Other-platform runtime
+acceptance remains separate.
 
 ## 2026-10-05 — Detached Settings, selection and theme navigation
 

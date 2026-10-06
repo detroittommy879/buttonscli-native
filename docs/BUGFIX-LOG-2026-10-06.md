@@ -27,6 +27,10 @@
 - Full native suite: 251 library tests and two import fixtures pass; 13 optional
   tests ignored by default. New focus regression, native clipboard/Settings and
   three-pane probes pass explicitly. Strict native Clippy and formatting pass.
-- Final optimized executable rebuild/startup check in progress. Existing
-  incremental-cache access/PDB filename warnings are nonfatal; no global settings
-  were changed. Linux/macOS interaction was not tested.
+- Final optimized Windows executable rebuilt successfully. Isolated release
+  startup smoke passes (1471x975 window); it closes only its owned app/shells.
+  Shutdown emitted a nonfatal ended-pipe diagnostic; the smoke exited zero.
+  Existing incremental-cache/PDB warnings are nonfatal. No global settings were
+  changed. Linux/macOS interaction was not tested.
+- Fix committed as `065aaa2`; only the two original user-owned untracked paths
+  remain outside these changes.
