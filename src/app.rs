@@ -12295,8 +12295,42 @@ mod tests {
                                 egui::PointerButton::Primary,
                                 false,
                             )),
-                            9 => events.push(egui::Event::Text("settings-open-input".into())),
+                            9 => {
+                                let focus = ctx.memory(|memory| memory.focused());
+                                ctx.data_mut(|data| {
+                                    data.insert_temp(egui::Id::new("probe-terminal-focus"), focus)
+                                });
+                                for key in [
+                                    egui::Key::ArrowUp,
+                                    egui::Key::ArrowDown,
+                                    egui::Key::ArrowLeft,
+                                    egui::Key::ArrowRight,
+                                    egui::Key::Tab,
+                                    egui::Key::Escape,
+                                ] {
+                                    events.push(egui::Event::Key {
+                                        key,
+                                        physical_key: None,
+                                        pressed: true,
+                                        repeat: false,
+                                        modifiers: egui::Modifiers::NONE,
+                                    });
+                                }
+                                events.push(egui::Event::Text("settings-open-input".into()));
+                            }
                             10 => {
+                                let expected_focus = ctx
+                                    .data(|data| {
+                                        data.get_temp::<Option<egui::Id>>(egui::Id::new(
+                                            "probe-terminal-focus",
+                                        ))
+                                    })
+                                    .flatten();
+                                if expected_focus.is_none()
+                                    || ctx.memory(|memory| memory.focused()) != expected_focus
+                                {
+                                    return Err("terminal keys moved native workspace focus into UI controls".into());
+                                }
                                 if self.app.tabs[0].output.snapshot().last_input
                                     != "settings-open-input"
                                 {
@@ -13153,6 +13187,155 @@ mod tests {
         assert!(app.ai_help_state.lock().unwrap().error.is_some());
         assert_eq!(app.tabs[0].id, second);
         assert_eq!(app.tabs[0].output.snapshot().input_sequence, 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "uses test-owned ConPTY sessions; run explicitly on Windows"]
+    fn terminal_keys_do_not_navigate_or_activate_workspace_controls() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let preferences = Preferences {
+            default_shell_id: "input-fixture".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "input-fixture".into(),
+                label: "Input fixture".into(),
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Start-Sleep -Seconds 60\""
+                    .into(),
+                working_directory: String::new(),
+            }],
+            ..Default::default()
+        };
+        let mut workspace = Workspace(ButtonsApp::empty(preferences));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        app.show_localization_onboarding = false;
+        app.open_tab(ctx.clone());
+        app.open_tab(ctx.clone());
+        app.focused = 0;
+        app.show_all_auto_tiles();
+        let key_event = |key, modifiers| egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        };
+        let render_input = |app: &mut ButtonsApp, events, window_focused| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1800.0, 900.0),
+                    )),
+                    events,
+                    focused: window_focused,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.shortcuts(ctx);
+                    app.top_menu(ctx);
+                    app.tab_bar(ctx);
+                    app.terminal_search_bar(ctx);
+                    app.preset_bar(ctx);
+                    app.status_bar(ctx);
+                    app.sidebar(ctx);
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            )
+        };
+        let render = |app: &mut ButtonsApp, events| render_input(app, events, true);
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+        let terminal_focus = ctx.memory(|memory| memory.focused()).unwrap();
+        let other_inputs = app.tabs[1].output.snapshot().input_sequence;
+        for key in [
+            egui::Key::ArrowUp,
+            egui::Key::ArrowDown,
+            egui::Key::ArrowLeft,
+            egui::Key::ArrowRight,
+            egui::Key::Tab,
+            egui::Key::Escape,
+            egui::Key::Enter,
+            egui::Key::Space,
+        ] {
+            let before = app.tabs[0].output.snapshot().input_sequence;
+            let mut events = vec![key_event(key, egui::Modifiers::NONE)];
+            if key == egui::Key::Space {
+                events.push(egui::Event::Text(" ".into()));
+            }
+            render(app, events);
+            assert_eq!(
+                ctx.memory(|memory| memory.focused()),
+                Some(terminal_focus),
+                "{key:?} stole terminal focus"
+            );
+            assert_eq!(
+                app.tabs[0].output.snapshot().input_sequence,
+                before + 1,
+                "{key:?} must reach the shell exactly once"
+            );
+            render(app, vec![]);
+            assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        }
+        render(app, vec![key_event(egui::Key::Tab, egui::Modifiers::SHIFT)]);
+        assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::PointerMoved(egui::pos2(35.0, 15.0)),
+                egui::Event::Text("typing stays here".into()),
+            ],
+        );
+        assert_eq!(
+            app.tabs[0].output.snapshot().last_input,
+            "typing stays here"
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+        assert_eq!(app.tabs[1].output.snapshot().input_sequence, other_inputs);
+        assert_eq!(app.tabs.len(), 2);
+        assert!(!app.show_settings);
+        assert!(!ctx.memory(|memory| memory.any_popup_open()));
+
+        // Another native window must not reset this widget's key ownership.
+        for _ in 0..3 {
+            render_input(app, vec![], false);
+        }
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![key_event(egui::Key::ArrowUp, egui::Modifiers::NONE)],
+        );
+        assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // F6 deliberately transfers ownership to UI controls; F6 returns it.
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(app, vec![key_event(egui::Key::F6, egui::Modifiers::NONE)]);
+        render(app, vec![key_event(egui::Key::Tab, egui::Modifiers::NONE)]);
+        assert!(app.keyboard_navigation);
+        assert_ne!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        render(app, vec![key_event(egui::Key::F6, egui::Modifiers::NONE)]);
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+        render(
+            app,
+            vec![key_event(egui::Key::ArrowUp, egui::Modifiers::NONE)],
+        );
+        assert!(!app.keyboard_navigation);
+        assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
     }
 
     #[cfg(windows)]

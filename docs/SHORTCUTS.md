@@ -33,3 +33,5 @@ ported yet.
 
 F6 is the fixed control-navigation key: leave shell input to navigate app
 controls with Tab/Shift+Tab, then press F6 or click a terminal to return.
+While a terminal owns focus, arrows, Tab/Shift+Tab, and Escape stay in the shell
+instead of moving focus to workspace buttons.

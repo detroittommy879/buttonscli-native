@@ -232,9 +232,20 @@ impl<'a> TerminalView<'a> {
                 memory.focused().is_none() || memory.has_focus(layout.id)
             })
         {
-            layout.request_focus();
+            // request_focus resets egui's event filter, even when this widget
+            // already owns focus. Preserve the filter across terminal frames.
+            if !layout.ctx.memory(|memory| memory.has_focus(layout.id)) {
+                layout.request_focus();
+            }
         } else if !self.has_focus && !layout.gained_focus() {
             layout.surrender_focus();
+        }
+
+        if self.interactive
+            && self.has_focus
+            && layout.ctx.memory(|memory| memory.has_focus(layout.id))
+        {
+            lock_terminal_focus(layout);
         }
 
         self
@@ -374,7 +385,10 @@ impl<'a> TerminalView<'a> {
                         && state.is_dragged) =>
                 {
                     if pressed && button == PointerButton::Primary {
-                        layout.request_focus();
+                        if !layout.has_focus() {
+                            layout.request_focus();
+                        }
+                        lock_terminal_focus(layout);
                     }
                     input_actions.push(process_button_click(
                         state,
@@ -420,19 +434,34 @@ impl<'a> TerminalView<'a> {
             }
         }
 
-        if state.is_selecting && layout.ctx.input(|i| i.pointer.primary_down()) {
+        if state.is_selecting && layout.ctx.input(|i| i.pointer.primary_down())
+        {
             if let Some(pos) = layout.ctx.pointer_latest_pos() {
-                let delta = selection_edge_scroll(layout.rect, pos, self.font.font_type().size);
+                let delta = selection_edge_scroll(
+                    layout.rect,
+                    pos,
+                    self.font.font_type().size,
+                );
                 if delta != 0 {
                     let now = layout.ctx.input(|i| i.time);
-                    if !wheel_scrolled && state.selection_scroll_at.is_none_or(|last| now - last >= 0.05) {
-                        self.backend.process_command(BackendCommand::Scroll(delta));
-                        self.backend.process_command(BackendCommand::SelectUpdate(
-                            pos.x - layout.rect.left(), pos.y - layout.rect.top(),
-                        ));
+                    if !wheel_scrolled
+                        && state
+                            .selection_scroll_at
+                            .is_none_or(|last| now - last >= 0.05)
+                    {
+                        self.backend
+                            .process_command(BackendCommand::Scroll(delta));
+                        self.backend.process_command(
+                            BackendCommand::SelectUpdate(
+                                pos.x - layout.rect.left(),
+                                pos.y - layout.rect.top(),
+                            ),
+                        );
                         state.selection_scroll_at = Some(now);
                     }
-                    layout.ctx.request_repaint_after(std::time::Duration::from_millis(50));
+                    layout.ctx.request_repaint_after(
+                        std::time::Duration::from_millis(50),
+                    );
                 } else {
                     state.selection_scroll_at = None;
                 }
@@ -1104,6 +1133,22 @@ fn mix_color(first: Color32, second: Color32, amount: f32) -> Color32 {
     )
 }
 
+fn lock_terminal_focus(layout: &Response) {
+    // Shell navigation, completion and Escape belong to the terminal. The app
+    // explicitly surrenders focus for F6 control navigation and UI text fields.
+    layout.ctx.memory_mut(|memory| {
+        memory.set_focus_lock_filter(
+            layout.id,
+            egui::EventFilter {
+                tab: true,
+                horizontal_arrows: true,
+                vertical_arrows: true,
+                escape: true,
+            },
+        );
+    });
+}
+
 fn process_keyboard_event(
     event: egui::Event,
     backend: &TerminalBackend,
@@ -1279,9 +1324,11 @@ fn process_mouse_wheel(
 fn selection_edge_scroll(rect: Rect, pointer: Pos2, cell_height: f32) -> i32 {
     let edge = cell_height.clamp(8.0, 24.0);
     if pointer.y < rect.top() + edge {
-        (1.0 + (rect.top() + edge - pointer.y) / cell_height.max(1.0)).clamp(1.0, 8.0) as i32
+        (1.0 + (rect.top() + edge - pointer.y) / cell_height.max(1.0))
+            .clamp(1.0, 8.0) as i32
     } else if pointer.y > rect.bottom() - edge {
-        -((1.0 + (pointer.y - rect.bottom() + edge) / cell_height.max(1.0)).clamp(1.0, 8.0) as i32)
+        -((1.0 + (pointer.y - rect.bottom() + edge) / cell_height.max(1.0))
+            .clamp(1.0, 8.0) as i32)
     } else {
         0
     }

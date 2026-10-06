@@ -1,5 +1,16 @@
 # Reconstruction journal
 
+## 2026-10-06 — Terminal keys stay out of workspace navigation
+
+Reproduced ArrowUp writing to the focused ConPTY and moving egui focus to a
+workspace control in the same frame. TerminalView now locks arrows, Tab/Shift+Tab
+and Escape to the terminal and preserves that filter across frames, selection
+clicks and native-window focus changes. F6 still transfers input to UI controls.
+Added a full-chrome, two-ConPTY regression and expanded the native detached
+Settings/OS clipboard probe. Both pass; existing three-pane selection, IME,
+search and F6 coverage passes. See [run log](BUGFIX-LOG-2026-10-06.md) for final
+build/check results. Other-platform runtime acceptance remains separate.
+
 ## 2026-10-05 — Detached Settings, selection and theme navigation
 
 Detached Settings no longer disables the main terminal; its selected status
