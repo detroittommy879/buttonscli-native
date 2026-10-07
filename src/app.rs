@@ -3739,7 +3739,11 @@ impl ButtonsApp {
                                 colors.tabs_idle
                             })
                             .stroke(Stroke::new(
-                                if active || highlighted { 2.0 } else { 1.0 },
+                                if active || highlighted {
+                                    2.0_f32
+                                } else {
+                                    1.0_f32
+                                },
                                 if pane_number.is_some() {
                                     indicator
                                 } else {
@@ -4577,7 +4581,7 @@ impl ButtonsApp {
             if readable_on(widget.bg_fill) != foreground {
                 widget.bg_fill = settings_background;
             }
-            widget.fg_stroke = Stroke::new(2.0, foreground);
+            widget.fg_stroke = Stroke::new(2.0_f32, foreground);
         }
         apply_zone_style(
             ui,
@@ -11258,7 +11262,7 @@ fn render_pane_tree(
                 pane.painter().rect_stroke(
                     rect.shrink(1.0),
                     2.0,
-                    Stroke::new(if hovered { 2.0 } else { 1.0 }, indicator),
+                    Stroke::new(if hovered { 2.0_f32 } else { 1.0_f32 }, indicator),
                     egui::StrokeKind::Inside,
                 );
             }
@@ -11613,7 +11617,10 @@ fn paint_pane_hover_label(ui: &egui::Ui, rect: egui::Rect, title: &str, style: P
     painter.rect_stroke(
         label_rect,
         6.0,
-        Stroke::new(1.0, crate::dock::with_opacity(style.indicator, style.fade)),
+        Stroke::new(
+            1.0_f32,
+            crate::dock::with_opacity(style.indicator, style.fade),
+        ),
         egui::StrokeKind::Inside,
     );
     painter.galley(label_rect.min + egui::vec2(8.0, 5.0), galley, style.text);

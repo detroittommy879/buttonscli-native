@@ -26,3 +26,9 @@
   fixtures pass. Explicit five-terminal, membership/lifecycle, navigation-key,
   three-pane selection/scroll/input and native hover/idle probes pass.
   Native/WASM strict Clippy and formatting pass. Existing cache/PDB warnings persist.
+- Optimized local and public-branch Git cargo installations pass on Rust 1.96;
+  installed executables report 0.1.0. Cargo moves the final executable into its
+  install root; copied the verified Git binary back to `target/release/buttonscli.exe`
+  for the existing startup probe, which passes with an isolated profile.
+- Initial GitHub web check on Rust 1.97 rejects an older untyped `Stroke::new(2.0)`.
+  Made stroke widths explicitly f32, including new indicators, without changing behavior.

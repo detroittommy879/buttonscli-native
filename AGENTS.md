@@ -57,6 +57,8 @@ cargo build --locked --release --bin buttonscli
 ```
 
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
+- CI uses newer stable Rust than some local installs. Write explicit `f32` literals
+  for `Stroke::new` widths; Rust 1.97 rejects float fallback under strict Clippy.
 - Explicit Windows probes: `cargo test --locked --lib <name> -- --ignored --test-threads=1`.
   Useful names: `tab_clicks_replace_focused_pane_and_keep_keyboard_input`,
   `three_panes_select_copy_scroll_and_route_keyboard_independently`,

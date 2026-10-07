@@ -15,6 +15,7 @@ Until this PR merges, add `--branch codex/pane-fonts-theme-editor` to test its f
 For a local checkout: `cargo install --path . --locked --bin buttonscli`.
 Cargo installs the executable into `~/.cargo/bin`; themes/fonts are embedded.
 It does not create desktop shortcuts. Repeat the Git command to update.
+Local and branch Git installations were verified on Windows with Rust 1.96.
 
 ## Enable plain `cargo install buttonscli`
 
