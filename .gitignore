@@ -3,6 +3,7 @@
 /web/pkg/
 /.idea/
 /.vscode/
+/.aicp/
 *.log
 *.profraw
 
