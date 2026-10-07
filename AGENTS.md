@@ -26,6 +26,8 @@
   share app-theme accents; the hover label uses that terminal's theme and font preference.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
+- Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
+  geometry use the outer rectangle. Let the widget handle cell/input coordinates.
 - The adapter locks arrows/Tab/Escape to the terminal. Repeated `request_focus` resets
   egui's event filter; preserve it, including while another native window is foreground.
   F6 intentionally transfers focus to workspace controls.
@@ -57,6 +59,9 @@ cargo build --locked --release --bin buttonscli
 ```
 
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
+- Use `wrapping_row` for button rows: egui's centered `horizontal_wrapped` can make
+  successive controls descend with larger fonts. Favorites allocate the name/star
+  together before wrapping; `push_id` alone does not keep a pair together.
 - CI uses newer stable Rust than some local installs. Write explicit `f32` literals
   for `Stroke::new` widths; Rust 1.97 rejects float fallback under strict Clippy.
 - Explicit Windows probes: `cargo test --locked --lib <name> -- --ignored --test-threads=1`.

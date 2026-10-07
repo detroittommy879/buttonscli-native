@@ -2923,7 +2923,7 @@ impl ButtonsApp {
                     .inner_margin(egui::Margin::symmetric(9, 4)),
             )
             .show(ctx, |ui| {
-                ui.horizontal_wrapped(|ui| {
+                wrapping_row(ui, |ui| {
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut self.terminal_search_query)
                             .hint_text(crate::i18n::text(
@@ -3554,7 +3554,7 @@ impl ButtonsApp {
                     "This opens a bundled installer script for a fast AI-coding setup: common dev tools, VS Code, and the most approachable AI CLIs in one place.",
                 ));
                 ui.add_space(8.0);
-                ui.horizontal_wrapped(|ui| {
+                wrapping_row(ui, |ui| {
                     ui.label(crate::i18n::literal(&locale, "Platform"));
                     for platform in [
                         crate::cool_stuff::InstallerPlatform::Windows,
@@ -3695,7 +3695,7 @@ impl ButtonsApp {
                 let mut action = None;
                 let mut add = None;
                 let mut reopen = false;
-                ui.horizontal_wrapped(|ui| {
+                wrapping_row(ui, |ui| {
                     for (index, tab) in self.tabs.iter().enumerate() {
                         let active = index == self.focused;
                         let pane_number = displayed
@@ -4051,7 +4051,7 @@ impl ButtonsApp {
             });
         });
         if controls_available {
-            ui.horizontal_wrapped(|ui| {
+            wrapping_row(ui, |ui| {
                 ui.checkbox(
                     &mut self.preferences.dock_compact,
                     crate::i18n::text(
@@ -4082,7 +4082,7 @@ impl ButtonsApp {
             ui.add_space(4.0);
         }
         if self.preferences.dock_compact {
-            ui.horizontal_wrapped(|ui| {
+            wrapping_row(ui, |ui| {
                 for (index, preset) in presets.iter().enumerate() {
                     let response = ui
                         .button(&preset.label)
@@ -4189,7 +4189,7 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
-                ui.horizontal_wrapped(|ui| {
+                wrapping_row(ui, |ui| {
                     ui.label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
                     ui.label(
@@ -4589,7 +4589,7 @@ impl ButtonsApp {
             &self.preferences.typography.settings,
         );
         ui.scope(|ui| {
-            ui.horizontal_wrapped(|ui| {
+            wrapping_row(ui, |ui| {
                 ui.selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Themes,
@@ -4651,7 +4651,7 @@ impl ButtonsApp {
         });
         ui.separator();
         if self.settings_tab == SettingsTab::Themes {
-            ui.horizontal_wrapped(|ui| {
+            wrapping_row(ui, |ui| {
                 ui.selectable_value(
                     &mut self.theme_settings_tab,
                     ThemeSettingsTab::Library,
@@ -6959,7 +6959,7 @@ impl ButtonsApp {
             ))
             .color(colors.muted),
         );
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             ui.label(crate::i18n::literal(&self.locale, "Apply:"));
             ui.checkbox(&mut self.preferences.theme_apply.app, "App chrome");
             ui.checkbox(
@@ -7041,23 +7041,57 @@ impl ButtonsApp {
         let mut remove = None;
         #[cfg(not(target_arch = "wasm32"))]
         let mut favorite_apply = None;
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             for (id, name) in &favorites {
-                ui.push_id(("favorite", id), |ui| {
-                    #[cfg(not(target_arch = "wasm32"))]
-                    if ui.button(name).clicked() {
-                        favorite_apply = Some(id.clone());
-                    }
-                    #[cfg(target_arch = "wasm32")]
-                    ui.label(name);
-                    if ui
-                        .small_button("★")
-                        .on_hover_text(crate::i18n::literal(&self.locale, "Remove from favorites"))
-                        .clicked()
-                    {
-                        remove = Some(id.clone());
-                    }
+                let font = TextStyle::Button.resolve(ui.style());
+                let (name_size, star_size) = ui.fonts(|fonts| {
+                    (
+                        fonts
+                            .layout_no_wrap(name.clone(), font.clone(), ui.visuals().text_color())
+                            .size(),
+                        fonts
+                            .layout_no_wrap("★".into(), font, ui.visuals().text_color())
+                            .size(),
+                    )
                 });
+                let padding = ui.spacing().button_padding * 2.0;
+                let gap = ui.spacing().item_spacing.x;
+                let star_width = star_size.x + padding.x;
+                let pair_width =
+                    (name_size.x + padding.x + gap + star_width).min(ui.available_width());
+                let name_width = (pair_width - gap - star_width).max(0.0);
+                let height =
+                    (name_size.y.max(star_size.y) + padding.y).max(ui.spacing().interact_size.y);
+                // Allocate the whole pair before wrapping, with no wrapping inside it.
+                ui.allocate_ui_with_layout(
+                    egui::vec2(pair_width, height),
+                    Layout::left_to_right(Align::Center),
+                    |ui| {
+                        ui.push_id(("favorite", id), |ui| {
+                            #[cfg(not(target_arch = "wasm32"))]
+                            if ui
+                                .add_sized([name_width, height], egui::Button::new(name).truncate())
+                                .on_hover_text(name)
+                                .clicked()
+                            {
+                                favorite_apply = Some(id.clone());
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            ui.add_sized([name_width, height], egui::Label::new(name).truncate())
+                                .on_hover_text(name);
+                            if ui
+                                .add_sized([star_width, height], egui::Button::new("★"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Remove from favorites",
+                                ))
+                                .clicked()
+                            {
+                                remove = Some(id.clone());
+                            }
+                        });
+                    },
+                );
             }
         });
         if let Some(id) = remove {
@@ -7089,7 +7123,7 @@ impl ButtonsApp {
                 .desired_width(f32::INFINITY),
         );
 
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             ui.selectable_value(&mut self.preferences.theme_browser_compact, false, "Cards");
             ui.selectable_value(
                 &mut self.preferences.theme_browser_compact,
@@ -7136,10 +7170,11 @@ impl ButtonsApp {
             .color(colors.muted),
         );
 
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             if matches.len() != self.themes.all().len() && ui.button("Show all themes").clicked() {
                 self.theme_search.clear();
-                self.preferences.theme_browser_collection = crate::theme_browser::ThemeCollection::All;
+                self.preferences.theme_browser_collection =
+                    crate::theme_browser::ThemeCollection::All;
             }
             #[cfg(not(target_arch = "wasm32"))]
             if ui.button("Reload personal themes").on_hover_text("Reload JSON files from the active native profile. Bundled assets require a rebuild.").clicked() {
@@ -7203,7 +7238,7 @@ impl ButtonsApp {
                                         .stroke(Stroke::new(1.0_f32, if selected { colors.accent } else { colors.border }))
                                         .inner_margin(6.0).show(ui, |ui| {
                                         ui.set_width((ui.available_width() - 12.0).max(100.0));
-                                        ui.horizontal_wrapped(|ui| {
+                                        wrapping_row(ui, |ui| {
                                             let favorite = self.preferences.favorite_theme_ids.contains(&theme.id);
                                             if ui.add_enabled(local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites),
                                                 egui::Button::new(if favorite { "★" } else { "☆" }).selected(favorite))
@@ -7469,7 +7504,7 @@ impl ButtonsApp {
                     &locale,
                     "This candidate is not previewed or saved yet.",
                 ));
-                ui.horizontal_wrapped(|ui| {
+                wrapping_row(ui, |ui| {
                     preview = ui
                         .button(crate::i18n::literal(&locale, "Preview candidate"))
                         .clicked();
@@ -7568,7 +7603,7 @@ impl ButtonsApp {
             self.queue_theme_editor_preview(ui.ctx());
         }
 
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             if ui
                 .button(crate::i18n::literal(&locale, "New variant"))
                 .clicked()
@@ -8014,7 +8049,7 @@ impl ButtonsApp {
         if changed {
             self.queue_theme_editor_preview(ui.ctx());
         }
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             if ui
                 .button(crate::i18n::literal(&locale, "Preview"))
                 .clicked()
@@ -8801,7 +8836,7 @@ impl ButtonsApp {
                     }
                 }
             });
-        ui.horizontal_wrapped(|ui| {
+        wrapping_row(ui, |ui| {
             if ui
                 .button(crate::i18n::literal(
                     &self.locale,
@@ -8898,7 +8933,7 @@ impl ButtonsApp {
                 .inner_margin(10.0)
                 .show(ui, |ui| {
                     ui.label(RichText::new("Terminal bold rendering").strong());
-                    ui.horizontal_wrapped(|ui| {
+                    wrapping_row(ui, |ui| {
                         let family = self.preferences.typography.terminal.family.clone();
                         let requested = self.preferences.typography.terminal_bold_weight;
                         let resolved = font_catalog.resolved_weight(&family, requested);
@@ -10111,7 +10146,7 @@ impl ButtonsApp {
                                     ui.strong(text.replace("**", ""));
                                 }
                                 display::MarkdownBlock::Bullet(text) => {
-                                    ui.horizontal_wrapped(|ui| {
+                                    wrapping_row(ui, |ui| {
                                         ui.label("•");
                                         ui.label(text.replace("**", ""));
                                     });
@@ -10610,6 +10645,27 @@ fn settings_scroll_style() -> egui::style::ScrollStyle {
     }
 }
 
+fn wrapping_row<R>(
+    ui: &mut egui::Ui,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let size = egui::vec2(
+        ui.available_rect_before_wrap()
+            .intersect(ui.clip_rect())
+            .width()
+            .max(0.0),
+        ui.spacing().interact_size.y,
+    );
+    // Centered rows in egui 0.31 shift later widgets as the row grows taller.
+    let layout = if ui.layout().prefer_right_to_left() {
+        Layout::right_to_left(Align::Min)
+    } else {
+        Layout::left_to_right(Align::Min)
+    }
+    .with_main_wrap(true);
+    ui.allocate_ui_with_layout(size, layout, add_contents)
+}
+
 fn apply_zone_style(ui: &mut egui::Ui, catalog: &fonts::FontCatalog, zone: &FontZone) {
     for (text_style, scale) in [
         (TextStyle::Heading, 1.35),
@@ -10649,7 +10705,7 @@ fn font_zone_editor(
                     "This font is unavailable. A bundled fallback is active until you choose another font.",
                 ));
             }
-            ui.horizontal_wrapped(|ui| {
+            wrapping_row(ui, |ui| {
                 egui::ComboBox::from_id_salt(("font-family", label))
                     .selected_text(
                         RichText::new(&zone.family)
@@ -11217,7 +11273,7 @@ fn render_pane_tree(
             let mut pane = ui.new_child(
                 egui::UiBuilder::new()
                     .id_salt(("terminal-pane", tab.id))
-                    .max_rect(rect)
+                    .max_rect(rect.shrink2(egui::vec2(4.0, 2.0)))
                     .layout(Layout::top_down(Align::Min)),
             );
             pane.set_clip_rect(rect);
@@ -11856,7 +11912,7 @@ fn preset_action_menu(
 
 #[cfg(not(target_arch = "wasm32"))]
 fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
-    ui.horizontal_wrapped(|ui| {
+    wrapping_row(ui, |ui| {
         let mut native = document["metadata"]["nativeThemeVersion"]
             .as_u64()
             .is_some_and(|version| version > 0);
@@ -12633,7 +12689,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    #[ignore = "opens a test-owned five-terminal native window for visual verification"]
+    #[ignore = "opens a test-owned terminal and theme-library window for visual verification"]
     fn native_pane_identity_and_idle_fade_probe() {
         struct Probe {
             app: ButtonsApp,
@@ -12642,6 +12698,7 @@ mod tests {
             hovered: bool,
             captured: bool,
             faded: bool,
+            themes_captured: bool,
             directory: std::path::PathBuf,
         }
         impl Drop for Probe {
@@ -12657,8 +12714,20 @@ mod tests {
             }
             fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
                 save_probe_screenshots(ctx);
-                self.app.update(ctx, frame);
                 let elapsed = self.started.elapsed().as_secs_f64();
+                if elapsed > 6.3 {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        apply_zone_style(
+                            ui,
+                            &self.app.font_catalog,
+                            &self.app.preferences.typography.settings,
+                        );
+                        egui::ScrollArea::vertical()
+                            .show(ui, |ui| self.app.theme_library_settings(ui));
+                    });
+                } else {
+                    self.app.update(ctx, frame);
+                }
                 if !self.hovered && elapsed > 0.5 {
                     if let Some(rect) = self.app.pane_rects.get(&self.app.tabs[1].id) {
                         self.pending.push(egui::Event::PointerMoved(rect.center()));
@@ -12677,7 +12746,13 @@ mod tests {
                     )));
                     self.faded = true;
                 }
-                if elapsed > 6.2 {
+                if !self.themes_captured && elapsed > 6.8 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.directory.join("theme-favorites.png"),
+                    )));
+                    self.themes_captured = true;
+                }
+                if elapsed > 7.5 {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 ctx.request_repaint_after(Duration::from_millis(50));
@@ -12694,7 +12769,7 @@ mod tests {
         let options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_title("ButtonsCLI pane identity probe")
-                .with_inner_size([1280.0, 820.0]),
+                .with_inner_size([1280.0, 1000.0]),
             persist_window: false,
             event_loop_builder: Some(Box::new(|builder| {
                 winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
@@ -12706,18 +12781,23 @@ mod tests {
         eframe::run_native("ButtonsCLI pane identity probe", options, Box::new(move |cc| {
             let mut preferences = Preferences { show_sidebar: false, show_presets: false, calm_mode: true, ..Default::default() };
             preferences.pane_hover_label.opacity = 1.0;
+            preferences.typography.tabs.size = 22.0;
+            preferences.typography.settings.size = 24.0;
+            preferences.theme_browser_sort = crate::theme_browser::ThemeSort::NativeVersion;
+            preferences.favorite_theme_ids = vec!["midnight".into(), "1990crt".into(), "chromatic-arcade-halfbright".into(), "ice_cream_truck_1".into()];
             let mut app = ButtonsApp::empty(preferences);
+            app.theme_search = "no-theme-matches-this-fixture".into();
             app.show_localization_onboarding = false;
             fonts::install(&cc.egui_ctx, &app.font_catalog);
             app.apply_style(&cc.egui_ctx);
-            for number in 1..=5 {
+            for number in 1..=6 {
                 app.open_named_tab(cc.egui_ctx.clone(), &format!("term{number}"), Some(&format!("powershell.exe -NoLogo -NoProfile -Command \"Write-Output 'term{number} - pane identity fixture'; Write-Output 'Existing terminal text stays readable under the label.'; Start-Sleep -Seconds 12\"")), None).unwrap();
             }
             app.focused = 0;
             app.pane_layout = PaneLayout::Grid;
             app.visible_panes = vec![0, 1];
             app.auto_tile.requested_count = 2;
-            Ok(Box::new(Probe { app, started: std::time::Instant::now(), pending: Vec::new(), hovered: false, captured: false, faded: false, directory: capture_directory }))
+            Ok(Box::new(Probe { app, started: std::time::Instant::now(), pending: Vec::new(), hovered: false, captured: false, faded: false, themes_captured: false, directory: capture_directory }))
         })).unwrap();
         assert!(
             directory.join("pane-hover.png").exists(),
@@ -12726,6 +12806,10 @@ mod tests {
         assert!(
             directory.join("pane-idle.png").exists(),
             "native idle screenshot saved"
+        );
+        assert!(
+            directory.join("theme-favorites.png").exists(),
+            "native theme favorites screenshot saved"
         );
         println!("Pane identity captures: {}", directory.display());
     }
@@ -13715,12 +13799,8 @@ mod tests {
                 .iter()
                 .map(|tab| tab.backend.selectable_content())
                 .collect();
-            let left = if index == 0 {
-                8.0
-            } else {
-                tracks[index - 1].center().x + 17.0
-            };
-            let start = egui::pos2(left + 3.0, track.top() + 35.0);
+            let left = app.pane_rects[&app.tabs[index].id].left();
+            let start = egui::pos2(left + 10.0, track.top() + 35.0);
             let end = start + egui::vec2(105.0, 0.0);
             render(app, &ctx, vec![egui::Event::PointerMoved(start)]);
             render(
@@ -13824,7 +13904,8 @@ mod tests {
         );
         assert_eq!(app.tabs[0].output.snapshot().input_sequence, before_ime[0]);
         assert_eq!(app.tabs[1].output.snapshot().input_sequence, before_ime[1]);
-        let start = egui::pos2(tracks[1].center().x + 20.0, tracks[2].top() + 35.0);
+        let third_left = app.pane_rects[&app.tabs[2].id].left();
+        let start = egui::pos2(third_left + 10.0, tracks[2].top() + 35.0);
         let outside = egui::pos2(1900.0, 200.0);
         render(app, &ctx, vec![egui::Event::PointerMoved(start)]);
         render(
@@ -13856,7 +13937,7 @@ mod tests {
             .backend
             .process_command(BackendCommand::Scroll(60));
         render(app, &ctx, vec![]);
-        let edge_start = egui::pos2(tracks[1].center().x + 35.0, tracks[2].top() + 80.0);
+        let edge_start = egui::pos2(third_left + 25.0, tracks[2].top() + 80.0);
         let edge_bottom = egui::pos2(edge_start.x + 45.0, tracks[2].bottom() + 30.0);
         render(app, &ctx, vec![egui::Event::PointerMoved(edge_start)]);
         render(
@@ -14321,6 +14402,7 @@ mod tests {
         let app = &mut workspace.0;
         let ctx = egui::Context::default();
         fonts::install(&ctx, &app.font_catalog);
+        app.preferences.typography.tabs.size = 22.0;
         for _ in 0..5 {
             app.open_tab(ctx.clone());
         }
@@ -14353,6 +14435,24 @@ mod tests {
         for _ in 0..3 {
             render(app, vec![]);
         }
+        let output = render(app, vec![]);
+        let tab_tops: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| {
+                if let egui::Shape::Text(text) = &clipped.shape {
+                    if text.galley.job.text.starts_with("term") && text.pos.y < 140.0 {
+                        return Some(text.pos.y);
+                    }
+                }
+                None
+            })
+            .collect();
+        assert_eq!(tab_tops.len(), 5);
+        assert!(
+            tab_tops.iter().all(|y| (y - tab_tops[0]).abs() < 1.0),
+            "large-font tabs stay level"
+        );
         let mut expected = vec![0, 1];
         for index in [2, 4, 0, 3, 1, 4, 2] {
             app.keyboard_navigation = true;
@@ -14551,6 +14651,127 @@ mod tests {
                 render(pointer_events(edit, egui::PointerButton::Primary, true));
                 render(pointer_events(edit, egui::PointerButton::Primary, false));
                 assert_eq!(action, Some(PresetAction::Edit(collection, 2)));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn favorite_theme_pairs_stay_on_one_line_and_wrap_together() {
+        for width in [1050.0, 480.0, 220.0] {
+            let ctx = egui::Context::default();
+            let mut app = ButtonsApp::empty(Preferences::default());
+            fonts::install(&ctx, &app.font_catalog);
+            app.preferences.typography.settings.size = 24.0;
+            app.preferences.theme_browser_sort = crate::theme_browser::ThemeSort::NativeVersion;
+            app.preferences.favorite_theme_ids = vec![
+                "midnight".into(),
+                "1990crt".into(),
+                "chromatic-arcade-halfbright".into(),
+                "ice_cream_truck_1".into(),
+            ];
+            app.theme_search = "no-theme-matches-this-fixture".into();
+            let mut render = || {
+                ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width, 1800.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            apply_zone_style(
+                                ui,
+                                &app.font_catalog,
+                                &app.preferences.typography.settings,
+                            );
+                            app.theme_library_settings(ui);
+                        });
+                    },
+                )
+            };
+            render();
+            let output = render();
+            let favorite_top = text_position(&output, "Favorite themes").unwrap().y;
+            let favorite_bottom = text_position(&output, "Chrome corner radius").unwrap().y;
+            let stars: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|clipped| {
+                    if let egui::Shape::Text(text) = &clipped.shape {
+                        if text.galley.job.text == "★"
+                            && text.pos.y > favorite_top
+                            && text.pos.y < favorite_bottom
+                        {
+                            return Some(clipped.shape.visual_bounding_rect().center());
+                        }
+                    }
+                    None
+                })
+                .collect();
+            assert_eq!(stars.len(), 4, "all favorite stars visible at width {width}, between {favorite_top} and {favorite_bottom}");
+            assert!(
+                stars.iter().all(|star| star.x < width),
+                "favorite stars stay inside the viewport"
+            );
+            for id in &app.preferences.favorite_theme_ids {
+                let name = &app.themes.get(id).name;
+                let text = output
+                    .shapes
+                    .iter()
+                    .find_map(|clipped| {
+                        if let egui::Shape::Text(text) = &clipped.shape {
+                            if text.galley.job.text == *name
+                                && text.pos.y > favorite_top
+                                && text.pos.y < favorite_bottom
+                            {
+                                return Some(text);
+                            }
+                        }
+                        None
+                    })
+                    .unwrap();
+                assert_eq!(
+                    text.galley.rows.len(),
+                    1,
+                    "favorite name must not become a tall narrow column at width {width}: {name}"
+                );
+                let center = text.pos + text.galley.size() * 0.5;
+                assert!(
+                    stars
+                        .iter()
+                        .any(|star| (star.y - center.y).abs() < 1.0 && star.x > center.x),
+                    "favorite name and star stay together at width {width}: {name}"
+                );
+            }
+            let control_tops: Vec<_> = [
+                "Cards",
+                "Compact rows",
+                "Native version (newest first)",
+                "All collections",
+            ]
+            .iter()
+            .filter_map(|label| {
+                output.shapes.iter().find_map(|clipped| {
+                    if let egui::Shape::Text(text) = &clipped.shape {
+                        if text.galley.job.text == *label {
+                            return Some(text.pos);
+                        }
+                    }
+                    None
+                })
+            })
+            .collect();
+            if width > 1000.0 {
+                assert_eq!(control_tops.len(), 4);
+                assert!(
+                    control_tops
+                        .iter()
+                        .all(|pos| (pos.y - control_tops[0].y).abs() < 1.0),
+                    "theme browser controls must not drift down the row"
+                );
             }
         }
     }

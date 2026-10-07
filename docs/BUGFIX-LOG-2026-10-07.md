@@ -32,3 +32,26 @@
   for the existing startup probe, which passes with an isolated profile.
 - Initial GitHub web check on Rust 1.97 rejects an older untyped `Stroke::new(2.0)`.
   Made stroke widths explicitly f32, including new indicators, without changing behavior.
+
+## Button alignment and terminal inset follow-up
+
+- User screenshots show descending tab/filter rows, a favorite name wrapping into
+  a tall narrow column with its star below, and text against terminal borders.
+- Started from pushed `5650b6f`; PR #2 remains open/draft; working tree was clean.
+- Pinned egui wrapping rows center widgets against a growing row height; `push_id`
+  inherits wrapping and does not keep the favorite name/star pair atomic.
+- Reproduced theme control drift with a 24 pt font before changing layout. Shared
+  top-aligned wrapping rows fix tabs, filters and other wrapped controls. Favorites
+  allocate each complete pair, truncating long names with a full-name tooltip.
+- At 220 pt width, earlier oversized controls expand egui's available width beyond
+  the window. Constrain wrapping rows to the clip bounds; all four stars now fit.
+- Inset terminal content 4 pt horizontally/2 pt vertically to clear pane borders.
+  Selection probe now starts inside actual pane geometry rather than fixed margins.
+- Old scrollbar-derived drag coordinates landed in the new gutter and failed the
+  multiline assertion. Deriving every drag start from the pane rectangle fixes it.
+- Final follow-up: 254 library tests, 2 import fixtures, strict native/WASM Clippy
+  and formatting pass. Explicit large-font tab/input and three-pane selection,
+  copy/scroll/IME probes pass. Native captures in `.private/button-layout-probe/`
+  confirm level tabs/filters, readable first columns and aligned favorites.
+  Optimized build and isolated native startup pass; existing shutdown pipe warning
+  persists. Updated the existing draft PR; leave merging for user testing.
