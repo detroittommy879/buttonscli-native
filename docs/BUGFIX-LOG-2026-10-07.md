@@ -55,3 +55,13 @@
   confirm level tabs/filters, readable first columns and aligned favorites.
   Optimized build and isolated native startup pass; existing shutdown pipe warning
   persists. Updated the existing draft PR; leave merging for user testing.
+
+## Font spacing and mixed-theme follow-up
+
+- Started from clean `7fe35aa`; fetched origin and inspected open draft PR #2.
+- UI letter spacing was persisted but never passed into text layout. Added shared
+  text helpers so tracking changes labels/button bounds before wrapping; child UIs
+  inherit their font zone. Font samples use their own zone, not Settings tracking.
+- Current theme preview/save bypasses Apply scopes and clears per-tab themes/fonts;
+  drafts also copy one source rather than the resolved shared appearance. Fix next.
+- V3/collection format remains a proposal only; no new tab assignment schema.

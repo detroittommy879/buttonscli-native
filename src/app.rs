@@ -37,6 +37,7 @@ use crate::theme::PaneDividerTheme;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::theme::TerminalEffects;
 use crate::theme::{AppColors, ThemeCatalog, ThemeDefinition};
+use crate::ui_text::SpacedUi;
 use egui::{Align, Color32, FontId, Layout, RichText, Stroke, TextStyle, Vec2};
 #[cfg(not(target_arch = "wasm32"))]
 use serde_json::{json, Value};
@@ -831,7 +832,10 @@ fn prepare_fresh_install_language(preferences: &mut Preferences) {
 
 fn locale_selector(ui: &mut egui::Ui, id: &'static str, locale: &mut String) {
     egui::ComboBox::from_id_salt(id)
-        .selected_text(crate::i18n::locale_info(locale).native_name.to_owned())
+        .selected_text(crate::ui_text::spaced_text(
+            ui,
+            crate::i18n::locale_info(locale).native_name.to_owned(),
+        ))
         .show_ui(ui, |ui| {
             for info in crate::i18n::LOCALE_INFO {
                 let label = if info.native_name == info.english_name {
@@ -839,7 +843,7 @@ fn locale_selector(ui: &mut egui::Ui, id: &'static str, locale: &mut String) {
                 } else {
                     format!("{} ({})", info.native_name, info.english_name)
                 };
-                ui.selectable_value(locale, info.code.to_owned(), label);
+                ui.spaced_selectable_value(locale, info.code.to_owned(), label);
             }
         });
 }
@@ -1413,6 +1417,7 @@ impl ButtonsApp {
         // Native palettes define their own colors. Keep that style selected
         // when Windows reports a different system theme after initialization.
         ctx.set_theme(egui::Theme::Dark);
+        crate::ui_text::set_default_spacing(ctx, self.preferences.typography.shell.letter_spacing);
         let colors = &self.active_app_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
@@ -2597,7 +2602,7 @@ impl ButtonsApp {
         if self.tabs.is_empty() {
             ui.centered_and_justified(|ui| {
                 if ui
-                    .button(crate::i18n::literal(&self.locale, "Open a terminal"))
+                    .spaced_button(crate::i18n::literal(&self.locale, "Open a terminal"))
                     .clicked()
                 {
                     self.dispatch_ui_or_notice(
@@ -2788,12 +2793,12 @@ impl ButtonsApp {
     #[cfg(target_arch = "wasm32")]
     fn web_demo(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.label(
+        ui.spaced_label(
             RichText::new("SANDBOX TERMINAL")
                 .strong()
                 .color(colors.accent),
         );
-        ui.label(
+        ui.spaced_label(
             RichText::new("A safe in-browser preview — commands never leave this page")
                 .small()
                 .color(colors.muted),
@@ -2805,12 +2810,12 @@ impl ButtonsApp {
             .max_height((ui.available_height() - 52.0).max(120.0))
             .show(ui, |ui| {
                 for line in &self.demo_lines {
-                    ui.label(RichText::new(line).monospace().color(colors.text));
+                    ui.spaced_label(RichText::new(line).monospace().color(colors.text));
                 }
             });
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label(RichText::new("$").monospace().color(colors.accent));
+            ui.spaced_label(RichText::new("$").monospace().color(colors.accent));
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.demo_input)
                     .font(
@@ -2824,7 +2829,7 @@ impl ButtonsApp {
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
             if submit
                 || ui
-                    .button(crate::i18n::literal(&self.locale, "Run"))
+                    .spaced_button(crate::i18n::literal(&self.locale, "Run"))
                     .clicked()
             {
                 let command = std::mem::take(&mut self.demo_input);
@@ -2952,7 +2957,7 @@ impl ButtonsApp {
                         action = Some(!ui.input(|input| input.modifiers.shift));
                     }
                     if ui
-                        .button(crate::i18n::text(
+                        .spaced_button(crate::i18n::text(
                             &self.locale,
                             crate::i18n::MessageKey::TerminalSearchPrevious,
                             &[],
@@ -2962,7 +2967,7 @@ impl ButtonsApp {
                         action = Some(false);
                     }
                     if ui
-                        .button(crate::i18n::text(
+                        .spaced_button(crate::i18n::text(
                             &self.locale,
                             crate::i18n::MessageKey::TerminalSearchNext,
                             &[],
@@ -2972,7 +2977,7 @@ impl ButtonsApp {
                         action = Some(true);
                     }
                     if ui
-                        .button(crate::i18n::text(
+                        .spaced_button(crate::i18n::text(
                             &self.locale,
                             crate::i18n::MessageKey::TerminalSearchClear,
                             &[],
@@ -2982,10 +2987,10 @@ impl ButtonsApp {
                         clear_search = true;
                     }
                     if let Some(status) = &self.terminal_search_status {
-                        ui.label(RichText::new(status).small().color(colors.muted));
+                        ui.spaced_label(RichText::new(status).small().color(colors.muted));
                     }
                     if ui
-                        .small_button(crate::i18n::literal(&self.locale, "×"))
+                        .spaced_small_button(crate::i18n::literal(&self.locale, "×"))
                         .clicked()
                     {
                         close = true;
@@ -3036,11 +3041,11 @@ impl ButtonsApp {
             .open(&mut open)
             .default_size([760.0, 500.0])
             .show(ctx, |ui| {
-                ui.label(format!("{title} — retained text snapshot"));
-                ui.label("Select and copy text here. Refresh to read new output; this view stays still while you read.");
-                refresh = ui.button("Refresh snapshot").clicked();
+                ui.spaced_label(format!("{title} — retained text snapshot"));
+                ui.spaced_label("Select and copy text here. Refresh to read new output; this view stays still while you read.");
+                refresh = ui.spaced_button("Refresh snapshot").clicked();
                 egui::ScrollArea::both().id_salt("terminal-reader-scroll").show(ui, |ui| {
-                    let label = ui.label("Terminal output");
+                    let label = ui.spaced_label("Terminal output");
                     let mut read_only = text.as_str();
                     let response = ui.add(egui::TextEdit::multiline(&mut read_only).font(egui::TextStyle::Monospace).cursor_at_end(false).desired_width(f32::INFINITY))
                         .labelled_by(label.id);
@@ -3175,17 +3180,17 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.shell);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("B").strong().color(colors.accent).size(12.0));
-                    ui.label(
+                    ui.spaced_label(RichText::new("B").strong().color(colors.accent).size(12.0));
+                    ui.spaced_label(
                         RichText::new("BUTTONSCLI")
                             .strong()
                             .extra_letter_spacing(1.5),
                     );
                     ui.separator();
-                    ui.menu_button(crate::i18n::literal(&self.locale, "File"), |ui| {
+                    ui.spaced_menu_button(crate::i18n::literal(&self.locale, "File"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
-                            .button(crate::i18n::literal(
+                            .spaced_button(crate::i18n::literal(
                                 &self.locale,
                                 "New terminal  Ctrl+Shift+T",
                             ))
@@ -3204,11 +3209,11 @@ impl ButtonsApp {
                         {
                             let options = self.shell_menu_options();
                             let mut launch = None;
-                            ui.menu_button(
+                            ui.spaced_menu_button(
                                 crate::i18n::literal(&self.locale, "New terminal with…"),
                                 |ui| {
                                     for (id, label, detail) in options {
-                                        if ui.button(label).on_hover_text(detail).clicked() {
+                                        if ui.spaced_button(label).on_hover_text(detail).clicked() {
                                             launch = Some(id);
                                             ui.close_menu();
                                         }
@@ -3228,10 +3233,13 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 !self.recently_closed.is_empty(),
-                                egui::Button::new(crate::i18n::literal(
-                                    &self.locale,
-                                    "Reopen closed terminal  Ctrl+Shift+U",
-                                )),
+                                crate::ui_text::button(
+                                    ui,
+                                    crate::i18n::literal(
+                                        &self.locale,
+                                        "Reopen closed terminal  Ctrl+Shift+U",
+                                    ),
+                                ),
                             )
                             .clicked()
                         {
@@ -3240,20 +3248,20 @@ impl ButtonsApp {
                         }
                         ui.separator();
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
                             .clicked()
                         {
                             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                         }
                     });
-                    ui.menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
-                        ui.checkbox(&mut self.preferences.show_sidebar, "Command dock");
-                        ui.checkbox(&mut self.preferences.show_presets, "Preset bar");
+                    ui.spaced_menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
+                        ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Command dock");
+                        ui.spaced_checkbox(&mut self.preferences.show_presets, "Preset bar");
                         #[cfg(not(target_arch = "wasm32"))]
                         if quick_secrets_available() {
                             ui.separator();
                             if ui
-                                .button(crate::i18n::literal(&self.locale, "Quick Secrets"))
+                                .spaced_button(crate::i18n::literal(&self.locale, "Quick Secrets"))
                                 .clicked()
                             {
                                 self.open_quick_secrets();
@@ -3263,43 +3271,49 @@ impl ButtonsApp {
                     });
                     #[cfg(not(target_arch = "wasm32"))]
                     if cool_stuff_available() {
-                        ui.menu_button(crate::i18n::literal(&self.locale, "Cool Stuff"), |ui| {
-                            if ui
-                                .button(crate::i18n::literal(
-                                    &self.locale,
-                                    "Install AI coding tools",
-                                ))
-                                .clicked()
-                            {
-                                self.show_cool_stuff = true;
-                                self.cool_stuff_command = None;
-                                self.cool_stuff_shell_profile = None;
-                                self.cool_stuff_type_reason = None;
-                                self.cool_stuff_error = None;
-                                ui.close_menu();
-                            }
-                            ui.separator();
-                            for (label, url) in crate::cool_stuff::PROVIDER_LINKS {
+                        ui.spaced_menu_button(
+                            crate::i18n::literal(&self.locale, "Cool Stuff"),
+                            |ui| {
                                 if ui
-                                    .button(crate::i18n::literal(&self.locale, label))
+                                    .spaced_button(crate::i18n::literal(
+                                        &self.locale,
+                                        "Install AI coding tools",
+                                    ))
                                     .clicked()
                                 {
-                                    ctx.open_url(egui::OpenUrl::new_tab(url));
+                                    self.show_cool_stuff = true;
+                                    self.cool_stuff_command = None;
+                                    self.cool_stuff_shell_profile = None;
+                                    self.cool_stuff_type_reason = None;
+                                    self.cool_stuff_error = None;
                                     ui.close_menu();
                                 }
-                            }
-                        });
+                                ui.separator();
+                                for (label, url) in crate::cool_stuff::PROVIDER_LINKS {
+                                    if ui
+                                        .spaced_button(crate::i18n::literal(&self.locale, label))
+                                        .clicked()
+                                    {
+                                        ctx.open_url(egui::OpenUrl::new_tab(url));
+                                        ui.close_menu();
+                                    }
+                                }
+                            },
+                        );
                     }
-                    ui.menu_button(crate::i18n::literal(&self.locale, "Terminal"), |ui| {
+                    ui.spaced_menu_button(crate::i18n::literal(&self.locale, "Terminal"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
-                                egui::Button::new(crate::i18n::text(
-                                    &self.locale,
-                                    crate::i18n::MessageKey::TerminalFind,
-                                    &[],
-                                )),
+                                crate::ui_text::button(
+                                    ui,
+                                    crate::i18n::text(
+                                        &self.locale,
+                                        crate::i18n::MessageKey::TerminalFind,
+                                        &[],
+                                    ),
+                                ),
                             )
                             .clicked()
                         {
@@ -3311,7 +3325,7 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 !self.tabs.is_empty(),
-                                egui::Button::new("Read terminal text…"),
+                                crate::ui_text::button(ui, "Read terminal text…"),
                             )
                             .clicked()
                         {
@@ -3322,11 +3336,14 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
-                                egui::Button::new(crate::i18n::text(
-                                    &self.locale,
-                                    crate::i18n::MessageKey::TerminalSelectAll,
-                                    &[],
-                                )),
+                                crate::ui_text::button(
+                                    ui,
+                                    crate::i18n::text(
+                                        &self.locale,
+                                        crate::i18n::MessageKey::TerminalSelectAll,
+                                        &[],
+                                    ),
+                                ),
                             )
                             .clicked()
                         {
@@ -3337,11 +3354,14 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 terminal_search_available() && !self.tabs.is_empty(),
-                                egui::Button::new(crate::i18n::text(
-                                    &self.locale,
-                                    crate::i18n::MessageKey::TerminalClearScreen,
-                                    &[],
-                                )),
+                                crate::ui_text::button(
+                                    ui,
+                                    crate::i18n::text(
+                                        &self.locale,
+                                        crate::i18n::MessageKey::TerminalClearScreen,
+                                        &[],
+                                    ),
+                                ),
                             )
                             .clicked()
                         {
@@ -3349,18 +3369,21 @@ impl ButtonsApp {
                             ui.close_menu();
                         }
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "Settings"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "Settings"))
                             .clicked()
                         {
                             self.show_settings = true;
                             ui.close_menu();
                         }
                     });
-                    ui.menu_button(crate::i18n::literal(&self.locale, "Help"), |ui| {
+                    ui.spaced_menu_button(crate::i18n::literal(&self.locale, "Help"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
                         if read_only_guides_available()
                             && ui
-                                .button(crate::i18n::literal(&self.locale, "Read-only guides"))
+                                .spaced_button(crate::i18n::literal(
+                                    &self.locale,
+                                    "Read-only guides",
+                                ))
                                 .clicked()
                         {
                             self.show_guides = true;
@@ -3369,7 +3392,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         if user_feedback_available()
                             && ui
-                                .button(crate::i18n::literal(&self.locale, "Send Feedback"))
+                                .spaced_button(crate::i18n::literal(&self.locale, "Send Feedback"))
                                 .clicked()
                         {
                             self.show_feedback = true;
@@ -3378,7 +3401,7 @@ impl ButtonsApp {
                         }
                         #[cfg(not(target_arch = "wasm32"))]
                         if ui
-                            .button(crate::i18n::text(
+                            .spaced_button(crate::i18n::text(
                                 &self.locale,
                                 crate::i18n::MessageKey::AiHelp,
                                 &[],
@@ -3389,7 +3412,7 @@ impl ButtonsApp {
                             ui.close_menu();
                         }
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "About ButtonsCLI"))
                             .clicked()
                         {
                             self.show_about = true;
@@ -3397,7 +3420,7 @@ impl ButtonsApp {
                         }
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(RichText::new("NATIVE · RUST").small().color(colors.muted));
+                        ui.spaced_label(RichText::new("NATIVE · RUST").small().color(colors.muted));
                     });
                 });
             });
@@ -3549,27 +3572,27 @@ impl ButtonsApp {
             .resizable(true)
             .default_size([600.0, 620.0])
             .show(ctx, |ui| {
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &locale,
                     "This opens a bundled installer script for a fast AI-coding setup: common dev tools, VS Code, and the most approachable AI CLIs in one place.",
                 ));
                 ui.add_space(8.0);
                 wrapping_row(ui, |ui| {
-                    ui.label(crate::i18n::literal(&locale, "Platform"));
+                    ui.spaced_label(crate::i18n::literal(&locale, "Platform"));
                     for platform in [
                         crate::cool_stuff::InstallerPlatform::Windows,
                         crate::cool_stuff::InstallerPlatform::Ubuntu,
                         crate::cool_stuff::InstallerPlatform::Macos,
                     ] {
-                        ui.selectable_value(
+                        ui.spaced_selectable_value(
                             &mut selected_platform,
                             platform,
                             crate::i18n::literal(&locale, platform.label()),
                         );
                     }
                     if let Some(host) = crate::cool_stuff::InstallerPlatform::host() {
-                        ui.label(crate::i18n::literal(&locale, "Auto-detected target:"));
-                        ui.label(crate::i18n::literal(&locale, host.label()));
+                        ui.spaced_label(crate::i18n::literal(&locale, "Auto-detected target:"));
+                        ui.spaced_label(crate::i18n::literal(&locale, host.label()));
                     }
                 });
                 ui.separator();
@@ -3577,38 +3600,38 @@ impl ButtonsApp {
                 egui::ScrollArea::vertical()
                     .max_height(470.0)
                     .show(ui, |ui| {
-                        ui.heading(details.headline);
-                        ui.label(details.summary);
+                        ui.spaced_heading(details.headline);
+                        ui.spaced_label(details.summary);
                         ui.add_space(8.0);
-                        ui.label(crate::i18n::literal(&locale, "Bundled script"));
+                        ui.spaced_label(crate::i18n::literal(&locale, "Bundled script"));
                         ui.monospace(selected_platform.script_file_name());
-                        ui.label(crate::i18n::literal(&locale, "Recommended shell"));
+                        ui.spaced_label(crate::i18n::literal(&locale, "Recommended shell"));
                         ui.monospace(details.recommended_shell);
                         ui.add_space(8.0);
-                        ui.strong(crate::i18n::literal(&locale, "What it installs"));
+                        ui.spaced_strong(crate::i18n::literal(&locale, "What it installs"));
                         for item in details.what_it_installs {
-                            ui.label(format!("• {item}"));
+                            ui.spaced_label(format!("• {item}"));
                         }
                         ui.add_space(8.0);
-                        ui.strong(crate::i18n::literal(&locale, "Command that will be typed"));
+                        ui.spaced_strong(crate::i18n::literal(&locale, "Command that will be typed"));
                         ui.add(
                             egui::TextEdit::multiline(&mut command_display)
                             .desired_rows(2)
                             .code_editor()
                             .interactive(false),
                         );
-                        ui.label(crate::i18n::literal(&locale, "Types for review"));
+                        ui.spaced_label(crate::i18n::literal(&locale, "Types for review"));
                         if let Some(reason) = &type_reason {
-                            ui.colored_label(colors.warning, reason);
+                            ui.spaced_colored_label(colors.warning, reason);
                         }
                         ui.add_space(8.0);
-                        ui.strong(crate::i18n::literal(&locale, "After install"));
+                        ui.spaced_strong(crate::i18n::literal(&locale, "After install"));
                         for step in details.after_install {
-                            ui.label(format!("• {step}"));
+                            ui.spaced_label(format!("• {step}"));
                         }
                         ui.add_space(8.0);
-                        ui.strong(crate::i18n::literal(&locale, "Notes"));
-                        ui.label(details.note);
+                        ui.spaced_strong(crate::i18n::literal(&locale, "Notes"));
+                        ui.spaced_label(details.note);
                     });
 
                 ui.separator();
@@ -3616,7 +3639,7 @@ impl ButtonsApp {
                     if ui
                         .add_enabled(
                             command.is_some(),
-                            egui::Button::new(crate::i18n::literal(&locale, "Copy command")),
+                            crate::ui_text::button(ui, crate::i18n::literal(&locale, "Copy command")),
                         )
                         .clicked()
                     {
@@ -3625,14 +3648,14 @@ impl ButtonsApp {
                     if ui
                         .add_enabled(
                             command.is_some() && shell_profile.is_some(),
-                            egui::Button::new(crate::i18n::literal(&locale, "Type in new tab")),
+                            crate::ui_text::button(ui, crate::i18n::literal(&locale, "Type in new tab")),
                         )
                         .clicked()
                     {
                         action = Some(DialogAction::Type);
                     }
                     if ui
-                        .button(crate::i18n::literal(&locale, "Close"))
+                        .spaced_button(crate::i18n::literal(&locale, "Close"))
                         .clicked()
                     {
                         request_close = true;
@@ -3726,7 +3749,7 @@ impl ButtonsApp {
                         if active {
                             text = text.strong();
                         }
-                        let button = egui::Button::new(text)
+                        let button = crate::ui_text::button(ui, text)
                             .fill(if active {
                                 colors.tabs_active
                             } else if pane_number.is_some() {
@@ -3791,7 +3814,7 @@ impl ButtonsApp {
                             );
                         });
                         if self.preferences.show_action_buttons {
-                            ui.menu_button("⋮", |ui| {
+                            ui.spaced_menu_button("⋮", |ui| {
                                 tab_action_menu(
                                     ui,
                                     &self.locale,
@@ -3804,9 +3827,9 @@ impl ButtonsApp {
                         }
                     }
                     let options = self.shell_menu_options();
-                    ui.menu_button(RichText::new("+").color(colors.accent), |ui| {
+                    ui.spaced_menu_button(RichText::new("+").color(colors.accent), |ui| {
                         for (id, label, detail) in options {
-                            if ui.button(label).on_hover_text(detail).clicked() {
+                            if ui.spaced_button(label).on_hover_text(detail).clicked() {
                                 add = Some(id);
                                 ui.close_menu();
                             }
@@ -3819,7 +3842,7 @@ impl ButtonsApp {
                     ));
                     if !self.recently_closed.is_empty()
                         && ui
-                            .button("↶")
+                            .spaced_button("↶")
                             .on_hover_text(crate::i18n::literal(
                                 &self.locale,
                                 "Reopen the most recently closed terminal",
@@ -3867,7 +3890,7 @@ impl ButtonsApp {
                     ui.horizontal(|ui| {
                         for (index, preset) in presets.iter().enumerate() {
                             let response = ui
-                                .button(&preset.label)
+                                .spaced_button(&preset.label)
                                 .on_hover_text(preset_hover_text(&self.locale, preset));
                             if response.clicked() {
                                 action = Some(PresetAction::Run(PresetCollection::Commands, index));
@@ -3883,7 +3906,7 @@ impl ButtonsApp {
                             );
                         }
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "+"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "+"))
                             .on_hover_text(crate::i18n::literal(&self.locale, "Add a preset"))
                             .clicked()
                         {
@@ -3943,7 +3966,7 @@ impl ButtonsApp {
                 if ui
                     .add_sized(
                         [ui.available_width().max(1.0), 30.0],
-                        egui::Button::new(crate::i18n::literal(&self.locale, "›")),
+                        crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "›")),
                     )
                     .on_hover_text(crate::i18n::text(
                         &self.locale,
@@ -4036,14 +4059,14 @@ impl ButtonsApp {
             &self.preferences.typography.preset_dock,
         );
         ui.horizontal(|ui| {
-            ui.label(
+            ui.spaced_label(
                 RichText::new(&self.preferences.dock_title)
                     .strong()
                     .color(colors.accent_alt),
             );
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
-                    .small_button(crate::i18n::literal(&self.locale, "‹"))
+                    .spaced_small_button(crate::i18n::literal(&self.locale, "‹"))
                     .clicked()
                 {
                     self.preferences.show_sidebar = false;
@@ -4052,7 +4075,7 @@ impl ButtonsApp {
         });
         if controls_available {
             wrapping_row(ui, |ui| {
-                ui.checkbox(
+                ui.spaced_checkbox(
                     &mut self.preferences.dock_compact,
                     crate::i18n::text(
                         &self.locale,
@@ -4064,7 +4087,7 @@ impl ButtonsApp {
         }
         if !self.preferences.dock_compact {
             ui.add_space(4.0);
-            ui.label(
+            ui.spaced_label(
                 RichText::new("Saved remote connections for the focused terminal")
                     .small()
                     .color(colors.muted),
@@ -4074,7 +4097,7 @@ impl ButtonsApp {
         let presets = self.preferences.ssh_presets.clone();
         let mut action = None;
         if presets.is_empty() {
-            ui.label(
+            ui.spaced_label(
                 RichText::new("No SSH presets yet")
                     .small()
                     .color(colors.muted),
@@ -4085,7 +4108,7 @@ impl ButtonsApp {
             wrapping_row(ui, |ui| {
                 for (index, preset) in presets.iter().enumerate() {
                     let response = ui
-                        .button(&preset.label)
+                        .spaced_button(&preset.label)
                         .on_hover_text(preset_hover_text(&self.locale, preset));
                     if response.clicked() {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
@@ -4111,7 +4134,10 @@ impl ButtonsApp {
                     };
                     let button_width = (ui.available_width() - action_width - 4.0).max(40.0);
                     let response = ui
-                        .add_sized([button_width, 30.0], egui::Button::new(&preset.label))
+                        .add_sized(
+                            [button_width, 30.0],
+                            crate::ui_text::button(ui, &preset.label),
+                        )
                         .on_hover_text(preset_hover_text(&self.locale, preset));
                     if response.clicked() {
                         action = Some(PresetAction::Run(PresetCollection::Ssh, index));
@@ -4131,7 +4157,7 @@ impl ButtonsApp {
         if ui
             .add_sized(
                 [ui.available_width(), 28.0],
-                egui::Button::new(crate::i18n::literal(&self.locale, "+ Add SSH preset")),
+                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+ Add SSH preset")),
             )
             .clicked()
         {
@@ -4142,7 +4168,7 @@ impl ButtonsApp {
         }
         ui.add_space(12.0);
         ui.separator();
-        ui.label(
+        ui.spaced_label(
             RichText::new("RUN A COMMAND")
                 .small()
                 .strong()
@@ -4157,7 +4183,7 @@ impl ButtonsApp {
         if (ui
             .add_sized(
                 [ui.available_width(), 30.0],
-                egui::Button::new(crate::i18n::literal(&self.locale, "Run in terminal")),
+                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Run in terminal")),
             )
             .clicked()
             || run)
@@ -4190,9 +4216,9 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 wrapping_row(ui, |ui| {
-                    ui.label(RichText::new("SHELL READY").small().color(colors.accent));
+                    ui.spaced_label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
-                    ui.label(
+                    ui.spaced_label(
                         RichText::new(if cfg!(target_arch = "wasm32") {
                             "sandbox replay engine"
                         } else {
@@ -4202,7 +4228,7 @@ impl ButtonsApp {
                         .color(colors.status_text),
                     );
                     ui.separator();
-                    ui.label(
+                    ui.spaced_label(
                         RichText::new(format!(
                             "{} px",
                             terminal_size as i32
@@ -4218,44 +4244,44 @@ impl ButtonsApp {
                         let current = self.preferences.theme_id.clone();
                         let mut action = None;
                         ui.horizontal(|ui| {
-                            ui.menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
+                            ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
-                            if ui.button(crate::i18n::literal(&self.locale, "Random theme"))
+                            if ui.spaced_button(crate::i18n::literal(&self.locale, "Random theme"))
                                 .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
                         });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
                         ui.separator();
-                        ui.label("Row banding");
+                        ui.spaced_label("Row banding");
                         ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
                         ui.separator();
-                        ui.label(RichText::new("Panes").small().color(colors.muted));
+                        ui.spaced_label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::Single, "1")
+                            .spaced_selectable_label(self.pane_layout == PaneLayout::Single, "1")
                             .on_hover_text(crate::i18n::literal(&self.locale, "Single pane"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Single }, ctx);
                         }
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::Columns, "COL")
+                            .spaced_selectable_label(self.pane_layout == PaneLayout::Columns, "COL")
                             .on_hover_text(crate::i18n::literal(&self.locale, "Arrange visible terminals in columns"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Columns }, ctx);
                         }
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::Rows, "ROW")
+                            .spaced_selectable_label(self.pane_layout == PaneLayout::Rows, "ROW")
                             .on_hover_text(crate::i18n::literal(&self.locale, "Arrange visible terminals in rows"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::Layout { mode: LayoutMode::Rows }, ctx);
                         }
                         if ui
-                            .selectable_label(self.pane_layout == PaneLayout::Grid, "GRID")
+                            .spaced_selectable_label(self.pane_layout == PaneLayout::Grid, "GRID")
                             .on_hover_text(crate::i18n::literal(&self.locale, "Tile visible terminals in a balanced grid"))
                             .clicked()
                         {
@@ -4264,7 +4290,7 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 pane_count > 1 && !self.preferences.pane_split_ratios.is_empty(),
-                                egui::Button::new(crate::i18n::literal(&self.locale, "↺")),
+                                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "↺")),
                             )
                             .on_hover_text(crate::i18n::literal(&self.locale, "Reset draggable pane dividers"))
                             .clicked()
@@ -4272,19 +4298,19 @@ impl ButtonsApp {
                             self.preferences.pane_split_ratios.clear();
                         }
                         if ui
-                            .add_enabled(pane_count > 1, egui::Button::new(crate::i18n::literal(&self.locale, "−")))
+                            .add_enabled(pane_count > 1, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "−")))
                             .on_hover_text(crate::i18n::literal(&self.locale, "Show one fewer terminal"))
                             .clicked()
                         {
                             self.dispatch_ui_or_notice(None, Action::VisibleCount { count: pane_count - 1 }, ctx);
                         }
-                        ui.label(
+                        ui.spaced_label(
                             RichText::new(if !self.rendered_panes.is_empty() && self.rendered_panes.len() < pane_count { format!("{}/{pane_count}", self.rendered_panes.len()) } else { pane_count.to_string() })
                                 .small()
                                 .color(colors.status_text),
                         ).on_hover_text(crate::i18n::literal(&self.locale, "Visible / requested panes. Use the tab strip to reach panes hidden by window size."));
                         if ui
-                            .add_enabled(pane_count < 10, egui::Button::new(crate::i18n::literal(&self.locale, "+")))
+                            .add_enabled(pane_count < 10, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+")))
                             .on_hover_text(crate::i18n::literal(&self.locale, "Show one more terminal"))
                             .clicked()
                         {
@@ -4293,7 +4319,7 @@ impl ButtonsApp {
                     }
                     #[cfg(not(target_arch = "wasm32"))]
                     if ui.add_enabled(self.auto_tile.eligible_count(&self.tab_ids()) > 0,
-                        egui::Button::new(crate::i18n::literal(&self.locale, "All")))
+                        crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "All")))
                         .on_hover_text(crate::i18n::literal(&self.locale, "Auto-tile all included terminals (up to 10). No new terminals are opened."))
                         .clicked() {
                         self.show_all_auto_tiles();
@@ -4301,7 +4327,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         if self.control_server.is_some()
                             && ui
-                                .small_button(crate::i18n::text(&self.locale,
+                                .spaced_small_button(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::AgentInst,
                                     &[],
                                 ))
@@ -4320,10 +4346,10 @@ impl ButtonsApp {
                             }
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        if ui.small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
+                        if ui.spaced_small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
                             self.open_ai_help();
                         }
-                        if ui.add(egui::Button::new(crate::i18n::literal(&self.locale, "Settings"))
+                        if ui.add(crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Settings"))
                             .small().selected(self.show_settings))
                             .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
                             .clicked() {
@@ -4337,9 +4363,9 @@ impl ButtonsApp {
                                 &[],
                             );
                             let calm = if controls_enabled {
-                                ui.selectable_label(self.preferences.calm_mode, calm_label)
+                                ui.spaced_selectable_label(self.preferences.calm_mode, calm_label)
                             } else {
-                                ui.label(calm_label)
+                                ui.spaced_label(calm_label)
                             }
                                 .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::CalmModeHelp,
@@ -4349,7 +4375,7 @@ impl ButtonsApp {
                                 self.preferences.calm_mode = !self.preferences.calm_mode;
                             }
                             let zoom_in = ui
-                                .add_enabled(controls_enabled, egui::Button::new(crate::i18n::literal(&self.locale, "+")))
+                                .add_enabled(controls_enabled, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+")))
                                 .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomIn,
                                     &[],
@@ -4358,7 +4384,7 @@ impl ButtonsApp {
                                 self.zoom_focused_terminal(crate::dock::ZoomAction::In);
                             }
                             let zoom_out = ui
-                                .add_enabled(controls_enabled, egui::Button::new(crate::i18n::literal(&self.locale, "−")))
+                                .add_enabled(controls_enabled, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "−")))
                                 .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomOut,
                                     &[],
@@ -4371,9 +4397,9 @@ impl ButtonsApp {
                                     .unwrap_or(self.preferences.typography.terminal.size),
                             );
                             let zoom_reset = if controls_enabled {
-                                ui.small_button(format!("{zoom}%"))
+                                ui.spaced_small_button(format!("{zoom}%"))
                             } else {
-                                ui.label(format!("{zoom}%"))
+                                ui.spaced_label(format!("{zoom}%"))
                             }
                                 .on_hover_text(crate::i18n::text(&self.locale,
                                     crate::i18n::MessageKey::TerminalZoomReset,
@@ -4590,55 +4616,59 @@ impl ButtonsApp {
         );
         ui.scope(|ui| {
             wrapping_row(ui, |ui| {
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Themes,
                     crate::i18n::literal(&self.locale, "Themes"),
                 );
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Fonts,
                     crate::i18n::literal(&self.locale, "Fonts"),
                 );
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Commands,
                     crate::i18n::literal(&self.locale, "Commands"),
                 );
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Workspace,
                     crate::i18n::literal(&self.locale, "Workspace"),
                 );
                 if localization_settings_available() {
-                    ui.selectable_value(
+                    ui.spaced_selectable_value(
                         &mut self.settings_tab,
                         SettingsTab::Language,
                         crate::i18n::literal(&self.locale, "Language & Region"),
                     );
                 }
-                ui.selectable_value(&mut self.settings_tab, SettingsTab::Keyboard, "Keyboard");
-                ui.selectable_value(
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Keyboard,
+                    "Keyboard",
+                );
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Shortcuts,
                     crate::i18n::text(&self.locale, crate::i18n::MessageKey::Shortcuts, &[]),
                 );
                 #[cfg(not(target_arch = "wasm32"))]
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Providers,
                     crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
                 );
                 #[cfg(not(target_arch = "wasm32"))]
                 if account_signin_available() {
-                    ui.selectable_value(
+                    ui.spaced_selectable_value(
                         &mut self.settings_tab,
                         SettingsTab::Account,
                         crate::i18n::literal(&self.locale, "Account"),
                     );
                 }
                 #[cfg(not(target_arch = "wasm32"))]
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Import,
                     crate::i18n::text(
@@ -4652,19 +4682,19 @@ impl ButtonsApp {
         ui.separator();
         if self.settings_tab == SettingsTab::Themes {
             wrapping_row(ui, |ui| {
-                ui.selectable_value(
+                ui.spaced_selectable_value(
                     &mut self.theme_settings_tab,
                     ThemeSettingsTab::Library,
                     "Library",
                 );
                 #[cfg(not(target_arch = "wasm32"))]
                 {
-                    ui.selectable_value(
+                    ui.spaced_selectable_value(
                         &mut self.theme_settings_tab,
                         ThemeSettingsTab::Edit,
                         "Edit",
                     );
-                    ui.selectable_value(
+                    ui.spaced_selectable_value(
                         &mut self.theme_settings_tab,
                         ThemeSettingsTab::Generate,
                         "Generate",
@@ -4721,7 +4751,7 @@ impl ButtonsApp {
                 .layout(Layout::right_to_left(Align::Center)),
             |ui| {
                 if ui
-                    .button(crate::i18n::text(
+                    .spaced_button(crate::i18n::text(
                         &self.locale,
                         crate::i18n::MessageKey::SettingsKeepClose,
                         &[],
@@ -4731,7 +4761,7 @@ impl ButtonsApp {
                     *close_action = Some(SettingsCloseAction::Keep);
                 }
                 if ui
-                    .button(crate::i18n::text(
+                    .spaced_button(crate::i18n::text(
                         &self.locale,
                         crate::i18n::MessageKey::SettingsRevertClose,
                         &[],
@@ -4745,22 +4775,22 @@ impl ButtonsApp {
     }
 
     fn language_settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading(crate::i18n::literal(&self.locale, "Language & Region"));
-        ui.label(crate::i18n::literal(
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Language & Region"));
+        ui.spaced_label(crate::i18n::literal(
             &self.locale,
             "Choose how ButtonsCLI resolves its display language. Existing installs keep their current behavior until you change it here.",
         ));
         ui.add_space(8.0);
-        ui.label(crate::i18n::literal(&self.locale, "Display language"));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Display language"));
 
         let mut mode = self.preferences.localization.mode;
         let mut locale = self.preferences.localization.manual_locale.clone();
-        ui.radio_value(
+        ui.spaced_radio_value(
             &mut mode,
             LocalizationMode::System,
             crate::i18n::literal(&self.locale, "Use system language"),
         );
-        ui.radio_value(
+        ui.spaced_radio_value(
             &mut mode,
             LocalizationMode::Manual,
             crate::i18n::literal(&self.locale, "Choose a specific language"),
@@ -4775,16 +4805,20 @@ impl ButtonsApp {
         self.refresh_locale();
 
         let current = crate::i18n::locale_info(&self.locale).native_name;
-        ui.label(self.localized_arg("Current app language: {language}", "language", current));
+        ui.spaced_label(self.localized_arg(
+            "Current app language: {language}",
+            "language",
+            current,
+        ));
         if mode == LocalizationMode::System {
             let detected = crate::i18n::locale_info(crate::i18n::system_locale()).native_name;
-            ui.label(self.localized_arg(
+            ui.spaced_label(self.localized_arg(
                 "Detected system language: {language}",
                 "language",
                 detected,
             ));
         }
-        ui.small(crate::i18n::literal(
+        ui.spaced_small(crate::i18n::literal(
             &self.locale,
             "Changes apply immediately in the main window, detached windows, and native menus.",
         ));
@@ -4800,25 +4834,25 @@ impl ButtonsApp {
         egui::Modal::new(egui::Id::new("localization-first-run"))
             .show(ctx, |ui| {
                 ui.set_max_width(440.0);
-                ui.heading(crate::i18n::literal(&self.locale, "Choose your app language"));
+                ui.spaced_heading(crate::i18n::literal(&self.locale, "Choose your app language"));
                 ui.add_space(6.0);
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "ButtonsCLI can follow your system language or stay pinned to a specific language. You can change this later in Settings.",
                 ));
                 let detected = crate::i18n::locale_info(crate::i18n::system_locale()).native_name;
-                ui.small(self.localized_arg(
+                ui.spaced_small(self.localized_arg(
                     "Detected from your system: {language}",
                     "language",
                     detected,
                 ));
                 ui.add_space(6.0);
-                ui.radio_value(
+                ui.spaced_radio_value(
                     &mut mode,
                     LocalizationMode::System,
                     crate::i18n::literal(&self.locale, "Keep following the system language"),
                 );
-                ui.radio_value(
+                ui.spaced_radio_value(
                     &mut mode,
                     LocalizationMode::Manual,
                     crate::i18n::literal(&self.locale, "Use a specific language instead"),
@@ -4827,7 +4861,7 @@ impl ButtonsApp {
                     locale_selector(ui, "onboarding-locale-selector", &mut locale);
                 }
                 ui.add_space(8.0);
-                confirmed = ui.button(crate::i18n::literal(&self.locale, "Continue")).clicked();
+                confirmed = ui.spaced_button(crate::i18n::literal(&self.locale, "Continue")).clicked();
             });
         self.preferences.localization.mode = mode;
         self.preferences.localization.manual_locale = locale;
@@ -5128,7 +5162,7 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn account_settings(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
         let locale = self.locale.clone();
-        ui.heading(crate::i18n::literal(&locale, "ButtonsCLI account"));
+        ui.spaced_heading(crate::i18n::literal(&locale, "ButtonsCLI account"));
         ui.add_space(8.0);
         let mut request_code = false;
         let mut verify_code = false;
@@ -5136,33 +5170,33 @@ impl ButtonsApp {
 
         if let Some(session) = &self.account_session {
             ui.horizontal(|ui| {
-                ui.label(crate::i18n::literal(&locale, "Signed in as"));
-                ui.strong(&session.user.email);
+                ui.spaced_label(crate::i18n::literal(&locale, "Signed in as"));
+                ui.spaced_strong(&session.user.email);
             });
             ui.add_space(8.0);
             if ui
                 .add_enabled(
                     !self.account_busy,
-                    egui::Button::new(crate::i18n::literal(&locale, "Sign out")),
+                    crate::ui_text::button(ui, crate::i18n::literal(&locale, "Sign out")),
                 )
                 .clicked()
             {
                 sign_out = true;
             }
         } else {
-            ui.label(crate::i18n::literal(&locale, "No account signed in"));
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(&locale, "No account signed in"));
+            ui.spaced_label(crate::i18n::literal(
                 &locale,
                 "Sign-in manages your ButtonsCLI account session and checks server access. Local terminals and provider settings work without an account.",
             ));
             ui.add_space(8.0);
-            ui.label(crate::i18n::literal(&locale, "Email address"));
+            ui.spaced_label(crate::i18n::literal(&locale, "Email address"));
             ui.add_enabled_ui(!self.account_busy, |ui| {
                 ui.text_edit_singleline(&mut self.account_email_draft);
             });
             if self.account_code_requested {
                 ui.add_space(6.0);
-                ui.label(crate::i18n::formatted_literal(
+                ui.spaced_label(crate::i18n::formatted_literal(
                     &locale,
                     "Enter the code sent to {email}.",
                     &[("email", &self.account_email_draft)],
@@ -5173,14 +5207,14 @@ impl ButtonsApp {
                 verify_code = ui
                     .add_enabled(
                         !self.account_busy && !self.account_code_draft.trim().is_empty(),
-                        egui::Button::new(crate::i18n::literal(&locale, "Continue")),
+                        crate::ui_text::button(ui, crate::i18n::literal(&locale, "Continue")),
                     )
                     .clicked();
             } else {
                 request_code = ui
                     .add_enabled(
                         !self.account_busy && self.account_email_draft.contains('@'),
-                        egui::Button::new(crate::i18n::literal(&locale, "Send code")),
+                        crate::ui_text::button(ui, crate::i18n::literal(&locale, "Send code")),
                     )
                     .clicked();
             }
@@ -5201,7 +5235,7 @@ impl ButtonsApp {
                     crate::i18n::literal(&locale, "Could not verify that code.")
                 }
             };
-            ui.colored_label(
+            ui.spaced_colored_label(
                 if matches!(
                     notice,
                     AccountNotice::CodeRequestFailed | AccountNotice::SignInFailed
@@ -5229,29 +5263,30 @@ impl ButtonsApp {
     fn provider_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey as M};
         let warning_color = self.colors().warning;
-        ui.heading(text(&self.locale, M::Providers, &[]));
-        ui.label(text(&self.locale, M::ProviderHelp, &[]));
+        ui.spaced_heading(text(&self.locale, M::Providers, &[]));
+        ui.spaced_label(text(&self.locale, M::ProviderHelp, &[]));
         if crate::features::local::enabled() {
-            ui.label(
+            ui.spaced_label(
                 "Local feature override is enabled. Restart after changing feature-flags.json.",
             );
         }
         let ai_unlocked = ai_help_available();
         if !ai_unlocked {
-            ui.label(text(&self.locale, M::AiHelpLockedProvider, &[]));
+            ui.spaced_label(text(&self.locale, M::AiHelpLockedProvider, &[]));
         }
         let settings = &mut self.preferences.provider_settings;
         let prior = settings.active_provider_id.clone();
         egui::ComboBox::from_label(text(&self.locale, M::ActiveProvider, &[]))
-            .selected_text(
+            .selected_text(crate::ui_text::spaced_text(
+                ui,
                 settings
                     .active()
                     .map(|provider| provider.name.as_str())
                     .unwrap_or("—"),
-            )
+            ))
             .show_ui(ui, |ui| {
                 for provider in &settings.providers {
-                    ui.selectable_value(
+                    ui.spaced_selectable_value(
                         &mut settings.active_provider_id,
                         provider.id.clone(),
                         &provider.name,
@@ -5262,7 +5297,10 @@ impl ButtonsApp {
             self.credential_draft.zeroize();
             self.credential_message = None;
         }
-        if ui.button(text(&self.locale, M::AddProvider, &[])).clicked() {
+        if ui
+            .spaced_button(text(&self.locale, M::AddProvider, &[]))
+            .clicked()
+        {
             let unique = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|duration| duration.as_nanos())
@@ -5286,22 +5324,22 @@ impl ButtonsApp {
         };
         let provider = &mut settings.providers[index];
         ui.horizontal(|ui| {
-            let label = ui.label(text(&self.locale, M::ProviderName, &[]));
+            let label = ui.spaced_label(text(&self.locale, M::ProviderName, &[]));
             ui.text_edit_singleline(&mut provider.name)
                 .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            let label = ui.label(text(&self.locale, M::ProviderEndpoint, &[]));
+            let label = ui.spaced_label(text(&self.locale, M::ProviderEndpoint, &[]));
             ui.text_edit_singleline(&mut provider.endpoint)
                 .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            let label = ui.label(text(&self.locale, M::ProviderModel, &[]));
+            let label = ui.spaced_label(text(&self.locale, M::ProviderModel, &[]));
             ui.text_edit_singleline(&mut provider.model)
                 .labelled_by(label.id);
         });
         if validate_endpoint(&provider.endpoint).is_err() {
-            ui.colored_label(
+            ui.spaced_colored_label(
                 warning_color,
                 text(&self.locale, M::ProviderEndpointInvalid, &[]),
             );
@@ -5324,16 +5362,16 @@ impl ButtonsApp {
             },
             &[],
         );
-        ui.label(text(
+        ui.spaced_label(text(
             &self.locale,
             M::ProviderKeyStatus,
             &[("status", &key_status)],
         ));
         ui.horizontal(|ui| {
-            ui.label(text(&self.locale, M::ApiKey, &[]));
+            ui.spaced_label(text(&self.locale, M::ApiKey, &[]));
             ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
         });
-        ui.checkbox(
+        ui.spaced_checkbox(
             &mut self.credential_session_only,
             text(&self.locale, M::SessionOnlyKey, &[]),
         );
@@ -5341,19 +5379,19 @@ impl ButtonsApp {
         let save = ui
             .add_enabled(
                 !self.credential_busy && !self.credential_draft.trim().is_empty(),
-                egui::Button::new(text(&self.locale, M::SaveKey, &[])),
+                crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
             )
             .clicked();
         let delete = ui
             .add_enabled(
                 !self.credential_busy && (has_session_key || has_saved_key),
-                egui::Button::new(text(&self.locale, M::RemoveKey, &[])),
+                crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
             )
             .clicked();
         let remove = ui
             .add_enabled(
                 !self.credential_busy && !has_session_key && !has_saved_key,
-                egui::Button::new(text(&self.locale, M::RemoveProvider, &[])),
+                crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
             )
             .clicked();
         let mut test_connection = false;
@@ -5365,7 +5403,7 @@ impl ButtonsApp {
                         && !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok()
                         && !provider.model.trim().is_empty(),
-                    egui::Button::new(text(&self.locale, M::TestConnection, &[])),
+                    crate::ui_text::button(ui, text(&self.locale, M::TestConnection, &[])),
                 )
                 .clicked();
             discover_models = ui
@@ -5373,16 +5411,16 @@ impl ButtonsApp {
                     ai_unlocked
                         && !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok(),
-                    egui::Button::new(text(&self.locale, M::DiscoverModels, &[])),
+                    crate::ui_text::button(ui, text(&self.locale, M::DiscoverModels, &[])),
                 )
                 .clicked();
         });
         if !self.provider_models.is_empty() {
             egui::ComboBox::from_label(text(&self.locale, M::ProviderModel, &[]))
-                .selected_text(&provider.model)
+                .selected_text(crate::ui_text::spaced_text(ui, &provider.model))
                 .show_ui(ui, |ui| {
                     for model in &self.provider_models {
-                        ui.selectable_value(&mut provider.model, model.clone(), model);
+                        ui.spaced_selectable_value(&mut provider.model, model.clone(), model);
                     }
                 });
         }
@@ -5390,10 +5428,10 @@ impl ButtonsApp {
             ui.spinner();
         }
         if let Some(message) = &self.provider_message {
-            ui.label(message);
+            ui.spaced_label(message);
         }
         if let Some(message) = &self.credential_message {
-            ui.label(message);
+            ui.spaced_label(message);
         }
         if test_connection || discover_models {
             let profile_name = profile_name.to_owned();
@@ -5828,21 +5866,21 @@ impl ButtonsApp {
             .resizable(true)
             .default_width(520.0)
             .show(ctx, |ui| {
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "No recovery. If you forget this passphrase, delete the vault and create a new one.",
                 ));
-                ui.small(crate::i18n::literal(
+                ui.spaced_small(crate::i18n::literal(
                     &self.locale,
                     "Choose a ready terminal. The shell may echo pasted text into terminal output.",
                 ));
                 ui.horizontal(|ui| {
-                    ui.label(crate::i18n::literal(&self.locale, "Quick Secrets Auto-Lock"));
+                    ui.spaced_label(crate::i18n::literal(&self.locale, "Quick Secrets Auto-Lock"));
                     egui::ComboBox::from_id_salt("quick-secrets-auto-lock")
-                        .selected_text(self.preferences.quick_secrets_auto_lock_minutes.to_string())
+                        .selected_text(crate::ui_text::spaced_text(ui, self.preferences.quick_secrets_auto_lock_minutes.to_string()))
                         .show_ui(ui, |ui| {
                             for minutes in [0, 5, 15, 30, 60, 120] {
-                                ui.selectable_value(
+                                ui.spaced_selectable_value(
                                     &mut self.preferences.quick_secrets_auto_lock_minutes,
                                     minutes,
                                     minutes.to_string(),
@@ -5850,18 +5888,18 @@ impl ButtonsApp {
                             }
                         });
                 });
-                ui.small(crate::i18n::literal(
+                ui.spaced_small(crate::i18n::literal(
                     &self.locale,
                     "Set how many minutes the unlock code stays active after you open the vault. Use 0 to require manual locking only.",
                 ));
                 ui.separator();
 
                 if let Some(message) = &self.quick_secrets_message {
-                    ui.colored_label(self.colors().warning, message);
+                    ui.spaced_colored_label(self.colors().warning, message);
                 }
                 if self.quick_secrets_busy {
                     ui.spinner();
-                    ui.label(crate::i18n::literal(&self.locale, "Working…"));
+                    ui.spaced_label(crate::i18n::literal(&self.locale, "Working…"));
                 } else if self.quick_secrets_session.is_none() {
                     ui.add(
                         egui::TextEdit::singleline(&mut *self.quick_secrets_passphrase_draft)
@@ -5882,7 +5920,7 @@ impl ButtonsApp {
                     if ui
                         .add_enabled(
                             !self.quick_secrets_busy,
-                            egui::Button::new(crate::i18n::literal(
+                            crate::ui_text::button(ui, crate::i18n::literal(
                                 &self.locale,
                                 if create { "Create vault" } else { "Unlock vault" },
                             )),
@@ -5905,17 +5943,17 @@ impl ButtonsApp {
                         self.quick_secrets_selected_target = None;
                     }
                     ui.horizontal(|ui| {
-                        ui.label(crate::i18n::literal(&self.locale, "Terminal"));
+                        ui.spaced_label(crate::i18n::literal(&self.locale, "Terminal"));
                         let selected = self
                             .quick_secrets_selected_target
                             .and_then(|id| ready_targets.iter().find(|(candidate, _)| *candidate == id))
                             .map(|(_, title)| title.as_str())
                             .unwrap_or("No terminal selected");
                         egui::ComboBox::from_id_salt("quick-secrets-target")
-                            .selected_text(crate::i18n::literal(&self.locale, selected))
+                            .selected_text(crate::ui_text::spaced_text(ui, crate::i18n::literal(&self.locale, selected)))
                             .show_ui(ui, |ui| {
                                 for (id, title) in &ready_targets {
-                                    ui.selectable_value(
+                                    ui.spaced_selectable_value(
                                         &mut self.quick_secrets_selected_target,
                                         Some(*id),
                                         title,
@@ -5935,18 +5973,18 @@ impl ButtonsApp {
                         })
                         .unwrap_or_default();
                     if entries.is_empty() {
-                        ui.label(crate::i18n::literal(&self.locale, "No secrets saved yet."));
+                        ui.spaced_label(crate::i18n::literal(&self.locale, "No secrets saved yet."));
                     }
                     let mut delivery = None;
                     let mut remove_entry = None;
                     for (id, label) in entries {
                         ui.group(|ui| {
                             ui.horizontal(|ui| {
-                                ui.label(&label);
+                                ui.spaced_label(&label);
                                 if ui
                                     .add_enabled(
                                         self.quick_secrets_selected_target.is_some(),
-                                        egui::Button::new(crate::i18n::literal(
+                                        crate::ui_text::button(ui, crate::i18n::literal(
                                             &self.locale,
                                             "paste only",
                                         )),
@@ -5958,7 +5996,7 @@ impl ButtonsApp {
                                 if ui
                                     .add_enabled(
                                         self.quick_secrets_selected_target.is_some(),
-                                        egui::Button::new(crate::i18n::literal(
+                                        crate::ui_text::button(ui, crate::i18n::literal(
                                             &self.locale,
                                             "paste + enter",
                                         )),
@@ -5978,7 +6016,7 @@ impl ButtonsApp {
                                 } else {
                                     crate::i18n::literal(&self.locale, "Delete")
                                 };
-                                if ui.small_button(delete_label).clicked() {
+                                if ui.spaced_small_button(delete_label).clicked() {
                                     if confirming {
                                         remove_entry = Some(id.clone());
                                     } else {
@@ -6027,7 +6065,7 @@ impl ButtonsApp {
                     ui.separator();
                     if self.quick_secrets_add_open {
                         if ui
-                            .button(crate::i18n::literal(
+                            .spaced_button(crate::i18n::literal(
                                 &self.locale,
                                 "Hide add secret form",
                             ))
@@ -6051,7 +6089,7 @@ impl ButtonsApp {
                                 .add_enabled(
                                     !self.quick_secrets_label_draft.trim().is_empty()
                                         && !self.quick_secrets_secret_draft.is_empty(),
-                                    egui::Button::new(crate::i18n::literal(
+                                    crate::ui_text::button(ui, crate::i18n::literal(
                                         &self.locale,
                                         "Save",
                                     )),
@@ -6079,7 +6117,7 @@ impl ButtonsApp {
                             }
                         });
                     } else if ui
-                        .button(crate::i18n::literal(&self.locale, "Add secret"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Add secret"))
                         .clicked()
                     {
                         self.quick_secrets_label_draft.clear();
@@ -6091,7 +6129,7 @@ impl ButtonsApp {
 
                     ui.separator();
                     if ui
-                        .button(crate::i18n::literal(&self.locale, "Lock vault"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Lock vault"))
                         .clicked()
                     {
                         self.lock_quick_secrets();
@@ -6100,13 +6138,13 @@ impl ButtonsApp {
                 if self.quick_secrets_vault_exists && !self.quick_secrets_busy {
                     ui.separator();
                     if self.quick_secrets_confirm_forget {
-                        ui.label(crate::i18n::literal(
+                        ui.spaced_label(crate::i18n::literal(
                             &self.locale,
                             "This permanently deletes every saved secret in the active profile.",
                         ));
                         ui.horizontal(|ui| {
                             if ui
-                                .button(crate::i18n::literal(
+                                .spaced_button(crate::i18n::literal(
                                     &self.locale,
                                     "Delete vault and secrets",
                                 ))
@@ -6129,14 +6167,14 @@ impl ButtonsApp {
                                     .map(|error| quick_secrets_error_text(&self.locale, error));
                             }
                             if ui
-                                .button(crate::i18n::literal(&self.locale, "Cancel"))
+                                .spaced_button(crate::i18n::literal(&self.locale, "Cancel"))
                                 .clicked()
                             {
                                 self.quick_secrets_confirm_forget = false;
                             }
                         });
                     } else if ui
-                        .button(crate::i18n::literal(&self.locale, "Forget vault"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Forget vault"))
                         .clicked()
                     {
                         self.quick_secrets_confirm_forget = true;
@@ -6212,13 +6250,13 @@ impl ButtonsApp {
                     let body_top = ui.cursor().top();
                     apply_zone_style(ui, &catalog, &assistant_font);
                     use crate::i18n::{text, MessageKey};
-                    ui.heading(text(&locale, MessageKey::AiHelp, &[]));
-                    ui.label(text(&locale, MessageKey::AiHelpDescription, &[]));
+                    ui.spaced_heading(text(&locale, MessageKey::AiHelp, &[]));
+                    ui.spaced_label(text(&locale, MessageKey::AiHelpDescription, &[]));
                     if !ai_help_available() {
                         ui.separator();
-                        ui.label(text(&locale, MessageKey::AiHelpLockedProvider, &[]));
+                        ui.spaced_label(text(&locale, MessageKey::AiHelpLockedProvider, &[]));
                         if ui
-                            .button(text(&locale, MessageKey::AiHelpProviderSettings, &[]))
+                            .spaced_button(text(&locale, MessageKey::AiHelpProviderSettings, &[]))
                             .clicked()
                         {
                             queue(AiHelpCommand::OpenSettings);
@@ -6258,7 +6296,7 @@ impl ButtonsApp {
                         .show(ui, |ui| {
                             for (assistant, message) in &state.messages {
                                 ui.group(|ui| {
-                                    ui.label(
+                                    ui.spaced_label(
                                         RichText::new(if *assistant {
                                             text(&locale, MessageKey::AiHelp, &[])
                                         } else {
@@ -6266,11 +6304,15 @@ impl ButtonsApp {
                                         })
                                         .strong(),
                                     );
-                                    ui.label(message);
+                                    ui.spaced_label(message);
                                 });
                             }
                             if state.messages.is_empty() {
-                                ui.label(text(&locale, MessageKey::AiHelpConversationSession, &[]));
+                                ui.spaced_label(text(
+                                    &locale,
+                                    MessageKey::AiHelpConversationSession,
+                                    &[],
+                                ));
                             }
                             for action in &state.reviewed_actions {
                                 let target_id = state.target.as_ref().map(|target| target.0);
@@ -6285,19 +6327,19 @@ impl ButtonsApp {
                                         command,
                                         send_enter,
                                     } => {
-                                        ui.strong(text(
+                                        ui.spaced_strong(text(
                                             &locale,
                                             MessageKey::AiHelpReviewCommand,
                                             &[("label", label)],
                                         ));
-                                        ui.label(text(
+                                        ui.spaced_label(text(
                                             &locale,
                                             MessageKey::AiHelpTarget,
                                             &[("target", &target_title)],
                                         ));
-                                        ui.label(description);
+                                        ui.spaced_label(description);
                                         ui.monospace(command);
-                                        ui.label(text(
+                                        ui.spaced_label(text(
                                             &locale,
                                             if *send_enter {
                                                 MessageKey::AiHelpWouldEnter
@@ -6310,11 +6352,14 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     target_id.is_some(),
-                                                    egui::Button::new(text(
-                                                        &locale,
-                                                        MessageKey::AiHelpInsert,
-                                                        &[],
-                                                    )),
+                                                    crate::ui_text::button(
+                                                        ui,
+                                                        text(
+                                                            &locale,
+                                                            MessageKey::AiHelpInsert,
+                                                            &[],
+                                                        ),
+                                                    ),
                                                 )
                                                 .clicked()
                                             {
@@ -6327,11 +6372,14 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     target_id.is_some(),
-                                                    egui::Button::new(text(
-                                                        &locale,
-                                                        MessageKey::AiHelpInsertEnter,
-                                                        &[],
-                                                    )),
+                                                    crate::ui_text::button(
+                                                        ui,
+                                                        text(
+                                                            &locale,
+                                                            MessageKey::AiHelpInsertEnter,
+                                                            &[],
+                                                        ),
+                                                    ),
                                                 )
                                                 .clicked()
                                             {
@@ -6348,18 +6396,18 @@ impl ButtonsApp {
                                         description,
                                         key,
                                     } => {
-                                        ui.strong(text(
+                                        ui.spaced_strong(text(
                                             &locale,
                                             MessageKey::AiHelpReviewControl,
                                             &[("label", label)],
                                         ));
-                                        ui.label(text(
+                                        ui.spaced_label(text(
                                             &locale,
                                             MessageKey::AiHelpTarget,
                                             &[("target", &target_title)],
                                         ));
-                                        ui.label(description);
-                                        ui.label(text(
+                                        ui.spaced_label(description);
+                                        ui.spaced_label(text(
                                             &locale,
                                             MessageKey::AiHelpTerminalKey,
                                             &[("key", &format!("{key:?}"))],
@@ -6367,11 +6415,14 @@ impl ButtonsApp {
                                         if ui
                                             .add_enabled(
                                                 target_id.is_some(),
-                                                egui::Button::new(text(
-                                                    &locale,
-                                                    MessageKey::AiHelpSendReviewedKey,
-                                                    &[],
-                                                )),
+                                                crate::ui_text::button(
+                                                    ui,
+                                                    text(
+                                                        &locale,
+                                                        MessageKey::AiHelpSendReviewedKey,
+                                                        &[],
+                                                    ),
+                                                ),
                                             )
                                             .clicked()
                                         {
@@ -6386,16 +6437,19 @@ impl ButtonsApp {
                             }
                         });
                     if let Some(error) = &state.error {
-                        ui.colored_label(Color32::LIGHT_RED, error);
+                        ui.spaced_colored_label(Color32::LIGHT_RED, error);
                     }
                     if let Some(status) = &state.status {
-                        ui.label(RichText::new(status).color(Color32::LIGHT_GREEN));
+                        ui.spaced_label(RichText::new(status).color(Color32::LIGHT_GREEN));
                     }
                     if state.busy {
                         ui.horizontal(|ui| {
                             ui.spinner();
-                            ui.label(text(&locale, MessageKey::AiHelpWaitingProvider, &[]));
-                            if ui.button(text(&locale, MessageKey::Cancel, &[])).clicked() {
+                            ui.spaced_label(text(&locale, MessageKey::AiHelpWaitingProvider, &[]));
+                            if ui
+                                .spaced_button(text(&locale, MessageKey::Cancel, &[]))
+                                .clicked()
+                            {
                                 if let Some(cancel) = &state.cancel {
                                     cancel.store(true, Ordering::Relaxed);
                                 }
@@ -6405,7 +6459,7 @@ impl ButtonsApp {
                     if state.error.is_some() && !state.busy && !state.last_request_agent {
                         if let Some((question, context, target)) = state.last_request.clone() {
                             if ui
-                                .button(text(&locale, MessageKey::AiHelpRetry, &[]))
+                                .spaced_button(text(&locale, MessageKey::AiHelpRetry, &[]))
                                 .clicked()
                             {
                                 queue(AiHelpCommand::Submit(question, context, target));
@@ -6430,10 +6484,10 @@ impl ButtonsApp {
                             state.reviewed_actions.clear();
                         }
                         if state.agent_mode {
-                            ui.small(text(&locale, MessageKey::AiAgentConsent, &[]));
+                            ui.spaced_small(text(&locale, MessageKey::AiAgentConsent, &[]));
                         }
                         let changed = ui
-                            .checkbox(
+                            .spaced_checkbox(
                                 &mut state.include_context,
                                 text(&locale, MessageKey::AiHelpIncludeContext, &[]),
                             )
@@ -6445,11 +6499,10 @@ impl ButtonsApp {
                             if ui
                                 .add_enabled(
                                     !state.context_busy,
-                                    egui::Button::new(text(
-                                        &locale,
-                                        MessageKey::AiHelpPreviewContext,
-                                        &[],
-                                    )),
+                                    crate::ui_text::button(
+                                        ui,
+                                        text(&locale, MessageKey::AiHelpPreviewContext, &[]),
+                                    ),
                                 )
                                 .clicked()
                             {
@@ -6459,10 +6512,14 @@ impl ButtonsApp {
                             }
                             if state.context_busy {
                                 ui.spinner();
-                                ui.label(text(&locale, MessageKey::AiHelpPreparingContext, &[]));
+                                ui.spaced_label(text(
+                                    &locale,
+                                    MessageKey::AiHelpPreparingContext,
+                                    &[],
+                                ));
                             }
                             if let Some(preview) = &state.context_preview {
-                                ui.label(text(
+                                ui.spaced_label(text(
                                     &locale,
                                     MessageKey::AiHelpIncludedTerminal,
                                     &[
@@ -6477,11 +6534,15 @@ impl ButtonsApp {
                                     .show(ui, |ui| {
                                         ui.monospace(&preview.output);
                                     });
-                                ui.small(text(&locale, MessageKey::AiHelpContextSentPrivacy, &[]));
+                                ui.spaced_small(text(
+                                    &locale,
+                                    MessageKey::AiHelpContextSentPrivacy,
+                                    &[],
+                                ));
                             }
                         }
                         let question_label =
-                            ui.label(text(&locale, MessageKey::AiHelpQuestionHint, &[]));
+                            ui.spaced_label(text(&locale, MessageKey::AiHelpQuestionHint, &[]));
                         ui.add(
                             egui::TextEdit::multiline(&mut state.input)
                                 .desired_rows(3)
@@ -6493,7 +6554,10 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 context_ready,
-                                egui::Button::new(text(&locale, MessageKey::AiHelpSend, &[])),
+                                crate::ui_text::button(
+                                    ui,
+                                    text(&locale, MessageKey::AiHelpSend, &[]),
+                                ),
                             )
                             .clicked()
                         {
@@ -6949,8 +7013,8 @@ impl ButtonsApp {
 
     fn theme_library_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.heading(crate::i18n::literal(&self.locale, "Theme Library"));
-        ui.label(
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Theme Library"));
+        ui.spaced_label(
             RichText::new(format!(
                 "{} themes available · {} legacy selections · {} original theme files loaded",
                 self.themes.all().len(),
@@ -6960,18 +7024,18 @@ impl ButtonsApp {
             .color(colors.muted),
         );
         wrapping_row(ui, |ui| {
-            ui.label(crate::i18n::literal(&self.locale, "Apply:"));
-            ui.checkbox(&mut self.preferences.theme_apply.app, "App chrome");
-            ui.checkbox(
+            ui.spaced_label(crate::i18n::literal(&self.locale, "Apply:"));
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.app, "App chrome");
+            ui.spaced_checkbox(
                 &mut self.preferences.theme_apply.terminal,
                 "Terminal colors",
             );
-            ui.checkbox(&mut self.preferences.theme_apply.fonts, "Fonts");
-            ui.checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
-            ui.checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.fonts, "Fonts");
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
         });
         #[cfg(not(target_arch = "wasm32"))]
-        if ui.button("New from current theme").on_hover_text("Start an editable copy without switching the app or terminals to another saved theme.").clicked() {
+        if ui.spaced_button("New from current theme").on_hover_text("Start an editable copy without switching the app or terminals to another saved theme.").clicked() {
             self.start_personal_theme_draft();
             self.theme_settings_tab = ThemeSettingsTab::Edit;
         }
@@ -6979,7 +7043,7 @@ impl ButtonsApp {
         {
             use crate::i18n::{text, MessageKey};
             let current_id = self.theme_for_tab(self.focused).to_owned();
-            ui.label(format!(
+            ui.spaced_label(format!(
                 "{}: {}",
                 text(&self.locale, MessageKey::CurrentTerminalTheme, &[]),
                 self.themes.get(&current_id).name
@@ -6991,13 +7055,16 @@ impl ButtonsApp {
                 random_current = ui
                     .add_enabled(
                         !self.tabs.is_empty(),
-                        egui::Button::new(text(&self.locale, MessageKey::RandomCurrent, &[])),
+                        crate::ui_text::button(
+                            ui,
+                            text(&self.locale, MessageKey::RandomCurrent, &[]),
+                        ),
                     )
                     .clicked();
                 random_all = ui
                     .add_enabled(
                         !self.tabs.is_empty(),
-                        egui::Button::new(text(&self.locale, MessageKey::RandomAll, &[])),
+                        crate::ui_text::button(ui, text(&self.locale, MessageKey::RandomAll, &[])),
                     )
                     .clicked();
                 use_global = ui
@@ -7005,7 +7072,10 @@ impl ButtonsApp {
                         self.tabs
                             .get(self.focused)
                             .is_some_and(|tab| self.theme_overrides.contains_key(&tab.id)),
-                        egui::Button::new(text(&self.locale, MessageKey::UseGlobalTheme, &[])),
+                        crate::ui_text::button(
+                            ui,
+                            text(&self.locale, MessageKey::UseGlobalTheme, &[]),
+                        ),
                     )
                     .clicked();
             });
@@ -7024,7 +7094,7 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.divider_settings(ui);
         ui.separator();
-        ui.heading(crate::i18n::literal(&self.locale, "Favorite themes"));
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Favorite themes"));
         let favorites: Vec<_> = self
             .preferences
             .favorite_theme_ids
@@ -7033,7 +7103,7 @@ impl ButtonsApp {
             .map(|theme| (theme.id.clone(), theme.name.clone()))
             .collect();
         if favorites.is_empty() {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "No favorite themes yet. Star a theme in Settings → Themes.",
             ));
@@ -7070,7 +7140,10 @@ impl ButtonsApp {
                         ui.push_id(("favorite", id), |ui| {
                             #[cfg(not(target_arch = "wasm32"))]
                             if ui
-                                .add_sized([name_width, height], egui::Button::new(name).truncate())
+                                .add_sized(
+                                    [name_width, height],
+                                    crate::ui_text::button(ui, name).truncate(),
+                                )
                                 .on_hover_text(name)
                                 .clicked()
                             {
@@ -7080,7 +7153,7 @@ impl ButtonsApp {
                             ui.add_sized([name_width, height], egui::Label::new(name).truncate())
                                 .on_hover_text(name);
                             if ui
-                                .add_sized([star_width, height], egui::Button::new("★"))
+                                .add_sized([star_width, height], crate::ui_text::button(ui, "★"))
                                 .on_hover_text(crate::i18n::literal(
                                     &self.locale,
                                     "Remove from favorites",
@@ -7102,7 +7175,7 @@ impl ButtonsApp {
             self.set_theme_for_tab(self.focused, &id);
         }
         ui.separator();
-        ui.label(crate::i18n::text(
+        ui.spaced_label(crate::i18n::text(
             &self.locale,
             crate::i18n::MessageKey::ChromeCornerRadius,
             &[],
@@ -7124,17 +7197,20 @@ impl ButtonsApp {
         );
 
         wrapping_row(ui, |ui| {
-            ui.selectable_value(&mut self.preferences.theme_browser_compact, false, "Cards");
-            ui.selectable_value(
+            ui.spaced_selectable_value(&mut self.preferences.theme_browser_compact, false, "Cards");
+            ui.spaced_selectable_value(
                 &mut self.preferences.theme_browser_compact,
                 true,
                 "Compact rows",
             );
             egui::ComboBox::from_id_salt("theme-browser-sort")
-                .selected_text(self.preferences.theme_browser_sort.label())
+                .selected_text(crate::ui_text::spaced_text(
+                    ui,
+                    self.preferences.theme_browser_sort.label(),
+                ))
                 .show_ui(ui, |ui| {
                     for sort in crate::theme_browser::ThemeSort::ALL {
-                        ui.selectable_value(
+                        ui.spaced_selectable_value(
                             &mut self.preferences.theme_browser_sort,
                             sort,
                             sort.label(),
@@ -7142,10 +7218,13 @@ impl ButtonsApp {
                     }
                 });
             egui::ComboBox::from_id_salt("theme-browser-collection")
-                .selected_text(self.preferences.theme_browser_collection.label())
+                .selected_text(crate::ui_text::spaced_text(
+                    ui,
+                    self.preferences.theme_browser_collection.label(),
+                ))
                 .show_ui(ui, |ui| {
                     for collection in crate::theme_browser::ThemeCollection::ALL {
-                        ui.selectable_value(
+                        ui.spaced_selectable_value(
                             &mut self.preferences.theme_browser_collection,
                             collection,
                             collection.label(),
@@ -7160,7 +7239,7 @@ impl ButtonsApp {
             self.preferences.theme_browser_sort,
             &self.preferences.favorite_theme_ids,
         );
-        ui.label(
+        ui.spaced_label(
             RichText::new(format!(
                 "Showing {} of {} themes",
                 matches.len(),
@@ -7171,13 +7250,15 @@ impl ButtonsApp {
         );
 
         wrapping_row(ui, |ui| {
-            if matches.len() != self.themes.all().len() && ui.button("Show all themes").clicked() {
+            if matches.len() != self.themes.all().len()
+                && ui.spaced_button("Show all themes").clicked()
+            {
                 self.theme_search.clear();
                 self.preferences.theme_browser_collection =
                     crate::theme_browser::ThemeCollection::All;
             }
             #[cfg(not(target_arch = "wasm32"))]
-            if ui.button("Reload personal themes").on_hover_text("Reload JSON files from the active native profile. Bundled assets require a rebuild.").clicked() {
+            if ui.spaced_button("Reload personal themes").on_hover_text("Reload JSON files from the active native profile. Bundled assets require a rebuild.").clicked() {
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
             }
@@ -7185,7 +7266,7 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         {
             if let Some(store) = &self.native_store {
-                ui.label(
+                ui.spaced_label(
                     RichText::new(format!(
                         "Personal theme folder: {}",
                         store.profile_dir().join("themes").display()
@@ -7195,14 +7276,17 @@ impl ButtonsApp {
                 );
             }
             if !self.theme_load_warnings.is_empty() {
-                egui::CollapsingHeader::new(format!(
-                    "{} theme files could not be loaded",
-                    self.theme_load_warnings.len()
+                egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+                    ui,
+                    format!(
+                        "{} theme files could not be loaded",
+                        self.theme_load_warnings.len()
+                    ),
                 ))
                 .default_open(true)
                 .show(ui, |ui| {
                     for warning in &self.theme_load_warnings {
-                        ui.colored_label(colors.warning, warning);
+                        ui.spaced_colored_label(colors.warning, warning);
                     }
                 });
             }
@@ -7217,7 +7301,7 @@ impl ButtonsApp {
                 for (native, label) in [(true, "Native themes"), (false, "Legacy themes")] {
                 let group: Vec<_> = matches.iter().copied().filter(|&index| self.themes.all()[index].native_version.is_some() == native).collect();
                 if group.is_empty() { continue; }
-                egui::CollapsingHeader::new(format!("{label} ({})", group.len()))
+                egui::CollapsingHeader::new(crate::ui_text::spaced_text(ui, format!("{label} ({})", group.len())))
                     .id_salt(("theme-collection", native))
                     .default_open(true)
                     .show(ui, |ui| {
@@ -7241,11 +7325,11 @@ impl ButtonsApp {
                                         wrapping_row(ui, |ui| {
                                             let favorite = self.preferences.favorite_theme_ids.contains(&theme.id);
                                             if ui.add_enabled(local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites),
-                                                egui::Button::new(if favorite { "★" } else { "☆" }).selected(favorite))
+                                                crate::ui_text::button(ui, if favorite { "★" } else { "☆" }).selected(favorite))
                                                 .on_hover_text(if favorite { "Remove from favorites" } else { "Add to favorites" }).clicked() {
                                                 toggle_favorite = Some(theme.id.clone());
                                             }
-                                            if ui.selectable_label(selected, &theme.name).on_hover_text(&theme.description).clicked() {
+                                            if ui.spaced_selectable_label(selected, &theme.name).on_hover_text(&theme.description).clicked() {
                                                 apply = Some((index, false));
                                             }
                                             for swatch in [theme.colors.canvas, theme.colors.panel, theme.colors.accent,
@@ -7254,14 +7338,14 @@ impl ButtonsApp {
                                                 let (rect, _) = ui.allocate_exact_size(Vec2::splat(12.0), egui::Sense::hover());
                                                 ui.painter().rect_filled(rect, 2.0, swatch);
                                             }
-        if let Some(version) = theme.native_version { ui.weak(format!("Native v{version}")); }
-                                            if ui.small_button("Calm").clicked() { apply = Some((index, true)); }
+        if let Some(version) = theme.native_version { ui.spaced_weak(format!("Native v{version}")); }
+                                            if ui.spaced_small_button("Calm").clicked() { apply = Some((index, true)); }
                                             #[cfg(not(target_arch = "wasm32"))]
-                                            if ui.add_enabled(!self.tabs.is_empty(), egui::Button::new("This terminal").small()).clicked() {
+                                            if ui.add_enabled(!self.tabs.is_empty(), crate::ui_text::button(ui, "This terminal").small()).clicked() {
                                                 per_tab_theme = Some(theme.id.clone());
                                             }
                                             #[cfg(not(target_arch = "wasm32"))]
-                                            if ui.add_enabled(!self.tabs.is_empty(), egui::Button::new("All terminals").small()).clicked() {
+                                            if ui.add_enabled(!self.tabs.is_empty(), crate::ui_text::button(ui, "All terminals").small()).clicked() {
                                                 all_theme = Some(theme.id.clone());
                                             }
                                         });
@@ -7289,18 +7373,18 @@ impl ButtonsApp {
                                     frame.show(ui, |ui| {
                                         ui.set_min_size(Vec2::new(card_width - 20.0, 178.0));
                                         ui.set_max_width(card_width - 20.0);
-                                        ui.label(
+                                        ui.spaced_label(
                                             RichText::new(&theme.name)
                                                 .strong()
                                                 .color(theme.colors.text),
                                         );
-                                        ui.label(
+                                        ui.spaced_label(
                                             RichText::new(&theme.description)
                                                 .small()
                                                 .color(theme.colors.muted),
                                         );
                                         if theme.legacy_shader_requested {
-                                            ui.colored_label(
+                                            ui.spaced_colored_label(
                                                 theme.colors.warning,
                                                 crate::i18n::text(
                                                     &self.locale,
@@ -7330,14 +7414,14 @@ impl ButtonsApp {
                                         ui.horizontal(|ui| {
                                             let favorite = self.preferences.favorite_theme_ids.contains(&theme.id);
                                             if ui.add_enabled(local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites),
-                                                egui::Button::new(if favorite { "★" } else { "☆" }).selected(favorite))
+                                                crate::ui_text::button(ui, if favorite { "★" } else { "☆" }).selected(favorite))
                                                 .on_hover_text(crate::i18n::literal(&self.locale, if favorite { "Remove from favorites" } else { "Add to favorites" })).clicked() {
                                                 toggle_favorite = Some(theme.id.clone());
                                             }
                                             if ui
                                                 .add_sized(
                                                     [78.0, 26.0],
-                                                    egui::Button::new(if selected {
+                                                    crate::ui_text::button(ui, if selected {
                                                         "Applied"
                                                     } else {
                                                         "Apply"
@@ -7350,7 +7434,7 @@ impl ButtonsApp {
                                             if ui
                                                 .add_sized(
                                                     [78.0, 26.0],
-                                                    egui::Button::new(crate::i18n::literal(&self.locale, "Calm")),
+                                                    crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Calm")),
                                                 )
                                                 .on_hover_text(
                                                     "Apply selected sections without animation or noise",
@@ -7366,7 +7450,7 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     !self.tabs.is_empty(),
-                                                    egui::Button::new(text(&self.locale, MessageKey::ThisTerminal, &[])),
+                                                    crate::ui_text::button(ui, text(&self.locale, MessageKey::ThisTerminal, &[])),
                                                 )
                                                 .clicked()
                                             {
@@ -7375,7 +7459,7 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     !self.tabs.is_empty(),
-                                                    egui::Button::new(text(&self.locale, MessageKey::ThemeAll, &[])),
+                                                    crate::ui_text::button(ui, text(&self.locale, MessageKey::ThemeAll, &[])),
                                                 )
                                                 .on_hover_text(text(&self.locale, MessageKey::ThemeAllHelp, &[]))
                                                 .clicked()
@@ -7415,8 +7499,8 @@ impl ButtonsApp {
     fn theme_generator(&mut self, ui: &mut egui::Ui) {
         let locale = self.locale.clone();
         ui.separator();
-        ui.heading(crate::i18n::literal(&locale, "AI Theme Generator"));
-        ui.label(
+        ui.spaced_heading(crate::i18n::literal(&locale, "AI Theme Generator"));
+        ui.spaced_label(
             RichText::new(crate::i18n::literal(
                 &locale,
                 "Describe a color direction. The active provider receives your brief and the selected theme's color palette; terminal contents and API keys are not included.",
@@ -7434,12 +7518,12 @@ impl ButtonsApp {
         );
         let available = theme_generation_available();
         if !available {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &locale,
                 "Pro feature. Theme generation remains locked until entitlement integration is available.",
             ));
         } else if self.preferences.provider_settings.active().is_none() {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &locale,
                 "Choose an AI provider in the Providers settings first.",
             ));
@@ -7448,9 +7532,9 @@ impl ButtonsApp {
         let mut cancel = false;
         ui.horizontal(|ui| {
             if self.theme_generation_busy {
-                ui.label(crate::i18n::literal(&locale, "Generating theme…"));
+                ui.spaced_label(crate::i18n::literal(&locale, "Generating theme…"));
                 cancel = ui
-                    .button(crate::i18n::literal(&locale, "Cancel generation"))
+                    .spaced_button(crate::i18n::literal(&locale, "Cancel generation"))
                     .clicked();
             } else {
                 generate = ui
@@ -7459,7 +7543,7 @@ impl ButtonsApp {
                             && !self.provider_busy
                             && self.preferences.provider_settings.active().is_some()
                             && !self.theme_generation_prompt.trim().is_empty(),
-                        egui::Button::new(crate::i18n::literal(&locale, "Generate theme")),
+                        crate::ui_text::button(ui, crate::i18n::literal(&locale, "Generate theme")),
                     )
                     .clicked();
             }
@@ -7470,7 +7554,7 @@ impl ButtonsApp {
             self.start_theme_generation(ui.ctx());
         }
         if let Some(message) = &self.theme_generation_message {
-            ui.label(message);
+            ui.spaced_label(message);
         }
         let details = self.theme_generation_candidate.as_ref().map(|candidate| {
             (
@@ -7491,28 +7575,28 @@ impl ButtonsApp {
             let mut keep = false;
             let mut discard = false;
             ui.group(|ui| {
-                ui.strong(name);
+                ui.spaced_strong(name);
                 if !description.is_empty() {
-                    ui.label(description);
+                    ui.spaced_label(description);
                 }
-                ui.label(crate::i18n::formatted_literal(
+                ui.spaced_label(crate::i18n::formatted_literal(
                     &locale,
                     "Generated with {provider} · {model}",
                     &[("provider", &provider_name), ("model", &model_id)],
                 ));
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &locale,
                     "This candidate is not previewed or saved yet.",
                 ));
                 wrapping_row(ui, |ui| {
                     preview = ui
-                        .button(crate::i18n::literal(&locale, "Preview candidate"))
+                        .spaced_button(crate::i18n::literal(&locale, "Preview candidate"))
                         .clicked();
                     keep = ui
-                        .button(crate::i18n::literal(&locale, "Edit in theme library"))
+                        .spaced_button(crate::i18n::literal(&locale, "Edit in theme library"))
                         .clicked();
                     discard = ui
-                        .button(crate::i18n::literal(&locale, "Discard candidate"))
+                        .spaced_button(crate::i18n::literal(&locale, "Discard candidate"))
                         .clicked();
                 });
             });
@@ -7548,8 +7632,8 @@ impl ButtonsApp {
             .collect();
 
         ui.separator();
-        ui.heading(crate::i18n::literal(&locale, "Custom Theme Library"));
-        ui.label(
+        ui.spaced_heading(crate::i18n::literal(&locale, "Custom Theme Library"));
+        ui.spaced_label(
             RichText::new(crate::i18n::literal(
                 &locale,
                 "Create a theme by hand, preview it, then save it to this native profile.",
@@ -7558,7 +7642,7 @@ impl ButtonsApp {
             .color(self.colors().muted),
         );
         if ui
-            .checkbox(
+            .spaced_checkbox(
                 &mut self.preferences.theme_editor_live_preview,
                 "Apply edits automatically (500 ms after changes)",
             )
@@ -7576,11 +7660,11 @@ impl ButtonsApp {
             .map(|file_name| file_name.trim_end_matches(".json").to_owned())
             .unwrap_or_else(|| crate::i18n::literal(&locale, "Select a saved theme"));
         egui::ComboBox::from_id_salt("personal-theme-editor-select")
-            .selected_text(selected_label)
+            .selected_text(crate::ui_text::spaced_text(ui, selected_label))
             .show_ui(ui, |ui| {
                 for (id, name) in &personal_profiles {
                     if ui
-                        .selectable_label(
+                        .spaced_selectable_label(
                             self.theme_editor_file_name.as_deref()
                                 == id
                                     .rsplit(':')
@@ -7605,12 +7689,12 @@ impl ButtonsApp {
 
         wrapping_row(ui, |ui| {
             if ui
-                .button(crate::i18n::literal(&locale, "New variant"))
+                .spaced_button(crate::i18n::literal(&locale, "New variant"))
                 .clicked()
             {
                 self.start_personal_theme_draft();
             }
-            ui.label(
+            ui.spaced_label(
                 RichText::new(crate::i18n::literal(
                     &locale,
                     "New from the currently selected theme",
@@ -7631,7 +7715,7 @@ impl ButtonsApp {
 
         let Some(mut document) = self.theme_editor_document.clone() else {
             if let Some(status) = &self.theme_editor_status {
-                ui.label(status);
+                ui.spaced_label(status);
             }
             return;
         };
@@ -7643,238 +7727,359 @@ impl ButtonsApp {
             .unwrap_or(Value::Null);
         for (section, fields) in APP_THEME_COLOR_GROUPS {
             egui::Frame::group(ui.style()).show(ui, |ui| {
-                egui::CollapsingHeader::new(crate::i18n::literal(&locale, section))
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        for (label, pointer) in *fields {
-                            let fallback = resolved_document
-                                .pointer(pointer)
-                                .and_then(Value::as_str)
-                                .and_then(crate::theme::parse_color)
-                                .unwrap_or(Color32::GRAY);
-                            theme_color_setting_with_fallback(
-                                ui,
-                                &locale,
-                                &mut document,
-                                label,
-                                pointer,
-                                fallback,
-                            );
-                        }
-                    });
-            });
-            ui.add_space(6.0);
-        }
-        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "Terminal colors"))
-            .default_open(true)
-            .show(ui, |ui| {
-                theme_color_setting(
+                egui::CollapsingHeader::new(crate::ui_text::spaced_text(
                     ui,
-                    &locale,
-                    &mut document,
-                    "Background",
-                    "/theme/terminal/background",
-                );
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Foreground",
-                    "/theme/terminal/foreground",
-                );
-                egui::CollapsingHeader::new(crate::i18n::literal(&locale, "ANSI color palette"))
-                    .show(ui, |ui| {
-                        for (key, label) in [
-                            ("black", "Black"),
-                            ("red", "Red"),
-                            ("green", "Green"),
-                            ("yellow", "Yellow"),
-                            ("blue", "Blue"),
-                            ("magenta", "Magenta"),
-                            ("cyan", "Cyan"),
-                            ("white", "White"),
-                            ("brightBlack", "Bright black"),
-                            ("brightRed", "Bright red"),
-                            ("brightGreen", "Bright green"),
-                            ("brightYellow", "Bright yellow"),
-                            ("brightBlue", "Bright blue"),
-                            ("brightMagenta", "Bright magenta"),
-                            ("brightCyan", "Bright cyan"),
-                            ("brightWhite", "Bright white"),
-                        ] {
-                            theme_color_setting(
-                                ui,
-                                &locale,
-                                &mut document,
-                                label,
-                                &format!("/theme/terminal/ansiColors/{key}"),
-                            );
-                        }
-                    });
-            });
-        egui::CollapsingHeader::new(crate::i18n::literal(&locale, "Effects and dividers")).show(
-            ui,
-            |ui| {
-                let mut theme_effects_enabled =
-                    document["effects"]["masterDisabled"] != Value::Bool(true);
-                if ui
-                    .checkbox(
-                        &mut theme_effects_enabled,
-                        crate::i18n::literal(
-                            &locale,
-                            "Enable animated effects (gradient, noise and scanlines)",
-                        ),
-                    )
-                    .changed()
-                {
-                    set_theme_document_value(
-                        &mut document,
-                        "/effects/masterDisabled",
-                        json!(!theme_effects_enabled),
-                    );
-                }
-                theme_color_setting(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Divider color",
-                    "/theme/app/shell/paneDivider/color",
-                );
-                let mut thickness = document["theme"]["app"]["shell"]["paneDivider"]["thickness"]
-                    .as_f64()
-                    .unwrap_or(2.0) as f32;
-                if ui
-                    .add(
-                        egui::Slider::new(&mut thickness, 1.0..=6.0)
-                            .text(crate::i18n::literal(&locale, "Divider thickness")),
-                    )
-                    .changed()
-                {
-                    set_theme_document_value(
-                        &mut document,
-                        "/theme/app/shell/paneDivider/thickness",
-                        json!(thickness),
-                    );
-                }
-                theme_document_toggle(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Use gradient",
-                    "/theme/terminal/useGradient",
-                );
-                if document["theme"]["terminal"]["useGradient"] == true {
-                    let gradient_types = [
-                        ("linear", "Linear"),
-                        ("radial", "Radial"),
-                        ("conic", "Conic"),
-                        ("repeating-linear", "Repeating Linear"),
-                        ("repeating-radial", "Repeating Radial"),
-                        ("repeating-conic", "Repeating Conic"),
-                    ];
-                    let mut gradient_type = document["theme"]["terminal"]["gradientType"]
-                        .as_str()
-                        .unwrap_or("linear")
-                        .to_owned();
-                    let selected_label = gradient_types
-                        .iter()
-                        .find(|(kind, _)| *kind == gradient_type)
-                        .map(|(_, label)| *label)
-                        .unwrap_or("Linear");
-                    egui::ComboBox::from_id_salt("personal-theme-gradient-type")
-                        .selected_text(crate::i18n::literal(&locale, selected_label))
-                        .show_ui(ui, |ui| {
-                            for (kind, label) in gradient_types {
-                                ui.selectable_value(
-                                    &mut gradient_type,
-                                    kind.to_owned(),
-                                    crate::i18n::literal(&locale, label),
-                                );
-                            }
-                        });
-                    if gradient_type
-                        != document["theme"]["terminal"]["gradientType"]
-                            .as_str()
-                            .unwrap_or("linear")
-                    {
-                        set_theme_document_value(
-                            &mut document,
-                            "/theme/terminal/gradientType",
-                            json!(gradient_type),
-                        );
-                    }
-                    for (index, label) in [
-                        "Gradient color 1",
-                        "Gradient color 2",
-                        "Gradient color 3",
-                        "Gradient color 4",
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    {
-                        theme_color_setting(
-                            ui,
-                            &locale,
-                            &mut document,
-                            label,
-                            &format!("/theme/terminal/gradientColors/{index}"),
-                        );
-                    }
-                    theme_document_toggle(
-                        ui,
-                        &locale,
-                        &mut document,
-                        "Animate gradient",
-                        "/theme/terminal/gradientAnimation",
-                    );
-                }
-                theme_document_toggle(
-                    ui,
-                    &locale,
-                    &mut document,
-                    "Analog TV effect",
-                    "/effects/staticEnabled",
-                );
-                if document["effects"]["staticEnabled"] == true {
-                    theme_document_unit_slider(
-                        ui,
-                        &locale,
-                        &mut document,
-                        "Static overlay opacity",
-                        "/effects/staticOpacity",
-                    );
-                    for (label, pointer, fallback) in [
-                        ("Static intensity", "/effects/staticIntensity", 50.0),
-                        ("Static pattern drift", "/effects/staticAmplitude", 50.0),
-                        ("Static brightness", "/effects/staticBrightness", 42.0),
-                    ] {
-                        theme_document_bounded_slider(
+                    crate::i18n::literal(&locale, section),
+                ))
+                .default_open(true)
+                .show(ui, |ui| {
+                    for (label, pointer) in *fields {
+                        let fallback = resolved_document
+                            .pointer(pointer)
+                            .and_then(Value::as_str)
+                            .and_then(crate::theme::parse_color)
+                            .unwrap_or(Color32::GRAY);
+                        theme_color_setting_with_fallback(
                             ui,
                             &locale,
                             &mut document,
                             label,
                             pointer,
-                            (0.0, 100.0, fallback),
-                            "%",
+                            fallback,
                         );
                     }
-                    let density = document["effects"]["staticDensity"].as_f64().unwrap_or(0.2);
-                    let mut percent = if density > 1.0 {
-                        density
-                    } else {
-                        density * 100.0
-                    } as f32;
-                    if ui
-                        .add(
-                            egui::Slider::new(&mut percent, 0.0..=100.0)
-                                .text(crate::i18n::literal(&locale, "Static density")),
-                        )
-                        .changed()
-                    {
-                        set_theme_document_value(
+                });
+            });
+            ui.add_space(6.0);
+        }
+        egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+            ui,
+            crate::i18n::literal(&locale, "Terminal colors"),
+        ))
+        .default_open(true)
+        .show(ui, |ui| {
+            theme_color_setting(
+                ui,
+                &locale,
+                &mut document,
+                "Background",
+                "/theme/terminal/background",
+            );
+            theme_color_setting(
+                ui,
+                &locale,
+                &mut document,
+                "Foreground",
+                "/theme/terminal/foreground",
+            );
+            egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+                ui,
+                crate::i18n::literal(&locale, "ANSI color palette"),
+            ))
+            .show(ui, |ui| {
+                for (key, label) in [
+                    ("black", "Black"),
+                    ("red", "Red"),
+                    ("green", "Green"),
+                    ("yellow", "Yellow"),
+                    ("blue", "Blue"),
+                    ("magenta", "Magenta"),
+                    ("cyan", "Cyan"),
+                    ("white", "White"),
+                    ("brightBlack", "Bright black"),
+                    ("brightRed", "Bright red"),
+                    ("brightGreen", "Bright green"),
+                    ("brightYellow", "Bright yellow"),
+                    ("brightBlue", "Bright blue"),
+                    ("brightMagenta", "Bright magenta"),
+                    ("brightCyan", "Bright cyan"),
+                    ("brightWhite", "Bright white"),
+                ] {
+                    theme_color_setting(
+                        ui,
+                        &locale,
+                        &mut document,
+                        label,
+                        &format!("/theme/terminal/ansiColors/{key}"),
+                    );
+                }
+            });
+        });
+        egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+            ui,
+            crate::i18n::literal(&locale, "Effects and dividers"),
+        ))
+        .show(ui, |ui| {
+            let mut theme_effects_enabled =
+                document["effects"]["masterDisabled"] != Value::Bool(true);
+            if ui
+                .spaced_checkbox(
+                    &mut theme_effects_enabled,
+                    crate::i18n::literal(
+                        &locale,
+                        "Enable animated effects (gradient, noise and scanlines)",
+                    ),
+                )
+                .changed()
+            {
+                set_theme_document_value(
+                    &mut document,
+                    "/effects/masterDisabled",
+                    json!(!theme_effects_enabled),
+                );
+            }
+            theme_color_setting(
+                ui,
+                &locale,
+                &mut document,
+                "Divider color",
+                "/theme/app/shell/paneDivider/color",
+            );
+            let mut thickness = document["theme"]["app"]["shell"]["paneDivider"]["thickness"]
+                .as_f64()
+                .unwrap_or(2.0) as f32;
+            if ui
+                .add(
+                    egui::Slider::new(&mut thickness, 1.0..=6.0)
+                        .text(crate::i18n::literal(&locale, "Divider thickness")),
+                )
+                .changed()
+            {
+                set_theme_document_value(
+                    &mut document,
+                    "/theme/app/shell/paneDivider/thickness",
+                    json!(thickness),
+                );
+            }
+            theme_document_toggle(
+                ui,
+                &locale,
+                &mut document,
+                "Use gradient",
+                "/theme/terminal/useGradient",
+            );
+            if document["theme"]["terminal"]["useGradient"] == true {
+                let gradient_types = [
+                    ("linear", "Linear"),
+                    ("radial", "Radial"),
+                    ("conic", "Conic"),
+                    ("repeating-linear", "Repeating Linear"),
+                    ("repeating-radial", "Repeating Radial"),
+                    ("repeating-conic", "Repeating Conic"),
+                ];
+                let mut gradient_type = document["theme"]["terminal"]["gradientType"]
+                    .as_str()
+                    .unwrap_or("linear")
+                    .to_owned();
+                let selected_label = gradient_types
+                    .iter()
+                    .find(|(kind, _)| *kind == gradient_type)
+                    .map(|(_, label)| *label)
+                    .unwrap_or("Linear");
+                egui::ComboBox::from_id_salt("personal-theme-gradient-type")
+                    .selected_text(crate::ui_text::spaced_text(
+                        ui,
+                        crate::i18n::literal(&locale, selected_label),
+                    ))
+                    .show_ui(ui, |ui| {
+                        for (kind, label) in gradient_types {
+                            ui.spaced_selectable_value(
+                                &mut gradient_type,
+                                kind.to_owned(),
+                                crate::i18n::literal(&locale, label),
+                            );
+                        }
+                    });
+                if gradient_type
+                    != document["theme"]["terminal"]["gradientType"]
+                        .as_str()
+                        .unwrap_or("linear")
+                {
+                    set_theme_document_value(
+                        &mut document,
+                        "/theme/terminal/gradientType",
+                        json!(gradient_type),
+                    );
+                }
+                for (index, label) in [
+                    "Gradient color 1",
+                    "Gradient color 2",
+                    "Gradient color 3",
+                    "Gradient color 4",
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    theme_color_setting(
+                        ui,
+                        &locale,
+                        &mut document,
+                        label,
+                        &format!("/theme/terminal/gradientColors/{index}"),
+                    );
+                }
+                theme_document_toggle(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Animate gradient",
+                    "/theme/terminal/gradientAnimation",
+                );
+            }
+            theme_document_toggle(
+                ui,
+                &locale,
+                &mut document,
+                "Analog TV effect",
+                "/effects/staticEnabled",
+            );
+            if document["effects"]["staticEnabled"] == true {
+                theme_document_unit_slider(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Static overlay opacity",
+                    "/effects/staticOpacity",
+                );
+                for (label, pointer, fallback) in [
+                    ("Static intensity", "/effects/staticIntensity", 50.0),
+                    ("Static pattern drift", "/effects/staticAmplitude", 50.0),
+                    ("Static brightness", "/effects/staticBrightness", 42.0),
+                ] {
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        label,
+                        pointer,
+                        (0.0, 100.0, fallback),
+                        "%",
+                    );
+                }
+                let density = document["effects"]["staticDensity"].as_f64().unwrap_or(0.2);
+                let mut percent = if density > 1.0 {
+                    density
+                } else {
+                    density * 100.0
+                } as f32;
+                if ui
+                    .add(
+                        egui::Slider::new(&mut percent, 0.0..=100.0)
+                            .text(crate::i18n::literal(&locale, "Static density")),
+                    )
+                    .changed()
+                {
+                    set_theme_document_value(
+                        &mut document,
+                        "/effects/staticDensity",
+                        json!(percent),
+                    );
+                }
+            }
+            theme_document_toggle(
+                ui,
+                &locale,
+                &mut document,
+                "Scanlines",
+                "/effects/scanlinesEnabled",
+            );
+            if document["effects"]["scanlinesEnabled"] == true {
+                theme_document_unit_slider(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Scanline strength",
+                    "/effects/scanlinesStrength",
+                );
+            }
+            if effects_master_switch_available() {
+                theme_document_toggle(
+                    ui,
+                    &locale,
+                    &mut document,
+                    "Simple noise",
+                    "/effects/simpleNoiseEnabled",
+                );
+                if document["effects"]["simpleNoiseEnabled"] == true {
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Simple noise amount",
+                        "/effects/simpleNoiseAmount",
+                        (0.0, 100.0, 24.0),
+                        "%",
+                    );
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Noise resolution",
+                        "/effects/simpleNoiseResolution",
+                        (8.0, 100.0, 50.0),
+                        "%",
+                    );
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Noise frame rate",
+                        "/effects/simpleNoiseFps",
+                        (1.0, 60.0, 24.0),
+                        " FPS",
+                    );
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Minimum noise brightness",
+                        "/effects/simpleNoiseMinBrightness",
+                        (0.0, 100.0, 32.0),
+                        "%",
+                    );
+                    theme_document_bounded_slider(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Maximum noise brightness",
+                        "/effects/simpleNoiseMaxBrightness",
+                        (0.0, 100.0, 68.0),
+                        "%",
+                    );
+                    theme_document_toggle(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Ramp noise while idle",
+                        "/effects/simpleNoiseIdleEnabled",
+                    );
+                    if document["effects"]["simpleNoiseIdleEnabled"] == true {
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
                             &mut document,
-                            "/effects/staticDensity",
-                            json!(percent),
+                            "Idle noise amount",
+                            "/effects/simpleNoiseIdleAmount",
+                            (0.0, 100.0, 50.0),
+                            "%",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Idle delay",
+                            "/effects/simpleNoiseIdleDelaySeconds",
+                            (0.0, 300.0, 60.0),
+                            " s",
+                        );
+                        theme_document_bounded_slider(
+                            ui,
+                            &locale,
+                            &mut document,
+                            "Idle ramp duration",
+                            "/effects/simpleNoiseIdleRampSeconds",
+                            (1.0, 60.0, 6.0),
+                            " s",
                         );
                     }
                 }
@@ -7882,167 +8087,59 @@ impl ButtonsApp {
                     ui,
                     &locale,
                     &mut document,
-                    "Scanlines",
-                    "/effects/scanlinesEnabled",
+                    "Row banding (for readability)",
+                    "/effects/rowBandingEnabled",
                 );
-                if document["effects"]["scanlinesEnabled"] == true {
-                    theme_document_unit_slider(
-                        ui,
-                        &locale,
-                        &mut document,
-                        "Scanline strength",
-                        "/effects/scanlinesStrength",
-                    );
-                }
-                if effects_master_switch_available() {
-                    theme_document_toggle(
-                        ui,
-                        &locale,
-                        &mut document,
-                        "Simple noise",
-                        "/effects/simpleNoiseEnabled",
-                    );
-                    if document["effects"]["simpleNoiseEnabled"] == true {
-                        theme_document_bounded_slider(
-                            ui,
-                            &locale,
+                if document["effects"]["rowBandingEnabled"] == true {
+                    if document["effects"].get("rowBandingColor").is_none() {
+                        set_theme_document_value(
                             &mut document,
-                            "Simple noise amount",
-                            "/effects/simpleNoiseAmount",
-                            (0.0, 100.0, 24.0),
-                            "%",
-                        );
-                        theme_document_bounded_slider(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Noise resolution",
-                            "/effects/simpleNoiseResolution",
-                            (8.0, 100.0, 50.0),
-                            "%",
-                        );
-                        theme_document_bounded_slider(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Noise frame rate",
-                            "/effects/simpleNoiseFps",
-                            (1.0, 60.0, 24.0),
-                            " FPS",
-                        );
-                        theme_document_bounded_slider(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Minimum noise brightness",
-                            "/effects/simpleNoiseMinBrightness",
-                            (0.0, 100.0, 32.0),
-                            "%",
-                        );
-                        theme_document_bounded_slider(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Maximum noise brightness",
-                            "/effects/simpleNoiseMaxBrightness",
-                            (0.0, 100.0, 68.0),
-                            "%",
-                        );
-                        theme_document_toggle(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Ramp noise while idle",
-                            "/effects/simpleNoiseIdleEnabled",
-                        );
-                        if document["effects"]["simpleNoiseIdleEnabled"] == true {
-                            theme_document_bounded_slider(
-                                ui,
-                                &locale,
-                                &mut document,
-                                "Idle noise amount",
-                                "/effects/simpleNoiseIdleAmount",
-                                (0.0, 100.0, 50.0),
-                                "%",
-                            );
-                            theme_document_bounded_slider(
-                                ui,
-                                &locale,
-                                &mut document,
-                                "Idle delay",
-                                "/effects/simpleNoiseIdleDelaySeconds",
-                                (0.0, 300.0, 60.0),
-                                " s",
-                            );
-                            theme_document_bounded_slider(
-                                ui,
-                                &locale,
-                                &mut document,
-                                "Idle ramp duration",
-                                "/effects/simpleNoiseIdleRampSeconds",
-                                (1.0, 60.0, 6.0),
-                                " s",
-                            );
-                        }
-                    }
-                    theme_document_toggle(
-                        ui,
-                        &locale,
-                        &mut document,
-                        "Row banding (for readability)",
-                        "/effects/rowBandingEnabled",
-                    );
-                    if document["effects"]["rowBandingEnabled"] == true {
-                        if document["effects"].get("rowBandingColor").is_none() {
-                            set_theme_document_value(
-                                &mut document,
-                                "/effects/rowBandingColor",
-                                json!("#00ff44"),
-                            );
-                        }
-                        if document["effects"].get("rowBandingOpacity").is_none() {
-                            set_theme_document_value(
-                                &mut document,
-                                "/effects/rowBandingOpacity",
-                                json!(6),
-                            );
-                        }
-                        theme_color_setting(
-                            ui,
-                            &locale,
-                            &mut document,
-                            "Row banding color",
                             "/effects/rowBandingColor",
+                            json!("#00ff44"),
                         );
-                        let mut opacity = document["effects"]["rowBandingOpacity"]
-                            .as_f64()
-                            .unwrap_or(6.0) as f32;
-                        if ui
-                            .add(
-                                egui::Slider::new(&mut opacity, 0.0..=35.0)
-                                    .suffix("%")
-                                    .text(crate::i18n::literal(&locale, "Row banding opacity")),
-                            )
-                            .changed()
-                        {
-                            set_theme_document_value(
-                                &mut document,
-                                "/effects/rowBandingOpacity",
-                                json!(opacity),
-                            );
-                        }
+                    }
+                    if document["effects"].get("rowBandingOpacity").is_none() {
+                        set_theme_document_value(
+                            &mut document,
+                            "/effects/rowBandingOpacity",
+                            json!(6),
+                        );
+                    }
+                    theme_color_setting(
+                        ui,
+                        &locale,
+                        &mut document,
+                        "Row banding color",
+                        "/effects/rowBandingColor",
+                    );
+                    let mut opacity = document["effects"]["rowBandingOpacity"]
+                        .as_f64()
+                        .unwrap_or(6.0) as f32;
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut opacity, 0.0..=35.0)
+                                .suffix("%")
+                                .text(crate::i18n::literal(&locale, "Row banding opacity")),
+                        )
+                        .changed()
+                    {
+                        set_theme_document_value(
+                            &mut document,
+                            "/effects/rowBandingOpacity",
+                            json!(opacity),
+                        );
                     }
                 }
-                ui.label(
-                    RichText::new(crate::i18n::literal(
-                        &locale,
-                        "Font choices and unrecognized fields are preserved when saving.",
-                    ))
-                    .small()
-                    .color(self.colors().muted),
-                );
-            },
-        );
+            }
+            ui.spaced_label(
+                RichText::new(crate::i18n::literal(
+                    &locale,
+                    "Font choices and unrecognized fields are preserved when saving.",
+                ))
+                .small()
+                .color(self.colors().muted),
+            );
+        });
 
         let changed = document != before_edits;
         self.theme_editor_document = Some(document);
@@ -8051,30 +8148,33 @@ impl ButtonsApp {
         }
         wrapping_row(ui, |ui| {
             if ui
-                .button(crate::i18n::literal(&locale, "Preview"))
+                .spaced_button(crate::i18n::literal(&locale, "Preview"))
                 .clicked()
             {
                 self.preview_personal_theme_draft();
             }
             if ui
-                .button(crate::i18n::literal(&locale, "Save Current Theme"))
+                .spaced_button(crate::i18n::literal(&locale, "Save Current Theme"))
                 .clicked()
             {
                 self.save_personal_theme_draft();
             }
-            if ui.button(crate::i18n::literal(&locale, "Cancel")).clicked() {
+            if ui
+                .spaced_button(crate::i18n::literal(&locale, "Cancel"))
+                .clicked()
+            {
                 self.cancel_personal_theme_draft();
             }
             if self.theme_editor_file_exists {
                 if self.theme_editor_confirm_delete {
                     if ui
-                        .button(crate::i18n::literal(&locale, "Confirm delete"))
+                        .spaced_button(crate::i18n::literal(&locale, "Confirm delete"))
                         .clicked()
                     {
                         self.delete_personal_theme_draft();
                     }
                 } else if ui
-                    .button(crate::i18n::literal(&locale, "Delete theme"))
+                    .spaced_button(crate::i18n::literal(&locale, "Delete theme"))
                     .clicked()
                 {
                     self.theme_editor_confirm_delete = true;
@@ -8090,7 +8190,7 @@ impl ButtonsApp {
             self.export_personal_theme_draft();
         }
         if let Some(status) = &self.theme_editor_status {
-            ui.label(status);
+            ui.spaced_label(status);
         }
     }
 
@@ -8722,11 +8822,11 @@ impl ButtonsApp {
     fn divider_settings(&mut self, ui: &mut egui::Ui) {
         let inherited = self.active_app_theme().pane_divider;
         ui.separator();
-        ui.label(RichText::new("Pane dividers").strong());
+        ui.spaced_label(RichText::new("Pane dividers").strong());
         let mut custom = self.preferences.pane_divider.color_override.is_some()
             || self.preferences.pane_divider.thickness_override.is_some();
         if ui
-            .checkbox(&mut custom, "Custom color and thickness")
+            .spaced_checkbox(&mut custom, "Custom color and thickness")
             .changed()
         {
             if custom {
@@ -8761,7 +8861,7 @@ impl ButtonsApp {
                 self.preferences.pane_divider.thickness_override = Some(thickness);
             }
         } else {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Using the active app theme's divider style.",
             ));
@@ -8771,13 +8871,13 @@ impl ButtonsApp {
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         #[cfg(target_arch = "wasm32")]
         let _ = ctx;
-        ui.heading(crate::i18n::literal(&self.locale, "Fonts"));
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Fonts"));
         #[cfg(not(target_arch = "wasm32"))]
-        ui.label(crate::i18n::literal(&self.locale, "Bundled and installed fonts are loaded locally. Each area can use its own family, real file weight, and size."));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Bundled and installed fonts are loaded locally. Each area can use its own family, real file weight, and size."));
         #[cfg(target_arch = "wasm32")]
-        ui.label(crate::i18n::literal(&self.locale, "Bundled fonts are loaded locally. Each area can use its own family, real file weight, and size."));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Bundled fonts are loaded locally. Each area can use its own family, real file weight, and size."));
         #[cfg(not(target_arch = "wasm32"))]
-        ui.label(crate::i18n::literal(
+        ui.spaced_label(crate::i18n::literal(
             &self.locale,
             "System fonts are discovered offline. Import a .ttf or .otf file to add it to this native profile.",
         ));
@@ -8796,7 +8896,10 @@ impl ButtonsApp {
             if ui
                 .add_enabled(
                     custom_fonts_available(),
-                    egui::Button::new(crate::i18n::literal(&self.locale, "Import local font")),
+                    crate::ui_text::button(
+                        ui,
+                        crate::i18n::literal(&self.locale, "Import local font"),
+                    ),
                 )
                 .clicked()
             {
@@ -8809,15 +8912,15 @@ impl ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(status) = &self.custom_font_status {
-            ui.label(status);
+            ui.spaced_label(status);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        egui::CollapsingHeader::new("Current terminal font")
+        egui::CollapsingHeader::new(crate::ui_text::spaced_text(ui, "Current terminal font"))
             .default_open(true)
             .show(ui, |ui| {
                 if let Some(tab) = self.tabs.get(self.focused) {
                     let id = tab.id;
-                    ui.label(&tab.title);
+                    ui.spaced_label(&tab.title);
                     let original = self.font_for_pane(id);
                     let mut edited = original.clone();
                     font_zone_editor(
@@ -8831,14 +8934,14 @@ impl ButtonsApp {
                     if edited != original {
                         self.pane_fonts.insert(id, edited);
                     }
-                    if ui.button("Use theme / default font").clicked() {
+                    if ui.spaced_button("Use theme / default font").clicked() {
                         self.pane_fonts.remove(&id);
                     }
                 }
             });
         wrapping_row(ui, |ui| {
             if ui
-                .button(crate::i18n::literal(
+                .spaced_button(crate::i18n::literal(
                     &self.locale,
                     "Use Shell UI font across the app",
                 ))
@@ -8852,7 +8955,7 @@ impl ButtonsApp {
                 sync_zone(&source, &mut self.preferences.typography.status_bar);
             }
             if ui
-                .button(crate::i18n::literal(
+                .spaced_button(crate::i18n::literal(
                     &self.locale,
                     "Use AI Help font across the app",
                 ))
@@ -8932,27 +9035,30 @@ impl ButtonsApp {
                 .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
-                    ui.label(RichText::new("Terminal bold rendering").strong());
+                    ui.spaced_label(RichText::new("Terminal bold rendering").strong());
                     wrapping_row(ui, |ui| {
                         let family = self.preferences.typography.terminal.family.clone();
                         let requested = self.preferences.typography.terminal_bold_weight;
                         let resolved = font_catalog.resolved_weight(&family, requested);
                         egui::ComboBox::from_id_salt("terminal-bold-weight")
-                            .selected_text(if requested == resolved {
-                                format!("{requested} bold weight")
-                            } else {
-                                format!("{requested} requested → {resolved} file")
-                            })
+                            .selected_text(crate::ui_text::spaced_text(
+                                ui,
+                                if requested == resolved {
+                                    format!("{requested} bold weight")
+                                } else {
+                                    format!("{requested} requested → {resolved} file")
+                                },
+                            ))
                             .show_ui(ui, |ui| {
                                 for weight in font_catalog.weights_for(&family) {
-                                    ui.selectable_value(
+                                    ui.spaced_selectable_value(
                                         &mut self.preferences.typography.terminal_bold_weight,
                                         weight,
                                         weight.to_string(),
                                     );
                                 }
                             });
-                        ui.checkbox(
+                        ui.spaced_checkbox(
                             &mut self.preferences.typography.draw_bold_bright,
                             "Use bright ANSI colors for bold text",
                         );
@@ -9006,20 +9112,25 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn import_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey};
-        ui.heading(text(&self.locale, MessageKey::ImportFromOriginal, &[]));
-        ui.label(crate::i18n::literal(&self.locale, "Select an original profile and inspect a snapshot before importing. The original files are never changed."));
+        ui.spaced_heading(text(&self.locale, MessageKey::ImportFromOriginal, &[]));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Select an original profile and inspect a snapshot before importing. The original files are never changed."));
         ui.add_space(8.0);
         let previous_choice = self.import_source_choice.clone();
         egui::ComboBox::from_id_salt("import-source-profile")
-            .selected_text(
+            .selected_text(crate::ui_text::spaced_text(
+                ui,
                 self.import_source_choice
                     .as_deref()
                     .unwrap_or("Active profile"),
-            )
+            ))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.import_source_choice, None, "Active profile");
+                ui.spaced_selectable_value(&mut self.import_source_choice, None, "Active profile");
                 for name in &self.import_available_profiles {
-                    ui.selectable_value(&mut self.import_source_choice, Some(name.clone()), name);
+                    ui.spaced_selectable_value(
+                        &mut self.import_source_choice,
+                        Some(name.clone()),
+                        name,
+                    );
                 }
             });
         if self.import_source_choice != previous_choice {
@@ -9028,7 +9139,7 @@ impl ButtonsApp {
         }
         if !self.import_busy
             && ui
-                .button(text(&self.locale, MessageKey::ImportPreview, &[]))
+                .spaced_button(text(&self.locale, MessageKey::ImportPreview, &[]))
                 .clicked()
         {
             self.import_generation = self.import_generation.wrapping_add(1);
@@ -9064,19 +9175,19 @@ impl ButtonsApp {
         }
         if self.import_busy {
             ui.spinner();
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Reading or saving the import snapshot…",
             ));
         }
         if let Some(message) = &self.import_message {
-            ui.label(message);
+            ui.spaced_label(message);
         }
         let Some(preview) = &self.import_preview else {
             return;
         };
         ui.separator();
-        ui.label(format!(
+        ui.spaced_label(format!(
             "Source: {}{}",
             preview.source_profile,
             if preview.source_fallback {
@@ -9085,26 +9196,26 @@ impl ButtonsApp {
                 ""
             }
         ));
-        ui.label(format!("Destination: {}", preview.destination_profile));
+        ui.spaced_label(format!("Destination: {}", preview.destination_profile));
         if let Some(locale) = &preview.selected_locale {
-            ui.label(format!("Original language: {locale}"));
+            ui.spaced_label(format!("Original language: {locale}"));
         }
-        ui.label(format!(
+        ui.spaced_label(format!(
             "{} command presets · {} SSH presets · {} personal themes",
             preview.command_presets, preview.ssh_presets, preview.themes
         ));
-        ui.label(crate::i18n::literal(&self.locale, "Settings, shell profiles, fonts, theme choices and supported visual data are included. Commands are saved as presets; import does not run them."));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Settings, shell profiles, fonts, theme choices and supported visual data are included. Commands are saved as presets; import does not run them."));
         if !preview.provider_metadata.is_empty() {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Provider names, endpoints and models:",
             ));
             for provider in &preview.provider_metadata {
-                ui.label(provider);
+                ui.spaced_label(provider);
             }
         }
-        ui.label(text(&self.locale, MessageKey::ImportExcludedKeys, &[]));
-        ui.label(text(
+        ui.spaced_label(text(&self.locale, MessageKey::ImportExcludedKeys, &[]));
+        ui.spaced_label(text(
             &self.locale,
             MessageKey::ImportKeyCount,
             &[("count", &preview.credential_count.to_string())],
@@ -9112,18 +9223,18 @@ impl ButtonsApp {
         ui.add_enabled_ui(
             preview.credential_count > 0 && !preview.already_imported,
             |ui| {
-                ui.checkbox(
+                ui.spaced_checkbox(
                     &mut self.import_keys,
                     text(&self.locale, MessageKey::ImportKeysChoice, &[]),
                 );
             },
         );
-        ui.label(text(&self.locale, MessageKey::ImportOtherExclusions, &[]));
+        ui.spaced_label(text(&self.locale, MessageKey::ImportOtherExclusions, &[]));
         for warning in &preview.warnings {
-            ui.colored_label(self.colors().warning, warning);
+            ui.spaced_colored_label(self.colors().warning, warning);
         }
         if preview.already_imported {
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "This source snapshot was already imported. Native edits are preserved.",
             ));
@@ -9132,7 +9243,7 @@ impl ButtonsApp {
         let destination_profile = preview.destination_profile.clone();
         ui.horizontal(|ui| {
             if ui
-                .button(text(&self.locale, MessageKey::Cancel, &[]))
+                .spaced_button(text(&self.locale, MessageKey::Cancel, &[]))
                 .clicked()
             {
                 self.import_generation = self.import_generation.wrapping_add(1);
@@ -9141,7 +9252,7 @@ impl ButtonsApp {
             if !already_imported
                 && !self.import_busy
                 && ui
-                    .button(text(
+                    .spaced_button(text(
                         &self.locale,
                         MessageKey::ImportConfirm,
                         &[("profile", &destination_profile)],
@@ -9273,8 +9384,8 @@ impl ButtonsApp {
     fn shortcut_settings(&mut self, ui: &mut egui::Ui) {
         use crate::i18n::{text, MessageKey as M};
 
-        ui.heading(text(&self.locale, M::Shortcuts, &[]));
-        ui.label(text(&self.locale, M::ShortcutHelp, &[]));
+        ui.spaced_heading(text(&self.locale, M::Shortcuts, &[]));
+        ui.spaced_label(text(&self.locale, M::ShortcutHelp, &[]));
         ui.add_space(8.0);
         egui::Grid::new("native-shortcut-settings")
             .striped(true)
@@ -9287,17 +9398,17 @@ impl ButtonsApp {
                         .binding(action)
                         .map(ShortcutChord::label)
                         .unwrap_or_else(|| "—".into());
-                    ui.label(text(&self.locale, action.message_key(), &[]));
+                    ui.spaced_label(text(&self.locale, action.message_key(), &[]));
                     ui.monospace(current);
                     if ui
-                        .button(text(&self.locale, M::ShortcutRecord, &[]))
+                        .spaced_button(text(&self.locale, M::ShortcutRecord, &[]))
                         .clicked()
                     {
                         self.shortcut_capture = Some(action);
                         self.shortcut_feedback = None;
                     }
                     if ui
-                        .button(text(&self.locale, M::ShortcutClear, &[]))
+                        .spaced_button(text(&self.locale, M::ShortcutClear, &[]))
                         .clicked()
                     {
                         self.preferences.shortcuts.clear(action);
@@ -9311,7 +9422,7 @@ impl ButtonsApp {
             });
 
         if ui
-            .button(text(&self.locale, M::ShortcutResetDefaults, &[]))
+            .spaced_button(text(&self.locale, M::ShortcutResetDefaults, &[]))
             .clicked()
         {
             self.preferences.shortcuts.reset();
@@ -9321,7 +9432,7 @@ impl ButtonsApp {
 
         if self.shortcut_capture.is_some() {
             ui.add_space(6.0);
-            ui.label(text(&self.locale, M::ShortcutRecordPrompt, &[]));
+            ui.spaced_label(text(&self.locale, M::ShortcutRecordPrompt, &[]));
         }
         if let Some(feedback) = self.shortcut_feedback {
             let feedback = match feedback {
@@ -9345,35 +9456,35 @@ impl ButtonsApp {
                 ShortcutFeedback::Invalid => text(&self.locale, M::ShortcutInvalid, &[]),
             };
             ui.add_space(6.0);
-            ui.colored_label(self.colors().warning, feedback);
+            ui.spaced_colored_label(self.colors().warning, feedback);
         }
     }
 
     fn keyboard_settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Keyboard & clipboard");
-        ui.label("Copy: Ctrl+Shift+C, or Cmd+C on macOS. Paste: Ctrl+Shift+V, or Cmd+V on macOS. Custom bindings are in Shortcuts.");
-        ui.checkbox(
+        ui.spaced_heading("Keyboard & clipboard");
+        ui.spaced_label("Copy: Ctrl+Shift+C, or Cmd+C on macOS. Paste: Ctrl+Shift+V, or Cmd+V on macOS. Custom bindings are in Shortcuts.");
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.ctrl_c_copies_selection,
             "Ctrl+C copies when terminal text is selected",
         );
-        ui.label("With no selection, Ctrl+C interrupts the shell. Disable this option to always interrupt with Ctrl+C on Windows/Linux.");
-        ui.checkbox(
+        ui.spaced_label("With no selection, Ctrl+C interrupts the shell. Disable this option to always interrupt with Ctrl+C on Windows/Linux.");
+        ui.spaced_checkbox(
             &mut self.preferences.right_click_copies_selection,
             "Right-click copies selected terminal text",
         );
-        ui.checkbox(
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.copy_on_selection,
             "Copy automatically when mouse selection ends",
         );
-        ui.checkbox(
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.bracketed_paste,
             "Use bracketed paste when the terminal application requests it",
         );
-        ui.checkbox(
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.option_as_meta,
             "macOS: use Option as Meta (Escape prefix)",
         );
-        ui.label("Leave Option as Meta off to type accented and alternate characters with Option on Mac keyboards.");
+        ui.spaced_label("Leave Option as Meta off to type accented and alternate characters with Option on Mac keyboards.");
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -9395,43 +9506,43 @@ impl ButtonsApp {
     fn workspace_settings(&mut self, ui: &mut egui::Ui) {
         #[cfg(not(target_arch = "wasm32"))]
         use crate::i18n::{text, MessageKey as M};
-        ui.heading(crate::i18n::literal(&self.locale, "Workspace"));
-        ui.label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Workspace"));
+        ui.spaced_label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
         ui.add(
             egui::Slider::new(&mut self.preferences.animation_fps, 1..=60)
                 .text("Effect animation FPS limit"),
         );
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
-                let label = ui.label("Left panel name");
+                let label = ui.spaced_label("Left panel name");
                 ui.add(egui::TextEdit::singleline(&mut self.preferences.dock_title).char_limit(60)).labelled_by(label.id);
             });
-            ui.checkbox(
+            ui.spaced_checkbox(
                 &mut self.preferences.right_click_copies_selection,
                 "Right-click copies selected terminal text",
             ).on_hover_text("Copy immediately when text is selected. With no selection, right-click opens the pane menu.");
-            ui.label("Copy and paste behavior is configured in the Keyboard tab.");
+            ui.spaced_label("Copy and paste behavior is configured in the Keyboard tab.");
             #[cfg(not(target_arch = "wasm32"))]
             {
-                let label = ui.label("Retained scrollback lines per terminal (0–100,000)");
+                let label = ui.spaced_label("Retained scrollback lines per terminal (0–100,000)");
                 if ui.add(egui::DragValue::new(&mut self.preferences.scrollback_lines).range(0..=100_000)).labelled_by(label.id).changed() {
                     for tab in &mut self.tabs {
                         tab.backend.set_scrollback_lines(self.preferences.scrollback_lines);
                     }
                     self.terminal_search_status = None;
                 }
-                ui.label("Lowering the limit immediately discards older lines. Terminal → Read terminal text opens a selectable text snapshot for assistive tools.");
-                ui.checkbox(&mut self.preferences.terminal_history.auto_save, "Automatically save terminal text snapshots");
-                let label = ui.label("Delete saved snapshots after days");
+                ui.spaced_label("Lowering the limit immediately discards older lines. Terminal → Read terminal text opens a selectable text snapshot for assistive tools.");
+                ui.spaced_checkbox(&mut self.preferences.terminal_history.auto_save, "Automatically save terminal text snapshots");
+                let label = ui.spaced_label("Delete saved snapshots after days");
                 ui.add(egui::DragValue::new(&mut self.preferences.terminal_history.retention_days).range(1..=365)).labelled_by(label.id);
-                ui.label("Saved locally in dated UTC folders; snapshots can contain anything printed by your shell. Autosave runs every 5 seconds and on close, up to 200,000 characters per terminal. Expiry runs while the app is open.");
-                if ui.button("Save current terminal snapshot now").clicked() {
+                ui.spaced_label("Saved locally in dated UTC folders; snapshots can contain anything printed by your shell. Autosave runs every 5 seconds and on close, up to 200,000 characters per terminal. Expiry runs while the app is open.");
+                if ui.spaced_button("Save current terminal snapshot now").clicked() {
                     self.queue_terminal_history(Some(self.focused));
                 }
                 if let Some(store) = &self.native_store {
                     let folder = self.history_writer.as_ref().map_or_else(|| store.profile_dir().join("terminal-history"), |writer| writer.root.clone());
-                    ui.label(format!("History folder: {}", folder.display()));
-                    if ui.add_enabled(folder.exists(), egui::Button::new("Open saved history folder")).clicked() {
+                    ui.spaced_label(format!("History folder: {}", folder.display()));
+                    if ui.add_enabled(folder.exists(), crate::ui_text::button(ui, "Open saved history folder")).clicked() {
                         #[cfg(windows)]
                         let result = std::process::Command::new("explorer.exe").arg(&folder).spawn();
                         #[cfg(target_os = "linux")]
@@ -9442,10 +9553,10 @@ impl ButtonsApp {
                         if result.is_err() { self.notice = Some("Could not open the history folder.".into()); }
                     }
                 }
-                ui.checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU Analog TV effect)");
-                ui.label("Turn off for standard texture-based static. Calm mode disables motion and noise.");
+                ui.spaced_checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU Analog TV effect)");
+                ui.spaced_label("Turn off for standard texture-based static. Calm mode disables motion and noise.");
             }
-            ui.checkbox(
+            ui.spaced_checkbox(
                 &mut self.preferences.pane_hover_label.enabled,
                 crate::i18n::literal(&self.locale, "Show terminal name on hover"),
             );
@@ -9463,13 +9574,13 @@ impl ButtonsApp {
                     false,
                 );
             }
-            ui.checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-            ui.checkbox(&mut self.preferences.show_presets, "Show preset bar");
-            ui.checkbox(
+            ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Show command dock");
+            ui.spaced_checkbox(&mut self.preferences.show_presets, "Show preset bar");
+            ui.spaced_checkbox(
                 &mut self.preferences.show_action_buttons,
                 crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
             );
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Right-click a tab or preset for its menu. Menu buttons are optional.",
             ));
@@ -9495,15 +9606,15 @@ impl ButtonsApp {
                         )
                         .text(text(&self.locale, M::WindowOpacity, &[])),
                     );
-                    ui.label(text(&self.locale, M::WindowOpacitySupported, &[]));
+                    ui.spaced_label(text(&self.locale, M::WindowOpacitySupported, &[]));
                     if let Some(error) = &self.window_opacity_error {
-                        ui.colored_label(
+                        ui.spaced_colored_label(
                             self.colors().warning,
                             text(&self.locale, M::WindowOpacityFailed, &[("error", error)]),
                         );
                     }
                 } else {
-                    ui.label(text(&self.locale, M::WindowOpacityUnsupported, &[]));
+                    ui.spaced_label(text(&self.locale, M::WindowOpacityUnsupported, &[]));
                 }
             }
             #[cfg(not(target_arch = "wasm32"))]
@@ -9527,11 +9638,11 @@ impl ButtonsApp {
                         }
                     });
                 }
-                ui.checkbox(
+                ui.spaced_checkbox(
                     &mut self.preferences.dock_compact,
                     text(&self.locale, M::WorkspaceDockCompact, &[]),
                 );
-                ui.checkbox(
+                ui.spaced_checkbox(
                     &mut self.preferences.dock_auto_hide,
                     text(&self.locale, M::WorkspaceDockAutoHide, &[]),
                 );
@@ -9555,13 +9666,13 @@ impl ButtonsApp {
             #[cfg(target_arch = "wasm32")]
             {
                 ui.add_space(12.0);
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "Shell profiles are available in the native desktop app.",
                 ));
             }
             ui.add_space(12.0);
-            ui.label(crate::i18n::literal(
+            ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Preferences are saved locally and restored on the next launch.",
             ));
@@ -9573,8 +9684,8 @@ impl ButtonsApp {
         let colors = self.colors();
         ui.add_space(14.0);
         ui.separator();
-        ui.heading(crate::i18n::literal(&self.locale, "Shell Profiles"));
-        ui.label(
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Shell Profiles"));
+        ui.spaced_label(
             RichText::new(
                 "Choose the default for new terminals or select a different profile from the + menu. Commands launch directly—no extra shell interpolation.",
             )
@@ -9589,12 +9700,12 @@ impl ButtonsApp {
             .map(|(_, label, _)| label.clone())
             .unwrap_or_else(|| "Unavailable saved profile".into());
         ui.horizontal(|ui| {
-            ui.label(crate::i18n::literal(&self.locale, "Default shell"));
+            ui.spaced_label(crate::i18n::literal(&self.locale, "Default shell"));
             egui::ComboBox::from_id_salt("default-shell-profile")
-                .selected_text(selected_label)
+                .selected_text(crate::ui_text::spaced_text(ui, selected_label))
                 .show_ui(ui, |ui| {
                     for (id, label, detail) in &options {
-                        ui.selectable_value(
+                        ui.spaced_selectable_value(
                             &mut self.preferences.default_shell_id,
                             id.clone(),
                             label,
@@ -9603,7 +9714,7 @@ impl ButtonsApp {
                     }
                 });
         });
-        ui.label(crate::i18n::literal(
+        ui.spaced_label(crate::i18n::literal(
             &self.locale,
             "Default working directory",
         ));
@@ -9615,18 +9726,18 @@ impl ButtonsApp {
                 ))
                 .desired_width(f32::INFINITY),
         );
-        ui.label(
+        ui.spaced_label(
             RichText::new("Supports absolute paths, relative paths, and ~/… on desktop.")
                 .small()
                 .color(colors.muted),
         );
 
         ui.add_space(10.0);
-        ui.label(RichText::new("Detected shells").strong());
+        ui.spaced_label(RichText::new("Detected shells").strong());
         for shell in &self.detected_shells {
             ui.horizontal(|ui| {
-                ui.label(&shell.label);
-                ui.label(
+                ui.spaced_label(&shell.label);
+                ui.spaced_label(
                     RichText::new(&shell.command)
                         .monospace()
                         .small()
@@ -9637,9 +9748,9 @@ impl ButtonsApp {
 
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Custom shells").strong());
+            ui.spaced_label(RichText::new("Custom shells").strong());
             if ui
-                .button(crate::i18n::literal(&self.locale, "+ Add custom shell"))
+                .spaced_button(crate::i18n::literal(&self.locale, "+ Add custom shell"))
                 .clicked()
             {
                 self.add_custom_shell_profile();
@@ -9662,14 +9773,14 @@ impl ButtonsApp {
                     egui::Grid::new(("custom-shell-profile", &profile.id))
                         .num_columns(2)
                         .show(ui, |ui| {
-                            ui.label(crate::i18n::literal(&self.locale, "Label"));
+                            ui.spaced_label(crate::i18n::literal(&self.locale, "Label"));
                             ui.add(
                                 egui::TextEdit::singleline(&mut profile.label)
                                     .hint_text(crate::i18n::literal(&self.locale, "MSYS2 UCRT64"))
                                     .desired_width(f32::INFINITY),
                             );
                             ui.end_row();
-                            ui.label(crate::i18n::literal(&self.locale, "Command line"));
+                            ui.spaced_label(crate::i18n::literal(&self.locale, "Command line"));
                             ui.add(
                                 egui::TextEdit::singleline(&mut profile.command)
                                     .hint_text(crate::i18n::literal(
@@ -9679,7 +9790,7 @@ impl ButtonsApp {
                                     .desired_width(f32::INFINITY),
                             );
                             ui.end_row();
-                            ui.label(crate::i18n::literal(
+                            ui.spaced_label(crate::i18n::literal(
                                 &self.locale,
                                 "Working directory override",
                             ));
@@ -9695,7 +9806,7 @@ impl ButtonsApp {
                         });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "Remove"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "Remove"))
                             .clicked()
                         {
                             remove = Some(index);
@@ -9703,13 +9814,16 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 !profile.command.trim().is_empty(),
-                                egui::Button::new(crate::i18n::literal(&self.locale, "Open")),
+                                crate::ui_text::button(
+                                    ui,
+                                    crate::i18n::literal(&self.locale, "Open"),
+                                ),
                             )
                             .clicked()
                         {
                             launch = Some(profile.id.clone());
                         }
-                        ui.label(
+                        ui.spaced_label(
                             RichText::new("Launch this profile now")
                                 .small()
                                 .color(colors.muted),
@@ -9728,8 +9842,8 @@ impl ButtonsApp {
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.heading(crate::i18n::literal(&self.locale, "Saved Presets"));
-        ui.label(
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Saved Presets"));
+        ui.spaced_label(
             RichText::new(
                 "Command and SSH buttons are stored separately. Both target the focused terminal and can either type text or also press Enter.",
             )
@@ -9737,12 +9851,12 @@ impl ButtonsApp {
         );
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.selectable_value(
+            ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Commands,
                 format!("Commands ({})", self.preferences.presets.len()),
             );
-            ui.selectable_value(
+            ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Ssh,
                 format!("SSH ({})", self.preferences.ssh_presets.len()),
@@ -9750,17 +9864,17 @@ impl ButtonsApp {
         });
         ui.add_space(8.0);
         let collection = self.preset_settings_collection;
-        ui.heading(format!("{} Presets", collection.label()));
+        ui.spaced_heading(format!("{} Presets", collection.label()));
         ui.horizontal(|ui| {
             if ui
-                .button(format!("+ Add {} preset", collection.label()))
+                .spaced_button(format!("+ Add {} preset", collection.label()))
                 .clicked()
             {
                 self.open_add_preset_editor(collection);
             }
             if collection == PresetCollection::Commands
                 && ui
-                    .button(crate::i18n::literal(
+                    .spaced_button(crate::i18n::literal(
                         &self.locale,
                         "Restore starter presets",
                     ))
@@ -9768,7 +9882,7 @@ impl ButtonsApp {
             {
                 self.confirm_preset_reset = true;
             }
-            ui.label(
+            ui.spaced_label(
                 RichText::new(format!("{} saved", self.presets(collection).len()))
                     .small()
                     .color(colors.muted),
@@ -9783,20 +9897,20 @@ impl ButtonsApp {
                 .corner_radius(ui.visuals().widgets.inactive.corner_radius)
                 .inner_margin(8.0)
                 .show(ui, |ui| {
-                    ui.label(crate::i18n::literal(
+                    ui.spaced_label(crate::i18n::literal(
                         &self.locale,
                         "Replace every saved preset with the platform starter set?",
                     ));
                     ui.horizontal(|ui| {
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "Confirm reset"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "Confirm reset"))
                             .clicked()
                         {
                             self.preferences.presets = default_presets();
                             self.confirm_preset_reset = false;
                         }
                         if ui
-                            .button(crate::i18n::literal(&self.locale, "Cancel"))
+                            .spaced_button(crate::i18n::literal(&self.locale, "Cancel"))
                             .clicked()
                         {
                             self.confirm_preset_reset = false;
@@ -9818,14 +9932,14 @@ impl ButtonsApp {
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
-                                ui.label(RichText::new(&preset.label).strong());
-                                ui.label(
+                                ui.spaced_label(RichText::new(&preset.label).strong());
+                                ui.spaced_label(
                                     RichText::new(&preset.command)
                                         .monospace()
                                         .small()
                                         .color(colors.muted),
                                 );
-                                ui.label(
+                                ui.spaced_label(
                                     RichText::new(if preset.send_enter {
                                         "Runs immediately (sends Enter)"
                                     } else {
@@ -9837,19 +9951,19 @@ impl ButtonsApp {
                             });
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                 if ui
-                                    .button(crate::i18n::literal(&self.locale, "Delete"))
+                                    .spaced_button(crate::i18n::literal(&self.locale, "Delete"))
                                     .clicked()
                                 {
                                     action = Some(PresetAction::Delete(collection, index));
                                 }
                                 if ui
-                                    .button(crate::i18n::literal(&self.locale, "Edit"))
+                                    .spaced_button(crate::i18n::literal(&self.locale, "Edit"))
                                     .clicked()
                                 {
                                     action = Some(PresetAction::Edit(collection, index));
                                 }
                                 if ui
-                                    .button(crate::i18n::literal(&self.locale, "Run"))
+                                    .spaced_button(crate::i18n::literal(&self.locale, "Run"))
                                     .clicked()
                                 {
                                     action = Some(PresetAction::Run(collection, index));
@@ -9888,22 +10002,22 @@ impl ButtonsApp {
                     &self.font_catalog,
                     &self.preferences.typography.settings,
                 );
-                ui.label(crate::i18n::literal(&self.locale, "Button label"));
+                ui.spaced_label(crate::i18n::literal(&self.locale, "Button label"));
                 ui.add(
                     egui::TextEdit::singleline(&mut self.preset_label_draft)
                         .hint_text(crate::i18n::literal(&self.locale, "Git status"))
                         .desired_width(f32::INFINITY),
                 );
                 ui.add_space(8.0);
-                ui.label(crate::i18n::literal(&self.locale, "Command or text"));
+                ui.spaced_label(crate::i18n::literal(&self.locale, "Command or text"));
                 ui.add(
                     egui::TextEdit::multiline(&mut self.preset_command_draft)
                         .hint_text(crate::i18n::literal(&self.locale, "git status"))
                         .desired_rows(4)
                         .desired_width(f32::INFINITY),
                 );
-                ui.checkbox(&mut self.preset_send_enter_draft, "Send Enter after typing");
-                ui.label(
+                ui.spaced_checkbox(&mut self.preset_send_enter_draft, "Send Enter after typing");
+                ui.spaced_label(
                     RichText::new(if self.preset_send_enter_draft {
                         "Clicking this button will execute the command immediately."
                     } else {
@@ -9914,18 +10028,18 @@ impl ButtonsApp {
                 );
                 if let Some(error) = &self.preset_editor_error {
                     ui.add_space(6.0);
-                    ui.colored_label(ui.visuals().error_fg_color, error);
+                    ui.spaced_colored_label(ui.visuals().error_fg_color, error);
                 }
                 ui.add_space(10.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui
-                        .button(crate::i18n::literal(&self.locale, "Cancel"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Cancel"))
                         .clicked()
                     {
                         cancel = true;
                     }
                     if ui
-                        .button(crate::i18n::literal(&self.locale, "Save preset"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Save preset"))
                         .clicked()
                     {
                         save = true;
@@ -9960,7 +10074,7 @@ impl ButtonsApp {
                     &self.font_catalog,
                     &self.preferences.typography.settings,
                 );
-                ui.label(crate::i18n::literal(&self.locale, "Tab title"));
+                ui.spaced_label(crate::i18n::literal(&self.locale, "Tab title"));
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut self.tab_title_draft)
                         .desired_width(f32::INFINITY),
@@ -9968,18 +10082,18 @@ impl ButtonsApp {
                 let submitted =
                     response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
                 if let Some(error) = &self.tab_rename_error {
-                    ui.colored_label(ui.visuals().error_fg_color, error);
+                    ui.spaced_colored_label(ui.visuals().error_fg_color, error);
                 }
                 ui.add_space(8.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui
-                        .button(crate::i18n::literal(&self.locale, "Cancel"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Cancel"))
                         .clicked()
                     {
                         cancel = true;
                     }
                     if ui
-                        .button(crate::i18n::literal(&self.locale, "Rename"))
+                        .spaced_button(crate::i18n::literal(&self.locale, "Rename"))
                         .clicked()
                         || submitted
                     {
@@ -10059,7 +10173,7 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if ui
-                        .selectable_label(
+                        .spaced_selectable_label(
                             selected_tab == GuideTab::QuickStart,
                             crate::i18n::literal(&locale, "Quick start"),
                         )
@@ -10068,7 +10182,7 @@ impl ButtonsApp {
                         selected_tab = GuideTab::QuickStart;
                     }
                     if ui
-                        .selectable_label(
+                        .spaced_selectable_label(
                             selected_tab == GuideTab::AiHelp,
                             crate::i18n::text(
                                 &locale,
@@ -10081,7 +10195,7 @@ impl ButtonsApp {
                         selected_tab = GuideTab::AiHelp;
                     }
                     if ui
-                        .selectable_label(
+                        .spaced_selectable_label(
                             selected_tab == GuideTab::Online,
                             crate::i18n::literal(&locale, "Online guide"),
                         )
@@ -10091,7 +10205,7 @@ impl ButtonsApp {
                     }
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui
-                            .button(crate::i18n::literal(
+                            .spaced_button(crate::i18n::literal(
                                 &locale,
                                 "Open ButtonsCLI website",
                             ))
@@ -10107,7 +10221,7 @@ impl ButtonsApp {
                         if ui
                             .add_enabled(
                                 !busy,
-                                egui::Button::new(crate::i18n::literal(
+                                crate::ui_text::button(ui, crate::i18n::literal(
                                     &locale,
                                     "Load online guide",
                                 )),
@@ -10117,11 +10231,11 @@ impl ButtonsApp {
                             request_online = true;
                         }
                         if busy {
-                            ui.label(crate::i18n::literal(&locale, "Loading..."));
+                            ui.spaced_label(crate::i18n::literal(&locale, "Loading..."));
                         }
                     });
                     if fetch_error {
-                        ui.colored_label(
+                        ui.spaced_colored_label(
                             ui.visuals().error_fg_color,
                             crate::i18n::literal(
                                 &locale,
@@ -10140,26 +10254,26 @@ impl ButtonsApp {
                         for block in display::markdown_blocks(body) {
                             match block {
                                 display::MarkdownBlock::Heading { level: 1, text } => {
-                                    ui.heading(text.replace("**", ""));
+                                    ui.spaced_heading(text.replace("**", ""));
                                 }
                                 display::MarkdownBlock::Heading { text, .. } => {
-                                    ui.strong(text.replace("**", ""));
+                                    ui.spaced_strong(text.replace("**", ""));
                                 }
                                 display::MarkdownBlock::Bullet(text) => {
                                     wrapping_row(ui, |ui| {
-                                        ui.label("•");
-                                        ui.label(text.replace("**", ""));
+                                        ui.spaced_label("•");
+                                        ui.spaced_label(text.replace("**", ""));
                                     });
                                 }
                                 display::MarkdownBlock::Code(text) => {
-                                    ui.label(RichText::new(text).monospace());
+                                    ui.spaced_label(RichText::new(text).monospace());
                                 }
                                 display::MarkdownBlock::Paragraph(text) => {
-                                    ui.label(text.replace("**", ""));
+                                    ui.spaced_label(text.replace("**", ""));
                                 }
                                 display::MarkdownBlock::Spacer => ui.add_space(6.0),
                                 display::MarkdownBlock::Truncated => {
-                                    ui.weak(crate::i18n::literal(
+                                    ui.spaced_weak(crate::i18n::literal(
                                         &locale,
                                         "Additional guide lines were omitted for responsiveness.",
                                     ));
@@ -10168,7 +10282,7 @@ impl ButtonsApp {
                         }
                     });
                 } else if selected_tab == GuideTab::Online {
-                    ui.weak(crate::i18n::literal(
+                    ui.spaced_weak(crate::i18n::literal(
                         &locale,
                         "Load online guide",
                     ));
@@ -10252,25 +10366,25 @@ impl ButtonsApp {
             .resizable(true)
             .default_width(620.0)
             .show(ctx, |ui| {
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &locale,
                     "Sending includes this message after best-effort masking, its category, optional email, app version, OS, language, and random IDs used once for this submission. Terminal output, commands, clipboard, files, and diagnostics are never attached.",
                 ));
                 ui.add_space(6.0);
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &locale,
                     "Keep API keys private. Do not paste them into terminal output, screenshots, feedback, chat messages, or public files. You can revoke a key from the provider if it is ever exposed.",
                 ));
                 ui.add_space(10.0);
-                ui.label(crate::i18n::literal(&locale, "Category"));
+                ui.spaced_label(crate::i18n::literal(&locale, "Category"));
                 egui::ComboBox::from_id_salt("native-feedback-category")
-                    .selected_text(crate::i18n::literal(
+                    .selected_text(crate::ui_text::spaced_text(ui, crate::i18n::literal(
                         &locale,
                         self.feedback_category.label(),
-                    ))
+                    )))
                     .show_ui(ui, |ui| {
                         for category in FeedbackCategory::ALL {
-                            ui.selectable_value(
+                            ui.spaced_selectable_value(
                                 &mut self.feedback_category,
                                 category,
                                 crate::i18n::literal(&locale, category.label()),
@@ -10278,7 +10392,7 @@ impl ButtonsApp {
                         }
                     });
                 ui.add_space(8.0);
-                ui.label(crate::i18n::literal(&locale, "Message"));
+                ui.spaced_label(crate::i18n::literal(&locale, "Message"));
                 let message = ui.add(
                     egui::TextEdit::multiline(&mut self.feedback_message)
                         .desired_rows(7)
@@ -10287,7 +10401,7 @@ impl ButtonsApp {
                 );
                 message_changed = message.changed();
                 ui.add_space(6.0);
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &locale,
                     "Preview after best-effort secret masking:",
                 ));
@@ -10295,7 +10409,7 @@ impl ButtonsApp {
                     .max_height(120.0)
                     .show(ui, |ui| {
                         ui.group(|ui| {
-                            ui.label(if preview.is_empty() {
+                            ui.spaced_label(if preview.is_empty() {
                                 crate::i18n::literal(&locale, "Message")
                             } else {
                                 preview.clone()
@@ -10303,7 +10417,7 @@ impl ButtonsApp {
                         });
                     });
                 ui.add_space(6.0);
-                ui.label(crate::i18n::literal(&locale, "Optional reply email"));
+                ui.spaced_label(crate::i18n::literal(&locale, "Optional reply email"));
                 ui.add(
                     egui::TextEdit::singleline(&mut self.feedback_contact)
                         .char_limit(160)
@@ -10323,10 +10437,10 @@ impl ButtonsApp {
                     };
                     match status {
                         FeedbackStatus::Sent => {
-                            ui.colored_label(ui.visuals().hyperlink_color, message);
+                            ui.spaced_colored_label(ui.visuals().hyperlink_color, message);
                         }
                         FeedbackStatus::Failed => {
-                            ui.colored_label(ui.visuals().error_fg_color, message);
+                            ui.spaced_colored_label(ui.visuals().error_fg_color, message);
                         }
                     }
                 }
@@ -10335,19 +10449,19 @@ impl ButtonsApp {
                     if ui
                         .add_enabled(
                             !busy && !preview.trim().is_empty(),
-                            egui::Button::new(crate::i18n::literal(&locale, "Send")),
+                            crate::ui_text::button(ui, crate::i18n::literal(&locale, "Send")),
                         )
                         .clicked()
                     {
                         submit = true;
                     }
                     if busy {
-                        ui.label(crate::i18n::literal(&locale, "Loading..."));
+                        ui.spaced_label(crate::i18n::literal(&locale, "Loading..."));
                     }
                     if ui
                         .add_enabled(
                             !busy,
-                            egui::Button::new(crate::i18n::literal(&locale, "Cancel")),
+                            crate::ui_text::button(ui, crate::i18n::literal(&locale, "Cancel")),
                         )
                         .clicked()
                     {
@@ -10379,13 +10493,13 @@ impl ButtonsApp {
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.heading(crate::i18n::literal(&self.locale, "ButtonsCLI Native"));
-                ui.label(crate::i18n::literal(
+                ui.spaced_heading(crate::i18n::literal(&self.locale, "ButtonsCLI Native"));
+                ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "A fast terminal workspace built with Rust, egui, and Alacritty.",
                 ));
                 ui.add_space(8.0);
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "No webview. No browser runtime. Your shell stays local.",
                 ));
@@ -10609,7 +10723,7 @@ fn theme_path_action(ui: &mut egui::Ui, path: &mut String, hint: &str, action: &
             [input_width, ui.spacing().interact_size.y],
             egui::TextEdit::singleline(path).hint_text(hint),
         );
-        ui.button(action).clicked()
+        ui.spaced_button(action).clicked()
     })
     .inner
 }
@@ -10667,6 +10781,7 @@ fn wrapping_row<R>(
 }
 
 fn apply_zone_style(ui: &mut egui::Ui, catalog: &fonts::FontCatalog, zone: &FontZone) {
+    crate::ui_text::set_zone_spacing(ui, zone.letter_spacing);
     for (text_style, scale) in [
         (TextStyle::Heading, 1.35),
         (TextStyle::Body, 1.0),
@@ -10698,26 +10813,25 @@ fn font_zone_editor(
         .inner_margin(10.0)
         .show(ui, |ui| {
             ui.set_min_width((ui.available_width() - 24.0).max(420.0));
-            ui.label(RichText::new(crate::i18n::literal(locale, label)).strong().font(catalog.font_id(zone, monospace_only)));
+            ui.spaced_label(RichText::new(crate::i18n::literal(locale, label)).strong().font(catalog.font_id(zone, monospace_only)));
             if !catalog.is_available(&zone.family) {
-                ui.label(crate::i18n::literal(
+                ui.spaced_label(crate::i18n::literal(
                     locale,
                     "This font is unavailable. A bundled fallback is active until you choose another font.",
                 ));
             }
             wrapping_row(ui, |ui| {
                 egui::ComboBox::from_id_salt(("font-family", label))
-                    .selected_text(
+                    .selected_text(crate::ui_text::spaced_text(ui,
                         RichText::new(&zone.family)
-                            .font(FontId::new(13.0, catalog.font_family(zone, monospace_only))),
-                    )
+                            .font(FontId::new(13.0, catalog.font_family(zone, monospace_only)))))
                     .width(270.0)
                     .show_ui(ui, |ui| {
                         for family in catalog.family_names(monospace_only) {
                             let mut preview = zone.clone();
                             preview.family.clone_from(&family);
                             if ui
-                                .selectable_label(
+                                .spaced_selectable_label(
                                     zone.family == family,
                                     RichText::new(&family).font(FontId::new(
                                         13.0,
@@ -10740,10 +10854,10 @@ fn font_zone_editor(
 
                 let weights = catalog.weights_for(&zone.family);
                 egui::ComboBox::from_id_salt(("font-weight", label))
-                    .selected_text(format!("{} weight", zone.weight))
+                    .selected_text(crate::ui_text::spaced_text(ui, format!("{} weight", zone.weight)))
                     .show_ui(ui, |ui| {
                         for weight in weights {
-                            ui.selectable_value(&mut zone.weight, weight, weight.to_string());
+                            ui.spaced_selectable_value(&mut zone.weight, weight, weight.to_string());
                         }
                     });
                 ui.add(egui::Slider::new(&mut zone.size, 8.0..=32.0).suffix(" px"));
@@ -10754,14 +10868,15 @@ fn font_zone_editor(
                 }
             });
             let files = catalog.face_files(&zone.family);
-            ui.label(
+            ui.spaced_label(
                 RichText::new(format!("Loaded from {}", files.join(", ")))
                     .small()
                     .color(ui.visuals().weak_text_color()),
             );
             ui.label(
                 RichText::new("The quick brown fox · 0123456789 · ~/project $ cargo run")
-                    .font(catalog.font_id(zone, monospace_only)),
+                    .font(catalog.font_id(zone, monospace_only))
+                    .extra_letter_spacing(if monospace_only { 0.0 } else { zone.letter_spacing }),
             );
         });
     ui.add_space(8.0);
@@ -11340,8 +11455,8 @@ fn render_pane_tree(
                             .id_salt(("pane-action-scroll", tab.id))
                             .max_height((ui.ctx().screen_rect().height() - 64.0).max(150.0))
                             .show(ui, |ui| {
-                                ui.strong(&tab.title);
-                                ui.label(&theme.name);
+                                ui.spaced_strong(&tab.title);
+                                ui.spaced_label(&theme.name);
                                 pane_action_menu(
                                     ui,
                                     state.locale,
@@ -11351,9 +11466,9 @@ fn render_pane_tree(
                                     &mut action,
                                 );
                                 ui.separator();
-                                egui::CollapsingHeader::new(crate::i18n::literal(
-                                    state.locale,
-                                    "Terminal font",
+                                egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+                                    ui,
+                                    crate::i18n::literal(state.locale, "Terminal font"),
                                 ))
                                 .show(ui, |ui| {
                                     let mut edited = font.clone();
@@ -11369,7 +11484,7 @@ fn render_pane_tree(
                                         action = Some(PaneAction::Font(edited));
                                     }
                                     if ui
-                                        .button(crate::i18n::literal(
+                                        .spaced_button(crate::i18n::literal(
                                             state.locale,
                                             "Use theme / default font",
                                         ))
@@ -11691,7 +11806,7 @@ fn favorite_theme_menu(
     action: &mut Option<PaneAction>,
 ) {
     if favorites.is_empty() {
-        ui.label(crate::i18n::literal(
+        ui.spaced_label(crate::i18n::literal(
             locale,
             "No favorite themes yet. Star a theme in Settings → Themes.",
         ));
@@ -11701,7 +11816,7 @@ fn favorite_theme_menu(
             .max_height(320.0)
             .show(ui, |ui| {
                 for (id, name) in favorites {
-                    if ui.selectable_label(id == current, name).clicked() {
+                    if ui.spaced_selectable_label(id == current, name).clicked() {
                         *action = Some(PaneAction::Theme(id.clone()));
                         ui.close_menu();
                     }
@@ -11714,12 +11829,15 @@ fn favorite_theme_menu(
     } else {
         "Favorite current theme"
     };
-    if ui.button(crate::i18n::literal(locale, label)).clicked() {
+    if ui
+        .spaced_button(crate::i18n::literal(locale, label))
+        .clicked()
+    {
         *action = Some(PaneAction::ToggleFavorite(current.to_owned()));
         ui.close_menu();
     }
     if ui
-        .button(crate::i18n::literal(locale, "Theme settings"))
+        .spaced_button(crate::i18n::literal(locale, "Theme settings"))
         .clicked()
     {
         *action = Some(PaneAction::ThemeSettings);
@@ -11736,7 +11854,11 @@ fn pane_action_menu(
     included: bool,
     action: &mut Option<PaneAction>,
 ) {
-    egui::CollapsingHeader::new(crate::i18n::literal(locale, "Favorite themes")).show(ui, |ui| {
+    egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+        ui,
+        crate::i18n::literal(locale, "Favorite themes"),
+    ))
+    .show(ui, |ui| {
         favorite_theme_menu(ui, locale, current, favorites, action);
     });
     for (label, operation) in [
@@ -11747,14 +11869,17 @@ fn pane_action_menu(
         ("Clear screen", PaneAction::Clear),
         ("Rename", PaneAction::Rename),
     ] {
-        if ui.button(crate::i18n::literal(locale, label)).clicked() {
+        if ui
+            .spaced_button(crate::i18n::literal(locale, label))
+            .clicked()
+        {
             *action = Some(operation);
             ui.close_menu();
         }
     }
     let mut include = included;
     if ui
-        .checkbox(
+        .spaced_checkbox(
             &mut include,
             crate::i18n::literal(locale, "Include in auto-tile"),
         )
@@ -11765,7 +11890,7 @@ fn pane_action_menu(
     }
     ui.separator();
     if ui
-        .button(crate::i18n::literal(locale, "Close terminal"))
+        .spaced_button(crate::i18n::literal(locale, "Close terminal"))
         .clicked()
     {
         *action = Some(PaneAction::Close);
@@ -11782,14 +11907,17 @@ fn tab_action_menu(
     included: bool,
     action: &mut Option<TabAction>,
 ) {
-    if ui.button(crate::i18n::literal(locale, "Rename")).clicked() {
+    if ui
+        .spaced_button(crate::i18n::literal(locale, "Rename"))
+        .clicked()
+    {
         *action = Some(TabAction::Rename(index));
         ui.close_menu();
     }
     if ui
         .add_enabled(
             index > 0,
-            egui::Button::new(crate::i18n::literal(locale, "Move left")),
+            crate::ui_text::button(ui, crate::i18n::literal(locale, "Move left")),
         )
         .clicked()
     {
@@ -11799,7 +11927,7 @@ fn tab_action_menu(
     if ui
         .add_enabled(
             index + 1 < tab_count,
-            egui::Button::new(crate::i18n::literal(locale, "Move right")),
+            crate::ui_text::button(ui, crate::i18n::literal(locale, "Move right")),
         )
         .clicked()
     {
@@ -11809,7 +11937,7 @@ fn tab_action_menu(
     ui.separator();
     let mut include = included;
     if ui
-        .checkbox(
+        .spaced_checkbox(
             &mut include,
             crate::i18n::literal(locale, "Include in auto-tile"),
         )
@@ -11820,7 +11948,7 @@ fn tab_action_menu(
     }
     ui.separator();
     if ui
-        .button(crate::i18n::literal(locale, "Close terminal"))
+        .spaced_button(crate::i18n::literal(locale, "Close terminal"))
         .clicked()
     {
         *action = Some(TabAction::Close(index));
@@ -11881,7 +12009,7 @@ fn preset_button_menu(
 ) {
     response.context_menu(|ui| preset_action_menu(ui, locale, collection, index, action));
     if show_button {
-        ui.menu_button("⋮", |ui| {
+        ui.spaced_menu_button("⋮", |ui| {
             preset_action_menu(ui, locale, collection, index, action)
         });
     }
@@ -11895,16 +12023,25 @@ fn preset_action_menu(
     index: usize,
     action: &mut Option<PresetAction>,
 ) {
-    if ui.button(crate::i18n::literal(locale, "Run")).clicked() {
+    if ui
+        .spaced_button(crate::i18n::literal(locale, "Run"))
+        .clicked()
+    {
         *action = Some(PresetAction::Run(collection, index));
         ui.close_menu();
     }
-    if ui.button(crate::i18n::literal(locale, "Edit")).clicked() {
+    if ui
+        .spaced_button(crate::i18n::literal(locale, "Edit"))
+        .clicked()
+    {
         *action = Some(PresetAction::Edit(collection, index));
         ui.close_menu();
     }
     ui.separator();
-    if ui.button(crate::i18n::literal(locale, "Delete")).clicked() {
+    if ui
+        .spaced_button(crate::i18n::literal(locale, "Delete"))
+        .clicked()
+    {
         *action = Some(PresetAction::Delete(collection, index));
         ui.close_menu();
     }
@@ -11917,7 +12054,7 @@ fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
             .as_u64()
             .is_some_and(|version| version > 0);
         if ui
-            .checkbox(&mut native, "Native theme collection")
+            .spaced_checkbox(&mut native, "Native theme collection")
             .on_hover_text(
                 "Keep this theme in the native collection, separate from older legacy themes.",
             )
@@ -11933,7 +12070,7 @@ fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
             let mut version = document["metadata"]["nativeThemeVersion"]
                 .as_u64()
                 .unwrap_or(1);
-            ui.label("Version");
+            ui.spaced_label("Version");
             if ui
                 .add(egui::DragValue::new(&mut version).range(1..=999))
                 .changed()
@@ -11947,7 +12084,7 @@ fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
         .unwrap_or_default()
         .to_owned();
     ui.horizontal(|ui| {
-        ui.label(crate::i18n::literal(locale, "Theme name"));
+        ui.spaced_label(crate::i18n::literal(locale, "Theme name"));
         if ui
             .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
             .changed()
@@ -11959,7 +12096,7 @@ fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
         .as_str()
         .unwrap_or_default()
         .to_owned();
-    ui.label(crate::i18n::literal(locale, "Description"));
+    ui.spaced_label(crate::i18n::literal(locale, "Description"));
     if ui
         .add(
             egui::TextEdit::multiline(&mut description)
@@ -12064,7 +12201,7 @@ fn theme_color_setting_with_fallback(
         .and_then(crate::theme::parse_color)
         .unwrap_or(fallback);
     ui.horizontal(|ui| {
-        ui.label(crate::i18n::literal(locale, label));
+        ui.spaced_label(crate::i18n::literal(locale, label));
         if ui.color_edit_button_srgba(&mut color).changed() {
             set_theme_document_value(
                 document,
@@ -12089,7 +12226,7 @@ fn theme_document_toggle(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     if ui
-        .checkbox(&mut enabled, crate::i18n::literal(locale, label))
+        .spaced_checkbox(&mut enabled, crate::i18n::literal(locale, label))
         .changed()
     {
         set_theme_document_value(document, pointer, Value::Bool(enabled));
@@ -12280,18 +12417,18 @@ impl eframe::App for ButtonsApp {
             .frame(egui::Frame::new().fill(colors.canvas).inner_margin(8.0))
             .show(ctx, |ui| {
                 if let Some(notice) = &self.notice {
-                    ui.colored_label(colors.warning, notice);
+                    ui.spaced_colored_label(colors.warning, notice);
                     ui.add_space(8.0);
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 if self.import_offer {
                     ui.horizontal(|ui| {
-                        ui.label(crate::i18n::literal(
+                        ui.spaced_label(crate::i18n::literal(
                             &self.locale,
                             "Original ButtonsCLI settings are available to preview.",
                         ));
                         if ui
-                            .button(crate::i18n::text(
+                            .spaced_button(crate::i18n::text(
                                 &self.locale,
                                 crate::i18n::MessageKey::ImportFromOriginal,
                                 &[],
@@ -12302,7 +12439,7 @@ impl eframe::App for ButtonsApp {
                             self.settings_tab = SettingsTab::Import;
                         }
                         if ui
-                            .small_button(crate::i18n::literal(&self.locale, "Dismiss"))
+                            .spaced_small_button(crate::i18n::literal(&self.locale, "Dismiss"))
                             .clicked()
                         {
                             self.import_offer = false;
@@ -12982,7 +13119,7 @@ mod tests {
                 },
                 |ctx| {
                     egui::CentralPanel::default().show(ctx, |ui| {
-                        let response = ui.button("Terminal");
+                        let response = ui.spaced_button("Terminal");
                         if response.clicked() {
                             action = Some(TabAction::Activate(2));
                         }
@@ -13023,7 +13160,7 @@ mod tests {
                 },
                 |ctx| {
                     egui::CentralPanel::default().show(ctx, |ui| {
-                        ui.button("Pane").context_menu(|ui| {
+                        ui.spaced_button("Pane").context_menu(|ui| {
                             pane_action_menu(ui, "en", "basic2", &favorites, true, &mut action)
                         });
                     });
@@ -14623,7 +14760,7 @@ mod tests {
                         |ctx| {
                             egui::CentralPanel::default().show(ctx, |ui| {
                                 ui.horizontal(|ui| {
-                                    let response = ui.button("Preset");
+                                    let response = ui.spaced_button("Preset");
                                     if response.clicked() {
                                         action = Some(PresetAction::Run(collection, 2));
                                     }
