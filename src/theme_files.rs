@@ -307,6 +307,20 @@ fn font_zone(zone: &FontZone) -> Value {
     })
 }
 
+/// Replace supported appearance fields while retaining unrecognized theme metadata.
+pub(crate) fn overlay_appearance(target: &mut Value, resolved: &Value) {
+    if let Some(fields) = resolved.as_object() {
+        if !target.is_object() {
+            *target = json!({});
+        }
+        for (key, value) in fields {
+            overlay_appearance(&mut target[key], value);
+        }
+    } else {
+        *target = resolved.clone();
+    }
+}
+
 fn center_name(center: [f32; 2]) -> &'static str {
     match (
         center[0] >= 0.75,
@@ -369,6 +383,51 @@ fn now_rfc3339() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn theme_prompt_examples_import_through_the_current_loader() {
+        let guide = include_str!("../themeprompts.md").replace("\r\n", "\n");
+        let examples: Vec<_> = guide
+            .split("```json\n")
+            .skip(1)
+            .map(|block| block.split("\n```").next().unwrap())
+            .collect();
+        assert_eq!(examples.len(), 3);
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-prompt-import-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        std::fs::create_dir_all(&base).unwrap();
+        for (index, text) in examples.iter().enumerate() {
+            let path = base.join(format!("example-{index}.json"));
+            std::fs::write(&path, text).unwrap();
+            let (file, document) = import_theme_file(&store, &path).unwrap();
+            let parsed = ThemeDefinition::editor_document(&document).unwrap();
+            assert_eq!(document["version"], 1);
+            assert_eq!(parsed.native_version, Some(1));
+            assert_eq!(
+                document["theme"]["terminal"]["ansiColors"]
+                    .as_object()
+                    .unwrap()
+                    .len(),
+                16
+            );
+            assert_eq!(
+                read_theme_file(&store.profile_dir().join("themes").join(file)).unwrap(),
+                document
+            );
+        }
+        std::fs::remove_dir_all(base).unwrap();
+    }
 
     fn roots(label: &str) -> (PathBuf, PathBuf) {
         let root = std::env::temp_dir().join(format!(

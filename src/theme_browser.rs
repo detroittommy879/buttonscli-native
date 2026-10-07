@@ -61,6 +61,9 @@ pub(crate) fn matches(
         .iter()
         .enumerate()
         .filter(|(_, theme)| {
+            if theme.id.starts_with("preview:") {
+                return false;
+            }
             let native = theme.native_version.is_some();
             (collection == ThemeCollection::All
                 || native == (collection == ThemeCollection::Native))
@@ -108,10 +111,13 @@ mod tests {
         native.id = "personal:next".into();
         native.name = "Z new native".into();
         native.native_version = Some(2);
+        let mut preview = native.clone();
+        preview.id = "preview:default:draft".into();
         let themes = vec![
             catalog.get("basic2").clone(),
             native,
             catalog.get("aurora").clone(),
+            preview,
         ];
         assert_eq!(
             matches(&themes, "", ThemeCollection::Legacy, ThemeSort::Name, &[]),

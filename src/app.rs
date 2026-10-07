@@ -660,8 +660,6 @@ struct SettingsSnapshot {
 struct ThemePreviewSnapshot {
     preferences: Preferences,
     applied_preferences: Preferences,
-    theme_overrides: std::collections::BTreeMap<u64, String>,
-    pane_fonts: std::collections::BTreeMap<u64, fonts::PaneFont>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1551,14 +1549,12 @@ impl ButtonsApp {
         if let Some(font) = self.pane_fonts.get(&id) {
             return font.clone();
         }
-        if self.preferences.theme_apply.fonts {
-            if let Some(typography) = self
-                .theme_overrides
-                .get(&id)
-                .and_then(|theme| self.themes.get(theme).typography.as_ref())
-            {
-                return fonts::PaneFont::from(typography);
-            }
+        if let Some(typography) = self
+            .theme_overrides
+            .get(&id)
+            .and_then(|theme| self.themes.get(theme).typography.as_ref())
+        {
+            return fonts::PaneFont::from(typography);
         }
         fonts::PaneFont::from(&self.preferences.typography)
     }
@@ -7011,6 +7007,26 @@ impl ButtonsApp {
         }
     }
 
+    fn theme_apply_controls(&mut self, ui: &mut egui::Ui) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let before = self.preferences.theme_apply.clone();
+        wrapping_row(ui, |ui| {
+            ui.spaced_label(crate::i18n::literal(&self.locale, "Apply to shared:"));
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.app, "App chrome");
+            ui.spaced_checkbox(
+                &mut self.preferences.theme_apply.terminal,
+                "Terminal colors",
+            );
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.fonts, "Fonts");
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
+            ui.spaced_checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
+        });
+        #[cfg(not(target_arch = "wasm32"))]
+        if before != self.preferences.theme_apply && self.theme_editor_preview_snapshot.is_some() {
+            self.preview_personal_theme_draft();
+        }
+    }
+
     fn theme_library_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Theme Library"));
@@ -7023,20 +7039,10 @@ impl ButtonsApp {
             ))
             .color(colors.muted),
         );
-        wrapping_row(ui, |ui| {
-            ui.spaced_label(crate::i18n::literal(&self.locale, "Apply:"));
-            ui.spaced_checkbox(&mut self.preferences.theme_apply.app, "App chrome");
-            ui.spaced_checkbox(
-                &mut self.preferences.theme_apply.terminal,
-                "Terminal colors",
-            );
-            ui.spaced_checkbox(&mut self.preferences.theme_apply.fonts, "Fonts");
-            ui.spaced_checkbox(&mut self.preferences.theme_apply.gradient, "Gradients");
-            ui.spaced_checkbox(&mut self.preferences.theme_apply.effects, "Special effects");
-        });
+        self.theme_apply_controls(ui);
         #[cfg(not(target_arch = "wasm32"))]
-        if ui.spaced_button("New from current theme").on_hover_text("Start an editable copy without switching the app or terminals to another saved theme.").clicked() {
-            self.start_personal_theme_draft();
+        if ui.spaced_button("New from current appearance").on_hover_text("Capture the current shared UI, terminal default, fonts and effects. Individual tab themes stay separate.").clicked() {
+            self.start_current_appearance_draft();
             self.theme_settings_tab = ThemeSettingsTab::Edit;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -7636,11 +7642,12 @@ impl ButtonsApp {
         ui.spaced_label(
             RichText::new(crate::i18n::literal(
                 &locale,
-                "Create a theme by hand, preview it, then save it to this native profile.",
+                "Save a shared UI and terminal default. Preview and save use the Library Apply sections; individual tab themes are kept. A theme JSON does not store the mixed-tab arrangement.",
             ))
             .small()
             .color(self.colors().muted),
         );
+        self.theme_apply_controls(ui);
         if ui
             .spaced_checkbox(
                 &mut self.preferences.theme_editor_live_preview,
@@ -7682,7 +7689,9 @@ impl ButtonsApp {
             });
         if let Some(id) = selected_profile {
             self.restore_personal_theme_preview();
-            self.perform_global_theme_action(PaneAction::Theme(id.clone()));
+            if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
+                self.apply_theme(index, self.preferences.calm_mode);
+            }
             self.load_personal_theme_draft(&id);
             self.queue_theme_editor_preview(ui.ctx());
         }
@@ -7697,7 +7706,7 @@ impl ButtonsApp {
             ui.spaced_label(
                 RichText::new(crate::i18n::literal(
                     &locale,
-                    "New from the currently selected theme",
+                    "Copy the current shared appearance (UI, default terminal, fonts and effects)",
                 ))
                 .small()
                 .color(self.colors().muted),
@@ -8154,7 +8163,7 @@ impl ButtonsApp {
                 self.preview_personal_theme_draft();
             }
             if ui
-                .spaced_button(crate::i18n::literal(&locale, "Save Current Theme"))
+                .spaced_button(crate::i18n::literal(&locale, "Save shared theme"))
                 .clicked()
             {
                 self.save_personal_theme_draft();
@@ -8225,18 +8234,7 @@ impl ButtonsApp {
             ));
             return;
         }
-        let theme_id = self.theme_for_tab(self.focused).to_owned();
-        let source_theme = self.themes.get(&theme_id).clone();
-        let base_document = self
-            .themes
-            .personal_document(&theme_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                crate::theme_files::document_from_theme(
-                    &source_theme,
-                    &format!("{} Variant", source_theme.name),
-                )
-            });
+        let base_document = self.shared_appearance_document();
         let seed = crate::theme_generation::seed_palette(&base_document);
         let profile = self
             .native_store
@@ -8325,7 +8323,7 @@ impl ButtonsApp {
             .unwrap_or("Generated theme")
             .to_owned();
         let file_name = crate::theme_files::unique_file_name(&themes_directory, &name);
-        self.theme_editor_source_id = Some(self.theme_for_tab(self.focused).to_owned());
+        self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
         self.theme_editor_document = Some(candidate.document.clone());
         self.theme_editor_original_document = Some(candidate.document);
         self.theme_editor_file_name = Some(file_name);
@@ -8339,7 +8337,7 @@ impl ButtonsApp {
         self.theme_settings_tab = ThemeSettingsTab::Edit;
         self.theme_generation_message = Some(crate::i18n::literal(
             &self.locale,
-            "Candidate opened in the custom theme editor. Use Save Current Theme to keep it.",
+            "Candidate opened in the custom theme editor. Use Save shared theme to keep it.",
         ));
         if preview {
             self.preview_personal_theme_draft();
@@ -8347,18 +8345,54 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn shared_appearance_document(&self) -> Value {
+        let mut resolved = self.terminal_presentation();
+        resolved.colors = self.active_app_theme().colors.clone();
+        resolved.pane_divider =
+            resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
+        resolved.typography = Some(self.preferences.typography.clone());
+        let appearance = crate::theme_files::document_from_theme(&resolved, &resolved.name);
+        let mut document = self
+            .themes
+            .personal_document(&self.preferences.theme_id)
+            .cloned()
+            .unwrap_or_else(|| appearance.clone());
+        for key in ["theme", "effects"] {
+            crate::theme_files::overlay_appearance(&mut document[key], &appearance[key]);
+        }
+        document
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_current_appearance_draft(&mut self) {
+        self.start_personal_theme_draft_impl(true);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn start_personal_theme_draft(&mut self) {
+        self.start_personal_theme_draft_impl(false);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_personal_theme_draft_impl(&mut self, from_current: bool) {
         if !personal_theme_editor_available() {
             return;
         }
-        let source_document = if self.theme_editor_preview_snapshot.is_some()
-            || self.theme_editor_source_id.as_deref() == Some(self.theme_for_tab(self.focused))
+        let edited = self
+            .theme_editor_document
+            .as_ref()
+            .zip(self.theme_editor_original_document.as_ref())
+            .is_some_and(|(draft, original)| draft != original);
+        let source_document = if !from_current
+            && (self.theme_editor_preview_snapshot.is_some()
+                || (edited
+                    && self.theme_editor_source_id.as_deref() == Some(&self.preferences.theme_id)))
         {
             self.theme_editor_document.clone()
         } else {
             None
         };
-        let source_theme = self.themes.get(self.theme_for_tab(self.focused)).clone();
+        let current_document = self.shared_appearance_document();
         self.restore_personal_theme_preview();
         let Some(store) = self.native_store.as_ref() else {
             self.theme_editor_status = Some(crate::i18n::literal(
@@ -8367,13 +8401,9 @@ impl ButtonsApp {
             ));
             return;
         };
-        let theme_id = self.theme_for_tab(self.focused).to_owned();
-        let theme = source_theme;
-        self.theme_editor_source_id = Some(theme_id.clone());
-        let name = format!("{} Copy", theme.name);
-        let mut document = source_document
-            .or_else(|| self.themes.personal_document(&theme_id).cloned())
-            .unwrap_or_else(|| crate::theme_files::document_from_theme(&theme, &name));
+        self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
+        let name = format!("{} Copy", self.themes.get(&self.preferences.theme_id).name);
+        let mut document = source_document.unwrap_or(current_document);
         document["metadata"]["name"] = Value::String(name.clone());
         document["metadata"]["id"] = Value::String(
             crate::theme_files::suggested_file_name(&name)
@@ -8453,7 +8483,7 @@ impl ButtonsApp {
             Ok((file_name, document)) => {
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
-                self.theme_editor_source_id = Some(self.theme_for_tab(self.focused).to_owned());
+                self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
                 self.theme_editor_document = Some(document.clone());
                 self.theme_editor_original_document = Some(document);
                 self.theme_editor_file_name = Some(file_name);
@@ -8514,35 +8544,26 @@ impl ButtonsApp {
         let stem = file_name.trim_end_matches(".json");
         match self
             .themes
-            .preview_personal_document(store.profile_name(), stem, &document)
+            .preview_editor_document(store.profile_name(), stem, &document)
         {
             Ok(id) => {
                 self.theme_editor_preview_snapshot
                     .get_or_insert_with(|| ThemePreviewSnapshot {
                         preferences: self.preferences.clone(),
                         applied_preferences: self.preferences.clone(),
-                        theme_overrides: self.theme_overrides.clone(),
-                        pane_fonts: self.pane_fonts.clone(),
                     });
                 if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
                     let theme = self.themes.all()[index].clone();
-                    self.preferences.theme_id = id.clone();
-                    self.preferences.app_theme_id = id.clone();
-                    self.preferences.terminal_theme_id = id.clone();
-                    self.preferences.gradient_theme_id = id.clone();
-                    self.preferences.effects_theme_id = id;
-                    if let Some(typography) = theme.typography {
-                        self.preferences.typography = typography;
+                    if let Some(snapshot) = &self.theme_editor_preview_snapshot {
+                        restore_preview_preferences(&mut self.preferences, snapshot);
                     }
-                    self.preferences.calm_mode = false;
-                    self.theme_overrides.clear();
-                    self.pane_fonts.clear();
+                    self.apply_theme_sources(theme, self.preferences.calm_mode);
                     if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
                         snapshot.applied_preferences = self.preferences.clone();
                     }
                     self.theme_editor_status = Some(crate::i18n::literal(
                         &self.locale,
-                        "Preview is active. Save to keep it or cancel to restore.",
+                        "Selected Apply sections are previewing. Save to keep them or cancel to restore. Individual tab themes are kept.",
                     ));
                 }
             }
@@ -8570,16 +8591,6 @@ impl ButtonsApp {
         self.theme_editor_preview_due = None;
         if let Some(snapshot) = self.theme_editor_preview_snapshot.take() {
             restore_preview_preferences(&mut self.preferences, &snapshot);
-            for (id, theme) in snapshot.theme_overrides {
-                if self.tabs.iter().any(|tab| tab.id == id) {
-                    self.theme_overrides.entry(id).or_insert(theme);
-                }
-            }
-            for (id, font) in snapshot.pane_fonts {
-                if self.tabs.iter().any(|tab| tab.id == id) {
-                    self.pane_fonts.entry(id).or_insert(font);
-                }
-            }
             self.reload_personal_themes();
         }
     }
@@ -8600,40 +8611,47 @@ impl ButtonsApp {
             .as_str()
             .unwrap_or("Custom theme")
             .to_owned();
-        let file_name = self.theme_editor_file_name.clone().unwrap_or_else(|| {
+        let mut file_name = self.theme_editor_file_name.clone().unwrap_or_else(|| {
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name)
         });
         let profile_name = store.profile_name().to_owned();
-        let replace = self.theme_editor_file_exists;
+        let preview_id = format!(
+            "preview:{profile_name}:{}",
+            file_name.trim_end_matches(".json")
+        );
+        let existing_id = format!(
+            "personal:{profile_name}:{}",
+            file_name.trim_end_matches(".json")
+        );
+        let scopes = &self.preferences.theme_apply;
+        let keep_existing = self.theme_overrides.values().any(|id| id == &existing_id)
+            || (!scopes.app && self.preferences.app_theme_id == existing_id)
+            || (!scopes.terminal && self.preferences.terminal_theme_id == existing_id)
+            || (!scopes.gradient && self.preferences.gradient_theme_id == existing_id)
+            || (!scopes.effects && self.preferences.effects_theme_id == existing_id);
+        let replace = self.theme_editor_file_exists && !keep_existing;
+        if self.theme_editor_file_exists && keep_existing {
+            file_name =
+                crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        }
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
             crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, replace)
         });
         match result {
             Ok(saved_file_name) => {
-                if saved_file_name != file_name {
-                    let old_id = format!(
-                        "personal:{profile_name}:{}",
-                        file_name.trim_end_matches(".json")
-                    );
-                    let new_id = format!(
-                        "personal:{profile_name}:{}",
-                        saved_file_name.trim_end_matches(".json")
-                    );
-                    for selected in [
-                        &mut self.preferences.theme_id,
-                        &mut self.preferences.app_theme_id,
-                        &mut self.preferences.terminal_theme_id,
-                        &mut self.preferences.gradient_theme_id,
-                        &mut self.preferences.effects_theme_id,
-                    ] {
-                        if selected == &old_id {
-                            selected.clone_from(&new_id);
-                        }
-                    }
-                    for theme_id in self.theme_overrides.values_mut() {
-                        if theme_id == &old_id {
-                            theme_id.clone_from(&new_id);
-                        }
+                let saved_id = format!(
+                    "personal:{profile_name}:{}",
+                    saved_file_name.trim_end_matches(".json")
+                );
+                for selected in [
+                    &mut self.preferences.theme_id,
+                    &mut self.preferences.app_theme_id,
+                    &mut self.preferences.terminal_theme_id,
+                    &mut self.preferences.gradient_theme_id,
+                    &mut self.preferences.effects_theme_id,
+                ] {
+                    if selected == &preview_id {
+                        selected.clone_from(&saved_id);
                     }
                 }
                 self.theme_editor_file_name = Some(saved_file_name);
@@ -8650,11 +8668,18 @@ impl ButtonsApp {
                         .unwrap()
                         .trim_end_matches(".json")
                 );
-                self.perform_global_theme_action(PaneAction::Theme(id.clone()));
+                if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
+                    self.apply_theme(index, self.preferences.calm_mode);
+                }
                 self.theme_editor_source_id = Some(id);
+                self.persist_native_preferences();
                 self.theme_editor_status = Some(crate::i18n::literal(
                     &self.locale,
-                    "Theme saved to the active native profile.",
+                    if keep_existing {
+                        "Shared theme saved as a new variant to preserve individual tabs and unchecked sections."
+                    } else {
+                        "Shared theme saved. Selected Apply sections are active; individual tab themes are kept."
+                    },
                 ));
             }
             Err(error) => {
@@ -8794,6 +8819,10 @@ impl ButtonsApp {
         let theme = self.themes.all()[index].clone();
         #[cfg(not(target_arch = "wasm32"))]
         self.restore_personal_theme_preview();
+        self.apply_theme_sources(theme, calm);
+    }
+
+    fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
         let id = theme.id.clone();
         self.preferences.theme_id = id.clone();
         if self.preferences.theme_apply.app {
@@ -9492,7 +9521,7 @@ impl ButtonsApp {
         if self.theme_editor_preview_snapshot.is_some() {
             return;
         }
-        let id = self.theme_for_tab(self.focused).to_owned();
+        let id = self.preferences.theme_id.clone();
         if self.theme_editor_source_id.as_deref() == Some(&id) {
             return;
         }
@@ -12819,9 +12848,146 @@ mod tests {
         assert_eq!(app.font_for_pane(42).zone.size, 18.0);
         app.preferences.theme_apply.fonts = false;
         assert_eq!(
-            app.font_for_pane(7),
-            fonts::PaneFont::from(&app.preferences.typography)
+            app.font_for_pane(7).zone.size,
+            24.0,
+            "unchecking Apply Fonts must not change an already themed terminal"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens test-owned native terminals/settings for mixed-theme and spacing verification"]
+    fn native_mixed_themes_and_spacing_probe() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            step: usize,
+            ids: Vec<u64>,
+            overrides: std::collections::BTreeMap<u64, String>,
+            directory: std::path::PathBuf,
+        }
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                while !self.app.tabs.is_empty() {
+                    self.app.close_tab(0);
+                }
+            }
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                let elapsed = self.started.elapsed().as_secs_f32();
+                if self.step == 0 && elapsed > 1.0 {
+                    self.app.start_current_appearance_draft();
+                    self.app.theme_editor_document.as_mut().unwrap()["theme"]["app"]["shell"]
+                        ["background"] = json!("#132332");
+                    self.app.preview_personal_theme_draft();
+                    assert_eq!(self.app.theme_overrides, self.overrides);
+                    self.step = 1;
+                }
+                if elapsed < 2.7 {
+                    self.app.update(ctx, frame);
+                } else {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        font_zone_editor(
+                            ui,
+                            "en",
+                            &self.app.font_catalog,
+                            "Shell / UI",
+                            &mut self.app.preferences.typography.shell,
+                            false,
+                        );
+                        font_zone_editor(
+                            ui,
+                            "en",
+                            &self.app.font_catalog,
+                            "Tabs",
+                            &mut self.app.preferences.typography.tabs,
+                            false,
+                        );
+                    });
+                }
+                if self.step == 1 && elapsed > 2.0 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.directory.join("mixed-theme-preview.png"),
+                    )));
+                    self.step = 2;
+                }
+                if self.step == 2 && elapsed > 3.2 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.directory.join("font-spacing.png"),
+                    )));
+                    self.step = 3;
+                }
+                if self.step == 3 && elapsed > 3.7 {
+                    self.app.save_personal_theme_draft();
+                    assert_eq!(self.app.theme_overrides, self.overrides);
+                    assert_eq!(
+                        self.app.tabs.iter().map(|tab| tab.id).collect::<Vec<_>>(),
+                        self.ids
+                    );
+                    assert!(self.app.preferences.app_theme_id.starts_with("personal:"));
+                    self.step = 4;
+                }
+                if elapsed > 4.2 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let directory = std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::temp_dir().join(format!(
+                    "buttonscli-theme-spacing-{:032x}",
+                    fastrand::u128(..)
+                ))
+            });
+        std::fs::create_dir_all(&directory).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(directory.join("native")),
+            directory.join("legacy"),
+        )
+        .unwrap();
+        let capture = directory.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title("ButtonsCLI mixed themes and spacing probe")
+                .with_inner_size([1200.0, 680.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI mixed themes and spacing probe", options, Box::new(move |cc| {
+            let mut preferences = Preferences { show_sidebar: false, show_presets: false, calm_mode: true, ..Default::default() };
+            preferences.normalize_theme_sources();
+            preferences.typography.shell.letter_spacing = -1.0;
+            preferences.typography.tabs.letter_spacing = 4.0;
+            preferences.theme_apply = ThemeApplyScopes { app: true, terminal: false, fonts: false, gradient: false, effects: false };
+            let mut app = ButtonsApp::empty(preferences);
+            app.native_store = Some(store);
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            for (index, theme) in ["aurora", "basic2", "1990crt"].into_iter().enumerate() {
+                app.open_named_tab(cc.egui_ctx.clone(), &format!("term{}", index + 1), Some("powershell.exe -NoLogo -NoProfile -Command \"Write-Output 'Mixed theme fixture'; Write-Output 'Each pane keeps its own palette'; Start-Sleep -Seconds 12\""), None).unwrap();
+                app.set_theme_for_tab(index, theme);
+            }
+            app.pane_layout = PaneLayout::Columns;
+            app.visible_panes = vec![0, 1, 2];
+            app.auto_tile.requested_count = 3;
+            let ids = app.tabs.iter().map(|tab| tab.id).collect();
+            let overrides = app.theme_overrides.clone();
+            Ok(Box::new(Probe { app, started: Instant::now(), step: 0, ids, overrides, directory: capture }))
+        })).unwrap();
+        assert!(directory.join("mixed-theme-preview.png").is_file());
+        assert!(directory.join("font-spacing.png").is_file());
+        println!("Mixed-theme/spacing captures: {}", directory.display());
     }
 
     #[cfg(windows)]
@@ -12953,7 +13119,7 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
-    fn draft_preview_debounces_waits_for_release_and_applies_all_sections() {
+    fn draft_preview_debounces_waits_for_release_and_preserves_calm_mode() {
         let base = std::env::temp_dir().join(format!(
             "buttonscli-preview-debounce-{}-{}",
             std::process::id(),
@@ -12970,13 +13136,7 @@ mod tests {
         .unwrap();
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
-        app.preferences.theme_apply = ThemeApplyScopes {
-            app: false,
-            terminal: false,
-            fonts: false,
-            gradient: false,
-            effects: false,
-        };
+        app.preferences.theme_apply = ThemeApplyScopes::default();
         app.preferences.calm_mode = true;
         let original = app.preferences.theme_id.clone();
         app.start_personal_theme_draft();
@@ -13024,7 +13184,8 @@ mod tests {
         assert_eq!(app.preferences.terminal_theme_id, preview);
         assert_eq!(app.preferences.gradient_theme_id, preview);
         assert_eq!(app.preferences.effects_theme_id, preview);
-        assert!(app.terminal_presentation().effects.gradient_animation);
+        assert!(!app.terminal_presentation().effects.gradient_animation);
+        assert!(app.preferences.calm_mode);
         // Autosave must not retain an unsaved preview or disable the user's calm mode.
         app.preferences.dock_width = 222.0;
         let persisted = app.preferences_to_save();
@@ -15142,6 +15303,170 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
+    fn shared_theme_draft_captures_resolved_sources_and_save_keeps_tab_overrides() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-mixed-theme-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut prefs = Preferences::default();
+        prefs.normalize_theme_sources();
+        prefs.app_theme_id = "aurora".into();
+        prefs.gradient_theme_id = "aurora".into();
+        prefs.typography.shell.letter_spacing = 2.0;
+        prefs.pane_divider.color_override = Some("#123456".into());
+        let mut app = ButtonsApp::empty(prefs);
+        app.native_store = Some(store);
+        app.theme_overrides.insert(42, "aurora".into());
+        app.theme_overrides.insert(7, "basic2".into());
+        app.pane_fonts
+            .insert(42, fonts::PaneFont::from(&app.preferences.typography));
+        let overrides = app.theme_overrides.clone();
+        let pane_fonts = app.pane_fonts.clone();
+        let terminal_before = app.terminal_presentation_for(42).terminal_colors.background;
+        app.start_personal_theme_draft();
+        let draft = app.theme_editor_document.as_mut().unwrap();
+        assert_eq!(
+            draft["theme"]["app"]["shell"]["background"],
+            crate::theme::to_hex(app.themes.get("aurora").colors.canvas)
+        );
+        assert_eq!(
+            draft["theme"]["terminal"]["background"],
+            app.themes.get("basic2").terminal_colors.background
+        );
+        assert_eq!(draft["theme"]["typography"]["shell"]["letterSpacing"], 2.0);
+        assert_eq!(
+            draft["theme"]["app"]["shell"]["paneDivider"]["color"],
+            "#123456"
+        );
+        draft["futureRoot"] = json!({"keep": true});
+        draft["theme"]["app"]["shell"]["background"] = json!("#102030");
+        draft["theme"]["terminal"]["background"] = json!("#654321");
+        app.preferences.theme_apply = ThemeApplyScopes {
+            app: true,
+            terminal: false,
+            fonts: false,
+            gradient: false,
+            effects: false,
+        };
+        app.preview_personal_theme_draft();
+        assert_eq!(
+            app.colors().canvas,
+            crate::theme::parse_color("#102030").unwrap()
+        );
+        assert_eq!(app.preferences.terminal_theme_id, "basic2");
+        assert_eq!(app.preferences.gradient_theme_id, "aurora");
+        assert_eq!(app.theme_overrides, overrides);
+        assert_eq!(app.pane_fonts, pane_fonts);
+        assert_eq!(
+            app.terminal_presentation_for(42).terminal_colors.background,
+            terminal_before
+        );
+        app.restore_personal_theme_preview();
+        assert_eq!(app.preferences.app_theme_id, "aurora");
+        app.preview_personal_theme_draft();
+        app.save_personal_theme_draft();
+        assert_eq!(app.theme_overrides, overrides);
+        assert_eq!(app.pane_fonts, pane_fonts);
+        assert_eq!(app.preferences.terminal_theme_id, "basic2");
+        let saved = app.preferences.app_theme_id.clone();
+        assert!(saved.starts_with("personal:"));
+        let store = app.native_store.as_ref().unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        assert_eq!(loaded.preferences.app_theme_id, saved);
+        let mut catalog = ThemeCatalog::load();
+        assert!(catalog
+            .load_personal("default", &store.profile_dir())
+            .is_empty());
+        assert_eq!(
+            catalog.get(&saved).colors.canvas,
+            crate::theme::parse_color("#102030").unwrap()
+        );
+        assert_eq!(
+            catalog.personal_document(&saved).unwrap()["futureRoot"]["keep"],
+            true
+        );
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn saved_theme_preview_does_not_mutate_saved_tab_theme_or_unchecked_sources() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-preview-isolation-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        app.save_personal_theme_draft();
+        let saved = app.preferences.theme_id.clone();
+        app.theme_overrides.insert(42, saved.clone());
+        let original = app.terminal_presentation_for(42).terminal_colors.background;
+        app.load_personal_theme_draft(&saved);
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("#123456");
+        app.preferences.theme_apply.terminal = false;
+        app.preview_personal_theme_draft();
+        assert!(app.preferences.theme_id.starts_with("preview:"));
+        assert_eq!(app.preferences.terminal_theme_id, saved);
+        assert_eq!(
+            app.terminal_presentation_for(42).terminal_colors.background,
+            original
+        );
+        app.preferences.theme_apply.app = false;
+        app.preview_personal_theme_draft();
+        assert_eq!(
+            app.preferences.app_theme_id, saved,
+            "turning a scope off removes that preview"
+        );
+        app.theme_overrides.remove(&42);
+        app.cancel_personal_theme_draft();
+        assert_eq!(app.preferences.theme_id, saved);
+        assert!(
+            !app.theme_overrides.contains_key(&42),
+            "cancel must not undo a tab reset during preview"
+        );
+        app.theme_overrides.insert(42, saved.clone());
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("#123456");
+        app.preferences.theme_apply.app = true;
+        app.preview_personal_theme_draft();
+        app.save_personal_theme_draft();
+        assert_ne!(
+            app.preferences.app_theme_id, saved,
+            "save forks a theme still used by a tab"
+        );
+        assert_eq!(app.preferences.terminal_theme_id, saved);
+        assert_eq!(
+            app.terminal_presentation_for(42).terminal_colors.background,
+            original
+        );
+        assert_eq!(app.themes.get(&saved).terminal_colors.background, original);
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
     fn personal_theme_preview_cancel_restores_scopes_without_restarting_terminals() {
         use std::fs;
 
@@ -15176,7 +15501,7 @@ mod tests {
         app.theme_editor_document = Some(draft);
         app.preview_personal_theme_draft();
 
-        let preview_id = format!("personal:default:{}", file_name.trim_end_matches(".json"));
+        let preview_id = format!("preview:default:{}", file_name.trim_end_matches(".json"));
         assert_eq!(app.preferences.theme_id, preview_id);
         assert_eq!(
             app.themes.get(&preview_id).terminal_colors.background,

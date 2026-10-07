@@ -8,14 +8,25 @@ pub(crate) fn set_default_spacing(ctx: &egui::Context, spacing: f32) {
 }
 
 pub(crate) fn set_zone_spacing(ui: &Ui, spacing: f32) {
-    ui.data_mut(|data| data.insert_temp(ui.stack().id.with(SPACING_KEY), spacing));
+    let stamp = (
+        ui.ctx().viewport_id(),
+        ui.ctx().cumulative_pass_nr(),
+        spacing,
+    );
+    ui.data_mut(|data| data.insert_temp(ui.stack().id.with(SPACING_KEY), stamp));
 }
 
 pub(crate) fn spaced_text(ui: &Ui, text: impl Into<WidgetText>) -> WidgetText {
+    let viewport = ui.ctx().viewport_id();
+    let pass = ui.ctx().cumulative_pass_nr();
     let spacing = ui.data(|data| {
         ui.stack()
             .iter()
-            .find_map(|stack| data.get_temp::<f32>(stack.id.with(SPACING_KEY)))
+            .find_map(|stack| {
+                data.get_temp::<(egui::ViewportId, u64, f32)>(stack.id.with(SPACING_KEY))
+                    .filter(|stamp| stamp.0 == viewport && stamp.1 == pass)
+                    .map(|stamp| stamp.2)
+            })
             .or_else(|| data.get_temp::<f32>(Id::new(SPACING_KEY)))
             .unwrap_or(0.0)
     });
@@ -43,6 +54,7 @@ pub(crate) trait SpacedUi {
     fn spaced_label(&mut self, text: impl Into<WidgetText>) -> Response;
     fn spaced_heading(&mut self, text: impl Into<RichText>) -> Response;
     fn spaced_small(&mut self, text: impl Into<RichText>) -> Response;
+    #[cfg(not(target_arch = "wasm32"))]
     fn spaced_strong(&mut self, text: impl Into<RichText>) -> Response;
     fn spaced_weak(&mut self, text: impl Into<RichText>) -> Response;
     fn spaced_colored_label(&mut self, color: Color32, text: impl Into<RichText>) -> Response;
@@ -79,6 +91,7 @@ impl SpacedUi for Ui {
     fn spaced_small(&mut self, text: impl Into<RichText>) -> Response {
         self.spaced_label(text.into().small())
     }
+    #[cfg(not(target_arch = "wasm32"))]
     fn spaced_strong(&mut self, text: impl Into<RichText>) -> Response {
         self.spaced_label(text.into().strong())
     }
@@ -137,7 +150,6 @@ mod tests {
             set_default_spacing(&ctx, spacing);
             let _ = ctx.run(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    set_zone_spacing(ui, spacing);
                     widths.push(ui.spaced_button("Tracking test").rect.width());
                     set_zone_spacing(ui, 2.0);
                     ui.horizontal(|ui| {

@@ -62,6 +62,28 @@
 - UI letter spacing was persisted but never passed into text layout. Added shared
   text helpers so tracking changes labels/button bounds before wrapping; child UIs
   inherit their font zone. Font samples use their own zone, not Settings tracking.
-- Current theme preview/save bypasses Apply scopes and clears per-tab themes/fonts;
-  drafts also copy one source rather than the resolved shared appearance. Fix next.
+- Found preview/save bypassing Apply scopes and clearing per-tab themes/fonts;
+  drafts also copied one source rather than the resolved shared appearance.
 - V3/collection format remains a proposal only; no new tab assignment schema.
+- Preview/save now honors Apply scopes and Calm mode; Edit exposes those scopes.
+  Preview uses a separate ID so tabs referencing the saved source stay unchanged.
+  Saving forks sources used by individual tabs/unchecked sections. Apply Fonts
+  no longer changes how existing per-tab fonts render just by toggling the checkbox.
+- New from current appearance and AI seed capture resolved shared colors, fonts,
+  gradients/effects and divider overrides while preserving unsupported source fields.
+- Added three complete current-format AI prompts and a collection proposal. Examples
+  exercise real file import/export. Initial fixture failed on CRLF, then on the store's
+  lazy directory creation; normalize newlines and create the owned fixture root first.
+- Tracking regression checks real button width and child-zone inheritance. Initial
+  test exposed a prior-frame zone leak; stamp zones by viewport/render pass so stale
+  UI IDs can't change later screens. Native probe needed an explicit Instant import.
+- Cancel no longer restores per-tab maps it never modifies; this preserves manual
+  tab/font resets during a preview. Scope toggles immediately refresh an active preview.
+  Hide temporary previews from Library results. Shared apply helper must compile on
+  WASM too (initial native-only annotation failed that check).
+- Final: 258 library tests and 2 import fixtures pass; 16 optional probes skipped.
+  Explicit mixed-theme/spacing native capture, terminal-navigation and three-pane
+  selection/copy/scroll/IME/input probes pass. Images: `.private/theme-spacing-probe/`.
+  Prompt examples import and sample text contrast stays >=5.04:1. Formatting,
+  native/WASM strict Clippy, optimized build and isolated release startup pass.
+  Existing cache/PDB warnings remain nonfatal. No Linux/macOS or long-soak claim.

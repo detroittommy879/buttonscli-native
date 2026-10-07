@@ -198,15 +198,39 @@ impl ThemeCatalog {
         self.personal_documents.get(id)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(test, not(target_arch = "wasm32")))]
     pub(crate) fn preview_personal_document(
         &mut self,
         profile: &str,
         file_stem: &str,
         document: &Value,
     ) -> Result<String, String> {
-        validate_personal_document(document)?;
         let identity = format!("personal:{profile}:{file_stem}");
+        self.preview_document(identity, file_stem, document)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn preview_editor_document(
+        &mut self,
+        profile: &str,
+        file_stem: &str,
+        document: &Value,
+    ) -> Result<String, String> {
+        self.preview_document(
+            format!("preview:{profile}:{file_stem}"),
+            file_stem,
+            document,
+        )
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn preview_document(
+        &mut self,
+        identity: String,
+        file_stem: &str,
+        document: &Value,
+    ) -> Result<String, String> {
+        validate_personal_document(document)?;
         let mut theme = parse_legacy_value(file_stem, document, ThemeSource::Personal)
             .map_err(|error| error.to_string())?;
         theme.id.clone_from(&identity);
