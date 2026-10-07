@@ -33,7 +33,15 @@ action changes that pane. Random selection avoids its current theme.
 Favorites persist in the native profile and include personal themes. Missing
 personal themes are hidden from menus while their saved IDs are retained.
 
-Moving over a terminal pane displays its tab name as translucent text. Under
+Displayed tabs carry **P1, P2, …**, matching the numbered pane slots. The focused
+tab is bold; displayed tabs have accent borders. Hovering a pane highlights its
+tab, and hovering a displayed tab highlights its pane. Click a displayed tab to
+focus it; click a hidden tab to replace the focused pane. Other panes stay put,
+including when the selected terminal was hidden by window size.
+
+Moving over a terminal pane displays **P1 · termN** at its upper right, backed by
+an 80% opaque rounded box. After three seconds without movement, the label fades
+out over 1.5 seconds; moving again restores it. Under
 **Settings → Workspace**, **Show terminal name on hover** can disable it;
 **Terminal hover label** selects its own font, weight, and size, and **Hover
 label opacity** controls transparency. The label takes no clicks and does not
@@ -48,7 +56,7 @@ Reopen; it lasts for the current app session.
 The pane controls remember the requested group size across **1** and layout
 orientation changes. **All** tiles existing included terminals, up to ten,
 without opening shells. **+ / −** beside the pane count request a different
-group size; increasing it can open new terminals when there are too few
+group size while preserving existing pane positions; increasing it can open new terminals when there are too few
 included sessions. A small window may display fewer panes than requested;
 the count shows visible/requested, and the tab strip reaches every session.
 

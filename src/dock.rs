@@ -43,6 +43,42 @@ pub fn effects_need_repaint(gradient_animation: bool, static_opacity: f32) -> bo
     gradient_animation || static_opacity > 0.0
 }
 
+#[derive(Clone, Debug, Default)]
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct PaneHoverState {
+    hovered: bool,
+    position: Option<egui::Pos2>,
+    moved_at: f64,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl PaneHoverState {
+    pub(crate) fn update(
+        &mut self,
+        hovered: bool,
+        position: Option<egui::Pos2>,
+        now: f64,
+    ) -> (f32, Option<Duration>) {
+        if !hovered {
+            self.hovered = false;
+            return (0.0, None);
+        }
+        if !self.hovered || position != self.position {
+            self.moved_at = now;
+        }
+        self.hovered = true;
+        self.position = position;
+        let idle = (now - self.moved_at).max(0.0);
+        if idle < 3.0 {
+            (1.0, Some(Duration::from_secs_f64(3.0 - idle)))
+        } else if idle < 4.5 {
+            (((4.5 - idle) / 1.5) as f32, Some(Duration::from_millis(33)))
+        } else {
+            (0.0, None)
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AutoHideFrame {
     pub open: bool,
@@ -119,6 +155,22 @@ impl AutoHideState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn pane_label_fades_when_stationary_and_wakes_on_movement_or_reentry() {
+        let mut state = PaneHoverState::default();
+        let position = Some(egui::pos2(10.0, 20.0));
+        assert_eq!(
+            state.update(true, position, 1.0),
+            (1.0, Some(Duration::from_secs(3)))
+        );
+        assert_eq!(state.update(true, position, 4.75).0, 0.5);
+        assert_eq!(state.update(true, position, 5.5), (0.0, None));
+        assert_eq!(state.update(true, Some(egui::pos2(11.0, 20.0)), 6.0).0, 1.0);
+        assert_eq!(state.update(false, position, 6.1), (0.0, None));
+        assert_eq!(state.update(true, position, 6.2).0, 1.0);
+    }
 
     #[test]
     fn dock_auto_hide_uses_fake_time_and_stops_repainting_when_closed() {

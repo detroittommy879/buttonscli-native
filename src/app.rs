@@ -589,6 +589,10 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     rendered_panes: Vec<usize>,
     #[cfg(not(target_arch = "wasm32"))]
+    pane_rects: std::collections::BTreeMap<u64, egui::Rect>,
+    #[cfg(not(target_arch = "wasm32"))]
+    hovered_tab: Option<u64>,
+    #[cfg(not(target_arch = "wasm32"))]
     layout_window_start: usize,
     #[cfg(not(target_arch = "wasm32"))]
     focused: usize,
@@ -1373,6 +1377,10 @@ impl ButtonsApp {
             auto_tile: crate::autotile::AutoTile::default(),
             #[cfg(not(target_arch = "wasm32"))]
             rendered_panes: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            pane_rects: std::collections::BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            hovered_tab: None,
             #[cfg(not(target_arch = "wasm32"))]
             layout_window_start: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2225,6 +2233,8 @@ impl ButtonsApp {
         }
         if self.tabs.is_empty() {
             self.visible_panes.clear();
+            self.rendered_panes.clear();
+            self.pane_rects.clear();
             self.focused = 0;
             self.pane_layout = PaneLayout::Single;
             return;
@@ -2275,7 +2285,11 @@ impl ButtonsApp {
         }
         let tab = self.tabs.remove(from);
         self.tabs.insert(to, tab);
-        for slot in &mut self.visible_panes {
+        for slot in self
+            .visible_panes
+            .iter_mut()
+            .chain(self.rendered_panes.iter_mut())
+        {
             *slot = remap_index_after_move(*slot, from, to);
         }
         self.focused = remap_index_after_move(self.focused, from, to);
@@ -2452,6 +2466,8 @@ impl ButtonsApp {
     fn set_pane_layout(&mut self, layout: PaneLayout, context: &egui::Context) {
         self.pane_layout = layout;
         if layout == PaneLayout::Single {
+            self.rendered_panes.clear();
+            self.pane_rects.clear();
             self.visible_panes = if self.tabs.is_empty() {
                 Vec::new()
             } else {
@@ -2547,20 +2563,33 @@ impl ButtonsApp {
         if index >= self.tabs.len() {
             return;
         }
+        let displayed = if self.rendered_panes.is_empty() {
+            &self.visible_panes
+        } else {
+            &self.rendered_panes
+        };
         if self.pane_layout == PaneLayout::Single || !self.auto_tile.includes(self.tabs[index].id) {
             self.pane_layout = PaneLayout::Single;
             self.visible_panes = vec![index];
-        } else if !self.visible_panes.contains(&index) {
+        } else if !displayed.contains(&index) {
             let position = self
                 .visible_panes
                 .iter()
                 .position(|slot| *slot == self.focused)
                 .unwrap_or(0);
-            if let Some(slot) = self.visible_panes.get_mut(position) {
+            if let Some(hidden_position) = self.visible_panes.iter().position(|slot| *slot == index)
+            {
+                // A requested pane can be outside the current size-limited window.
+                // Swap it into the focused slot without moving the other displayed panes.
+                self.visible_panes.swap(position, hidden_position);
+            } else if let Some(slot) = self.visible_panes.get_mut(position) {
                 *slot = index;
+            } else {
+                self.visible_panes.push(index);
             }
         }
         self.focused = index;
+        self.keyboard_navigation = false;
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2653,6 +2682,7 @@ impl ButtonsApp {
             .filter_map(|id| self.tabs.iter().position(|tab| tab.id == *id))
             .collect();
         self.rendered_panes = visible.clone();
+        self.pane_rects.clear();
         let latest_activity_at_ms = visible
             .iter()
             .filter_map(|index| self.tabs.get(*index))
@@ -2676,6 +2706,7 @@ impl ButtonsApp {
             })
             .collect();
         let tree = pane_tree(self.pane_layout, &visible, plan.rows, plan.columns);
+        let indicator_colors = self.colors();
         ui.allocate_rect(rect, egui::Sense::hover());
         let mut render_state = PaneRenderState {
             ratios: &mut self.preferences.pane_split_ratios,
@@ -2695,6 +2726,10 @@ impl ButtonsApp {
             action: &mut pane_action,
             hover_label: &self.preferences.pane_hover_label,
             hover_font: &hover_font,
+            pane_indices: &visible,
+            pane_rects: &mut self.pane_rects,
+            hovered_tab: self.hovered_tab,
+            indicator_colors,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
             keyboard: &self.preferences.keyboard,
@@ -3631,6 +3666,24 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn tab_bar(&mut self, ctx: &egui::Context) {
         let colors = self.colors();
+        self.hovered_tab = None;
+        let hovered_pane = ctx
+            .input(|input| input.pointer.hover_pos())
+            .and_then(|pointer| {
+                self.pane_rects
+                    .iter()
+                    .find_map(|(id, rect)| rect.contains(pointer).then_some(*id))
+            });
+        let displayed = if self.rendered_panes.is_empty() {
+            self.visible_panes.clone()
+        } else {
+            self.rendered_panes.clone()
+        };
+        let focused_pane = displayed
+            .iter()
+            .position(|index| *index == self.focused)
+            .unwrap_or(0)
+            + 1;
         egui::TopBottomPanel::top("tabs")
             .frame(
                 egui::Frame::new()
@@ -3645,49 +3698,78 @@ impl ButtonsApp {
                 ui.horizontal_wrapped(|ui| {
                     for (index, tab) in self.tabs.iter().enumerate() {
                         let active = index == self.focused;
-                        let visible = if self.rendered_panes.is_empty() {
-                            self.visible_panes.contains(&index)
-                        } else {
-                            self.rendered_panes.contains(&index)
-                        };
-                        let label = if tab.exited {
-                            format!("{}  · exited", tab.title)
-                        } else if visible && !active {
-                            format!("{}  · visible", tab.title)
+                        let pane_number = displayed
+                            .iter()
+                            .position(|slot| *slot == index)
+                            .map(|slot| slot + 1);
+                        let mut label = tab.title.clone();
+                        if let Some(number) = pane_number {
+                            label.push_str(&format!(" · P{number}"));
+                        }
+                        if tab.exited {
+                            label.push_str(" · exited");
                         } else if !self.auto_tile.includes(tab.id) {
-                            format!(
-                                "{}  · {}",
-                                tab.title,
+                            label.push_str(&format!(
+                                " · {}",
                                 crate::i18n::literal(&self.locale, "solo")
-                            )
-                        } else {
-                            tab.title.clone()
-                        };
-                        let button = egui::Button::new(RichText::new(label).color(if active {
-                            colors.text
-                        } else {
-                            colors.muted
-                        }))
-                        .fill(if active {
-                            colors.tabs_active
-                        } else {
-                            colors.tabs_idle
-                        })
-                        .stroke(Stroke::new(
-                            1.0_f32,
-                            if active {
-                                colors.tabs_border
+                            ));
+                        }
+                        let highlighted = hovered_pane == Some(tab.id);
+                        let indicator =
+                            pane_indicator_color(&colors, pane_number.unwrap_or(focused_pane));
+                        let mut text =
+                            RichText::new(label).color(if active || pane_number.is_some() {
+                                colors.text
                             } else {
-                                colors.border
+                                colors.muted
+                            });
+                        if active {
+                            text = text.strong();
+                        }
+                        let button = egui::Button::new(text)
+                            .fill(if active {
+                                colors.tabs_active
+                            } else if pane_number.is_some() {
+                                mix_effect_color(
+                                    colors.tabs_idle,
+                                    indicator,
+                                    if highlighted { 0.25 } else { 0.12 },
+                                )
+                            } else {
+                                colors.tabs_idle
+                            })
+                            .stroke(Stroke::new(
+                                if active || highlighted { 2.0 } else { 1.0 },
+                                if pane_number.is_some() {
+                                    indicator
+                                } else {
+                                    colors.border
+                                },
+                            ));
+                        let response = ui.add_sized([150.0, 28.0], button).on_hover_text(format!(
+                            "{}\n{}",
+                            match pane_number {
+                                Some(number) => format!(
+                                    "Pane {number}{}",
+                                    if active {
+                                        " · keyboard focus"
+                                    } else {
+                                        " · click to focus"
+                                    }
+                                ),
+                                None if !self.auto_tile.includes(tab.id) =>
+                                    "Click to show this terminal alone".into(),
+                                None => format!("Click to replace Pane {focused_pane}"),
                             },
+                            crate::i18n::text(
+                                &self.locale,
+                                crate::i18n::MessageKey::TabThemeTooltip,
+                                &[("name", &self.themes.get(self.theme_for_tab(index)).name)],
+                            )
                         ));
-                        let response =
-                            ui.add_sized([150.0, 28.0], button)
-                                .on_hover_text(crate::i18n::text(
-                                    &self.locale,
-                                    crate::i18n::MessageKey::TabThemeTooltip,
-                                    &[("name", &self.themes.get(self.theme_for_tab(index)).name)],
-                                ));
+                        if response.hovered() {
+                            self.hovered_tab = Some(tab.id);
+                        }
                         if response.double_clicked() {
                             action = Some(TabAction::Rename(index));
                         } else if response.clicked() {
@@ -11110,6 +11192,10 @@ struct PaneRenderState<'a> {
     action: &'a mut Option<(u64, PaneAction)>,
     hover_label: &'a crate::settings::PaneHoverLabel,
     hover_font: &'a FontId,
+    pane_indices: &'a [usize],
+    pane_rects: &'a mut std::collections::BTreeMap<u64, egui::Rect>,
+    hovered_tab: Option<u64>,
+    indicator_colors: crate::theme::AppColors,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -11159,6 +11245,23 @@ fn render_pane_tree(
                 *state.clicked = Some(*index);
             }
             let theme = state.override_themes.get(&tab.id).unwrap_or(state.theme);
+            state.pane_rects.insert(tab.id, rect);
+            let number = state
+                .pane_indices
+                .iter()
+                .position(|pane| pane == index)
+                .unwrap_or(0)
+                + 1;
+            let indicator = pane_indicator_color(&state.indicator_colors, number);
+            let hovered = response.hovered() || state.hovered_tab == Some(tab.id);
+            if hovered || state.focused == *index {
+                pane.painter().rect_stroke(
+                    rect.shrink(1.0),
+                    2.0,
+                    Stroke::new(if hovered { 2.0 } else { 1.0 }, indicator),
+                    egui::StrokeKind::Inside,
+                );
+            }
             if !state.modal_open
                 && local_feature_available(
                     crate::features::catalog::FeatureKey::TerminalContextMenu,
@@ -11223,18 +11326,40 @@ fn render_pane_tree(
                     });
                 }
             }
+            let hover_id = egui::Id::new(("pane-hover-motion", tab.id));
+            let mut hover_state = ui.ctx().data_mut(|data| {
+                data.get_temp::<crate::dock::PaneHoverState>(hover_id)
+                    .unwrap_or_default()
+            });
+            let (fade, repaint_after) = ui.input(|input| {
+                hover_state.update(
+                    hovered && !state.modal_open,
+                    input.pointer.hover_pos(),
+                    input.time,
+                )
+            });
+            ui.ctx()
+                .data_mut(|data| data.insert_temp(hover_id, hover_state));
             if state.hover_label.enabled
                 && local_feature_available(crate::features::catalog::FeatureKey::PaneHoverLabel)
                 && !state.modal_open
-                && response.hovered()
+                && fade > 0.0
             {
+                if let Some(delay) = repaint_after {
+                    ui.ctx().request_repaint_after(delay);
+                }
                 paint_pane_hover_label(
                     &pane,
                     rect,
-                    &tab.title,
-                    state.hover_font,
-                    theme.colors.text,
-                    state.hover_label.opacity,
+                    &format!("P{number} · {}", tab.title),
+                    PaneLabelStyle {
+                        font: state.hover_font,
+                        text: theme.colors.text,
+                        background: theme.colors.canvas,
+                        indicator,
+                        opacity: state.hover_label.opacity,
+                        fade,
+                    },
                 );
             }
         }
@@ -11443,30 +11568,55 @@ fn pane_state_after_close(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn paint_pane_hover_label(
-    ui: &egui::Ui,
-    rect: egui::Rect,
-    title: &str,
-    font: &FontId,
-    color: Color32,
+fn pane_indicator_color(colors: &crate::theme::AppColors, number: usize) -> Color32 {
+    if number % 2 == 1 {
+        colors.accent
+    } else {
+        colors.accent_alt
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct PaneLabelStyle<'a> {
+    font: &'a FontId,
+    text: Color32,
+    background: Color32,
+    indicator: Color32,
     opacity: f32,
-) {
-    let position = egui::pos2(rect.center().x, rect.top() + 16.0);
+    fade: f32,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn paint_pane_hover_label(ui: &egui::Ui, rect: egui::Rect, title: &str, style: PaneLabelStyle<'_>) {
+    if style.opacity <= 0.0 {
+        return;
+    }
     let painter = ui.painter().with_clip_rect(rect.shrink(4.0));
-    painter.text(
-        position + egui::vec2(1.0, 1.0),
-        egui::Align2::CENTER_TOP,
-        title,
-        font.clone(),
-        Color32::from_black_alpha((opacity * 200.0) as u8),
+    let galley = painter.layout(
+        title.to_owned(),
+        style.font.clone(),
+        crate::dock::with_opacity(style.text, style.opacity * style.fade),
+        (rect.width() - 36.0).max(1.0),
     );
-    painter.text(
-        position,
-        egui::Align2::CENTER_TOP,
-        title,
-        font.clone(),
-        Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), (opacity * 255.0) as u8),
+    let label_rect = egui::Rect::from_min_size(
+        egui::pos2(
+            (rect.right() - galley.size().x - 24.0).max(rect.left() + 4.0),
+            rect.top() + 8.0,
+        ),
+        galley.size() + egui::vec2(16.0, 10.0),
     );
+    painter.rect_filled(
+        label_rect,
+        6.0,
+        crate::dock::with_opacity(style.background, 0.8 * style.fade),
+    );
+    painter.rect_stroke(
+        label_rect,
+        6.0,
+        Stroke::new(1.0, crate::dock::with_opacity(style.indicator, style.fade)),
+        egui::StrokeKind::Inside,
+    );
+    painter.galley(label_rect.min + egui::vec2(8.0, 5.0), galley, style.text);
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -12472,6 +12622,105 @@ mod tests {
             app.font_for_pane(7),
             fonts::PaneFont::from(&app.preferences.typography)
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens a test-owned five-terminal native window for visual verification"]
+    fn native_pane_identity_and_idle_fade_probe() {
+        struct Probe {
+            app: ButtonsApp,
+            started: std::time::Instant,
+            pending: Vec<egui::Event>,
+            hovered: bool,
+            captured: bool,
+            faded: bool,
+            directory: std::path::PathBuf,
+        }
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                while !self.app.tabs.is_empty() {
+                    self.app.close_tab(0);
+                }
+            }
+        }
+        impl eframe::App for Probe {
+            fn raw_input_hook(&mut self, _ctx: &egui::Context, input: &mut egui::RawInput) {
+                input.events.append(&mut self.pending);
+            }
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                self.app.update(ctx, frame);
+                let elapsed = self.started.elapsed().as_secs_f64();
+                if !self.hovered && elapsed > 0.5 {
+                    if let Some(rect) = self.app.pane_rects.get(&self.app.tabs[1].id) {
+                        self.pending.push(egui::Event::PointerMoved(rect.center()));
+                        self.hovered = true;
+                    }
+                }
+                if !self.captured && elapsed > 1.0 && self.hovered {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.directory.join("pane-hover.png"),
+                    )));
+                    self.captured = true;
+                }
+                if !self.faded && elapsed > 5.5 && self.hovered {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.directory.join("pane-idle.png"),
+                    )));
+                    self.faded = true;
+                }
+                if elapsed > 6.2 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(50));
+            }
+        }
+        let directory = std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::temp_dir()
+                    .join(format!("buttonscli-pane-probe-{:032x}", fastrand::u128(..)))
+            });
+        std::fs::create_dir_all(&directory).unwrap();
+        let capture_directory = directory.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title("ButtonsCLI pane identity probe")
+                .with_inner_size([1280.0, 820.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI pane identity probe", options, Box::new(move |cc| {
+            let mut preferences = Preferences { show_sidebar: false, show_presets: false, calm_mode: true, ..Default::default() };
+            preferences.pane_hover_label.opacity = 1.0;
+            let mut app = ButtonsApp::empty(preferences);
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            for number in 1..=5 {
+                app.open_named_tab(cc.egui_ctx.clone(), &format!("term{number}"), Some(&format!("powershell.exe -NoLogo -NoProfile -Command \"Write-Output 'term{number} - pane identity fixture'; Write-Output 'Existing terminal text stays readable under the label.'; Start-Sleep -Seconds 12\"")), None).unwrap();
+            }
+            app.focused = 0;
+            app.pane_layout = PaneLayout::Grid;
+            app.visible_panes = vec![0, 1];
+            app.auto_tile.requested_count = 2;
+            Ok(Box::new(Probe { app, started: std::time::Instant::now(), pending: Vec::new(), hovered: false, captured: false, faded: false, directory: capture_directory }))
+        })).unwrap();
+        assert!(
+            directory.join("pane-hover.png").exists(),
+            "native hover screenshot saved"
+        );
+        assert!(
+            directory.join("pane-idle.png").exists(),
+            "native idle screenshot saved"
+        );
+        println!("Pane identity captures: {}", directory.display());
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -13952,7 +14201,7 @@ mod tests {
         app.show_all_auto_tiles();
         assert_eq!(app.visible_panes.len(), 4);
         fonts::install(&ctx, &app.font_catalog);
-        let title = app.tabs[0].title.clone();
+        let title = format!("P1 · {}", app.tabs[app.visible_panes[0]].title);
         let mut render_hover = |enabled| {
             app.preferences.pane_hover_label.enabled = enabled;
             ctx.run(
@@ -14036,6 +14285,219 @@ mod tests {
         app.toggle_auto_tile(2);
         app.show_all_auto_tiles();
         assert_eq!(app.visible_panes.len(), 3);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "uses five test-owned ConPTY sessions; run explicitly on Windows"]
+    fn tab_clicks_replace_focused_pane_and_keep_keyboard_input() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let preferences = Preferences {
+            default_shell_id: "pane-fixture".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "pane-fixture".into(),
+                label: "Pane fixture".into(),
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Start-Sleep -Seconds 60\""
+                    .into(),
+                working_directory: String::new(),
+            }],
+            ..Default::default()
+        };
+        let mut workspace = Workspace(ButtonsApp::empty(preferences));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        for _ in 0..5 {
+            app.open_tab(ctx.clone());
+        }
+        app.show_localization_onboarding = false;
+        app.focused = 0;
+        app.visible_panes = vec![0, 1];
+        app.pane_layout = PaneLayout::Grid;
+        app.auto_tile.requested_count = 2;
+        let ids = app.tab_ids();
+        let mut time = 0.0;
+        let size = std::cell::Cell::new(egui::vec2(1600.0, 900.0));
+        let mut render = |app: &mut ButtonsApp, events| {
+            time += 0.2;
+            ctx.run(
+                egui::RawInput {
+                    time: Some(time),
+                    screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size.get())),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.shortcuts(ctx);
+                    app.top_menu(ctx);
+                    app.tab_bar(ctx);
+                    app.status_bar(ctx);
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            )
+        };
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+        let mut expected = vec![0, 1];
+        for index in [2, 4, 0, 3, 1, 4, 2] {
+            app.keyboard_navigation = true;
+            let output = render(app, vec![]);
+            let title = &app.tabs[index].title;
+            let pos = output
+                .shapes
+                .iter()
+                .find_map(|clipped| {
+                    if let egui::Shape::Text(shape) = &clipped.shape {
+                        if shape.galley.job.text.starts_with(title) && shape.pos.y < 140.0 {
+                            return Some(clipped.shape.visual_bounding_rect().center());
+                        }
+                    }
+                    None
+                })
+                .expect("tab button is present");
+            if !expected.contains(&index) {
+                let slot = expected.iter().position(|tab| *tab == app.focused).unwrap();
+                expected[slot] = index;
+            }
+            render(app, pointer_events(pos, egui::PointerButton::Primary, true));
+            render(
+                app,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+            render(app, vec![]);
+            assert_eq!(app.focused, index, "clicked tab gets focus");
+            assert_eq!(
+                app.rendered_panes, expected,
+                "only focused pane is replaced"
+            );
+            let before: Vec<_> = app
+                .tabs
+                .iter()
+                .map(|tab| tab.output.snapshot().input_sequence)
+                .collect();
+            render(app, vec![egui::Event::Text("x".into())]);
+            for (tab_index, tab) in app.tabs.iter().enumerate() {
+                assert_eq!(
+                    tab.output.snapshot().input_sequence > before[tab_index],
+                    tab_index == index,
+                    "typing after tab click reaches only the clicked terminal"
+                );
+            }
+        }
+        let before = app.rendered_panes.clone();
+        app.set_visible_pane_count(3, &ctx);
+        render(app, vec![]);
+        assert_eq!(
+            &app.rendered_panes[..2],
+            before.as_slice(),
+            "adding panes preserves existing positions"
+        );
+        app.set_visible_pane_count(2, &ctx);
+        render(app, vec![]);
+        assert_eq!(
+            app.rendered_panes, before,
+            "removing panes preserves focused pane and positions"
+        );
+        assert_eq!(
+            app.tab_ids(),
+            ids,
+            "tab switching does not respawn sessions"
+        );
+
+        app.show_all_auto_tiles();
+        size.set(egui::vec2(760.0, 480.0));
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+        assert!(
+            app.rendered_panes.len() < 5,
+            "window hides some requested panes"
+        );
+        for _ in 0..4 {
+            let target = (0..5)
+                .find(|index| !app.rendered_panes.contains(index))
+                .unwrap();
+            let mut expected = app.rendered_panes.clone();
+            let slot = expected
+                .iter()
+                .position(|index| *index == app.focused)
+                .unwrap();
+            expected[slot] = target;
+            let output = render(app, vec![]);
+            let label = &app.tabs[target].title;
+            let pos = text_position(&output, label).expect("hidden terminal tab remains available");
+            render(app, pointer_events(pos, egui::PointerButton::Primary, true));
+            render(
+                app,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+            render(app, vec![]);
+            assert_eq!(
+                app.rendered_panes, expected,
+                "size-hidden terminal replaces the focused slot"
+            );
+            assert_eq!(app.visible_panes.len(), 5, "requested group stays intact");
+        }
+
+        let rect = app.pane_rects[&app.tabs[app.focused].id];
+        let pointer = rect.center();
+        render(app, vec![egui::Event::PointerMoved(pointer)]);
+        let output = render(app, vec![]);
+        let number = app
+            .rendered_panes
+            .iter()
+            .position(|index| *index == app.focused)
+            .unwrap()
+            + 1;
+        let label = format!("P{number} · {}", app.tabs[app.focused].title);
+        let position =
+            text_position(&output, &label).expect("hover identifies the pane and terminal");
+        assert!(
+            position.x > rect.center().x && position.y < rect.top() + 60.0,
+            "hover label is at upper right"
+        );
+        let inactive = app
+            .rendered_panes
+            .iter()
+            .copied()
+            .find(|index| *index != app.focused)
+            .unwrap();
+        let inactive_rect = app.pane_rects[&app.tabs[inactive].id];
+        render(
+            app,
+            pointer_events(inactive_rect.center(), egui::PointerButton::Primary, true),
+        );
+        render(
+            app,
+            pointer_events(inactive_rect.center(), egui::PointerButton::Primary, false),
+        );
+        render(app, vec![]);
+        assert_eq!(
+            app.focused, inactive,
+            "pane click selects the next replacement target"
+        );
+        let displayed_ids: Vec<_> = app
+            .rendered_panes
+            .iter()
+            .map(|index| app.tabs[*index].id)
+            .collect();
+        app.move_tab(0, 4);
+        assert_eq!(
+            app.rendered_panes
+                .iter()
+                .map(|index| app.tabs[*index].id)
+                .collect::<Vec<_>>(),
+            displayed_ids,
+            "moving tab buttons preserves cached pane identities"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]

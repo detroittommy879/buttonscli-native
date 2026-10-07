@@ -29,19 +29,28 @@ impl AutoTile {
         ids.iter().filter(|id| self.includes(**id)).count()
     }
 
-    /// Focus first, then preserve the current group, then fill in tab order.
+    /// Preserve pane positions, keep focus when shrinking, then fill in tab order.
     /// Membership uses IDs so reordering or removing tabs cannot transfer it.
     pub(crate) fn select(&self, ids: &[u64], focused: usize, previous: &[usize]) -> Vec<usize> {
         let count = self.requested_count.clamp(1, 10);
         let mut selected = Vec::with_capacity(count);
-        for index in std::iter::once(focused)
-            .chain(previous.iter().copied())
-            .chain(0..ids.len())
-        {
+        for index in previous.iter().copied() {
+            if ids.get(index).is_some_and(|id| self.includes(*id)) && !selected.contains(&index) {
+                selected.push(index);
+            }
+        }
+        selected.truncate(count);
+        if ids.get(focused).is_some_and(|id| self.includes(*id)) && !selected.contains(&focused) {
+            if selected.len() == count {
+                selected.pop();
+            }
+            selected.push(focused);
+        }
+        for (index, id) in ids.iter().enumerate() {
             if selected.len() == count {
                 break;
             }
-            if ids.get(index).is_some_and(|id| self.includes(*id)) && !selected.contains(&index) {
+            if self.includes(*id) && !selected.contains(&index) {
                 selected.push(index);
             }
         }
@@ -67,7 +76,7 @@ mod tests {
         tiles.set_included(20, true);
         assert_eq!(
             tiles.select(&[10, 20, 30, 40, 50], 1, &[3, 0, 2, 4]),
-            vec![1, 3, 0, 2]
+            vec![3, 0, 2, 1]
         );
     }
 
@@ -109,5 +118,22 @@ mod tests {
         let selected = tiles.select(&ids, 0, &[]);
         assert_eq!(selected.len(), 10);
         assert!(!selected.contains(&1));
+    }
+
+    #[test]
+    fn count_changes_keep_positions_and_never_drop_focus() {
+        let mut tiles = AutoTile {
+            requested_count: 3,
+            ..Default::default()
+        };
+        assert_eq!(
+            tiles.select(&[10, 20, 30, 40, 50], 2, &[3, 2]),
+            vec![3, 2, 0]
+        );
+        tiles.requested_count = 2;
+        assert_eq!(
+            tiles.select(&[10, 20, 30, 40, 50], 0, &[3, 2, 0]),
+            vec![3, 0]
+        );
     }
 }
