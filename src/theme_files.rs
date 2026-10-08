@@ -181,6 +181,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
     json!({
         "version": 1,
         "metadata": {
+            "nativeThemeVersion": theme.native_version.unwrap_or(1),
             "id": suggested_file_name(&name).trim_end_matches(".json"),
             "name": name,
             "description": theme.description,
@@ -193,6 +194,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
                 "shell": {
                     "background": to_hex(theme.colors.canvas),
                     "backgroundSecondary": to_hex(theme.colors.panel),
+                    "buttonBackground": to_hex(theme.colors.raised),
                     "textMain": to_hex(theme.colors.text),
                     "textDim": to_hex(theme.colors.muted),
                     "accent": to_hex(theme.colors.accent),
@@ -212,6 +214,9 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
                 "presetDock": {
                     "background": to_hex(theme.colors.dock_background),
                     "accent": to_hex(theme.colors.accent_alt),
+                    "buttonBackground": to_hex(theme.colors.dock_button),
+                    "buttonHover": to_hex(theme.colors.dock_button_hover),
+                    "buttonText": to_hex(theme.colors.dock_button_text),
                 },
                 "settings": { "background": to_hex(theme.colors.settings_background) },
                 "statusBar": {
@@ -302,6 +307,20 @@ fn font_zone(zone: &FontZone) -> Value {
     })
 }
 
+/// Replace supported appearance fields while retaining unrecognized theme metadata.
+pub(crate) fn overlay_appearance(target: &mut Value, resolved: &Value) {
+    if let Some(fields) = resolved.as_object() {
+        if !target.is_object() {
+            *target = json!({});
+        }
+        for (key, value) in fields {
+            overlay_appearance(&mut target[key], value);
+        }
+    } else {
+        *target = resolved.clone();
+    }
+}
+
 fn center_name(center: [f32; 2]) -> &'static str {
     match (
         center[0] >= 0.75,
@@ -365,6 +384,51 @@ fn now_rfc3339() -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn theme_prompt_examples_import_through_the_current_loader() {
+        let guide = include_str!("../themeprompts.md").replace("\r\n", "\n");
+        let examples: Vec<_> = guide
+            .split("```json\n")
+            .skip(1)
+            .map(|block| block.split("\n```").next().unwrap())
+            .collect();
+        assert_eq!(examples.len(), 3);
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-prompt-import-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        std::fs::create_dir_all(&base).unwrap();
+        for (index, text) in examples.iter().enumerate() {
+            let path = base.join(format!("example-{index}.json"));
+            std::fs::write(&path, text).unwrap();
+            let (file, document) = import_theme_file(&store, &path).unwrap();
+            let parsed = ThemeDefinition::editor_document(&document).unwrap();
+            assert_eq!(document["version"], 1);
+            assert_eq!(parsed.native_version, Some(1));
+            assert_eq!(
+                document["theme"]["terminal"]["ansiColors"]
+                    .as_object()
+                    .unwrap()
+                    .len(),
+                16
+            );
+            assert_eq!(
+                read_theme_file(&store.profile_dir().join("themes").join(file)).unwrap(),
+                document
+            );
+        }
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
     fn roots(label: &str) -> (PathBuf, PathBuf) {
         let root = std::env::temp_dir().join(format!(
             "buttonscli-theme-files-{label}-{}-{}",
@@ -416,12 +480,22 @@ mod tests {
             .preview_personal_document("test-profile", "my-copy", &document)
             .unwrap();
         let parsed = catalog.get(&id);
+        assert_eq!(parsed.native_version, Some(1));
         assert_eq!(
             parsed.terminal_colors.background,
             theme.terminal_colors.background
         );
         assert_eq!(parsed.terminal_colors.red, theme.terminal_colors.red);
         assert_eq!(parsed.pane_divider.thickness, theme.pane_divider.thickness);
+        let mut future = parsed.clone();
+        future.native_version = Some(2);
+        let future_document = document_from_theme(&future, "Native v2");
+        assert_eq!(
+            crate::theme::ThemeDefinition::editor_document(&future_document)
+                .unwrap()
+                .native_version,
+            Some(2)
+        );
         let bytes = encoded_theme(&mut document).unwrap();
         let round_trip: Value = serde_json::from_slice(&bytes).unwrap();
         assert!(round_trip["metadata"]["createdAt"]

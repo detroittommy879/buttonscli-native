@@ -1,6 +1,51 @@
 # Changelog
 
-## Unreleased
+## 2026-10-07 — Stable Windows daily-use checkpoint
+
+The recommended source branch is `main`. The core terminal workspace is ready
+for daily Windows use; its creator reports daily use and core parity close to
+or matching the original app. This is a source checkpoint, not a signed binary
+release or a claim that every legacy/AI feature is finished.
+
+### Changed and fixed
+
+- Predictable tab switching replaces the focused displayed slot; pane-count
+  changes preserve order. Matching tab/pane numbers, accents and fading hover
+  labels make session placement visible without restarting shells.
+- Terminal arrows, Tab and Escape stay with the shell. Detached Settings leaves
+  terminal input enabled; F6 deliberately moves to workspace controls.
+- Fixed selection scrolling and Windows clipboard delivery, including optional
+  right-click copy and copy-on-selection; improved paste/IME handling and terminal
+  padding. Corrected inherited terminal capabilities for colored full-screen apps.
+- Added per-terminal fonts, compact theme browsing and Library / Edit / Generate
+  subtabs. Scoped theme preview/save preserves unrelated per-tab appearance and
+  unsupported JSON fields; UI letter spacing now affects text and control bounds.
+- Fixed wrapped-control alignment and favorite name/star pairing at larger fonts.
+- Added bounded history export/expiry, terminal reader accessibility and AI Help
+  streaming/retry/cancel/reviewed-action fixtures.
+- Added explicit local JSON feature access in optimized builds for testing AI
+  Help, palette generation and CLI/MCP control with a normal native profile.
+- Documented Cargo Git installation, theme trials and future full-appearance/
+  native shader generation. Added newer real Windows workspace screenshots.
+
+### Still in preview or planned
+
+- AI Help and CLI/MCP control are working previews (roughly 70% readiness estimates,
+  not measured reliability). Broad provider/client/platform acceptance remains.
+- AI generation currently creates palette drafts; full appearance generation,
+  native Shader Lab/WGSL and theme collections remain planned.
+- Live shells and per-tab appearance are session-only. General profile switching,
+  signed downloadable releases, hosted access, automatic updates and rollback
+  are unfinished. Linux/macOS interaction and long-duration soak coverage remain.
+
+See [README readiness](README.md#current-status), [limitations](docs/LIMITATIONS.md)
+and the dated [verification record](docs/VERIFICATION.md) for evidence and scope.
+
+## Earlier native rebuild
+
+Historical implementation notes follow. The October 7 readiness notes above
+supersede older access descriptions: local JSON flags now enable release
+testing, and old hosted feedback/runtime-config paths are disabled.
 
 - Added free saved theme favorites with a section in Themes, stars on theme cards,
   and a status-bar menu, plus a quick random-theme button for the focused terminal.

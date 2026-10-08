@@ -12,11 +12,11 @@ and hundreds of themes.
 ![UI](https://img.shields.io/badge/native_UI-egui_%2B_wgpu-9b87f5?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT_%2F_Apache--2.0-66c2a5?style=flat-square)](#license)
 
-[Get started](#get-started) · [Features](#what-you-can-do-today) · [Screenshots](#make-it-your-own) · [Current status](#current-status) · [Documentation](#documentation)
+[Get started](#get-started) · [Features](#what-you-can-do-today) · [Screenshots](#make-it-your-own) · [Current status](#current-status) · [Changelog](CHANGELOG.md)
 
 </div>
 
-![ButtonsCLI Native with five live terminals, separate command and SSH docks, and individually themed panes](docs/images/workspace-october-2026.png)
+![ButtonsCLI Native with six numbered panes, command and SSH docks, and individually themed live terminals](docs/images/workspace-grid-2026-10-07.png)
 
 ButtonsCLI Native brings your terminal sessions and frequently used commands
 into one configurable desktop workspace. Keep a local shell, remote SSH
@@ -24,10 +24,12 @@ sessions, build output, and a system monitor visible together; give each pane
 its own theme and turn repeated commands into buttons. The UI uses egui/wgpu
 and the terminal engine uses Alacritty through a vendored egui adapter.
 
-**Usable as a terminal today, with more work ahead.** This is the native Rust
-rebuild of [ButtonsCLI](https://buttonscli.com). AI Help is not ready for normal
-use yet, and CLI/MCP agent control is currently available only through a debug
-development override. See [current status](#current-status) for the details.
+**Ready for daily terminal use on Windows.** This native Rust rebuild of
+[ButtonsCLI](https://buttonscli.com) is used daily by its creator, who reports
+that the core workflow is close to or on par with the original app. `main` is
+the recommended stable source branch; clone or install from it for the latest
+daily-use version. Optional AI and agent features remain previews. See
+[current status](#current-status) and the [October 7 changelog](CHANGELOG.md).
 
 ## What you can do today
 
@@ -37,20 +39,22 @@ development override. See [current status](#current-status) for the details.
 | **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. |
 | **Put commands on buttons** | Separate command and SSH docks with editable presets. Choose whether a button types the command or also sends Enter. Docks resize, collapse, and auto-hide. |
 | **Use the terminal normally** | Scrollback and scrollbars, selection, copy/paste, hyperlinks, regex search, select-all, clear-screen, and live PTY resizing. |
-| **Make every pane recognizable** | 555 bundled legacy theme choices, per-terminal themes, Theme all, favorites, and random-theme controls. Edit, import, and export personal theme JSON. |
+| **Make every pane recognizable** | 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
 | **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. Calm effects pauses motion; window opacity works on Windows. |
 | **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Preview an import from the original app into a separate native profile. Provider keys transfer only when selected explicitly. |
 | **Launch a workspace** | Start multiple tabs with a chosen shell/directory and optional commands for specific tabs. Startup options are available without AI or agent-control access. |
 
 Right-click tabs, panes, or presets for their actions. Detached Settings previews
-changes in the workspace and offers **Revert and Close**.
+changes in the workspace and offers **Revert and Close**. You can keep typing
+in the terminal while detached Settings is open. Matching pane numbers and tab
+accents show where each session is displayed; switching tabs keeps shells alive.
 
 ## Make it your own
 
 The same workspace can use quiet solid colors, gradients, or supported terminal
 effects. Each pane can keep a different theme.
 
-![The five-pane workspace with dark chrome, mixed terminal palettes, gradients and static effects](docs/images/workspace-effects-october-2026.png)
+![Three stacked live terminals with dark chrome, gradients, colored htop output and a compact SSH dock](docs/images/workspace-rows-2026-10-07.png)
 
 <table>
   <tr>
@@ -69,11 +73,20 @@ examples from that workspace.</sub>
 
 ## Get started
 
-Install a Rust toolchain and your platform's build prerequisites, then build
-from source:
+Install **current stable Rust**, Git and your platform's
+[build prerequisites](docs/BUILDING.md). Install the recommended `main` version:
 
 ```sh
-git clone https://github.com/detroittommy879/buttonscli-native.git
+cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli
+buttonscli
+```
+
+Repeat the install command to update. This builds the optimized desktop app
+with its patched terminal dependencies and embedded themes/fonts. See
+[Cargo installation](cargo-how-to.md) for details. To build from a checkout:
+
+```sh
+git clone --branch main https://github.com/detroittommy879/buttonscli-native.git
 cd buttonscli-native
 cargo run --locked --bin buttonscli
 ```
@@ -88,8 +101,12 @@ Run `target/release/buttonscli.exe` on Windows, or
 `./target/release/buttonscli` on Linux/macOS. The first build compiles the Rust
 dependencies. The desktop app does not need Node; Node is used by the optional
 CLI/MCP helpers. See [building notes](docs/BUILDING.md) for Linux packages and
-the separate browser demo. Signed releases and automatic updates are still
-unfinished.
+the separate browser demo. Distribution is currently from source: downloadable
+desktop releases, signing and automatic updates are still unfinished.
+
+To test gated features with your normal saved setup, use the
+[local JSON feature flag](docs/LOCAL-FEATURE-FLAGS.md) and launch the executable
+directly. This enables AI Help and other implemented gates in release builds.
 
 **Open three PowerShell tabs and run a command in the first:**
 
@@ -112,22 +129,33 @@ Bindings can be edited or cleared in **Settings → Shortcuts**.
 
 ## Current status
 
-The terminal workspace is the useful part of this build. Some optional features
-have implementation and test coverage but are still locked or unfinished.
+**Stable Windows core; optional features still in preview.** Readiness below is
+for the stated workflow, not a promise of zero bugs or complete legacy parity.
+“Complete” means the core feature is implemented and covered by Windows checks
+and daily use. Approximate percentages are editorial progress estimates, not
+test pass rates or reliability measurements. Updated October 7, 2026.
 
-| Area | Status |
-| --- | --- |
-| **Terminal workspace** | Available now. Windows has live PTY/CLI checks; earlier Linux/X11 desktop evidence is recorded. Broader clipboard, focus, DPI, accessibility and platform review remains. |
-| **AI Help** | **Not ready for normal use.** Provider settings, streaming, optional terminal context and reviewed suggestions exist, with partial testing against a local fake provider. Release builds keep requests locked pending entitlement integration; real-provider and full interaction acceptance remain open. |
-| **CLI / MCP agent control** | **Implemented, with development tests; locked in release builds.** The local API and installed Node CLI have Windows live-app checks. All 14 MCP tools have fake-API contract coverage; the official MCP client smoke covers tool discovery and live status/tabs. This does not certify every tool in every agent client. |
-| **AI theme generation** | Source implementation and mock-provider tests exist. Locked in release builds; live-provider and GUI acceptance remain. |
-| **Effects / Shader Lab** | Supported gradients, scanlines, noise and analog static render natively. Legacy GLSL shaders do not run; Shader Lab, HSync warp and remaining effect work are unfinished. |
-| **Accounts / distribution** | Hosted entitlement integration, production signing trust, updater activation and rollback still need work. The old feedback/runtime-config production paths are disabled pending a new native service. |
+| Area | Readiness | What works / what remains |
+| --- | --- | --- |
+| **Shells, tabs and panes** | **Complete for the core Windows workflow** | Local PTYs, shell/WSL choices, SSH through a shell, COL / ROW / GRID, dividers, predictable tab replacement and independent input. Real Windows interaction probes pass. |
+| **Commands and terminal tools** | **Complete for the core Windows workflow** | Command/SSH presets, selection, right-click or automatic copy, paste, scrolling, search and resizing. Terminal arrows/Tab/Escape stay with the shell; F6 moves to workspace controls. |
+| **Themes, fonts and Settings** | **Complete for the core Windows workflow** | Per-tab appearance, favorites, personal JSON import/export, scoped preview/save, font tracking and detached Settings. Advanced theme collections and persistent tab assignment rules are proposals. |
+| **AI Help** | **Working preview, roughly 70% ready** | Streaming, provider settings, optional context and reviewed actions work in fixture tests; real Mistral backend checks also passed. Broader real-provider GUI, accessibility and hosted access acceptance remain. |
+| **CLI / MCP agent control** | **Working preview, roughly 70% ready** | Authenticated local API, live Windows CLI checks and 14-tool fake-API coverage. Full live tool/client coverage, GUI handoff and Linux/macOS acceptance remain. |
+| **AI theme generation** | **Palette preview** | Validated palette drafts and provider tests exist. Full appearance generation with fonts/effects and native shaders is [planned](docs/AI-THEME-AND-SHADER-PLAN.md). |
+| **Effects / Shader Lab** | **Supported effects work; shader work unfinished** | Gradients, scanlines, noise, row banding and analog static render natively. Legacy GLSL, Shader Lab and HSync warp do not run. |
+| **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
+| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Hosted entitlement integration, downloadable releases, production signing, updater activation and rollback remain; old feedback/runtime-config services are disabled. |
+
+AI Help, AI theme generation and CLI/MCP control require an explicit
+[local feature flag](docs/LOCAL-FEATURE-FLAGS.md) for release testing. The core
+terminal workspace does not need these features enabled. Agent Mode is a
+separate unfinished prototype.
 
 ### Can an agent control it yet?
 
-**In a debug build, yes, for the paths covered by the tests. In a normal release
-build, access is currently locked.** Agent control uses an authenticated API
+**Yes, for the paths covered by the tests, with development access or the local
+JSON override enabled.** Agent control uses an authenticated API
 bound to `127.0.0.1`, with an instance-specific connection file. Helpers can
 create/rename tabs, arrange layouts, read output, send text or keys, and run
 presets. **Agent Inst.** copies the connection instructions when control is enabled.
@@ -145,8 +173,9 @@ limits are in [Native agent control](docs/CONTROL-API.md).
 
 ### What still needs to be done?
 
-- Finish AI Help's real-provider, credential, focus/target and reviewed-action
-  checks, plus the hosted access integration that unlocks release builds.
+- Broaden AI Help's real-provider GUI and accessibility checks, and finish hosted
+  access integration. Streaming/retry/cancel and reviewed-target routing already
+  have isolated Windows fixture coverage.
 - Finish agent-control GUI handoff and broader MCP-client/tool acceptance,
   including Linux and macOS runtime checks.
 - Complete signed release/update activation and rollback.

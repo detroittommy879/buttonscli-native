@@ -36,11 +36,15 @@ mod settings;
 mod shortcuts;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod startup;
+#[cfg(not(target_arch = "wasm32"))]
+mod terminal_history;
 pub mod theme;
+mod theme_browser;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_files;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_generation;
+mod ui_text;
 mod window_opacity;
 
 #[cfg(not(target_arch = "wasm32"))]

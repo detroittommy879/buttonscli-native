@@ -13,17 +13,19 @@ pub(crate) enum ShortcutAction {
     CloseTab,
     ReopenTab,
     CopySelection,
+    FindTerminal,
     Paste,
     OpenSettings,
     Quit,
 }
 
 impl ShortcutAction {
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 8] = [
         Self::NewTab,
         Self::CloseTab,
         Self::ReopenTab,
         Self::CopySelection,
+        Self::FindTerminal,
         Self::Paste,
         Self::OpenSettings,
         Self::Quit,
@@ -35,6 +37,7 @@ impl ShortcutAction {
             Self::CloseTab => MessageKey::ShortcutCloseTab,
             Self::ReopenTab => MessageKey::ShortcutReopenTab,
             Self::CopySelection => MessageKey::ShortcutCopy,
+            Self::FindTerminal => MessageKey::TerminalFind,
             Self::Paste => MessageKey::ShortcutPaste,
             Self::OpenSettings => MessageKey::ShortcutOpenSettings,
             Self::Quit => MessageKey::ShortcutQuit,
@@ -47,6 +50,7 @@ impl ShortcutAction {
             Self::CloseTab => "close-tab",
             Self::ReopenTab => "reopen-tab",
             Self::CopySelection => "copy-selection",
+            Self::FindTerminal => "find-terminal",
             Self::Paste => "paste",
             Self::OpenSettings => "open-settings",
             Self::Quit => "quit",
@@ -93,7 +97,9 @@ impl ShortcutChord {
     }
 
     pub(crate) fn is_reserved_terminal_interrupt(&self) -> bool {
-        self.key == "C" && !self.shift && (self.primary || self.ctrl)
+        self.key == "C"
+            && !self.shift
+            && (self.ctrl || (self.primary && !cfg!(target_os = "macos")))
     }
 
     pub(crate) fn matches(&self, key: Key, modifiers: Modifiers) -> bool {
@@ -154,6 +160,7 @@ impl Default for ShortcutSettings {
             (ShortcutAction::CloseTab, "W"),
             (ShortcutAction::ReopenTab, "U"),
             (ShortcutAction::CopySelection, "C"),
+            (ShortcutAction::FindTerminal, "F"),
             (ShortcutAction::Paste, "V"),
             (ShortcutAction::OpenSettings, "Comma"),
             (ShortcutAction::Quit, "Q"),
@@ -169,7 +176,11 @@ impl Default for ShortcutSettings {
                             primary: true,
                             ctrl: false,
                             alt: false,
-                            shift: true,
+                            shift: !(cfg!(target_os = "macos")
+                                && matches!(
+                                    action,
+                                    ShortcutAction::CopySelection | ShortcutAction::Paste
+                                )),
                         }),
                     )
                 })
@@ -402,7 +413,11 @@ mod tests {
                     shift: false,
                 }
             ),
-            Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            if cfg!(target_os = "macos") {
+                Ok(())
+            } else {
+                Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            }
         );
         assert_eq!(
             settings.assign(
@@ -415,7 +430,11 @@ mod tests {
                     shift: false,
                 }
             ),
-            Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            if cfg!(target_os = "macos") {
+                Ok(())
+            } else {
+                Err(ShortcutAssignError::ReservedTerminalInterrupt)
+            }
         );
     }
 

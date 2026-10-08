@@ -1,5 +1,199 @@
 # Reconstruction journal
 
+## 2026-10-06 — Terminal keys stay out of workspace navigation
+
+Reproduced ArrowUp writing to the focused ConPTY and moving egui focus to a
+workspace control in the same frame. TerminalView now locks arrows, Tab/Shift+Tab
+and Escape to the terminal and preserves that filter across frames, selection
+clicks and native-window focus changes. F6 still transfers input to UI controls.
+Added a full-chrome, two-ConPTY regression and expanded the native detached
+Settings/OS clipboard probe. Both pass; existing three-pane selection, IME,
+search and F6 coverage passes. 251 library tests, two fixtures, strict native
+Clippy, formatting, optimized Windows build and isolated release startup pass.
+See [run log](BUGFIX-LOG-2026-10-06.md) for details. Other-platform runtime
+acceptance remains separate.
+
+## 2026-10-05 — Detached Settings, selection and theme navigation
+
+Detached Settings no longer disables the main terminal; its selected status
+button reveals the existing window. Fixed nested status wrapping that could
+consume the terminal height. Real Windows clipboard checks now cover right-click
+and automatic selection copy. Selection supports wheel and edge scrolling across
+history, including release outside the pane. Added Settings padding/contrast,
+catalog counts, Show all/reload and personal-theme warnings. Theme assets are
+embedded at build time; the user's valid Abyssal Bloom is included by this rebuild.
+
+Separate UI experiment replaces stacked resize dividers with Library / Edit /
+Generate subtabs, fixes clipped import/export actions and clarifies New variant.
+251 library tests, two fixtures, explicit native interaction probes, strict
+native/WASM Clippy and optimized Windows build pass. The transient three-theme
+state and hours-long freeze were not reproduced. See the concise
+[run log](BUGFIX-LOG-2026-10-05.md), [proposal](SETTINGS-UX-PLAN.md) and generated
+concepts; appearance presets, slot defaults and provider redesign are proposals.
+The same native clipboard/Settings probe also passes in the optimized build.
+
+## 2026-10-04 — Settings, theme drafts, clipboard and readability
+
+Wrapped Settings tabs; made scrollbar contrast independent of theme; saved native
+window size/position on close and added remembered section dividers below the
+theme list/generator/editor. Explicit Keep/Close now writes preferences immediately.
+Theme drafts follow external theme switches, dropdown selection establishes the
+new source, and variants retain current edits instead of restoring an old theme.
+Noise texture bounds now share one scale across both axes. Renamed static to
+Analog TV effect. Added zero-default ±RGB status row banding behind terminal
+text/ANSI backgrounds, including clipped gradient geometry.
+
+Keyboard settings add selection-aware Ctrl+C, optional copy on selection,
+bracketed paste and macOS Option/Meta behavior. Native Copy/Paste delivery no
+longer requires a held modifier; custom shortcuts are consumed once. Added IME
+cursor output and committed-text delivery, suppressing preedit and duplicate
+Option Key/Text writes. macOS defaults use Cmd+C/V and preserve Ctrl+C for the
+shell. Checked Apple Terminal guidance and pinned egui-winit source; see
+[keyboard/settings notes](KEYBOARD-AND-SETTINGS.md) for sources and Mac acceptance.
+The app already repainted on demand; added a 30 FPS default animation cap instead
+of changing its event-driven input/output scheduling.
+
+Validation: 251 library tests plus two fixtures pass (11 optional tests ignored),
+strict native/WASM Clippy pass, and the explicit three-ConPTY selection/copy/IME/
+scroll/focus test passes. The terminal widget's 19 tests include brightness math,
+gradient clipping and bracketed-paste envelopes. Native Settings move/resize,
+title-bar close/save and reopen geometry pass with an isolated profile; its
+capture shows the second tab row and visible scrollbars. Probe initially searched
+for the button label rather than the window title; corrected to ButtonsCLI Settings.
+One intermediate edit used the Windows text encoding; corrected to UTF-8 before
+checks. Existing incremental-cache/PDB diagnostics do not fail builds. macOS
+runtime and GPU-power measurement remain unverified. No legacy settings edited.
+Final optimized Windows and WASM builds pass. The optimized Windows build also
+passes the separate Settings move/resize/close/reopen probe; final diagnostic
+capture is `target/settings-layout-release.png`. Implementation checkpoint:
+`09e7a5d` on `codex/pane-fonts-theme-editor`; no push or public release performed.
+
+## 2026-10-04 — SSH/htop blank screen from inherited TERM=dumb
+
+Reproduced the reported empty htop screen with only misplaced, uncolored bottom
+menus using local WSL htop and `TERM=dumb`. The same app/theme displays the full
+colored screen with `xterm-256color`. Native PTYs inherited the launcher's terminal
+capabilities; the normal release opened by the coding tools inherited `dumb`.
+Changed only the child PTY environment to advertise `TERM=xterm-256color` and
+`COLORTERM=truecolor` on Windows/Linux/macOS, keeping the parent and user settings
+untouched. Added a ConPTY regression that starts under a dumb parent, verifies
+the child's capability values, and checks actual standard/indexed/RGB grid colors.
+That check passes. Added an isolated real-htop capture helper using the installed
+WSL environment and optionally a read-only copy of the current theme. No server
+connections, packages or SSH configuration are changed.
+
+Strict native Clippy and the full suite pass (247 library tests, two fixtures,
+11 optional tests ignored). The optimized release rebuild passes. The exact
+same Windows-shell-to-WSL htop fixture is blank before the fix and fully colored
+after it; both captures were inspected with the current personal theme copied
+into the isolated profile. No owned htop processes survive cleanup. Reopened the
+corrected standalone release with the normal native profile for manual SSH
+comparison. Existing remote sessions need a new connection, or the temporary
+`TERM=xterm-256color htop` command. Existing PDB/incremental-cache and ended-pipe
+cleanup diagnostics remain nonfatal.
+
+## 2026-10-04 — Local JSON access and ordinary release testing
+
+Added `.buttonscli-native/feature-flags.json` with explicit `enable_all` access
+in debug and release, read once at startup outside the normal profile settings.
+It overrides catalog/account/runtime gates and the separate Agent Mode debug
+restriction. Missing/false/invalid files retain ordinary access. The flag does
+not create absent implementations or restore disabled hosted services. Provider
+settings show when the override is enabled; existing provider keys, buttons,
+active profiles, terminal action review and CLI/MCP authentication are preserved.
+Updated the AI fixture/PTY integration to use an isolated JSON flag instead of
+the debug environment override, allowing the same checks in optimized builds.
+Added flag parsing/bounds/profile-preservation and all-catalog access checks.
+The fake-provider launcher still intentionally uses a temporary profile; normal
+testing now uses the release executable directly.
+
+The first optimized build and 247 library tests pass, plus the explicit optimized
+AI Help fixture/PTY test (stream/retry/cancel/context/reviewed target delivery).
+The release smoke confirms JSON access without development environment flags,
+enabled control handoff and opening the separate AI Help window. Its screenshot
+exposed Send clipping after the additional Agent Mode option was unlocked; the
+composer now reserves room for that option and its optional consent text. The
+new UIA probe initially tried to inspect chat controls, but the separate viewport
+exposes a placeholder tree; this is not full assistant accessibility acceptance.
+The probe now states its narrower handoff/window checks, with visual verification
+and app-level tests for chat. Native active-profile settings were preserved when
+creating the user's small flag file (11 presets and 10 providers). Final checks
+and normal-profile launch follow below.
+
+Final optimized rebuild and release-window capture pass; Send is now fully
+visible alongside the unlocked Agent Mode option. Native/WASM strict Clippy,
+formatting and script parsing pass. Existing PDB collision and incremental-cache
+access notes remain nonfatal. Real provider calls are left to the user's manual
+comparison; the saved active Mistral model field is empty and needs a choice in
+provider settings before chatting. The native settings hash remained unchanged
+through flag setup and isolated checks.
+
+Opened the final release executable directly with the user's normal native
+profile and left it running, with AI Help open. Control handoff/window-opening
+checks pass there too, without a temporary home or provider changes. The first
+normal-window probe ran before the actual titled window was ready; retrying the
+real handle passed, and the probe now waits for its initial accessibility tree.
+
+## 2026-10-03 — Terminal usability, accessibility and local AI fixture
+
+Continued on `codex/pane-fonts-theme-editor`; the unrelated `.aicp/` folder was
+left alone. Added native AccessKit adapters, named terminal nodes with viewport
+text, a frozen read-only terminal text reader, F6 chrome navigation, labelled
+provider/composer controls, and focus preservation for text fields. Search now
+has an editable Ctrl/Cmd+Shift+F shortcut, live matching, Shift+Enter backwards,
+Escape close, and a wrapping strip. Existing right-click copy defaults on and
+its three-pane ConPTY selection/copy/scroll/input regression passes.
+
+Workspace saves a 0–100,000-line scrollback cap, custom left-panel name, and
+standard/advanced static switch. Optional history defaults off and writes bounded
+200,000-character grid snapshots to profile-local UTC date folders every five
+seconds and on close. A bounded background writer expires only recognized
+snapshot files while the app runs; foreign files and nested folders survive.
+Manual save and opening the history folder are available. These are retained
+text snapshots, not a complete raw output recorder or restorable shell sessions.
+
+Added a reusable Node loopback provider and isolated Windows debug launcher.
+No real credentials/providers or personal settings are used. Fixture checks pass
+for Unicode/SSE, failure/retry, quota, malformed events, disconnect and cancel.
+The explicit AI Help app/PTY test passes streaming, context off/on, inert actions,
+insertion into the original target after focus changes, retry, cancel, retained
+conversation on reopen, and closed-target rejection. Reader AccessKit and history
+replacement/expiry tests pass. The initial history test exposed Windows canonical
+path-prefix mismatch; keeping the guarded lexical path fixed it. egui 0.31 does
+not mark immutable text inputs read-only itself; the reader now sets that native
+attribute explicitly. Full gates and live Windows UI Automation checks follow.
+
+Analog static already uses a WGSL GPU overlay; simple noise uses bounded CPU
+pixel textures, scanlines/banding use shapes, and gradients use meshes. Kept this
+mixed renderer and added its existing texture fallback as the standard option.
+`three-d` would introduce an OpenGL renderer and `bevy_egui` a game-engine
+integration; neither is needed for this WGPU/eframe app. Shader Lab/HSync still
+need an offscreen terminal rendering stage, separately from noise overlays.
+
+Final follow-up: Windows UI Automation now passes terminal name/focus, menu
+Invoke, reader TextPattern/ValuePattern, read-only metadata and actual nonempty
+text selection. Native GUI startup and a target-owned capture pass; the capture
+was inspected. The first selection probe read too early; focus plus a bounded
+selection wait fixed it. Initial screenshots also exposed unused blank screen
+rows pushing the reader to its end; the reader trims those rows and initially
+focuses its text. NVDA/Narrator and other-platform screen-reader acceptance remain
+open. Existing Vulkan validation/PDB and ended-pipe diagnostics remain.
+
+Extended three-pane ConPTY checks pass live Find focus/highlights, no search/F6
+bytes sent to the shell, independent history truncation, zero-history limits,
+and three real output snapshots saved in an isolated profile. AI Help also passes
+reviewed Insert + Enter. Review exposed that reopening AI Help reset old
+suggestions to the newly focused terminal; reopening now preserves both in-flight
+and completed action targets, including an absent target. The regression passes.
+Native full suite passes 245 library tests and two fixtures (10 optional tests
+ignored); explicit AI Help and three-pane tests pass. Strict native/WASM checks,
+desktop and optimized WASM builds, formatting, six Node checks and the MCP
+contract pass. Changes are committed locally; no production activation or new
+renderer dependency was introduced.
+
+Successful settings import drains and resets the old profile's history writer
+before switching stores, preventing subsequent snapshots from using its folder.
+
 ## 2026-10-02 — GitHub README and integration follow-through
 
 Rebuilt the README around the usable terminal workspace: centered title/badges,

@@ -43,7 +43,9 @@ constraints.
 | Command presets | Done | `src/components/PresetBar.tsx`, `src/types/index.ts` | Add, edit, delete, restore defaults, and persist label/command/`sendEnter`; a click targets the focused terminal and can type without submitting. |
 | SSH presets | Done | `src/components/PresetBar.tsx`, config `sshPresets` | Maintain a separate SSH-oriented preset collection with the same editing and focused-terminal rules. |
 | Dock behavior | Partial | `src/components/PresetBar.tsx` | Top and left docks resize, collapse, auto-hide, and support compact wrapping without covering terminal content. |
-| Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Seven native app actions have editable recorded bindings, conflict checks, reset/clear, and Ctrl+C protection; verify recording in the GUI and complete the remaining original actions. |
+| Keyboard shortcuts | Partial | `src/services/keyboardShortcuts.ts` | Eight native app actions (including Find) have editable recorded bindings, conflict checks, reset/clear, and Ctrl+C protection. F6 leaves shell input for control navigation; complete remaining legacy actions and broader platform review. |
+| Terminal search and retained history | Done | native Alacritty grid and `src/terminal_history.rs` | Live regex highlights/navigation, bounded adjustable scrollback and optional dated plain-text snapshots/expiry pass Windows app/PTY and file tests. Saved text is bounded; it does not restore shell sessions. |
+| Native accessibility | Partial | AccessKit and `docs/TERMINAL-HISTORY-ACCESSIBILITY.md` | Native adapters, named terminal viewport text and a read-only text reader pass AccessKit and live Windows UI Automation checks. NVDA/Narrator, Orca/VoiceOver and broader control coverage remain open. |
 | Status controls | Partial | `src/components/StatusBar.tsx` | Show live shell/tab/pane state and restore the useful layout, zoom, opacity, effect, and assistant controls. |
 
 ## P1 — visual system
@@ -75,7 +77,7 @@ preferences JSON.
 | Capability | Status | Legacy source | Acceptance criteria |
 | --- | --- | --- | --- |
 | Provider management | Partial | `src/ai/aiSdkService.ts`, `src/types/index.ts` (`NamedProvider`) | Native add/edit/import endpoints and models, selected-key transfer, Test Connection and model discovery are implemented in source; finish UI/manual provider review. |
-| Plain AI Help window | Partial | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Separate native window source path explains bounded terminal output and suggests reviewed commands; finish GUI/provider acceptance. |
+| Plain AI Help window | Partial | `src/components/AssistantPanel.tsx`, `AssistantOverlay.tsx` | Reusable loopback fixture and isolated launcher exist; app/PTY integration passes streaming, context, retry/cancel, reviewed insertion/run, target preservation on reopen and closed-target rejection. Finish real-provider GUI and platform acceptance; release rollout stays gated. |
 | Terminal context | Partial | `src/hooks/useAIAssistantChat.ts` | Optional bounded grid preview, explicit send and best-effort redaction are implemented; finish privacy/runtime review. |
 | Suggested actions | Partial | `src/services/assistantActions.ts` | Commands and allowlisted control keys are parsed and require explicit target-bound review; finish runtime regression and GUI checks. |
 | AI theme/shader generation | Partial | theme and shader designer services; native V03 theme generator | Theme generation has a source implementation; shader generation remains deferred until native WGSL compilation and rendering can validate candidates safely. |

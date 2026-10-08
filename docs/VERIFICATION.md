@@ -1,7 +1,184 @@
 # Verification record
 
-Last run: 2026-10-02 on Windows, Rust 1.96.0. Earlier Linux-only checks
+Last run: 2026-10-07 on Windows. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-07 stable-main publication checks
+
+- Full locked suite: 258 library tests and two legacy import fixtures pass;
+  17 optional library probes are ignored by default. Formatting, strict native
+  and WASM Clippy, and the optimized Windows desktop build pass.
+- Explicit Windows probes pass for tab/pane replacement and keyboard delivery,
+  three-pane selection/copy/scroll/IME, terminal navigation-key ownership, and
+  actual OS clipboard delivery with detached Settings open. Tests use owned
+  temporary profiles/shells and restore the prior text clipboard.
+- Isolated optimized startup passes. Existing incremental-cache/PDB warnings and
+  ended-pipe shutdown diagnostics persist without failing the checks.
+- Five Node CLI deadline checks, the 14-tool MCP fake-API stdio contract and the
+  fake-provider discovery/stream/retry/cancel check pass.
+- The creator reports daily Windows use and core parity close to or matching
+  the original app. README readiness reflects that report plus scoped checks;
+  roughly 70% preview estimates are editorial, not measured reliability.
+- Two supplied October 7 workspace screenshots were inspected and copied
+  unchanged; changed-document links and image paths resolve. No downloadable
+  release, Linux/macOS interaction certification or multi-hour soak is claimed.
+
+## 2026-10-05 Settings / clipboard / selection follow-up
+
+- `cargo test --locked --lib`: 251 pass; 12 optional tests ignored. Two legacy
+  import fixtures pass. Explicit three-ConPTY selection test covers wheel/edge
+  scrolling in both directions, stationary pointer updates, copy on outside
+  release and stopping the selection scroll timer.
+- Explicit `native_clipboard_and_detached_settings_probe` checks exact selected
+  text in the real Windows clipboard for right-click and automatic copy, and
+  typing into a real terminal with detached Settings open. Test-owned windows,
+  shell and profile only; restores the prior text clipboard. Native captures
+  verify all 560 themes in Library and Edit padding/checkmark/import visibility.
+- Strict native/WASM Clippy and optimized Windows build pass. Existing
+  incremental-cache and bin/lib PDB diagnostics are nonfatal. No legacy profile
+  is edited. Local user `.aicp/` and Abyssal Bloom assets remain unstaged.
+- The optimized native clipboard/Settings probe also passes: exact OS clipboard
+  content for both copy modes and main-terminal typing with detached Settings.
+- The hours-long freeze and transient three-theme state are not reproduced;
+  the identified detached-window input lock and catalog visibility are addressed.
+  Larger mixed-workspace save/default-slot/provider changes are documented
+  proposals. ImageGen concepts are separate from native acceptance captures.
+
+## 2026-10-04 SSH/htop terminal-capability regression
+
+- Before the change, real local WSL htop reproduces a blank screen with only
+  uncolored bottom menus when given the launcher's `TERM=dumb`. The same saved
+  theme/typography shows full colored meters/process rows with xterm-256color.
+  Passing the actual Windows child shell's TERM through to WSL reproduces it too.
+- The new ignored ConPTY check passes from a dumb parent: its spawned shell has
+  xterm-256color/truecolor, the parent remains dumb, and parsed standard ANSI,
+  indexed 256-color and explicit RGB cells resolve to the expected colors.
+- `cargo test --locked`: 247 library tests and two import fixtures pass, with 11
+  optional tests ignored. Strict native Clippy, formatting/diff and PowerShell
+  parsing checks pass. The optimized release rebuild passes. Inspected before/
+  after captures of the identical Windows-child-to-WSL fixture: blank uncolored
+  menus before, full colored CPU/memory meters, process rows and menu after.
+- The fixture is local only; no remote SSH login, package install or server
+  configuration change is involved. Owned htop sessions terminate on app close.
+
+## 2026-10-04 local JSON access and release testing
+
+- `cargo build --release --locked --bin buttonscli` builds the standalone Windows
+  executable. Native and WASM strict Clippy, formatting, diff checks and
+  PowerShell script parsing pass. Compiler incremental-cache access notes and
+  the pre-existing bin/lib PDB collision warning do not fail these checks.
+- `cargo test --release --locked --lib`: 247 pass, 10 optional tests ignored.
+  New tests cover every catalog key, explicit false/missing/invalid JSON,
+  unknown keys, oversized files and preservation of existing profile data.
+- `cargo test --release --locked --lib ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery -- --ignored --test-threads=1`
+  passes with a test-owned JSON flag, loopback provider and CMD sessions. No
+  debug-only access override is required. The app gates for AI Help, Agent Mode,
+  theme generation, Quick Secrets and remote control are available in optimized
+  builds. Streaming, context, review/target routing, retry and cancel pass.
+- `pwsh -NoProfile -File scripts/native-smoke.ps1 -SkipBuild -Release -WithLocalFeatureFlags`
+  passes startup, visible window bounds, enabled control handoff and opening AI
+  Help in a separate window. The probe removes development access flags and
+  uses an isolated profile. Optional `-AiHelpCapturePath` captures the chat.
+  Initial capture found Send clipping with the newly exposed Agent Mode row;
+  the reserved composer height was increased. The final rebuild/capture was
+  inspected: Agent Mode, context, composer and the full Send button are visible.
+- The separate assistant viewport currently exposes a placeholder UIA tree, so
+  this probe does not certify its composer accessibility. Main terminal/reader
+  accessibility remains covered by the earlier dedicated checks.
+- The user's normal native JSON flag was enabled independently of active-profile
+  settings; existing presets/providers and profile JSON were preserved. Normal
+  launch uses the standalone executable, with no temporary-home launcher.
+  The final normal-profile launch and AI Help window-opening check pass; the app
+  was left open for manual real-provider comparison. Its active Mistral model
+  field is empty, so a model must be selected before sending. No real provider
+  request or terminal action was triggered during these checks.
+
+## 2026-10-03 terminal accessibility, history and AI Help fixture
+
+- Full native suite: 245 library tests and two import fixtures pass; 10 optional
+  library tests are ignored by default. Strict native/WASM checks, desktop and
+  optimized WASM builds, formatting and diff checks pass.
+- The explicit three-pane ConPTY check now also verifies the Find shortcut and
+  text focus, live match highlights, absence of shell input from search/F6,
+  independent history truncation, zero scrollback and three dated text files
+  containing real test output. Selection/right-click copy and keyboard/scroll
+  routing continue to pass.
+- `cargo test ai_help_fixture_stream_retry_cancel_and_reviewed_target_delivery --lib -- --ignored --test-threads=1`
+  passes against the reusable Node fixture with test-owned CMD sessions. It
+  covers visible streaming, context off/on, inert suggestions, reviewed Insert
+  and Insert + Enter, focus/reopen target retention, retry, cancel and closed
+  target rejection. The debug launcher uses an isolated temporary profile.
+- `pwsh -NoProfile -File scripts/native-smoke.ps1 -SkipBuild -WithAccessibility`
+  passes Windows UI Automation discovery, menu Invoke, reader TextPattern and
+  ValuePattern, read-only metadata and nonempty text selection. The startup
+  capture was inspected. A headless AccessKit tree check also passes.
+- Six Node CLI/fake-provider checks and the MCP contract pass. Real-provider
+  GUI acceptance, NVDA/Narrator and Linux/macOS screen readers remain open.
+  Existing PDB/graphics-driver and ended-pipe diagnostics remain; they did not
+  fail the functional checks.
+
+## 2026-10-02 pane interaction and compact theme browser
+
+- Created checkpoint `0dd74df` before the requested changes on
+  `codex/pane-fonts-theme-editor`.
+- Full library suite: 242 pass, nine optional tests ignored; both legacy import
+  fixtures pass. Strict native Clippy, formatting and desktop/browser compile
+  checks pass. Five CLI deadline checks and the MCP stdio contract pass.
+- Explicit Windows `three_panes_select_copy_scroll_and_route_keyboard_independently`
+  passes with three finite, test-owned ConPTY sessions: selection on the first
+  drag, independent selection state, direct right-click clipboard commands,
+  wheel/scrollbar routing without changing other panes, keyboard input with the
+  pointer outside the focused pane, and releasing a drag outside the window.
+  Multiline copy preserves line breaks. Turning direct copy off restores the
+  menu; hovering font controls does not expand them, and open pane menus block
+  terminal keyboard input. All test shells are closed.
+- The deeper-history fixture also exposed an invalid grid index in bounded
+  terminal text snapshots. Tail reads now count backwards from the final screen
+  line correctly; short reads stay bounded and larger reads include history.
+- Pointer tests verify that hovering the favorites section does not open it,
+  and status Favorites/Random apply every theme zone while clearing pane theme
+  and font overrides, even with the editor's Apply scopes unchecked.
+- Compact-browser UI tests render palette swatches and click a native theme;
+  search/filter/sort tests cover name order, favorites, legacy separation and
+  newer native versions. Native authoring versions survive export/parse.
+- Isolated native startup and status-bar capture pass. The compact browser is
+  covered by headless egui interaction tests; full manual visual acceptance
+  remains open. Existing bin/lib PDB and graphics-driver notices remain.
+
+## 2026-10-02 pane fonts and theme-editor follow-up
+
+- Started `codex/pane-fonts-theme-editor` from merged `origin/main`; the new
+  GitHub README was preserved.
+- Full native suite: 239 library tests and two import fixtures pass; eight
+  explicitly optional tests are ignored. Strict Clippy and desktop/browser
+  compile checks pass. Final native color round-trip coverage includes separate
+  shell/control, tab, dock/button, Settings and status-bar fields.
+- Font regressions cover two themes with different families/sizes, terminal-only
+  legacy font metadata, manual overrides and the Fonts apply scope. The explicit
+  Windows ConPTY lifecycle check passes with font retention across reorder,
+  random-theme reset, close and recovery, and stale popup targeting checks.
+- Fake-time editor checks verify the 500 ms debounce, held-mouse suppression,
+  all-section preview despite unchecked card scopes, animated-gradient state,
+  disabling preview without losing draft edits, and excluding an unsaved preview
+  from autosave. Existing minimum-window/footer and menu-pointer tests pass.
+- Windows isolated GUI startup/capture passes. The captured 1296×859 frame was
+  inspected: **★ Favorites** and **Random theme** are visible in the status bar.
+  This does not replace interactive acceptance of every editor/scrollbar control.
+- Five CLI deadline regressions and the MCP fake-API contract pass. The isolated
+  live CLI/PTY matrix and official SDK smoke pass; the SDK lists 14 tools and calls
+  status/tabs. The full real MCP tool matrix remains open.
+- Provider 2's originally pasted line break caused an invalid header; trimming
+  fixed transport construction. Both original/replacement credentials then got
+  HTTP 429 on completion. Native `/v1/models` discovery succeeded with the bounded
+  500-ID list. Further Provider 2 testing stopped at the user's request.
+- The user-supplied Mistral endpoint and exactly `codestral-latest` passed a real
+  completion, streamed AI Help response and generated palette schema/contrast
+  validation. Prompts were synthetic and no terminal context or keys were logged.
+  Mistral was saved as a separate active provider with its key in the OS vault.
+  No generated theme was written by the test. Full AI GUI acceptance remains open.
+- Existing bin/lib PDB naming and unavailable Vulkan-driver/validation-layer
+  messages remain; startup/rendering and functional assertions pass using the
+  available graphics backend.
 
 ## 2026-10-02 README and integration checks
 

@@ -525,6 +525,92 @@ fn default_shell() -> (String, Vec<String>) {
 mod tests {
     #[cfg(windows)]
     #[test]
+    #[ignore = "uses a test-owned ConPTY; launch with TERM=dumb and one test thread"]
+    fn terminal_capabilities_and_colors_survive_a_dumb_launcher() {
+        use std::time::{Duration, Instant};
+        assert_eq!(std::env::var("TERM").as_deref(), Ok("dumb"));
+        struct Fixture(std::path::PathBuf);
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let script = Fixture(
+            std::env::temp_dir().join(format!("buttonscli-colors-{:032x}.ps1", fastrand::u128(..))),
+        );
+        std::fs::write(&script.0, r#"
+Write-Output ('CAPABILITIES:' + $env:TERM + ':' + $env:COLORTERM)
+$esc = [string][char]27
+[Console]::Write($esc + '[31m@' + $esc + '[38;5;46m#' + $esc + '[38;2;11;222;33m%' + $esc + "[0m`r`n")
+Write-Output 'COLOR-FIXTURE-DONE'
+Start-Sleep -Seconds 30
+"#).unwrap();
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let launch = super::ShellLaunch::for_executable_with_args(
+            "color-fixture",
+            "powershell.exe",
+            vec![
+                "-NoLogo".into(),
+                "-NoProfile".into(),
+                "-ExecutionPolicy".into(),
+                "Bypass".into(),
+                "-File".into(),
+                script.0.to_string_lossy().into_owned(),
+            ],
+            None,
+        );
+        let mut tab = super::TerminalTab::spawn(
+            990,
+            "color-fixture".into(),
+            egui::Context::default(),
+            tx,
+            launch,
+        )
+        .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            tab.backend.sync();
+            if tab.backend.visible_text().contains("COLOR-FIXTURE-DONE") {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "color fixture did not finish drawing"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let text = tab.backend.visible_text();
+        assert!(
+            text.contains("CAPABILITIES:xterm-256color:truecolor"),
+            "{text}"
+        );
+        assert_eq!(
+            std::env::var("TERM").as_deref(),
+            Ok("dumb"),
+            "the app's parent environment must remain unchanged"
+        );
+        let theme = egui_term::TerminalTheme::default();
+        let rendered_color = |marker| {
+            let cell = tab
+                .backend
+                .last_content()
+                .grid
+                .display_iter()
+                .find(|cell| cell.c == marker)
+                .unwrap();
+            theme.get_color(cell.fg)
+        };
+        assert_eq!(
+            rendered_color('@'),
+            egui::Color32::from_rgb(0xac, 0x42, 0x42)
+        );
+        assert_eq!(rendered_color('#'), egui::Color32::from_rgb(0, 255, 0));
+        assert_eq!(rendered_color('%'), egui::Color32::from_rgb(11, 222, 33));
+        drop(tab);
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "launches test-owned ConPTY shells and a descendant; run explicitly on Windows"]
     fn rapid_close_terminates_owned_shell_and_busy_descendant() {
         use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};

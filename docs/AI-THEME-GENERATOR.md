@@ -17,12 +17,16 @@ Theme** in that editor to keep it. New generated themes use a collision-safe
 filename and never replace a saved theme. You can cancel the preview or discard
 the candidate without writing it.
 
-This is a Pro feature. The release build keeps it locked until entitlement
-integration is available. Debug builds can exercise it with
+This is a Pro feature. The [local JSON override](LOCAL-FEATURE-FLAGS.md) enables
+it in both debug and release builds. Without that flag, release access remains
+locked. Debug builds can also exercise it with
 `BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR=1`; that override does not work in
 release builds. A configured endpoint and model are required. Provider requests
 may include your brief and the selected palette, so review the provider you
 have selected before generating.
 
-The candidate flow and validation have Windows source tests. Live provider
-requests and interactive Windows GUI behavior have not yet been certified.
+The candidate flow and validation have Windows source tests. On 2026-10-02,
+Mistral's `https://api.mistral.ai/v1/chat/completions` endpoint with exactly
+`codestral-latest` produced a real palette candidate that passed native schema
+and contrast validation. The acceptance test did not save a theme. Interactive
+Windows GUI behavior and broader provider/platform acceptance remain open.

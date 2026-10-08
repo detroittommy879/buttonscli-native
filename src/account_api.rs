@@ -332,6 +332,7 @@ impl<'a> AccountClient<'a> {
                     AccountError::ResponseTooLarge
                 }
                 crate::assistant::transport::TransportError::Network
+                | crate::assistant::transport::TransportError::InvalidCredential
                 | crate::assistant::transport::TransportError::Cancelled => AccountError::Network,
             })
     }

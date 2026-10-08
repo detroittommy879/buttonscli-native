@@ -15,6 +15,8 @@ pub struct ThemeDefinition {
     pub name: String,
     pub description: String,
     pub source: ThemeSource,
+    /// Native authoring generation; absent for original legacy documents.
+    pub native_version: Option<u64>,
     pub colors: AppColors,
     pub pane_divider: PaneDividerTheme,
     pub terminal_colors: TerminalColors,
@@ -39,6 +41,11 @@ pub struct PaneDividerTheme {
 }
 
 impl ThemeDefinition {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn editor_document(document: &Value) -> Result<Self, serde_json::Error> {
+        parse_legacy_value("editor", document, ThemeSource::Personal)
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub fn terminal(&self) -> TerminalTheme {
         TerminalTheme::new(Box::new(self.terminal_colors.palette()))
@@ -191,15 +198,39 @@ impl ThemeCatalog {
         self.personal_documents.get(id)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(test, not(target_arch = "wasm32")))]
     pub(crate) fn preview_personal_document(
         &mut self,
         profile: &str,
         file_stem: &str,
         document: &Value,
     ) -> Result<String, String> {
-        validate_personal_document(document)?;
         let identity = format!("personal:{profile}:{file_stem}");
+        self.preview_document(identity, file_stem, document)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn preview_editor_document(
+        &mut self,
+        profile: &str,
+        file_stem: &str,
+        document: &Value,
+    ) -> Result<String, String> {
+        self.preview_document(
+            format!("preview:{profile}:{file_stem}"),
+            file_stem,
+            document,
+        )
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn preview_document(
+        &mut self,
+        identity: String,
+        file_stem: &str,
+        document: &Value,
+    ) -> Result<String, String> {
+        validate_personal_document(document)?;
         let mut theme = parse_legacy_value(file_stem, document, ThemeSource::Personal)
             .map_err(|error| error.to_string())?;
         theme.id.clone_from(&identity);
@@ -230,7 +261,7 @@ pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String>
     Ok(())
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AppColors {
     pub canvas: Color32,
     pub panel: Color32,
@@ -247,6 +278,9 @@ pub struct AppColors {
     pub tabs_active: Color32,
     pub tabs_border: Color32,
     pub dock_background: Color32,
+    pub dock_button: Color32,
+    pub dock_button_hover: Color32,
+    pub dock_button_text: Color32,
     pub settings_background: Color32,
     pub status_background: Color32,
     pub status_text: Color32,
@@ -448,6 +482,9 @@ fn native_themes() -> Vec<ThemeDefinition> {
             tabs_active: canvas,
             tabs_border: accent,
             dock_background: panel,
+            dock_button: mix(panel, Color32::WHITE, 0.08),
+            dock_button_hover: mix(panel, Color32::WHITE, 0.16),
+            dock_button_text: Color32::from_rgb(218, 226, 242),
             settings_background: panel,
             status_background: mix(panel, Color32::WHITE, 0.06),
             status_text: Color32::from_rgb(139, 151, 171),
@@ -458,6 +495,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
             name: name.into(),
             description: "Native ButtonsCLI foundation theme".into(),
             source: ThemeSource::Native,
+            native_version: Some(1),
             terminal_colors: terminal_from_app(&colors),
             legacy_shader_requested: false,
             effects: TerminalEffects::default(),
@@ -507,7 +545,15 @@ fn parse_legacy_value(
     let colors = AppColors {
         canvas,
         panel,
-        raised: color(tabs, &["idleBackground", "background"], &to_hex(panel)),
+        raised: color(
+            shell,
+            &["buttonBackground"],
+            &to_hex(color(
+                tabs,
+                &["idleBackground", "background"],
+                &to_hex(panel),
+            )),
+        ),
         border: color(shell, &["border", "borderColor"], "#37486c"),
         text,
         muted,
@@ -532,6 +578,21 @@ fn parse_legacy_value(
             &to_hex(accent),
         ),
         dock_background: color(dock, &["background"], &to_hex(panel)),
+        dock_button: color(
+            dock,
+            &["buttonBackground"],
+            &to_hex(color(
+                tabs,
+                &["idleBackground", "background"],
+                &to_hex(panel),
+            )),
+        ),
+        dock_button_hover: color(
+            dock,
+            &["buttonHover"],
+            &to_hex(color(shell, &["border", "borderColor"], "#37486c")),
+        ),
+        dock_button_text: color(dock, &["buttonText"], &to_hex(text)),
         settings_background: color(settings, &["background"], &to_hex(panel)),
         status_background: color(status, &["background", "backgroundColor"], &to_hex(panel)),
         status_text: color(status, &["text", "foreground"], &to_hex(muted)),
@@ -582,6 +643,9 @@ fn parse_legacy_value(
             .unwrap_or("Bundled legacy ButtonsCLI theme")
             .to_owned(),
         source,
+        native_version: document["metadata"]["nativeThemeVersion"]
+            .as_u64()
+            .filter(|version| *version > 0),
         colors,
         pane_divider: divider,
         terminal_colors,
@@ -765,7 +829,17 @@ fn parse_gradient_center(value: &str) -> [f32; 2] {
 }
 
 fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography> {
-    if !value.is_object() {
+    if !value.is_object()
+        && ![
+            "fontFamily",
+            "fontSize",
+            "fontWeight",
+            "fontWeightBold",
+            "drawBoldTextInBrightColors",
+        ]
+        .iter()
+        .any(|key| terminal_theme.get(key).is_some())
+    {
         return None;
     }
     let defaults = Typography::default();
@@ -929,7 +1003,10 @@ mod tests {
     fn every_bundled_json_theme_loads() {
         let catalog = ThemeCatalog::load();
         assert_eq!(catalog.bundle_count(), BUNDLED_THEME_JSON.len());
-        assert_eq!(BUNDLED_THEME_JSON.len(), 127);
+        assert!(
+            BUNDLED_THEME_JSON.len() >= 127,
+            "retain the original bundle when adding themes"
+        );
     }
 
     #[test]
@@ -946,8 +1023,16 @@ mod tests {
     #[test]
     fn complete_legacy_catalog_is_present() {
         let catalog = ThemeCatalog::load();
-        assert_eq!(catalog.legacy_count(), 555);
-        assert_eq!(catalog.all().len(), 559);
+        let legacy_code: Vec<Value> = serde_json::from_str(LEGACY_CODE_THEMES_JSON).unwrap();
+        assert_eq!(legacy_code.len(), 428);
+        assert_eq!(
+            catalog.legacy_count(),
+            BUNDLED_THEME_JSON.len() + legacy_code.len()
+        );
+        assert_eq!(
+            catalog.all().len(),
+            native_themes().len() + catalog.legacy_count()
+        );
         assert_eq!(catalog.get("v4-zenburn").name, "v4-Zenburn");
     }
 
@@ -1151,11 +1236,13 @@ mod tests {
         fs::write(themes.join("second.json"), second).unwrap();
         fs::write(themes.join("broken.json"), "{bad").unwrap();
         let mut catalog = ThemeCatalog::load();
+        let base_count = catalog.all().len();
+        let legacy_count = catalog.legacy_count();
         let warnings = catalog.load_personal("Work_Space", &profile);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("broken.json"));
-        assert_eq!(catalog.legacy_count(), 555);
-        assert_eq!(catalog.all().len(), 561);
+        assert_eq!(catalog.legacy_count(), legacy_count);
+        assert_eq!(catalog.all().len(), base_count + 2);
         assert_eq!(catalog.get("basic2").source, ThemeSource::LegacyBundle);
         assert_eq!(
             catalog.get("personal:Work_Space:first").source,
@@ -1185,7 +1272,7 @@ mod tests {
         let other_profile = profile.join("other");
         fs::create_dir(&other_profile).unwrap();
         assert!(catalog.load_personal("Other", &other_profile).is_empty());
-        assert_eq!(catalog.all().len(), 559);
+        assert_eq!(catalog.all().len(), base_count);
         assert!(catalog
             .personal_document("personal:Work_Space:first")
             .is_none());

@@ -5,12 +5,13 @@ not a backlog disguised as release notes.
 
 ## Platform verification
 
-- Linux Mint/X11 has earlier manual desktop evidence. Windows 11 has isolated
-  startup, real PTY/control-CLI checks and partial AI Help GUI review using a
-  loopback provider. Broader keyboard, clipboard, DPI, performance and visual
+- Linux Mint/X11 has earlier manual desktop evidence. Windows has isolated
+  startup, real PTY/control-CLI checks, explicit pane/input/clipboard/selection
+  probes and the creator's daily use. AI Help has partial GUI review using a
+  loopback provider. Broader DPI, performance, screen-reader and platform
   acceptance remain open; see [the verification record](VERIFICATION.md).
-- Eframe and Alacritty expose macOS and Windows implementations, and the app has
-  no Unix-only UI code, but those targets still need native CI and manual tests.
+- Windows validation is local; GitHub CI covers Linux and the browser target.
+  macOS still needs native CI and manual interaction tests.
 - The browser package compiles and packages successfully. The available VM
   browser has WebGL disabled, so it exercised the explicit compatibility
   fallback rather than rendering the canvas. Test the canvas on a
@@ -45,8 +46,8 @@ not a backlog disguised as release notes.
   are outside that process-tree guarantee.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
-  screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior
-  still need GUI review on Fedora and Windows.
+  screen or mouse-reporting mode. Explicit Windows wheel/drag/selection probes
+  pass; Fedora interaction and broader platform review remain.
 - Terminal search, next/previous navigation, match highlights, select-all, and
   clear-screen actions are implemented against the live Alacritty grid. Focused
   tests cover wrapped wide Unicode, scrollback, and keeping the terminal state
@@ -74,8 +75,9 @@ not a backlog disguised as release notes.
   callback with a bounded fallback. One-pane adapter/visual review passed;
   multi-pane frame-cost and wider DPI review remain open. HSync warp and standalone wallpaper
   drawing are not rendered. The AI theme generator has a review-first source
-  path but remains Pro-gated until entitlement integration is available; live
-  provider and GUI checks remain open.
+  path but remains Pro-gated until production entitlement/rollout acceptance is
+  available. Mistral backend palette generation passed on 2026-10-02; full GUI
+  and broader provider checks remain open.
   Glow math belongs to Shader Lab presets rather than a standalone effect.
   HSync needs an offscreen renderer path; see
   [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). The remaining
@@ -119,15 +121,21 @@ not a backlog disguised as release notes.
   preserved in compatibility data and are not activated by native import.
 - AI Help has editable providers, a separate-window source path, streaming,
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
-  release builds stay locked until entitlement integration exists. The
+  ordinary release access stays locked, but the explicit
+  [local JSON override](LOCAL-FEATURE-FLAGS.md) enables release testing. The
   `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
-  real-provider or OS-credential interaction is certified. Partial Windows
+  complete real-provider GUI interaction is certified. Separate AI Help viewport
+  controls currently expose a placeholder Windows UI Automation tree; main
+  terminal/reader checks do not certify assistant accessibility. Mistral completion and
+  streaming backend checks passed on 2026-10-02, and native provider keys were
+  read/saved through Windows Credential Manager. Partial Windows
   window/stream/context/retry review used a loopback fake provider. The preserved
-  Agent Mode prototype is outside migration scope and requires a separate debug
-  opt-in; it is unavailable in release builds.
+  Agent Mode prototype is outside migration scope; the local override enables
+  it in release builds, while ordinary debug access requires a separate opt-in.
 - Native agent control has an authenticated loopback API, exact-instance
   discovery, a Node helper and tab/layout/preset/input routes in source. It is
-  Pro-gated; release builds stay locked until entitlement integration exists.
+  Pro-gated; ordinary release access stays locked unless the local JSON override
+  is enabled.
   The `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1` override works only in debug
   builds. The isolated Windows HTTP/PTY and installed Node CLI matrix passes;
   direct Agent Inst. clipboard handoff and cross-platform runtime review remain

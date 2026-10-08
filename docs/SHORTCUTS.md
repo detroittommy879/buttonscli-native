@@ -13,6 +13,7 @@ The defaults are:
 | Close tab | `Primary+Shift+W` |
 | Reopen tab | `Primary+Shift+U` |
 | Copy selection | `Primary+Shift+C` |
+| Find in terminal | `Primary+Shift+F` |
 | Paste | `Primary+Shift+V` |
 | Open Settings | `Primary+Shift+,` |
 | Quit | `Primary+Shift+Q` |
@@ -26,6 +27,11 @@ without Shift is also blocked so the same setting stays safe on Windows and
 Linux; use the default `Primary+Shift+C` for copy instead.
 
 The original app's custom shortcut settings remain preserved in the imported
-compatibility data but are not activated. Native currently exposes the seven
+compatibility data but are not activated. Native currently exposes the eight
 actions above; other original actions depend on features that have not been
 ported yet.
+
+F6 is the fixed control-navigation key: leave shell input to navigate app
+controls with Tab/Shift+Tab, then press F6 or click a terminal to return.
+While a terminal owns focus, arrows, Tab/Shift+Tab, and Escape stay in the shell
+instead of moving focus to workspace buttons.

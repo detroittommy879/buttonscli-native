@@ -122,6 +122,15 @@ impl NativeStore {
         &self.profile
     }
 
+    pub(crate) fn prepare_history_profile(&self) -> Result<PathBuf, StoreError> {
+        let _lock = self.acquire_root_lock()?;
+        let profile = self.profile_dir();
+        ensure_native_path(&self.root.0, &profile)?;
+        fs::create_dir_all(&profile)?;
+        ensure_native_path(&self.root.0, &profile)?;
+        Ok(profile)
+    }
+
     pub(crate) fn root_dir(&self) -> &Path {
         &self.root.0
     }
@@ -686,7 +695,7 @@ fn guard_distinct_roots(native: &Path, original: &Path) -> Result<(), StoreError
     Ok(())
 }
 
-fn ensure_native_path(root: &Path, candidate: &Path) -> Result<(), StoreError> {
+pub(crate) fn ensure_native_path(root: &Path, candidate: &Path) -> Result<(), StoreError> {
     let canonical_root = root.canonicalize()?;
     let relative = candidate
         .strip_prefix(root)
@@ -707,7 +716,7 @@ fn ensure_native_path(root: &Path, candidate: &Path) -> Result<(), StoreError> {
     Ok(())
 }
 
-fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
+pub(crate) fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
     let parent = path.parent().ok_or(StoreError::InvalidProfile)?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)

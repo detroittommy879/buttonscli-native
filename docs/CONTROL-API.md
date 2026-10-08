@@ -5,9 +5,10 @@ scripts and coding agents. It listens only on `127.0.0.1` and uses a random port
 and token for each app run. The API serves terminal state and actions from the
 native app's session dispatcher.
 
-The feature is `automationRemoteControl` (Pro). The native build does not have
-entitlement integration yet, so release builds keep it unavailable. A debug
-build can exercise it when launched with
+The feature is `automationRemoteControl` (Pro). The
+[local JSON override](LOCAL-FEATURE-FLAGS.md) enables it in both debug and release
+builds; ordinary release access remains locked. A debug build can also exercise
+it when launched with
 `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`.
 
 ## Copy the exact instance handoff

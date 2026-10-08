@@ -7,6 +7,10 @@ in the terminal grid and include retained scrollback, wrapped lines, and wide
 Unicode characters. The search follows the focused tab or pane, including a
 session whose pane is currently hidden by the layout.
 
+**Ctrl+Shift+F** (Cmd+Shift+F on macOS) opens and focuses Find; this binding is
+editable in Settings → Shortcuts. Typing highlights matches immediately.
+Enter moves forward, Shift+Enter moves backwards, and Escape closes the strip.
+
 Search follows Alacritty's regex matching rules: it is case-insensitive unless
 the pattern contains an uppercase character. Invalid patterns show a short
 error. **Clear search** removes highlights from every terminal; closing the
@@ -19,6 +23,16 @@ retained scrollback. Use the Copy shortcut to copy it.
 command to the shell. The shell keeps running, and the cleared lines remain in
 scrollback. This is separate from typing `clear` at the shell prompt.
 
-Terminal search and buffer actions are free. The Windows implementation has
-focused grid tests; opening the native GUI and checking the controls on Windows
-and Fedora remain part of desktop acceptance.
+Drag to select text, then **right-click** to copy immediately. This defaults on
+under Settings → Workspace → Right-click copies selected terminal text. With no
+selection, or with that option off, right-click opens the pane menu. The keyboard
+copy default is Ctrl/Cmd+Shift+C; Ctrl+C interrupts the shell.
+
+**Terminal → Read terminal text…** opens a stationary, selectable, read-only
+snapshot for keyboard navigation and assistive tools. Refresh updates that same
+terminal's retained text. **F6** switches between shell input and app controls;
+use Tab/Shift+Tab to navigate controls, then F6 or click a pane to return.
+
+Settings → Workspace also configures retained scrollback and optional saved text
+history. See [history and accessibility](TERMINAL-HISTORY-ACCESSIBILITY.md).
+Terminal search and buffer actions are free.

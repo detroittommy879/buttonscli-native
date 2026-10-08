@@ -772,6 +772,26 @@ pub struct Typography {
     pub draw_bold_bright: bool,
 }
 
+/// Session-local terminal typography, independent of application chrome.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PaneFont {
+    pub zone: FontZone,
+    pub bold_weight: u16,
+    pub draw_bold_bright: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl From<&Typography> for PaneFont {
+    fn from(value: &Typography) -> Self {
+        Self {
+            zone: value.terminal.clone(),
+            bold_weight: value.terminal_bold_weight,
+            draw_bold_bright: value.draw_bold_bright,
+        }
+    }
+}
+
 impl Default for Typography {
     fn default() -> Self {
         Self {
