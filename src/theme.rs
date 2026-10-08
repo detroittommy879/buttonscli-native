@@ -396,10 +396,25 @@ impl Default for ShaderBackground {
 }
 
 impl ShaderBackground {
+    // Order is the GPU preset index; keep existing entries stable.
+    pub const PRESETS: &'static [(&'static str, &'static str)] = &[
+        ("aurora", "Aurora"),
+        ("ink", "Flowing ink"),
+        ("waves", "Waves"),
+        ("nebula", "Nebula"),
+        ("starfield", "Starfield"),
+        ("circuit", "Circuit"),
+        ("caustics", "Water caustics"),
+    ];
+
+    pub fn preset_index(&self) -> Option<usize> {
+        Self::PRESETS.iter().position(|(id, _)| *id == self.preset)
+    }
+
     pub fn from_value(value: &Value) -> Option<Self> {
         let mut shader: Self = serde_json::from_value(value.clone()).ok()?;
         if shader.version != 1
-            || !matches!(shader.preset.as_str(), "aurora" | "ink" | "waves")
+            || shader.preset_index().is_none()
             || ![shader.strength, shader.speed, shader.scale]
                 .into_iter()
                 .all(f32::is_finite)

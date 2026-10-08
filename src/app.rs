@@ -7571,17 +7571,11 @@ impl ButtonsApp {
                 .unwrap_or_default();
         if enabled {
             egui::ComboBox::from_id_salt("shader-preset")
-                .selected_text(match shader.preset.as_str() {
-                    "ink" => "Flowing ink",
-                    "waves" => "Waves",
-                    _ => "Aurora",
-                })
+                .selected_text(
+                    crate::theme::ShaderBackground::PRESETS[shader.preset_index().unwrap_or(0)].1,
+                )
                 .show_ui(ui, |ui| {
-                    for (value, label) in [
-                        ("aurora", "Aurora"),
-                        ("ink", "Flowing ink"),
-                        ("waves", "Waves"),
-                    ] {
+                    for &(value, label) in crate::theme::ShaderBackground::PRESETS {
                         ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
                     }
                 });

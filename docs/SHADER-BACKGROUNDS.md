@@ -1,7 +1,8 @@
 # Shader backgrounds: first native version
 
-Settings → Themes → Shaders has three app-owned WGSL patterns: Aurora,
-Flowing ink and Waves. Enable **GPU shader backgrounds** (off by default),
+Settings → Themes → Shaders has seven app-owned WGSL patterns: Aurora,
+Flowing ink, Waves, Nebula, Starfield, Circuit and Water caustics.
+Enable **GPU shader backgrounds** (off by default),
 create a variant or open a theme in Edit, then choose a pattern and strength,
 scale and motion. The preview uses synthetic text. Preview/save follows the
 Library's Apply scopes: **Special effects** must be checked to apply a shared shader.
@@ -31,7 +32,7 @@ The current extension is **app-owned presets**, separate from the proposed
 }
 ```
 
-`preset`: `aurora`, `ink`, `waves`. Strength is clamped to 0–0.65, speed to
+`preset`: `aurora`, `ink`, `waves`, `nebula`, `starfield`, `circuit`, `caustics`. Strength is clamped to 0–0.65, speed to
 0–2 and scale to 0.25–4. Set `shaderBackground` to null to remove it. Unknown
 versions/presets stay inert on import. Source strings are never compiled. Colors
 come from the terminal background and gradient colors (or app accents if no
@@ -50,6 +51,27 @@ implement the restricted validator, helper preview and recovery from
 [Astra's plan](AI-THEME-AND-SHADER-PLAN.md). Native shader compilation has real
 driver/compiler exposure; use the checked APIs documented for the
 [pinned wgpu 24 device](https://docs.rs/wgpu/24.0.5/wgpu/struct.Device.html).
+
+## Built-in experiments
+
+Search the Library for **Shader** to try Shader Nebula, Shader Starfield,
+Shader Circuit or Shader Water Caustics. Enable GPU backgrounds in Shaders and
+include Special effects when applying. Each theme also carries a dark gradient
+fallback. The original three patterns remain available in the preset chooser.
+
+- Nebula: three fixed noise octaves with domain warping, drifting colored clouds.
+- Starfield: two hashed-cell layers, gentle parallax and twinkle.
+- Circuit: broken grid traces, junctions and travelling light pulses.
+- Water caustics: warped wave interference forming moving bright filaments.
+
+These are original texture-free WGSL implementations informed by
+[The Book of Shaders: noise](https://thebookofshaders.com/11/),
+[fBM and domain warping](https://thebookofshaders.com/13/), and
+[TypeShade's starfield example](https://typeshade.dev/guide/examples/starfield/).
+No third-party shader source was copied. Stars and thin lines use pixel derivatives
+to soften edges. Nebula costs more arithmetic than the original sine patterns;
+no old-GPU performance claim is made. All presets share the existing limits,
+Calm/still behavior and disable toggle.
 
 ## AI fonts
 

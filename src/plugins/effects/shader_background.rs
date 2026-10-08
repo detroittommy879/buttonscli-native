@@ -44,11 +44,7 @@ pub(crate) fn callback(
                 },
                 shader.strength,
                 shader.scale,
-                match shader.preset.as_str() {
-                    "ink" => 1.0,
-                    "waves" => 2.0,
-                    _ => 0.0,
-                },
+                shader.preset_index()? as f32,
             ],
             colors,
         },
@@ -363,7 +359,8 @@ mod tests {
             device.push_error_scope(wgpu::ErrorFilter::Validation);
             let resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
             let mut frames = Vec::new();
-            for preset in [0.0, 1.0, 2.0] {
+            for index in 0..ShaderBackground::PRESETS.len() {
+                let preset = index as f32;
                 let still = render_sample(&device, &queue, &resources, preset, 0.0);
                 assert_eq!(
                     still,
@@ -382,8 +379,11 @@ mod tests {
                 );
                 frames.push(still);
             }
-            assert_ne!(frames[0], frames[1]);
-            assert_ne!(frames[1], frames[2]);
+            for (index, frame) in frames.iter().enumerate() {
+                for other in &frames[index + 1..] {
+                    assert_ne!(frame, other, "presets produce distinct GPU pixels");
+                }
+            }
             assert!(
                 device.pop_error_scope().await.is_none(),
                 "shader background pipeline validation failed"
