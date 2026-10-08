@@ -158,3 +158,13 @@ For theme comparisons, use owned temporary profiles and synthetic fixtures conta
 Keep old palette tests as a separate track. Start new creative trials on the same briefs at moderate and high controls, then repeat on held-out briefs and multiple samples. Record first-pass validity, repair rate, capability coverage, similarity/near-duplicates, blind human preference, comfort, latency and actual cost. A syntactically valid theme that ignores requested font/gradient choices should fail creative compliance. Do not automatically install all technically passing candidates.
 
 Implementation validation includes the repository's formatting, locked tests, native/WASM Clippy and release build checks, plus explicit native interaction probes. No runtime, GPU-safety, performance or cross-platform certification was performed for this assessment.
+
+
+## Implementation checkpoint: 2026-10-07
+
+User requested simple backgrounds before broader AI theme experiments. The first
+implemented slice adds app-owned background presets and optional installed-font
+AI choices; see [usage and remaining scope](SHADER-BACKGROUNDS.md). It does not
+implement generated WGSL, overlays, post-processing or the complete capability
+contract/creative-slider plan above. The original assessment remains the plan
+for those later slices.

@@ -271,6 +271,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             },
         },
         "effects": {
+            "shaderBackground": theme.effects.shader_background,
             "masterDisabled": theme.effects.master_disabled,
             "staticEnabled": theme.effects.static_opacity > 0.0,
             "staticOpacity": theme.effects.static_opacity,

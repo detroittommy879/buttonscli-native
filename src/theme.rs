@@ -311,6 +311,7 @@ pub struct TerminalColors {
 
 #[derive(Clone, Debug)]
 pub struct TerminalEffects {
+    pub shader_background: Option<ShaderBackground>,
     pub gradient: Option<[Color32; 4]>,
     pub gradient_geometry: GradientGeometry,
     pub gradient_animation: bool,
@@ -340,6 +341,7 @@ pub struct TerminalEffects {
 impl Default for TerminalEffects {
     fn default() -> Self {
         Self {
+            shader_background: None,
             gradient: None,
             gradient_geometry: GradientGeometry::default(),
             gradient_animation: false,
@@ -365,6 +367,49 @@ impl Default for TerminalEffects {
             simple_noise_idle_delay_seconds: 60.0,
             simple_noise_idle_ramp_seconds: 6.0,
         }
+    }
+}
+
+/// Versioned, app-owned procedural backgrounds. Imported source code stays inert.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ShaderBackground {
+    pub version: u32,
+    pub preset: String,
+    pub strength: f32,
+    pub speed: f32,
+    pub scale: f32,
+    pub animated: bool,
+}
+
+impl Default for ShaderBackground {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            preset: "aurora".into(),
+            strength: 0.35,
+            speed: 0.3,
+            scale: 1.0,
+            animated: true,
+        }
+    }
+}
+
+impl ShaderBackground {
+    pub fn from_value(value: &Value) -> Option<Self> {
+        let mut shader: Self = serde_json::from_value(value.clone()).ok()?;
+        if shader.version != 1
+            || !matches!(shader.preset.as_str(), "aurora" | "ink" | "waves")
+            || ![shader.strength, shader.speed, shader.scale]
+                .into_iter()
+                .all(f32::is_finite)
+        {
+            return None;
+        }
+        shader.strength = shader.strength.clamp(0.0, 0.65);
+        shader.speed = shader.speed.clamp(0.0, 2.0);
+        shader.scale = shader.scale.clamp(0.25, 4.0);
+        Some(shader)
     }
 }
 
@@ -717,6 +762,7 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
     let percent = |key: &str, fallback: f32| number(key, fallback) / 100.0;
 
     TerminalEffects {
+        shader_background: ShaderBackground::from_value(&effects["shaderBackground"]),
         gradient,
         gradient_geometry: parse_gradient_geometry(terminal),
         gradient_animation: gradient_enabled
@@ -866,7 +912,12 @@ fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography>
 
 fn parse_zone(value: &Value, mut fallback: FontZone, monospace_only: bool) -> FontZone {
     if let Some(family) = string_at(value, "fontFamily") {
-        fallback.family = fonts::resolve_bundled_family(&normalize_family(family), monospace_only);
+        let family = normalize_family(family);
+        fallback.family = if family.ends_with(" (System)") || family.ends_with(" (Custom)") {
+            family
+        } else {
+            fonts::resolve_bundled_family(&family, monospace_only)
+        };
     }
     if let Some(size) = number_at(value, "fontSize") {
         fallback.size = size as f32;
@@ -1007,6 +1058,43 @@ mod tests {
             BUNDLED_THEME_JSON.len() >= 127,
             "retain the original bundle when adding themes"
         );
+    }
+
+    #[test]
+    fn shader_background_contract_bounds_parameters_and_leaves_other_versions_inert() {
+        let shader = ShaderBackground::from_value(
+            &serde_json::json!({"version":1,"preset":"ink","strength":9,"speed":-5,"scale":99}),
+        )
+        .unwrap();
+        assert_eq!(
+            (shader.strength, shader.speed, shader.scale),
+            (0.65, 0.0, 4.0)
+        );
+        assert!(
+            ShaderBackground::from_value(&serde_json::json!({"version":2,"preset":"ink"}))
+                .is_none()
+        );
+        assert!(ShaderBackground::from_value(
+            &serde_json::json!({"preset":"arbitrary-source","source":"loop {}"})
+        )
+        .is_none());
+        assert!(ShaderBackground::from_value(
+            &serde_json::json!({"preset":"ink","strength":"NaN"})
+        )
+        .is_none());
+        for family in ["My Mono (System)", "My UI (Custom)"] {
+            let theme = parse_legacy_value(
+                "fonts",
+                &serde_json::json!({"theme":{"terminal":{"fontFamily":family}}}),
+                ThemeSource::Personal,
+            )
+            .unwrap();
+            assert_eq!(
+                theme.typography.unwrap().terminal.family,
+                family,
+                "external face identity must survive import for runtime resolution"
+            );
+        }
     }
 
     #[test]

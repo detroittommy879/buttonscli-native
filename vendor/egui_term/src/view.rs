@@ -50,6 +50,7 @@ pub struct TerminalView<'a> {
     font: TerminalFont,
     theme: TerminalTheme,
     background_gradient: Option<BackgroundGradient>,
+    background_callback: Option<egui::PaintCallback>,
     row_banding_color: Option<Color32>,
     row_brightness: u8,
     ctrl_c_copies_selection: bool,
@@ -130,6 +131,7 @@ impl<'a> TerminalView<'a> {
             font: TerminalFont::default(),
             theme: TerminalTheme::default(),
             background_gradient: None,
+            background_callback: None,
             row_banding_color: None,
             row_brightness: 0,
             ctrl_c_copies_selection: true,
@@ -155,6 +157,16 @@ impl<'a> TerminalView<'a> {
         gradient: Option<BackgroundGradient>,
     ) -> Self {
         self.background_gradient = gradient;
+        self
+    }
+
+    /// Paint a procedural background above the fallback fill but below all
+    /// cells, selection and cursor. The host owns the callback and resources.
+    pub fn set_background_callback(
+        mut self,
+        callback: Option<egui::PaintCallback>,
+    ) -> Self {
+        self.background_callback = callback;
         self
     }
 
@@ -523,7 +535,12 @@ impl<'a> TerminalView<'a> {
                 global_bg,
             ))
         };
+        let procedural_background = self.background_callback.is_some()
+            || self.background_gradient.is_some();
         let mut shapes = vec![background];
+        if let Some(callback) = self.background_callback {
+            shapes.push(Shape::Callback(callback));
+        }
         if self.row_brightness > 0 {
             shapes.extend(brightness_banding_shapes(
                 layout.rect,
@@ -595,7 +612,18 @@ impl<'a> TerminalView<'a> {
                 fg = Color32::WHITE;
             }
 
-            if global_bg != bg {
+            // An explicitly requested base color must also cover a procedural
+            // background; equality of the resolved RGB is not a default cell.
+            if global_bg != bg
+                || (procedural_background
+                    && (!matches!(
+                        indexed.bg,
+                        Color::Named(NamedColor::Background)
+                    ) || is_inverse
+                        || is_selected
+                        || is_current_search_match
+                        || is_search_match))
+            {
                 shapes.push(Shape::Rect(RectShape::filled(
                     Rect::from_min_size(
                         Pos2::new(x, y),

@@ -646,6 +646,8 @@ enum ThemeSettingsTab {
     Edit,
     #[cfg(not(target_arch = "wasm32"))]
     Generate,
+    #[cfg(not(target_arch = "wasm32"))]
+    Shaders,
 }
 
 struct SettingsSnapshot {
@@ -989,6 +991,10 @@ impl ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(render_state) = &cc.wgpu_render_state {
+            crate::plugins::effects::shader_background::register(
+                &cc.egui_ctx,
+                render_state.target_format,
+            );
             crate::plugins::effects::analog_static::register(
                 &cc.egui_ctx,
                 render_state.target_format,
@@ -1485,6 +1491,10 @@ impl ButtonsApp {
         let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
         let effects = &self.themes.get(&self.preferences.effects_theme_id).effects;
         theme.effects = TerminalEffects {
+            shader_background: effects.shader_background.clone().map(|mut shader| {
+                shader.animated &= !self.preferences.calm_mode;
+                shader
+            }),
             gradient: gradient.gradient,
             gradient_geometry: gradient.gradient_geometry,
             gradient_animation: gradient.gradient_animation
@@ -1533,6 +1543,9 @@ impl ButtonsApp {
             if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
                 let mut theme = theme.clone();
                 if self.preferences.calm_mode {
+                    if let Some(shader) = &mut theme.effects.shader_background {
+                        shader.animated = false;
+                    }
                     theme.effects.gradient_animation = false;
                     theme.effects.static_opacity = 0.0;
                     theme.effects.scanlines_strength = 0.0;
@@ -2733,6 +2746,7 @@ impl ButtonsApp {
             indicator_colors,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
+            shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps: self.preferences.animation_fps,
@@ -4694,6 +4708,11 @@ impl ButtonsApp {
                         &mut self.theme_settings_tab,
                         ThemeSettingsTab::Generate,
                         "Generate",
+                    );
+                    ui.spaced_selectable_value(
+                        &mut self.theme_settings_tab,
+                        ThemeSettingsTab::Shaders,
+                        "Shaders",
                     );
                 }
             });
@@ -7004,6 +7023,8 @@ impl ButtonsApp {
             ThemeSettingsTab::Edit => self.personal_theme_editor(ui),
             #[cfg(not(target_arch = "wasm32"))]
             ThemeSettingsTab::Generate => self.theme_generator(ui),
+            #[cfg(not(target_arch = "wasm32"))]
+            ThemeSettingsTab::Shaders => self.shader_settings(ui),
         }
     }
 
@@ -7502,6 +7523,156 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn shader_settings(&mut self, ui: &mut egui::Ui) {
+        if !local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds) {
+            return;
+        }
+        self.sync_theme_editor_to_current();
+        ui.spaced_heading("Shader backgrounds");
+        ui.spaced_label("Procedural backgrounds behind terminal text. Gradients remain the fallback. Calm freezes motion.");
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.shader_backgrounds_enabled,
+                "Enable GPU shader backgrounds",
+            )
+            .changed()
+        {
+            self.persist_native_preferences();
+            ui.ctx().request_repaint();
+        }
+        ui.spaced_label(RichText::new("Turn off for older computers or lower power use. Custom shader source and terminal post-processing are planned.").small());
+        if !personal_theme_editor_available() {
+            return;
+        }
+        if ui
+            .spaced_button("New shader variant from current appearance")
+            .clicked()
+        {
+            self.start_current_appearance_draft();
+        }
+        let Some(mut document) = self.theme_editor_document.clone() else {
+            ui.spaced_label(
+                "Create a variant here, or open a theme in Edit, to configure its background.",
+            );
+            return;
+        };
+        ui.spaced_label(format!(
+            "Editing: {}",
+            document["metadata"]["name"]
+                .as_str()
+                .unwrap_or("Theme draft")
+        ));
+        self.theme_apply_controls(ui);
+        let before = document.clone();
+        let mut enabled = document["effects"]["shaderBackground"].is_object();
+        ui.spaced_checkbox(&mut enabled, "Use a shader in this theme");
+        let mut shader =
+            crate::theme::ShaderBackground::from_value(&document["effects"]["shaderBackground"])
+                .unwrap_or_default();
+        if enabled {
+            egui::ComboBox::from_id_salt("shader-preset")
+                .selected_text(match shader.preset.as_str() {
+                    "ink" => "Flowing ink",
+                    "waves" => "Waves",
+                    _ => "Aurora",
+                })
+                .show_ui(ui, |ui| {
+                    for (value, label) in [
+                        ("aurora", "Aurora"),
+                        ("ink", "Flowing ink"),
+                        ("waves", "Waves"),
+                    ] {
+                        ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
+                    }
+                });
+            ui.add(egui::Slider::new(&mut shader.strength, 0.0..=0.65).text("Strength"));
+            ui.add(egui::Slider::new(&mut shader.scale, 0.25..=4.0).text("Scale"));
+            ui.spaced_checkbox(&mut shader.animated, "Animate background");
+            ui.add_enabled(
+                shader.animated,
+                egui::Slider::new(&mut shader.speed, 0.0..=2.0).text("Speed"),
+            );
+        }
+        if enabled {
+            crate::theme_files::overlay_appearance(
+                &mut document["effects"]["shaderBackground"],
+                &json!(shader),
+            );
+        } else {
+            set_theme_document_value(&mut document, "/effects/shaderBackground", Value::Null);
+        }
+        if document != before {
+            self.theme_editor_document = Some(document.clone());
+            self.queue_theme_editor_preview(ui.ctx());
+        }
+        // Preview uses synthetic text only and stays outside the live PTY.
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width().max(1.0), 140.0),
+            egui::Sense::hover(),
+        );
+        if let Ok(theme) = ThemeDefinition::editor_document(&document) {
+            ui.painter()
+                .rect_filled(rect, 0.0, shader_palette(&theme)[0]);
+            if enabled
+                && self.preferences.shader_backgrounds_enabled
+                && !theme.effects.master_disabled
+            {
+                shader.animated &= !self.preferences.calm_mode;
+                let time = ui.input(|i| i.time) as f32;
+                if let Some(callback) = crate::plugins::effects::shader_background::callback(
+                    ui,
+                    rect,
+                    &shader,
+                    u64::MAX,
+                    time,
+                    shader_palette(&theme),
+                ) {
+                    ui.painter().add(egui::Shape::Callback(callback));
+                    if shader.animated && shader.speed > 0.0 {
+                        ui.ctx()
+                            .request_repaint_after(std::time::Duration::from_millis(
+                                1000_u64
+                                    .div_ceil(self.preferences.animation_fps.clamp(1, 30) as u64),
+                            ));
+                    }
+                }
+            }
+            ui.painter().text(
+                rect.min + egui::vec2(14.0, 18.0),
+                egui::Align2::LEFT_TOP,
+                "Synthetic preview\n$ echo Hello, shaders\nHello, shaders",
+                FontId::monospace(16.0),
+                crate::theme::parse_color(&theme.terminal_colors.foreground)
+                    .unwrap_or(Color32::WHITE),
+            );
+        }
+        wrapping_row(ui, |ui| {
+            if ui.spaced_button("Preview on shared terminals").clicked() {
+                self.preview_personal_theme_draft();
+            }
+            if ui
+                .spaced_button(if self.theme_editor_file_exists {
+                    "Save theme"
+                } else {
+                    "Save variant"
+                })
+                .clicked()
+            {
+                self.save_personal_theme_draft();
+            }
+            if ui.spaced_button("Cancel draft").clicked() {
+                self.cancel_personal_theme_draft();
+            }
+            if ui.spaced_button("Edit full theme").clicked() {
+                self.theme_settings_tab = ThemeSettingsTab::Edit;
+            }
+        });
+        if let Some(status) = &self.theme_editor_status {
+            ui.spaced_label(status);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn theme_generator(&mut self, ui: &mut egui::Ui) {
         let locale = self.locale.clone();
         ui.separator();
@@ -7509,7 +7680,7 @@ impl ButtonsApp {
         ui.spaced_label(
             RichText::new(crate::i18n::literal(
                 &locale,
-                "Describe a color direction. The active provider receives your brief and the selected theme's color palette; terminal contents and API keys are not included.",
+                "Describe colors and typography. The provider receives your brief, the selected palette and allowed font names/weights. Installed font names are shared only when enabled.",
             ))
             .small()
             .color(self.colors().muted),
@@ -7522,6 +7693,11 @@ impl ButtonsApp {
                     "For example: deep ocean blues, warm amber highlights, readable ANSI colors",
                 )),
         );
+        ui.spaced_checkbox(
+            &mut self.preferences.ai_theme_allow_system_fonts,
+            "Allow installed and custom fonts (less portable)",
+        );
+        ui.spaced_label(RichText::new("Off uses bundled fonts only. Missing fonts on another computer fall back to bundled faces.").small());
         let available = theme_generation_available();
         if !available {
             ui.spaced_label(crate::i18n::literal(
@@ -8235,7 +8411,10 @@ impl ButtonsApp {
             return;
         }
         let base_document = self.shared_appearance_document();
-        let seed = crate::theme_generation::seed_palette(&base_document);
+        let mut seed = crate::theme_generation::seed_palette(&base_document);
+        seed["fontCatalog"] = self
+            .font_catalog
+            .generation_catalog(self.preferences.ai_theme_allow_system_fonts);
         let profile = self
             .native_store
             .as_ref()
@@ -8347,16 +8526,33 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn shared_appearance_document(&self) -> Value {
         let mut resolved = self.terminal_presentation();
+        // Calm changes presentation only, never the saved animation setting.
+        resolved.effects.shader_background = self
+            .themes
+            .get(&self.preferences.effects_theme_id)
+            .effects
+            .shader_background
+            .clone();
         resolved.colors = self.active_app_theme().colors.clone();
         resolved.pane_divider =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
         resolved.typography = Some(self.preferences.typography.clone());
-        let appearance = crate::theme_files::document_from_theme(&resolved, &resolved.name);
+        let mut appearance = crate::theme_files::document_from_theme(&resolved, &resolved.name);
         let mut document = self
             .themes
             .personal_document(&self.preferences.theme_id)
             .cloned()
             .unwrap_or_else(|| appearance.clone());
+        if resolved.effects.shader_background.is_none()
+            && crate::theme::ShaderBackground::from_value(&document["effects"]["shaderBackground"])
+                .is_none()
+        {
+            // An unsupported extension remains inert metadata in a new draft.
+            appearance["effects"]
+                .as_object_mut()
+                .unwrap()
+                .remove("shaderBackground");
+        }
         for key in ["theme", "effects"] {
             crate::theme_files::overlay_appearance(&mut document[key], &appearance[key]);
         }
@@ -10926,6 +11122,19 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn shader_palette(theme: &ThemeDefinition) -> [Color32; 4] {
+    let base =
+        crate::theme::parse_color(&theme.terminal_colors.background).unwrap_or(Color32::BLACK);
+    let colors = theme.effects.gradient.unwrap_or([
+        base,
+        theme.colors.accent,
+        theme.colors.accent_hover,
+        theme.colors.muted,
+    ]);
+    [base, colors[1], colors[2], colors[3]]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     row_brightness: u8,
@@ -10933,6 +11142,7 @@ struct TerminalInteraction {
     focused: bool,
     enabled: bool,
     advanced_effects: bool,
+    shader_backgrounds_enabled: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -11000,12 +11210,40 @@ fn terminal_surface(
         });
     let available = ui.available_size();
     let scrollbar_width = if available.x >= 80.0 { 14.0 } else { 0.0 };
+    let shader_rect = egui::Rect::from_min_size(
+        ui.available_rect_before_wrap().min,
+        egui::vec2((available.x - scrollbar_width).max(1.0), available.y),
+    );
+    let shader = theme.effects.shader_background.as_ref().filter(|shader| {
+        interaction.shader_backgrounds_enabled
+            && local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds)
+            && !theme.effects.master_disabled
+            && shader.strength > 0.0
+    });
+    let background_callback = shader.and_then(|shader| {
+        crate::plugins::effects::shader_background::callback(
+            ui,
+            shader_rect,
+            shader,
+            tab.id,
+            time,
+            shader_palette(theme),
+        )
+    });
+    let shader_active = background_callback.is_some();
+    if background_callback.is_some() && shader.is_some_and(|s| s.animated && s.speed > 0.0) {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(
+                1000_u64.div_ceil(interaction.animation_fps.clamp(1, 30) as u64),
+            ));
+    }
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(interaction.focused)
         .set_interactive(interaction.enabled)
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
+        .set_background_callback(background_callback)
         .set_keyboard_options(
             interaction.keyboard.ctrl_c_copies_selection,
             interaction.keyboard.copy_on_selection,
@@ -11050,6 +11288,7 @@ fn terminal_surface(
             time,
             interaction.advanced_effects,
             interaction.animation_fps,
+            shader_active,
         ),
         &mut tab.effect_textures,
     );
@@ -11138,12 +11377,12 @@ fn paint_terminal_effects(
     theme: &ThemeDefinition,
     terminal_id: u64,
     latest_activity_at_ms: u64,
-    rendering: (f32, bool, u32),
+    rendering: (f32, bool, u32, bool),
     textures: &mut crate::plugins::effects::simple_noise::NoiseTextures,
 ) {
     use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
-    let (time, advanced, animation_fps) = rendering;
+    let (time, advanced, animation_fps, shader_active) = rendering;
     if effects.master_disabled {
         *textures = Default::default();
         return;
@@ -11216,7 +11455,8 @@ fn paint_terminal_effects(
     let mut repaint_after_ms = if static_active {
         Some(34)
     } else {
-        crate::dock::effects_need_repaint(effects.gradient_animation, 0.0).then_some(80)
+        crate::dock::effects_need_repaint(effects.gradient_animation && !shader_active, 0.0)
+            .then_some(80)
     };
     if let Some(noise_delay) = noise_plan.repaint_after_ms {
         repaint_after_ms =
@@ -11378,6 +11618,7 @@ struct PaneRenderState<'a> {
     animation_fps: u32,
     right_click_copies_selection: bool,
     advanced_effects: bool,
+    shader_backgrounds_enabled: bool,
     keyboard_navigation: bool,
     ratios: &'a mut std::collections::BTreeMap<String, f32>,
     tabs: &'a mut [TerminalTab],
@@ -11436,6 +11677,7 @@ fn render_pane_tree(
                         && !state.keyboard_navigation,
                     enabled: !state.modal_open,
                     advanced_effects: state.advanced_effects,
+                    shader_backgrounds_enabled: state.shader_backgrounds_enabled,
                 },
                 (
                     state.font_catalog.font_id(&font.zone, true),
@@ -12984,6 +13226,8 @@ for ($row = 0; $row -lt 2; $row++) {
 }
 [Console]::WriteLine("${esc}[36mfn${esc}[0m main() { ${esc}[35mprintln!${esc}[0m(${esc}[32m`"Hello, palette!`"${esc}[0m); }")
 [Console]::WriteLine('')
+[Console]::WriteLine("${esc}[48;2;40;60;100m Explicit cell background stays above the shader ${esc}[0m")
+[Console]::WriteLine("${esc}[48;2;8;13;24m Explicit base-color background also stays solid ${esc}[0m")
 [Console]::WriteLine('Readability first. Judge theme fit, distinct colors, and long-session comfort.')
 Start-Sleep -Seconds 300
 "#).unwrap();
@@ -13004,7 +13248,14 @@ Start-Sleep -Seconds 300
             "ButtonsCLI theme evaluation",
             options,
             Box::new(move |cc| {
+                if let Some(render) = &cc.wgpu_render_state {
+                    crate::plugins::effects::shader_background::register(
+                        &cc.egui_ctx,
+                        render.target_format,
+                    );
+                }
                 let mut preferences = Preferences {
+                    shader_backgrounds_enabled: true,
                     show_sidebar: false,
                     show_presets: true,
                     ..Default::default()
@@ -13070,6 +13321,102 @@ Start-Sleep -Seconds 300
             .starts_with(std::env::temp_dir().canonicalize().unwrap()));
         std::fs::remove_dir_all(&owned_root).unwrap();
         println!("Native theme imports/captures passed: {}", expected.len());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens a test-owned shader Settings window for visual verification"]
+    fn native_shader_settings_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            image: std::path::PathBuf,
+            requested: bool,
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.app.settings_contents(ui, ctx, &mut None);
+                });
+                if !self.requested && self.started.elapsed() > Duration::from_secs(1) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.image.clone(),
+                    )));
+                    self.requested = true;
+                }
+                if self.started.elapsed() > Duration::from_secs(2) {
+                    assert!(self.image.is_file());
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let owned_root =
+            std::env::temp_dir().join(format!("buttonscli-shader-ui-{:032x}", fastrand::u128(..)));
+        std::fs::create_dir_all(&owned_root).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(owned_root.join("native")),
+            owned_root.join("legacy"),
+        )
+        .unwrap();
+        let image = capture.join("shader-settings.png");
+        let expected = image.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 800.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native(
+            "ButtonsCLI shader UI probe",
+            options,
+            Box::new(move |cc| {
+                if let Some(render) = &cc.wgpu_render_state {
+                    crate::plugins::effects::shader_background::register(
+                        &cc.egui_ctx,
+                        render.target_format,
+                    );
+                }
+                let mut app = ButtonsApp::empty(Preferences {
+                    shader_backgrounds_enabled: true,
+                    ..Default::default()
+                });
+                app.native_store = Some(store);
+                app.show_localization_onboarding = false;
+                app.show_settings = true;
+                app.settings_embedded = true;
+                app.settings_tab = SettingsTab::Themes;
+                app.theme_settings_tab = ThemeSettingsTab::Shaders;
+                app.start_current_appearance_draft();
+                app.theme_editor_document.as_mut().unwrap()["effects"]["shaderBackground"] =
+                    json!(crate::theme::ShaderBackground::default());
+                fonts::install(&cc.egui_ctx, &app.font_catalog);
+                app.apply_style(&cc.egui_ctx);
+                Ok(Box::new(Probe {
+                    app,
+                    started: Instant::now(),
+                    image,
+                    requested: false,
+                }))
+            }),
+        )
+        .unwrap();
+        assert!(expected.is_file());
+        assert!(owned_root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(owned_root).unwrap();
     }
 
     #[cfg(windows)]
@@ -14217,6 +14564,17 @@ Start-Sleep -Seconds 300
         let mut workspace = Workspace(ButtonsApp::empty(preferences));
         let app = &mut workspace.0;
         let ctx = egui::Context::default();
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        app.preferences.shader_backgrounds_enabled = true;
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        app.preferences.effects_theme_id = app
+            .themes
+            .preview_personal_document("input-probe", "shader", &document)
+            .unwrap();
         fonts::install(&ctx, &app.font_catalog);
         for _ in 0..3 {
             app.open_tab(ctx.clone());
@@ -14271,6 +14629,15 @@ Start-Sleep -Seconds 300
             );
             std::thread::sleep(std::time::Duration::from_millis(25));
         };
+        assert_eq!(
+            output
+                .shapes
+                .iter()
+                .filter(|shape| matches!(shape.shape, egui::Shape::Callback(_)))
+                .count(),
+            3,
+            "each interactive pane has its own background callback"
+        );
         let border = app.terminal_presentation().colors.border;
         for tab in &app.tabs {
             let tail = tab.backend.plain_text_tail(80);
@@ -15290,6 +15657,101 @@ Start-Sleep -Seconds 300
                 );
             }
         }
+    }
+
+    #[test]
+    fn shader_background_uses_effects_scope_and_calm_freezes_global_and_per_pane_motion() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        let id = app
+            .themes
+            .preview_personal_document("shader-test", "test", &document)
+            .unwrap();
+        app.preferences.effects_theme_id = id.clone();
+        app.theme_overrides.insert(77, id);
+        let shader = app
+            .terminal_presentation()
+            .effects
+            .shader_background
+            .unwrap();
+        assert!(shader.animated);
+        app.preferences.calm_mode = true;
+        assert!(
+            !app.terminal_presentation()
+                .effects
+                .shader_background
+                .unwrap()
+                .animated
+        );
+        assert!(
+            !app.terminal_presentation_for(77)
+                .effects
+                .shader_background
+                .unwrap()
+                .animated
+        );
+        assert_eq!(
+            app.shared_appearance_document()["effects"]["shaderBackground"]["animated"],
+            true,
+            "saving current appearance while Calm is on preserves animation preference"
+        );
+        let round_trip = crate::theme_files::document_from_theme(
+            &ThemeDefinition::editor_document(&document).unwrap(),
+            "Shader",
+        );
+        assert_eq!(
+            round_trip["effects"]["shaderBackground"],
+            document["effects"]["shaderBackground"]
+        );
+        assert!(
+            !app.preferences.shader_backgrounds_enabled,
+            "GPU backgrounds are explicitly opt-in"
+        );
+        assert!(!app.preferences.ai_theme_allow_system_fonts);
+    }
+
+    #[test]
+    fn shaders_page_renders_shared_draft_controls_and_synthetic_preview() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
+        app.theme_editor_document = Some(document.clone());
+        app.theme_editor_original_document = Some(document);
+        app.preferences.shader_backgrounds_enabled = true;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let output = ctx.run(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1000.0, 900.0),
+                )),
+                ..Default::default()
+            },
+            |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| app.shader_settings(ui));
+            },
+        );
+        assert!(text_position(&output, "Shader backgrounds").is_some());
+        assert!(text_position(&output, "Preview on shared terminals").is_some());
+        assert_eq!(
+            output
+                .shapes
+                .iter()
+                .filter(|shape| matches!(shape.shape, egui::Shape::Callback(_)))
+                .count(),
+            1
+        );
+        assert!(
+            app.tabs.is_empty(),
+            "synthetic preview must not spawn a shell"
+        );
     }
 
     #[test]

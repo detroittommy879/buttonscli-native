@@ -352,6 +352,32 @@ impl FontCatalog {
         names
     }
 
+    /// Only faces that really loaded; icon/emoji families are fallback-only.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn generation_catalog(&self, allow_installed: bool) -> serde_json::Value {
+        let mut families: BTreeMap<&str, (Vec<u16>, bool)> = BTreeMap::new();
+        for face in &self.faces {
+            if matches!(face.kind, FontKind::Symbols | FontKind::Emoji)
+                || (!allow_installed && !FONT_FACES.iter().any(|bundled| bundled.id == face.id))
+            {
+                continue;
+            }
+            let entry = families.entry(&face.family).or_default();
+            entry.0.push(face.weight);
+            entry.1 = matches!(face.kind, FontKind::Mono);
+        }
+        serde_json::Value::Array(
+            families
+                .into_iter()
+                .map(|(family, (mut weights, terminal))| {
+                    weights.sort_unstable();
+                    weights.dedup();
+                    serde_json::json!({"family": family, "weights": weights, "terminal": terminal})
+                })
+                .collect(),
+        )
+    }
+
     pub(crate) fn weights_for(&self, family: &str) -> Vec<u16> {
         let mut weights = self
             .faces
@@ -1040,6 +1066,20 @@ mod tests {
         assert!(warnings.is_empty());
         assert!(with_system_fonts.is_available("Fira Code (Custom)"));
         assert!(with_system_fonts.is_available("Fira Code (System)"));
+        let bundled_only = with_system_fonts.generation_catalog(false).to_string();
+        assert!(!bundled_only.contains("(System)"));
+        assert!(!bundled_only.contains("(Custom)"));
+        assert!(!bundled_only.contains("Symbols Nerd"));
+        let all = with_system_fonts.generation_catalog(true);
+        assert!(all.to_string().contains("Fira Code (System)"));
+        let face = all
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["family"] == "Fira Code (System)")
+            .unwrap();
+        assert_eq!(face["terminal"], true);
+        assert_eq!(face["weights"], serde_json::json!([400]));
 
         let broken = root.join("broken.ttf");
         std::fs::write(&broken, b"invalid").unwrap();

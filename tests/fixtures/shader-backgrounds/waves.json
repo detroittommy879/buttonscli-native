@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-waves",
+    "name": "Shader Waves",
+    "nativeThemeVersion": 1
+  },
+  "theme": {
+    "mode": "dark",
+    "terminal": {
+      "background": "#080d18",
+      "foreground": "#e4ecff",
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#080d18",
+        "#18664c",
+        "#53308a",
+        "#12364f"
+      ],
+      "gradientType": "radial"
+    },
+    "app": {
+      "shell": {
+        "background": "#101724",
+        "textMain": "#e4ecff",
+        "accent": "#44ccaa"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "waves",
+      "strength": 0.6,
+      "speed": 0.6,
+      "scale": 1.0,
+      "animated": true
+    }
+  }
+}

@@ -152,3 +152,38 @@
 - Pushed source/documentation and marked PR #2 ready. Five Node CLI deadline
   checks, MCP fake-API stdio contract and fake-provider test also pass. Record
   these in the final validation commit before waiting for its exact-head CI.
+
+
+## Shader backgrounds and AI font choices
+
+- Read Astra's proposal, fetched/inspected clean main and existing PRs. User
+  authorized a simple shader-first slice: app-owned Aurora/Ink/Waves with a
+  dedicated Themes/Shaders page, opt-in GPU toggle, synthetic preview and
+  existing draft/scoped save/cancel. Raw WGSL/GLSL stays inert.
+- Added a terminal background callback below cells/cursor/selection, bounded
+  uniforms/cache and motion repaint cap. Gradient/solid fallback remains; Calm
+  freezes shader motion, master off disables it. Added active/free
+  shaderBackgrounds; planned ShaderLab/VibeCodeShaders gates are unchanged.
+- AI generation now includes all seven typography zones, loaded face names and
+  real weights; installed/custom fonts are opt-in. Found/fixed a parser trap:
+  external (System)/(Custom) families were replaced by bundled defaults on
+  theme import. Keep those names for catalog resolution/fallback.
+- Still shaders must suppress repaint requests from the hidden animated
+  gradient. Calm presentation must not overwrite the saved shader animation.
+  Preserve unknown shader fields during edits. Explicit RGB backgrounds equal
+  to the base color still need opaque cells over procedural backgrounds; fixed
+  the old equality shortcut and visually checked both same/different colors.
+- Validation: 263 library + two fixture tests pass. Native GPU pixel tests prove
+  all presets, motion and deterministic still frames; terminal/Settings captures
+  were inspected. Three-pane selection/copy/scroll/IME/input passes with one
+  shader callback per pane. Formatting, strict native/WASM Clippy, optimized
+  Windows build and isolated release startup pass. Existing cache/PDB warnings
+  and ended-pipe shutdown diagnostics are nonfatal. Captures are under
+  `.private/shader-backgrounds-2026-10-07/`; fixtures are committed in tests.
+  No live AI-provider trial, old-GPU benchmark or Linux/macOS certification.
+- Probe fixes: added the missing Instant import; NativeStore::open is lazy, so
+  create the owned test root before cleanup. Root screenshots miss detached
+  Settings: render its actual contents in the capture viewport for this probe.
+- Broad source search output truncated; narrowed it. First documentation patch
+  had a bad log context and was reapplied separately. Python defaults to CP1252
+  here: use explicit UTF-8 for Markdown (plan append failed decoding).
