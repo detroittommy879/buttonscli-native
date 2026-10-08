@@ -14,6 +14,8 @@ are labeled by date in the sections below.
   temporary profiles/shells and restore the prior text clipboard.
 - Isolated optimized startup passes. Existing incremental-cache/PDB warnings and
   ended-pipe shutdown diagnostics persist without failing the checks.
+- Five Node CLI deadline checks, the 14-tool MCP fake-API stdio contract and the
+  fake-provider discovery/stream/retry/cancel check pass.
 - The creator reports daily Windows use and core parity close to or matching
   the original app. README readiness reflects that report plus scoped checks;
   roughly 70% preview estimates are editorial, not measured reliability.

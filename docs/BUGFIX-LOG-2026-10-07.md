@@ -149,3 +149,6 @@
 - GitHub reports no branch protection. Publication path: update existing PR #2,
   wait for CI on the exact pushed head, then merge with a head-SHA guard. No
   binary release/signing claim; source installs target stable `main` explicitly.
+- Pushed source/documentation and marked PR #2 ready. Five Node CLI deadline
+  checks, MCP fake-API stdio contract and fake-provider test also pass. Record
+  these in the final validation commit before waiting for its exact-head CI.
