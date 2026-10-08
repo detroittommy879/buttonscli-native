@@ -114,3 +114,20 @@
 - Five offline failure checks, 258 library tests + 2 fixtures, formatting,
   strict native/WASM Clippy and release build pass. Native captures cover all 16
   outputs. Reports/raw responses/PNGs in ignored `.private/theme-evals/`.
+
+## Full-appearance generation and shader assessment
+
+- Added `AI-THEME-AND-SHADER-PLAN.md`: current capability/font inventory, creative
+  controls, shared prompt contract, richer evals, and staged native WGSL plan.
+  Inspected legacy theme/shader generation read-only; no app/prompt code changed.
+- Root cause: eval explicitly bans fonts/shaders and disables gradients/effects;
+  in-app generation accepts palette patches only. Prompt edits alone are insufficient.
+- Traps: terminal font fields override typography.terminal; native uses four
+  gradient colors; Roboto italic cannot be distinctly selected by family/weight;
+  rowBandingOpacity uses legacy unit conversion, not an unconditional percentage.
+- Checked pinned wgpu 24 documentation and WGSL loop behavior. Generated shader
+  validation cannot guarantee freedom from GPU stalls; background/overlay first,
+  true post-processing needs per-pane offscreen rendering. Browser uses glow.
+- Validation: source/catalog review and documentation diff checks only; no paid
+  model calls, generated shaders executed, or app runtime certification. Broad
+  initial search output truncated; narrowed reads to relevant functions/catalogs.
