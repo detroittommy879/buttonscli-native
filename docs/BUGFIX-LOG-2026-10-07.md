@@ -131,3 +131,21 @@
 - Validation: source/catalog review and documentation diff checks only; no paid
   model calls, generated shaders executed, or app runtime certification. Broad
   initial search output truncated; narrowed reads to relevant functions/catalogs.
+
+## Stable-main publication
+
+- User authorized promotion after daily use. Clean branch had five unpushed
+  commits; fetched origin and inspected existing draft PR #2, default `main`
+  and prior CI before editing. Kept the branch/history and patched dependencies.
+- Refreshed README readiness/install guidance and CHANGELOG's dated source
+  checkpoint; approximate preview percentages are editorial, not test pass rates.
+  Removed stale branch-install advice and updated building/verification limits.
+- Inspected supplied screenshots; copied two October 7 workspace captures
+  unchanged. No private provider captures or ignored evaluation outputs staged.
+- 258 library tests + two fixtures, formatting, strict native/WASM Clippy,
+  optimized build and four explicit Windows pane/input/clipboard probes pass.
+  Isolated release startup and changed-doc local links pass. Existing cache/PDB
+  warnings and ended-pipe shutdown diagnostics remain nonfatal.
+- GitHub reports no branch protection. Publication path: update existing PR #2,
+  wait for CI on the exact pushed head, then merge with a head-SHA guard. No
+  binary release/signing claim; source installs target stable `main` explicitly.

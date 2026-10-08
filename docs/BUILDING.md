@@ -14,9 +14,15 @@ On Debian/Ubuntu-family systems the common native packages are `pkg-config`,
 
 ## macOS and Windows
 
-The application avoids platform-specific UI code. Eframe owns the window and
-GPU surface, while Alacritty selects the operating-system PTY implementation.
-These targets are architectural commitments, but are not yet verified in CI.
+Use current stable Rust and native build tools: Visual Studio C++ Build Tools
+with the Windows SDK on Windows, or Xcode Command Line Tools on macOS. Eframe
+owns the window/GPU surface; Alacritty selects the operating-system PTY backend.
+Windows has local build and real interaction checks. GitHub CI covers Linux
+and the browser target; macOS runtime acceptance remains open.
+
+Follow the [README](../README.md#get-started) to install the stable `main` branch
+or build the optimized desktop executable. No Node runtime is needed for the
+desktop app; the optional CLI/MCP helpers use Node.
 
 ## Web demo
 

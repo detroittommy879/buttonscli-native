@@ -5,12 +5,13 @@ not a backlog disguised as release notes.
 
 ## Platform verification
 
-- Linux Mint/X11 has earlier manual desktop evidence. Windows 11 has isolated
-  startup, real PTY/control-CLI checks and partial AI Help GUI review using a
-  loopback provider. Broader keyboard, clipboard, DPI, performance and visual
+- Linux Mint/X11 has earlier manual desktop evidence. Windows has isolated
+  startup, real PTY/control-CLI checks, explicit pane/input/clipboard/selection
+  probes and the creator's daily use. AI Help has partial GUI review using a
+  loopback provider. Broader DPI, performance, screen-reader and platform
   acceptance remain open; see [the verification record](VERIFICATION.md).
-- Eframe and Alacritty expose macOS and Windows implementations, and the app has
-  no Unix-only UI code, but those targets still need native CI and manual tests.
+- Windows validation is local; GitHub CI covers Linux and the browser target.
+  macOS still needs native CI and manual interaction tests.
 - The browser package compiles and packages successfully. The available VM
   browser has WebGL disabled, so it exercised the explicit compatibility
   fallback rather than rendering the canvas. Test the canvas on a
@@ -45,8 +46,8 @@ not a backlog disguised as release notes.
   are outside that process-tree guarantee.
 - A terminal with retained scrollback shows a draggable scrollbar based on the
   Alacritty grid's real history and display offset. The track hides in alternate
-  screen or mouse-reporting mode. Wheel, drag, selection and PTY resize behavior
-  still need GUI review on Fedora and Windows.
+  screen or mouse-reporting mode. Explicit Windows wheel/drag/selection probes
+  pass; Fedora interaction and broader platform review remain.
 - Terminal search, next/previous navigation, match highlights, select-all, and
   clear-screen actions are implemented against the live Alacritty grid. Focused
   tests cover wrapped wide Unicode, scrollback, and keeping the terminal state

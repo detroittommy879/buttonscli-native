@@ -1,7 +1,25 @@
 # Verification record
 
-Last run: 2026-10-05 on Windows. Earlier Linux-only checks
+Last run: 2026-10-07 on Windows. Earlier Linux-only checks
 are labeled by date in the sections below.
+
+## 2026-10-07 stable-main publication checks
+
+- Full locked suite: 258 library tests and two legacy import fixtures pass;
+  17 optional library probes are ignored by default. Formatting, strict native
+  and WASM Clippy, and the optimized Windows desktop build pass.
+- Explicit Windows probes pass for tab/pane replacement and keyboard delivery,
+  three-pane selection/copy/scroll/IME, terminal navigation-key ownership, and
+  actual OS clipboard delivery with detached Settings open. Tests use owned
+  temporary profiles/shells and restore the prior text clipboard.
+- Isolated optimized startup passes. Existing incremental-cache/PDB warnings and
+  ended-pipe shutdown diagnostics persist without failing the checks.
+- The creator reports daily Windows use and core parity close to or matching
+  the original app. README readiness reflects that report plus scoped checks;
+  roughly 70% preview estimates are editorial, not measured reliability.
+- Two supplied October 7 workspace screenshots were inspected and copied
+  unchanged; changed-document links and image paths resolve. No downloadable
+  release, Linux/macOS interaction certification or multi-hour soak is claimed.
 
 ## 2026-10-05 Settings / clipboard / selection follow-up
 

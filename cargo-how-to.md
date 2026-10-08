@@ -6,12 +6,11 @@ Use current stable Rust, Git and your platform's native build tools
 ## Install from Git
 
 ```sh
-cargo install --git https://github.com/detroittommy879/buttonscli-native.git --locked --bin buttonscli
+cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli
 buttonscli
 ```
 
-This builds the repository's default branch, including both patched vendor crates.
-Until this PR merges, add `--branch codex/pane-fonts-theme-editor` to test its fixes.
+This builds the recommended stable `main` branch, including both patched vendor crates.
 For a local checkout: `cargo install --path . --locked --bin buttonscli`.
 Cargo installs the executable into `~/.cargo/bin`; themes/fonts are embedded.
 It does not create desktop shortcuts. Repeat the Git command to update.
