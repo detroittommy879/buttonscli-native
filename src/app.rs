@@ -9088,6 +9088,8 @@ impl ButtonsApp {
     }
 
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let original_terminal_defaults = fonts::PaneFont::from(&self.preferences.typography);
         #[cfg(target_arch = "wasm32")]
         let _ = ctx;
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Fonts"));
@@ -9152,9 +9154,11 @@ impl ButtonsApp {
                     );
                     if edited != original {
                         self.pane_fonts.insert(id, edited);
+                        ctx.request_repaint_of(egui::ViewportId::ROOT);
                     }
                     if ui.spaced_button("Use theme / default font").clicked() {
                         self.pane_fonts.remove(&id);
+                        ctx.request_repaint_of(egui::ViewportId::ROOT);
                     }
                 }
             });
@@ -9240,11 +9244,14 @@ impl ButtonsApp {
                 &mut self.preferences.typography.status_bar,
                 false,
             );
+            ui.spaced_label(
+                "Changes below apply to all open terminals and become the default for new ones.",
+            );
             font_zone_editor(
                 ui,
                 &locale,
                 &font_catalog,
-                "Terminal",
+                "All terminals",
                 &mut self.preferences.typography.terminal,
                 true,
             );
@@ -9284,6 +9291,19 @@ impl ButtonsApp {
                     });
                 });
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let apply_terminal_defaults = ui.spaced_button("Apply to all terminals").clicked();
+            let edited = fonts::PaneFont::from(&self.preferences.typography);
+            if apply_terminal_defaults || edited != original_terminal_defaults {
+                // An explicit font edit takes precedence over theme/session fonts;
+                // colors, shaders and stable PTY ownership remain independent.
+                for tab in &self.tabs {
+                    self.pane_fonts.insert(tab.id, edited.clone());
+                }
+                ctx.request_repaint_of(egui::ViewportId::ROOT);
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -13047,6 +13067,276 @@ mod tests {
             "{}",
             failure.lock().unwrap().as_deref().unwrap_or("")
         );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn font_family_selectors_change_terminal_and_all_ui_zones() {
+        for (label, mono) in [
+            ("This terminal", true),
+            ("Terminal", true),
+            ("Shell / UI", false),
+            ("Tabs", false),
+            ("Command Dock", false),
+            ("Settings Dialog", false),
+            ("AI Help Window", false),
+            ("Status Bar", false),
+        ] {
+            let ctx = egui::Context::default();
+            let catalog = fonts::FontCatalog::bundled();
+            fonts::install(&ctx, &catalog);
+            let mut zone = if mono {
+                fonts::Typography::default().terminal
+            } else {
+                fonts::Typography::default().shell
+            };
+            let original = zone.family.clone();
+            let target = catalog
+                .family_names(mono)
+                .into_iter()
+                .find(|family| *family != original)
+                .unwrap();
+            let mut render = |events| {
+                ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1000.0, 750.0),
+                        )),
+                        events,
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            font_zone_editor(ui, "en", &catalog, label, &mut zone, mono);
+                        });
+                    },
+                )
+            };
+            render(vec![]);
+            let initial = render(vec![]);
+            let pos = text_position(&initial, &original).expect("family dropdown");
+            render(pointer_events(pos, egui::PointerButton::Primary, true));
+            render(pointer_events(pos, egui::PointerButton::Primary, false));
+            let popup = render(vec![]);
+            let pos = text_position(&popup, &target).expect("font choice");
+            render(pointer_events(pos, egui::PointerButton::Primary, true));
+            render(pointer_events(pos, egui::PointerButton::Primary, false));
+            let output = render(vec![]);
+            assert_eq!(zone.family, target, "{label} selector must update its font");
+            assert!(
+                output.shapes.iter().any(|clipped| matches!(&clipped.shape,
+                egui::Shape::Text(text) if text.galley.job.text.starts_with("The quick brown fox")
+                    && text.galley.job.sections[0].format.font_id == catalog.font_id(&zone, mono))),
+                "{label} preview must use the chosen face"
+            );
+            if !mono {
+                let output = ctx.run(egui::RawInput::default(), |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        apply_zone_style(ui, &catalog, &zone);
+                        ui.spaced_button("Font zone widget");
+                    });
+                });
+                assert!(output.shapes.iter().any(|clipped| matches!(&clipped.shape,
+                    egui::Shape::Text(text) if text.galley.job.text == "Font zone widget"
+                        && text.galley.job.sections[0].format.font_id == catalog.font_id(&zone, false))),
+                    "{label} widgets must use the selected UI face");
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens two finite test-owned ConPTY sessions; run explicitly on Windows"]
+    fn shader_theme_fonts_can_be_changed_from_settings_and_pane_controls() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let mut workspace = Workspace(ButtonsApp::empty(Preferences {
+            default_shell_id: "font-probe".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "font-probe".into(), label: "Font probe".into(),
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Write-Output 'font-probe-text'; Start-Sleep -Seconds 60\"".into(),
+                working_directory: String::new(),
+            }], ..Default::default()
+        }));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        app.preferences.shader_backgrounds_enabled = true;
+        for theme in ["shader-nebula", "shader-circuit"] {
+            app.open_tab(ctx.clone());
+            app.set_theme_for_tab(app.tabs.len() - 1, theme);
+        }
+        app.focused = 0;
+        let ids = app.tab_ids();
+        let themes = app.theme_overrides.clone();
+        let snapshot = app.capture_settings_snapshot();
+        fn render(
+            app: &mut ButtonsApp,
+            ctx: &egui::Context,
+            events: Vec<egui::Event>,
+        ) -> egui::FullOutput {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 2600.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.font_settings(ui, ctx));
+                },
+            )
+        }
+        fn select(app: &mut ButtonsApp, ctx: &egui::Context, old: &str, next: &str, last: bool) {
+            render(app, ctx, vec![]);
+            let output = render(app, ctx, vec![]);
+            let positions: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) if text.galley.job.text == old => {
+                        Some(clipped.shape.visual_bounding_rect().center())
+                    }
+                    _ => None,
+                })
+                .collect();
+            let pos = if last {
+                *positions.last().unwrap()
+            } else {
+                positions[0]
+            };
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, true),
+            );
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+            let output = render(app, ctx, vec![]);
+            let pos = text_position(&output, next).expect("font popup option");
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, true),
+            );
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+        }
+        let old = app.preferences.typography.terminal.family.clone();
+        select(app, &ctx, &old, "Commit Mono Bundled", true);
+        assert_eq!(
+            app.preferences.typography.terminal.family,
+            "Commit Mono Bundled"
+        );
+        for id in &ids {
+            assert_eq!(
+                app.font_for_pane(*id).zone.family,
+                "Commit Mono Bundled",
+                "editing the all-terminal font must override shader theme fonts"
+            );
+        }
+        select(app, &ctx, "Commit Mono Bundled", "Fira Code Bundled", false);
+        assert_eq!(app.font_for_pane(ids[0]).zone.family, "Fira Code Bundled");
+        assert_eq!(app.font_for_pane(ids[1]).zone.family, "Commit Mono Bundled");
+        let mut pane_font = app.font_for_pane(ids[1]);
+        pane_font.zone.family = "JetBrains Mono Bundled".into();
+        pane_font.zone.size = 24.0;
+        app.perform_pane_action(ids[1], PaneAction::Font(pane_font.clone()), &ctx);
+        assert_eq!(app.font_for_pane(ids[1]), pane_font);
+        assert_eq!(
+            app.theme_overrides, themes,
+            "fonts must preserve shaders/colors"
+        );
+        assert_eq!(app.tab_ids(), ids, "fonts must preserve PTY sessions");
+        app.set_pane_layout(PaneLayout::Columns, &ctx);
+        app.show_all_auto_tiles();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+        loop {
+            app.process_terminal_events();
+            let output = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            );
+            let painted: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) if text.galley.job.text == "f" => {
+                        Some(text.galley.job.sections[0].format.font_id.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+            if ids.iter().all(|id| {
+                painted.contains(&app.font_catalog.font_id(&app.font_for_pane(*id).zone, true))
+            }) {
+                assert_eq!(
+                    output
+                        .shapes
+                        .iter()
+                        .filter(|clipped| matches!(clipped.shape, egui::Shape::Callback(_)))
+                        .count(),
+                    2
+                );
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "actual terminal glyphs must use both selected faces/sizes: {painted:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(40));
+        }
+        let output = render(app, &ctx, vec![]);
+        let pos = text_position(&output, "Apply to all terminals").unwrap();
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        for id in &ids {
+            assert_eq!(
+                app.font_for_pane(*id).zone.family,
+                "Commit Mono Bundled",
+                "apply must also work when the default family was already selected"
+            );
+        }
+        assert_eq!(app.theme_overrides, themes);
+        app.restore_settings_snapshot(snapshot);
+        for id in &ids {
+            assert_eq!(app.font_for_pane(*id).zone.family, "Fira Code Bundled");
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
