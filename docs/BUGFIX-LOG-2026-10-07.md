@@ -87,3 +87,30 @@
   Prompt examples import and sample text contrast stays >=5.04:1. Formatting,
   native/WASM strict Clippy, optimized build and isolated release startup pass.
   Existing cache/PDB warnings remain nonfatal. No Linux/macOS or long-soak claim.
+
+## OpenRouter theme comparison
+
+- Verified the existing env key and all four requested exact image-capable IDs.
+  Added a four-worker, three-brief palette trial with strict JSON/contrast checks,
+  one bounded correction, raw responses and usage/cost/latency reports.
+- Native capture uses an owned temporary profile, real file import/parser and
+  synthetic PTY text. Hash-match the reference JSON/PNG before sending it; require
+  native validation before exclusive writes to the active personal-theme folder.
+- Probe initially treated import's filename/document tuple as a path; fixed that.
+  Close is asynchronous, so guard the finished index on the following frame.
+- V3 remains a separate proposal.
+- Calibration caught Haiku rejecting `temperature` despite catalog support and
+  GLM requiring reasoning. Don't retry permanent HTTP 4xx errors. Keep calibration
+  results. User then requested defaults for both: omit temperature/reasoning;
+  stopped the temporary low-reasoning trial and started a fresh defaults trial.
+- Defaults: Haiku and MiMo produced three passing palettes each. GLM exhausted
+  the 8k output budget on reasoning with empty content; allow 32k in a separate
+  extended trial, still omitting both temperature and reasoning settings.
+- Qwen billed more total/reasoning tokens than requested max_tokens: don't call
+  that field a universal cost cap. Record actual usage. Keep trial budgets apart.
+- Defaults trials: 16 passing files installed in active profile (Haiku/MiMo 3
+  each, Qwen/GLM 5 each), after native importer/color round-trip and captures.
+  Failures retained; initial calibration/low-reasoning outputs were not installed.
+- Five offline failure checks, 258 library tests + 2 fixtures, formatting,
+  strict native/WASM Clippy and release build pass. Native captures cover all 16
+  outputs. Reports/raw responses/PNGs in ignored `.private/theme-evals/`.

@@ -12856,6 +12856,224 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    #[ignore = "renders theme-eval JSON files in an owned native profile; requires input/capture directories"]
+    fn native_theme_eval_capture() {
+        struct Probe {
+            app: ButtonsApp,
+            themes: Vec<(String, std::path::PathBuf)>,
+            index: usize,
+            changed: std::time::Instant,
+            captured: bool,
+        }
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                while !self.app.tabs.is_empty() {
+                    self.app.close_tab(0);
+                }
+            }
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                if self.index == self.themes.len() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    return;
+                }
+                self.app.update(ctx, frame);
+                if !self.captured && self.changed.elapsed() > Duration::from_secs(2) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.themes[self.index].1.clone(),
+                    )));
+                    self.captured = true;
+                }
+                if self.captured && self.changed.elapsed() > Duration::from_millis(2500) {
+                    assert!(self.themes[self.index].1.is_file());
+                    self.index += 1;
+                    if self.index == self.themes.len() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    } else {
+                        let theme = self.app.themes.get(&self.themes[self.index].0).clone();
+                        self.app.apply_theme_sources(theme, false);
+                        self.changed = std::time::Instant::now();
+                        self.captured = false;
+                    }
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let input = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_THEME_EVAL_INPUT_DIR").expect("theme input directory"),
+        );
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let owned_root =
+            std::env::temp_dir().join(format!("buttonscli-theme-eval-{:032x}", fastrand::u128(..)));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(owned_root.join("native")),
+            owned_root.join("legacy"),
+        )
+        .unwrap();
+        let mut paths: Vec<_> = std::fs::read_dir(&input)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "json")
+            })
+            .collect();
+        paths.sort();
+        assert!(!paths.is_empty(), "no theme files supplied");
+        let themes: Vec<_> = paths
+            .iter()
+            .map(|path| {
+                let (imported, _) = crate::theme_files::import_theme_file(&store, path).unwrap();
+                let stem = std::path::Path::new(&imported)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap();
+                (
+                    format!("personal:{}:{stem}", store.profile_name()),
+                    capture
+                        .join(path.file_stem().unwrap())
+                        .with_extension("png"),
+                )
+            })
+            .collect();
+        let mut validation: Vec<_> = paths.iter().map(|path| {
+            use sha2::Digest;
+            let bytes = std::fs::read(path).unwrap();
+            let document = crate::theme_files::read_theme_file(path).unwrap();
+            let theme = ThemeDefinition::editor_document(&document).unwrap();
+            let resolved = crate::theme_files::document_from_theme(&theme, &theme.name);
+            fn assert_colors(input: &Value, output: &Value) {
+                if let Some(object) = input.as_object() {
+                    for (key, value) in object {
+                        assert_colors(value, &output[key]);
+                    }
+                } else if let Some(color) = input.as_str().filter(|value| value.starts_with('#')) {
+                    assert_eq!(Some(color.to_ascii_lowercase()), output.as_str().map(str::to_ascii_lowercase), "color ignored or changed by native loader: {color}");
+                }
+            }
+            assert_colors(&document["theme"], &resolved["theme"]);
+            json!({"file": path.file_name().unwrap().to_str().unwrap(), "sha256": format!("{:x}", sha2::Sha256::digest(bytes))})
+        }).collect();
+        let script = owned_root.join("fixture.ps1");
+        std::fs::write(&script, r#"
+$esc = [char]27
+[Console]::Write("${esc}[2J${esc}[H")
+[Console]::WriteLine('ButtonsCLI theme evaluation - synthetic terminal content')
+[Console]::WriteLine('Same commands, text and layout for every palette. No personal session data.')
+[Console]::WriteLine('')
+[Console]::WriteLine("${esc}[1mBold text${esc}[0m   Regular text   0123456789   ~/project > cargo test")
+[Console]::WriteLine("${esc}[32mPASS${esc}[0m  terminal input and scrolling")
+[Console]::WriteLine("${esc}[33mWARN${esc}[0m  inspect dim text and button contrast")
+[Console]::WriteLine("${esc}[31mERROR${esc}[0m simulated error, nothing failed")
+[Console]::WriteLine('')
+$names = @('black','red','green','yellow','blue','magenta','cyan','white')
+for ($row = 0; $row -lt 2; $row++) {
+    [Console]::WriteLine($(if ($row -eq 0) {'ANSI normal foregrounds:'} else {'ANSI bright foregrounds:'}))
+    for ($i = 0; $i -lt 8; $i++) {
+        $code = $(if ($row -eq 0) {30 + $i} else {90 + $i})
+        [Console]::Write("${esc}[${code}m$($names[$i].PadRight(10))${esc}[0m")
+    }
+    [Console]::WriteLine('')
+    [Console]::WriteLine('')
+}
+[Console]::WriteLine("${esc}[36mfn${esc}[0m main() { ${esc}[35mprintln!${esc}[0m(${esc}[32m`"Hello, palette!`"${esc}[0m); }")
+[Console]::WriteLine('')
+[Console]::WriteLine('Readability first. Judge theme fit, distinct colors, and long-session comfort.')
+Start-Sleep -Seconds 300
+"#).unwrap();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title("ButtonsCLI theme evaluation")
+                .with_inner_size([1200.0, 720.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        let expected: Vec<_> = themes.iter().map(|(_, path)| path.clone()).collect();
+        eframe::run_native(
+            "ButtonsCLI theme evaluation",
+            options,
+            Box::new(move |cc| {
+                let mut preferences = Preferences {
+                    show_sidebar: false,
+                    show_presets: true,
+                    ..Default::default()
+                };
+                preferences.normalize_theme_sources();
+                preferences.theme_apply = ThemeApplyScopes {
+                    app: true,
+                    terminal: true,
+                    fonts: true,
+                    gradient: true,
+                    effects: true,
+                };
+                let mut app = ButtonsApp::empty(preferences);
+                assert!(app
+                    .themes
+                    .load_personal(store.profile_name(), &store.profile_dir())
+                    .is_empty());
+                for (id, _) in &themes {
+                    assert_eq!(
+                        &app.themes.get(id).id,
+                        id,
+                        "native catalog must load each supplied theme"
+                    );
+                }
+                app.native_store = Some(store);
+                app.show_localization_onboarding = false;
+                app.apply_theme_sources(app.themes.get(&themes[0].0).clone(), false);
+                fonts::install(&cc.egui_ctx, &app.font_catalog);
+                app.apply_style(&cc.egui_ctx);
+                let command = format!(
+                    "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File \"{}\"",
+                    script.display()
+                );
+                app.open_named_tab(cc.egui_ctx.clone(), "Palette sample", Some(&command), None)
+                    .unwrap();
+                Ok(Box::new(Probe {
+                    app,
+                    themes,
+                    index: 0,
+                    changed: std::time::Instant::now(),
+                    captured: false,
+                }))
+            }),
+        )
+        .unwrap();
+        assert!(expected.iter().all(|path| path.is_file()));
+        for (entry, image) in validation.iter_mut().zip(&expected) {
+            use sha2::Digest;
+            entry["image"] = json!(image.file_name().unwrap().to_str().unwrap());
+            entry["imageSha256"] = json!(format!(
+                "{:x}",
+                sha2::Sha256::digest(std::fs::read(image).unwrap())
+            ));
+        }
+        std::fs::write(
+            capture.join("native-validation.json"),
+            serde_json::to_vec_pretty(&json!({"passed": true, "files": validation})).unwrap(),
+        )
+        .unwrap();
+        assert!(owned_root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(&owned_root).unwrap();
+        println!("Native theme imports/captures passed: {}", expected.len());
+    }
+
+    #[cfg(windows)]
+    #[test]
     #[ignore = "opens test-owned native terminals/settings for mixed-theme and spacing verification"]
     fn native_mixed_themes_and_spacing_probe() {
         use std::time::Instant;

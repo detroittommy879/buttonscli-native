@@ -9,5 +9,6 @@
 
 # Working notes, credentials, release keys, and non-public research belong here.
 /.private/
+/scripts/__pycache__/
 
 /docs/migration/

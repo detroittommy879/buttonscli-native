@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "metadata": {
+    "nativeThemeVersion": 1,
+    "id": "midnight-signal",
+    "name": "Midnight Signal",
+    "description": "Dark, legible palette with cool accents.",
+    "createdAt": null,
+    "updatedAt": null
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#0d1119",
+        "backgroundSecondary": "#171e2b",
+        "buttonBackground": "#273248",
+        "textMain": "#f0f4fb",
+        "textDim": "#b7c2d5",
+        "accent": "#426b96",
+        "accentHover": "#385c82",
+        "border": "#56667e",
+        "paneDivider": {
+          "color": "#426b96",
+          "thickness": 2
+        }
+      },
+      "tabs": {
+        "background": "#171e2b",
+        "idleBackground": "#202a3b",
+        "activeBackground": "#0d1119",
+        "activeBorder": "#426b96"
+      },
+      "presetDock": {
+        "background": "#171e2b",
+        "accent": "#9bdce5",
+        "buttonBackground": "#273248",
+        "buttonHover": "#385c82",
+        "buttonText": "#f0f4fb"
+      },
+      "settings": {
+        "background": "#171e2b"
+      },
+      "statusBar": {
+        "background": "#171e2b",
+        "text": "#c6d2e4",
+        "border": "#56667e",
+        "warning": "#efce78"
+      }
+    },
+    "terminal": {
+      "background": "#090d15",
+      "foreground": "#e6eefb",
+      "ansiColors": {
+        "black": "#151922",
+        "red": "#ff7588",
+        "green": "#91d894",
+        "yellow": "#efce78",
+        "blue": "#82acff",
+        "magenta": "#cc99eb",
+        "cyan": "#7bd9dc",
+        "white": "#d4dbe6",
+        "brightBlack": "#707d94",
+        "brightRed": "#ff98a5",
+        "brightGreen": "#b5edb5",
+        "brightYellow": "#ffe5a1",
+        "brightBlue": "#abc8ff",
+        "brightMagenta": "#e6b8ff",
+        "brightCyan": "#a5f0ef",
+        "brightWhite": "#ffffff"
+      },
+      "useGradient": false,
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": true
+  }
+}
