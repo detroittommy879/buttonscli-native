@@ -99,6 +99,8 @@ impl Default for ShellProfile {
 pub(crate) struct Preferences {
     pub(crate) localization: LocalizationPreferences,
     pub(crate) theme_id: String,
+    pub(crate) dock_background_override: Option<String>,
+    pub(crate) status_background_override: Option<String>,
     pub(crate) app_theme_id: String,
     pub(crate) terminal_theme_id: String,
     pub(crate) gradient_theme_id: String,
@@ -152,6 +154,8 @@ impl Default for Preferences {
         Self {
             localization: LocalizationPreferences::default(),
             theme_id: "basic2".into(),
+            dock_background_override: None,
+            status_background_override: None,
             app_theme_id: String::new(),
             terminal_theme_id: String::new(),
             gradient_theme_id: String::new(),

@@ -358,6 +358,12 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_source_id: Option<String>,
     settings_snapshot: Option<SettingsSnapshot>,
+    #[cfg(not(target_arch = "wasm32"))]
+    appearance_baseline: Option<Value>,
+    #[cfg(not(target_arch = "wasm32"))]
+    appearance_save_status: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_rename: String,
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
@@ -653,6 +659,8 @@ enum ThemeSettingsTab {
 struct SettingsSnapshot {
     preferences: Preferences,
     #[cfg(not(target_arch = "wasm32"))]
+    appearance_baseline: Option<Value>,
+    #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
     pane_fonts: std::collections::BTreeMap<u64, fonts::PaneFont>,
@@ -666,6 +674,17 @@ struct ThemePreviewSnapshot {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePreviewSnapshot) {
+    let mut current = serde_json::to_value(&*preferences).unwrap();
+    let applied = serde_json::to_value(&snapshot.applied_preferences).unwrap();
+    let original = serde_json::to_value(&snapshot.preferences).unwrap();
+    for (key, _) in NATIVE_APPEARANCE_FIELDS {
+        if current[*key] == applied[*key] {
+            current[*key] = original[*key].clone();
+        }
+    }
+    if let Ok(restored) = serde_json::from_value(current) {
+        *preferences = restored;
+    }
     if preferences.theme_id == snapshot.applied_preferences.theme_id {
         preferences.theme_id = snapshot.preferences.theme_id.clone();
     }
@@ -686,6 +705,17 @@ fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePr
     }
     if preferences.calm_mode == snapshot.applied_preferences.calm_mode {
         preferences.calm_mode = snapshot.preferences.calm_mode;
+    }
+    if preferences.dock_background_override == snapshot.applied_preferences.dock_background_override
+    {
+        preferences.dock_background_override =
+            snapshot.preferences.dock_background_override.clone();
+    }
+    if preferences.status_background_override
+        == snapshot.applied_preferences.status_background_override
+    {
+        preferences.status_background_override =
+            snapshot.preferences.status_background_override.clone();
     }
 }
 
@@ -1153,6 +1183,12 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_source_id: None,
             settings_snapshot: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            appearance_baseline: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            appearance_save_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_rename: String::new(),
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
@@ -1482,7 +1518,24 @@ impl ButtonsApp {
     }
 
     fn colors(&self) -> AppColors {
-        self.active_app_theme().colors.clone()
+        let mut colors = self.active_app_theme().colors.clone();
+        if let Some(color) = self
+            .preferences
+            .dock_background_override
+            .as_deref()
+            .and_then(crate::theme::parse_color)
+        {
+            colors.dock_background = color;
+        }
+        if let Some(color) = self
+            .preferences
+            .status_background_override
+            .as_deref()
+            .and_then(crate::theme::parse_color)
+        {
+            colors.status_background = color;
+        }
+        colors
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -4056,6 +4109,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn command_dock_contents(&mut self, ui: &mut egui::Ui, controls_available: bool) {
+        self.appearance_background_menu(ui, true);
         let colors = self.colors();
         ui.visuals_mut().widgets.inactive.bg_fill = colors.dock_button;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = colors.dock_button;
@@ -4225,6 +4279,8 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
+                #[cfg(not(target_arch = "wasm32"))]
+                self.appearance_background_menu(ui, false);
                 wrapping_row(ui, |ui| {
                     ui.spaced_label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
@@ -4427,6 +4483,8 @@ impl ButtonsApp {
         SettingsSnapshot {
             preferences: self.preferences.clone(),
             #[cfg(not(target_arch = "wasm32"))]
+            appearance_baseline: self.appearance_baseline.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: self.theme_overrides.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             pane_fonts: self.pane_fonts.clone(),
@@ -4439,6 +4497,11 @@ impl ButtonsApp {
         {
             self.theme_overrides = snapshot.theme_overrides;
             self.pane_fonts = snapshot.pane_fonts;
+            self.appearance_baseline = snapshot.appearance_baseline;
+            self.theme_editor_document = None;
+            self.theme_editor_original_document = None;
+            self.theme_editor_source_id = None;
+            self.appearance_save_status = None;
         }
     }
 
@@ -4481,6 +4544,8 @@ impl ButtonsApp {
             return;
         }
         if self.settings_snapshot.is_none() {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.ensure_appearance_baseline();
             self.settings_snapshot = Some(self.capture_settings_snapshot());
         }
         let old_app_theme = self.preferences.app_theme_id.clone();
@@ -4784,6 +4849,19 @@ impl ButtonsApp {
                     .clicked()
                 {
                     *close_action = Some(SettingsCloseAction::Revert);
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let dirty = self.appearance_is_dirty();
+                    let color = if dirty { Color32::from_rgb(100, 245, 175) } else { ui.visuals().weak_text_color() };
+                    let response = ui.add_enabled(dirty && self.native_store.is_some(), egui::Button::new(RichText::new("● Save copy").color(color)));
+                    if response.on_hover_text("Save current shared appearance and pending editor changes as the next numbered version. Individual terminal overrides stay in place.").clicked() {
+                        self.save_appearance_copy();
+                        ctx.request_repaint();
+                    }
+                    if let Some(status) = &self.appearance_save_status {
+                        ui.label(if status.contains("failed:") { "Save failed" } else { "Saved" }).on_hover_text(status);
+                    }
                 }
             },
         );
@@ -7017,6 +7095,30 @@ impl ButtonsApp {
     }
 
     fn theme_settings(&mut self, ui: &mut egui::Ui) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self
+            .themes
+            .personal_document(&self.preferences.theme_id)
+            .is_some()
+        {
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "Loaded: {}",
+                    self.themes.get(&self.preferences.theme_id).name
+                ));
+                ui.menu_button("Rename theme…", |ui| {
+                    if self.theme_rename.is_empty() {
+                        self.theme_rename =
+                            self.themes.get(&self.preferences.theme_id).name.clone();
+                    }
+                    ui.text_edit_singleline(&mut self.theme_rename);
+                    if ui.button("Save name").clicked() {
+                        self.rename_loaded_theme();
+                        ui.close_menu();
+                    }
+                });
+            });
+        }
         match self.theme_settings_tab {
             ThemeSettingsTab::Library => self.theme_library_settings(ui),
             #[cfg(not(target_arch = "wasm32"))]
@@ -8520,14 +8622,17 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn shared_appearance_document(&self) -> Value {
         let mut resolved = self.terminal_presentation();
-        // Calm changes presentation only, never the saved animation setting.
-        resolved.effects.shader_background = self
+        // Calm changes presentation only, never saved effect strengths or animation.
+        resolved.effects = self
             .themes
             .get(&self.preferences.effects_theme_id)
             .effects
-            .shader_background
             .clone();
-        resolved.colors = self.active_app_theme().colors.clone();
+        let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
+        resolved.effects.gradient = gradient.gradient;
+        resolved.effects.gradient_geometry = gradient.gradient_geometry;
+        resolved.effects.gradient_animation = gradient.gradient_animation;
+        resolved.colors = self.colors();
         resolved.pane_divider =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
         resolved.typography = Some(self.preferences.typography.clone());
@@ -8551,6 +8656,176 @@ impl ButtonsApp {
             crate::theme_files::overlay_appearance(&mut document[key], &appearance[key]);
         }
         document
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_copy_document(&self) -> Value {
+        let mut document = self.shared_appearance_document();
+        if let (Some(original), Some(draft)) = (
+            &self.theme_editor_original_document,
+            &self.theme_editor_document,
+        ) {
+            // Only overlay edited fields: a stale draft must not replace newer font
+            // or quick-color settings merely because it contains their old values.
+            merge_theme_edits(&mut document, original, draft);
+        }
+        // Native-only appearance controls supplement the portable palette schema.
+        let preferences = serde_json::to_value(&self.preferences).unwrap();
+        for (key, _) in NATIVE_APPEARANCE_FIELDS {
+            document["nativeAppearance"][*key] = preferences[*key].clone();
+        }
+        document
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_background_menu(&mut self, ui: &mut egui::Ui, dock: bool) {
+        self.ensure_appearance_baseline();
+        // Register behind the controls so their normal input keeps precedence.
+        let response = ui.interact(
+            ui.max_rect(),
+            ui.id().with("background-color-menu"),
+            egui::Sense::click(),
+        );
+        response.context_menu(|ui| {
+            ui.label(if dock {
+                "Dock background"
+            } else {
+                "Status bar background"
+            });
+            let colors = self.colors();
+            let mut color = if dock {
+                colors.dock_background
+            } else {
+                colors.status_background
+            };
+            let target = if dock {
+                &mut self.preferences.dock_background_override
+            } else {
+                &mut self.preferences.status_background_override
+            };
+            if ui.color_edit_button_srgba(&mut color).changed() {
+                *target = Some(crate::theme::to_hex(color));
+                ui.ctx().request_repaint();
+            }
+            if ui
+                .add_enabled(target.is_some(), egui::Button::new("Use theme color"))
+                .clicked()
+            {
+                *target = None;
+                ui.close_menu();
+            }
+            ui.small("Save a copy later in Settings.");
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_fingerprint(&self) -> Value {
+        let document = self.appearance_copy_document();
+        json!({"theme": document["theme"], "effects": document["effects"],
+            "nativeAppearance": document["nativeAppearance"],
+            "paneFonts": self.pane_fonts, "paneThemes": self.theme_overrides,
+            "shadersEnabled": self.preferences.shader_backgrounds_enabled,
+            "calm": self.preferences.calm_mode})
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ensure_appearance_baseline(&mut self) {
+        if self.appearance_baseline.is_none() {
+            self.appearance_baseline = Some(self.appearance_fingerprint());
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_is_dirty(&self) -> bool {
+        self.appearance_baseline
+            .as_ref()
+            .is_some_and(|baseline| baseline != &self.appearance_fingerprint())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_appearance_copy(&mut self) {
+        let Some(store) = &self.native_store else {
+            return;
+        };
+        let mut document = self.appearance_copy_document();
+        let source = self
+            .theme_editor_preview_snapshot
+            .as_ref()
+            .map(|snapshot| &snapshot.preferences.theme_id)
+            .unwrap_or(&self.preferences.theme_id);
+        let name = next_theme_version(
+            &self.themes.get(source).name,
+            self.themes.all().iter().map(|theme| theme.name.as_str()),
+        );
+        document["metadata"]["name"] = json!(name);
+        let file_name =
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
+        document["metadata"]["createdAt"] = Value::Null;
+        document["metadata"]["updatedAt"] = Value::Null;
+        let profile = store.profile_name().to_owned();
+        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
+            crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, false)
+        });
+        match result {
+            Ok(file) => {
+                self.theme_editor_preview_due = None;
+                self.theme_editor_preview_snapshot = None;
+                self.reload_personal_themes();
+                let id = format!("personal:{profile}:{}", file.trim_end_matches(".json"));
+                // This snapshot includes every shared section, independently of the
+                // Library's selective Apply controls. Keep per-PTY overrides intact.
+                let scopes = self.preferences.theme_apply.clone();
+                self.preferences.theme_apply = crate::settings::ThemeApplyScopes::default();
+                self.apply_theme_sources(self.themes.get(&id).clone(), self.preferences.calm_mode);
+                self.preferences.theme_apply = scopes;
+                self.load_personal_theme_draft(&id);
+                self.appearance_baseline = Some(self.appearance_fingerprint());
+                self.appearance_save_status = Some(format!("Saved {name}"));
+                self.persist_native_preferences();
+            }
+            Err(error) => self.appearance_save_status = Some(format!("Save failed: {error}")),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn rename_loaded_theme(&mut self) {
+        let id = self.preferences.theme_id.clone();
+        let (Some(store), Some(mut document)) = (
+            &self.native_store,
+            self.themes.personal_document(&id).cloned(),
+        ) else {
+            return;
+        };
+        let name = self.theme_rename.trim();
+        if name.is_empty() {
+            self.appearance_save_status = Some("Enter a theme name.".into());
+            return;
+        }
+        document["metadata"]["name"] = json!(name);
+        let file = format!("{}.json", id.rsplit(':').next().unwrap());
+        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
+            crate::theme_files::save_theme_file(store, &file, name, &bytes, true)
+        });
+        match result {
+            Ok(_) => {
+                // Rename only metadata, without discarding a pending editor draft.
+                if self.theme_editor_source_id.as_deref() == Some(&id) {
+                    for value in [
+                        &mut self.theme_editor_document,
+                        &mut self.theme_editor_original_document,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        value["metadata"]["name"] = json!(name);
+                    }
+                }
+                self.appearance_save_status = Some(format!("Renamed to {name}"));
+                self.reload_personal_themes();
+            }
+            Err(error) => self.appearance_save_status = Some(format!("Rename failed: {error}")),
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -8859,9 +9134,13 @@ impl ButtonsApp {
                         .trim_end_matches(".json")
                 );
                 if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
-                    self.apply_theme(index, self.preferences.calm_mode);
+                    self.apply_theme_sources(
+                        self.themes.all()[index].clone(),
+                        self.preferences.calm_mode,
+                    );
                 }
                 self.theme_editor_source_id = Some(id);
+                self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.persist_native_preferences();
                 self.theme_editor_status = Some(crate::i18n::literal(
                     &self.locale,
@@ -9010,6 +9289,15 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.restore_personal_theme_preview();
         self.apply_theme_sources(theme, calm);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.theme_editor_document = None;
+            self.theme_editor_original_document = None;
+            self.theme_editor_source_id = None;
+            self.theme_rename.clear();
+            self.appearance_save_status = None;
+            self.appearance_baseline = Some(self.appearance_fingerprint());
+        }
     }
 
     fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
@@ -9017,6 +9305,8 @@ impl ButtonsApp {
         self.preferences.theme_id = id.clone();
         if self.preferences.theme_apply.app {
             self.preferences.app_theme_id = id.clone();
+            self.preferences.dock_background_override = None;
+            self.preferences.status_background_override = None;
         }
         if self.preferences.theme_apply.terminal {
             self.preferences.terminal_theme_id = id.clone();
@@ -9034,6 +9324,26 @@ impl ButtonsApp {
         }
         if self.preferences.theme_apply.gradient || self.preferences.theme_apply.effects {
             self.preferences.calm_mode = calm;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(document) = self.themes.personal_document(&self.preferences.theme_id) {
+            let mut value = serde_json::to_value(&self.preferences).unwrap();
+            for (key, scope) in NATIVE_APPEARANCE_FIELDS {
+                let enabled = match *scope {
+                    "app" => self.preferences.theme_apply.app,
+                    "fonts" => self.preferences.theme_apply.fonts,
+                    _ => self.preferences.theme_apply.effects,
+                };
+                if enabled {
+                    if let Some(saved) = document["nativeAppearance"].get(*key) {
+                        value[*key] = saved.clone();
+                    }
+                }
+            }
+            if let Ok(mut preferences) = serde_json::from_value::<Preferences>(value) {
+                preferences.normalize_theme_sources();
+                self.preferences = preferences;
+            }
         }
     }
 
@@ -12333,6 +12643,63 @@ fn preset_action_menu(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
+    ("dock_opacity", "app"),
+    ("window_opacity", "app"),
+    ("chrome_corner_radius", "app"),
+    ("pane_hover_label", "fonts"),
+    ("row_banding_brightness", "effects"),
+    ("animation_fps", "effects"),
+    ("advanced_effects", "effects"),
+    ("shader_backgrounds_enabled", "effects"),
+    ("calm_mode", "effects"),
+    ("effects_focused_pane_only", "effects"),
+];
+
+#[cfg(not(target_arch = "wasm32"))]
+fn merge_theme_edits(target: &mut Value, original: &Value, edited: &Value) {
+    if original == edited {
+        return;
+    }
+    if let (Some(old), Some(new)) = (original.as_object(), edited.as_object()) {
+        if !target.is_object() {
+            *target = json!({});
+        }
+        for (key, value) in new {
+            merge_theme_edits(
+                &mut target[key],
+                old.get(key).unwrap_or(&Value::Null),
+                value,
+            );
+        }
+        for key in old.keys().filter(|key| !new.contains_key(*key)) {
+            target.as_object_mut().unwrap().remove(key);
+        }
+    } else {
+        *target = edited.clone();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn next_theme_version<'a>(name: &str, existing: impl Iterator<Item = &'a str>) -> String {
+    fn split(name: &str) -> (&str, u64) {
+        name.rsplit_once(" v")
+            .and_then(|(base, version)| version.parse().ok().map(|version| (base, version)))
+            .unwrap_or((name, 0))
+    }
+    let (base, initial) = split(name);
+    let highest = existing
+        .filter_map(|name| {
+            let (other, version) = split(name);
+            (other == base).then_some(version)
+        })
+        .max()
+        .unwrap_or(0)
+        .max(initial);
+    format!("{base} v{}", highest.saturating_add(1))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn edit_theme_metadata(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
     wrapping_row(ui, |ui| {
         let mut native = document["metadata"]["nativeThemeVersion"]
@@ -12645,6 +13012,8 @@ impl eframe::App for ButtonsApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.ensure_appearance_baseline();
         #[cfg(target_arch = "wasm32")]
         let _ = frame;
         self.refresh_locale();
@@ -12788,6 +13157,286 @@ impl eframe::App for ButtonsApp {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_copy_versions_merge_edits_rename_and_reload_without_losing_overrides() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-appearance-copy-{:032x}",
+            fastrand::u128(..)
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut preferences = Preferences::default();
+        preferences.normalize_theme_sources();
+        let mut app = ButtonsApp::empty(preferences);
+        app.native_store = Some(store);
+        app.ensure_appearance_baseline();
+        assert!(!app.appearance_is_dirty());
+        app.preferences.dock_title = "Unrelated workspace edit".into();
+        assert!(!app.appearance_is_dirty());
+        app.start_personal_theme_draft();
+        assert!(
+            !app.appearance_is_dirty(),
+            "creating a draft alone is not an appearance change"
+        );
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("#123456");
+        app.theme_editor_document.as_mut().unwrap()["futureExtension"] = json!({"keep": true});
+        app.preferences.typography.shell.size = 21.0;
+        app.preferences.dock_background_override = Some("#234567".into());
+        app.preferences.status_background_override = Some("#345678".into());
+        app.preferences.window_opacity = 0.8;
+        app.preferences.shader_backgrounds_enabled = true;
+        app.theme_overrides.insert(42, "aurora".into());
+        app.pane_fonts
+            .insert(42, fonts::PaneFont::from(&app.preferences.typography));
+        let overrides = app.theme_overrides.clone();
+        let pane_fonts = app.pane_fonts.clone();
+        assert!(app.appearance_is_dirty());
+        app.preferences.theme_apply.app = false;
+        app.preferences.theme_apply.fonts = false;
+        let source_name = app.themes.get(&app.preferences.theme_id).name.clone();
+        app.save_appearance_copy();
+        let first = app.preferences.theme_id.clone();
+        let saved = app.themes.personal_document(&first).unwrap();
+        assert_eq!(saved["metadata"]["name"], format!("{source_name} v1"));
+        assert_eq!(saved["theme"]["terminal"]["background"], "#123456");
+        assert_eq!(saved["theme"]["typography"]["shell"]["fontSize"], 21.0);
+        assert_eq!(saved["futureExtension"]["keep"], true);
+        assert_eq!(
+            saved["nativeAppearance"]["shader_backgrounds_enabled"],
+            true
+        );
+        assert_eq!(
+            app.colors().dock_background,
+            crate::theme::parse_color("#234567").unwrap()
+        );
+        assert_eq!(
+            app.colors().status_background,
+            crate::theme::parse_color("#345678").unwrap()
+        );
+        assert_eq!(app.theme_overrides, overrides);
+        assert_eq!(app.pane_fonts, pane_fonts);
+        assert!(!app.preferences.theme_apply.app);
+        assert!(!app.appearance_is_dirty());
+        app.preferences.typography.shell.size = 22.0;
+        app.save_appearance_copy();
+        assert_eq!(
+            app.themes.get(&app.preferences.theme_id).name,
+            format!("{source_name} v2")
+        );
+        assert_eq!(
+            app.themes
+                .get(&first)
+                .typography
+                .as_ref()
+                .unwrap()
+                .shell
+                .size,
+            21.0
+        );
+        let id = app.preferences.theme_id.clone();
+        app.theme_rename = "My renamed theme".into();
+        app.rename_loaded_theme();
+        assert_eq!(app.preferences.theme_id, id);
+        assert_eq!(app.themes.get(&id).name, "My renamed theme");
+        let mut catalog = ThemeCatalog::load();
+        assert!(catalog
+            .load_personal("default", &app.native_store.as_ref().unwrap().profile_dir())
+            .is_empty());
+        assert_eq!(catalog.get(&id).name, "My renamed theme");
+        app.preferences.window_opacity = 1.0;
+        app.preferences.shader_backgrounds_enabled = false;
+        app.preferences.theme_apply = ThemeApplyScopes::default();
+        let index = app
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == id)
+            .unwrap();
+        app.apply_theme(index, false);
+        assert_eq!(app.preferences.window_opacity, 0.8);
+        assert!(app.preferences.shader_backgrounds_enabled);
+        assert_eq!(
+            catalog.get(&id).colors.status_background,
+            crate::theme::parse_color("#345678").unwrap()
+        );
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_dirty_revert_and_failed_save_preserve_pending_changes() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-appearance-failure-{:032x}",
+            fastrand::u128(..)
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.ensure_appearance_baseline();
+        let snapshot = app.capture_settings_snapshot();
+        app.preferences.typography.shell.size += 2.0;
+        assert!(app.appearance_is_dirty());
+        app.restore_settings_snapshot(snapshot);
+        assert!(!app.appearance_is_dirty());
+        app.start_personal_theme_draft();
+        app.theme_editor_document.as_mut().unwrap()["version"] = json!(99999);
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("invalid color");
+        let before = app.preferences.clone();
+        app.save_appearance_copy();
+        assert!(app
+            .appearance_save_status
+            .as_deref()
+            .unwrap()
+            .starts_with("Save failed:"));
+        assert!(app.appearance_is_dirty());
+        assert_eq!(
+            serde_json::to_value(&app.preferences).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+        assert_eq!(
+            next_theme_version(
+                "Theme v2",
+                ["Theme v1", "Theme v7", "Other v90"].into_iter()
+            ),
+            "Theme v8"
+        );
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_background_context_menu_opens_and_resets_the_right_surface() {
+        for dock in [true, false] {
+            let mut app = ButtonsApp::empty(Preferences::default());
+            app.ensure_appearance_baseline();
+            app.preferences.dock_background_override = Some("#123456".into());
+            app.preferences.status_background_override = Some("#345678".into());
+            let ctx = egui::Context::default();
+            fonts::install(&ctx, &app.font_catalog);
+            let mut render = |events| {
+                ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(900.0, 700.0),
+                        )),
+                        events,
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        if dock {
+                            egui::SidePanel::left("test-dock")
+                                .show(ctx, |ui| app.command_dock_contents(ui, true));
+                        } else {
+                            app.status_bar(ctx);
+                        }
+                    },
+                )
+            };
+            render(vec![]);
+            let pos = if dock {
+                egui::pos2(40.0, 650.0)
+            } else {
+                egui::pos2(850.0, 680.0)
+            };
+            render(pointer_events(pos, egui::PointerButton::Secondary, true));
+            render(pointer_events(pos, egui::PointerButton::Secondary, false));
+            let menu = render(vec![]);
+            assert!(text_position(
+                &menu,
+                if dock {
+                    "Dock background"
+                } else {
+                    "Status bar background"
+                }
+            )
+            .is_some());
+            let reset =
+                text_position(&menu, "Use theme color").expect("background reset menu item");
+            render(pointer_events(reset, egui::PointerButton::Primary, true));
+            render(pointer_events(reset, egui::PointerButton::Primary, false));
+            assert_eq!(app.preferences.dock_background_override.is_none(), dock);
+            assert_eq!(app.preferences.status_background_override.is_none(), !dock);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_footer_button_saves_only_after_a_change() {
+        let base =
+            std::env::temp_dir().join(format!("buttonscli-footer-{:032x}", fastrand::u128(..)));
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(
+            NativeStore::open(
+                crate::storage::paths::NativeDataRoot(base.join("native")),
+                base.join("legacy"),
+            )
+            .unwrap(),
+        );
+        app.ensure_appearance_baseline();
+        app.settings_tab = SettingsTab::Fonts;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(720.0, 520.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default()
+                        .show(ctx, |ui| app.settings_contents(ui, ctx, &mut None));
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let pos = text_position(&output, "● Save copy").expect("footer button visible");
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert!(app.appearance_save_status.is_none());
+        app.preferences.typography.shell.size += 2.0;
+        render(&mut app, vec![]);
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert!(app
+            .appearance_save_status
+            .as_deref()
+            .unwrap()
+            .starts_with("Saved "));
+        assert!(!app.appearance_is_dirty());
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
     use super::*;
 
     #[cfg(target_os = "windows")]
@@ -13681,6 +14330,7 @@ Start-Sleep -Seconds 300
                 app.settings_embedded = true;
                 app.settings_tab = SettingsTab::Themes;
                 app.theme_settings_tab = ThemeSettingsTab::Shaders;
+                app.ensure_appearance_baseline();
                 app.start_current_appearance_draft();
                 app.theme_editor_document.as_mut().unwrap()["effects"]["shaderBackground"] =
                     json!(crate::theme::ShaderBackground::default());
@@ -16130,7 +16780,7 @@ Start-Sleep -Seconds 300
                         !text.contains("use of") || !text.contains(" ID "),
                         "duplicate widget ID: {text}"
                     );
-                    if text == &revert_label {
+                    if text == &revert_label || text == "● Save copy" {
                         footer_found = true;
                         let bounds = clipped.shape.visual_bounding_rect();
                         assert!(

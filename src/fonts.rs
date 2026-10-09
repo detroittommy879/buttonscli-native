@@ -800,7 +800,7 @@ pub struct Typography {
 
 /// Session-local terminal typography, independent of application chrome.
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct PaneFont {
     pub zone: FontZone,
     pub bold_weight: u16,
