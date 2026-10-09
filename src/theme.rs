@@ -88,6 +88,22 @@ impl ThemeCatalog {
         }
     }
 
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn import_browser_document(&mut self, document: &Value) -> Result<String, String> {
+        validate_personal_document(document)?;
+        let source_id = document["metadata"]["id"].as_str().unwrap();
+        let identity = format!("browser:{source_id}");
+        let mut theme = parse_legacy_value(source_id, document, ThemeSource::Personal)
+            .map_err(|error| error.to_string())?;
+        theme.id.clone_from(&identity);
+        if let Some(existing) = self.themes.iter_mut().find(|theme| theme.id == identity) {
+            *existing = theme;
+        } else {
+            self.themes.push(theme);
+        }
+        Ok(identity)
+    }
+
     pub fn all(&self) -> &[ThemeDefinition] {
         &self.themes
     }
@@ -243,7 +259,6 @@ impl ThemeCatalog {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
     let valid_metadata = |key: &str| {
         document["metadata"][key]
@@ -1063,6 +1078,27 @@ fn dim_hex(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn browser_import_preserves_identity_and_rejects_invalid_documents() {
+        let mut catalog = super::ThemeCatalog::load();
+        let count = catalog.all().len();
+        let mut document: serde_json::Value =
+            serde_json::from_str(super::BUNDLED_THEME_JSON[0].1).unwrap();
+        let id = catalog.import_browser_document(&document).unwrap();
+        assert!(id.starts_with("browser:"));
+        assert_eq!(catalog.all().len(), count + 1);
+        document["metadata"]["name"] = serde_json::json!("Updated browser theme");
+        assert_eq!(catalog.import_browser_document(&document).unwrap(), id);
+        assert_eq!(catalog.all().len(), count + 1);
+        assert_eq!(catalog.get(&id).name, "Updated browser theme");
+        document["version"] = serde_json::json!(2);
+        assert!(catalog.import_browser_document(&document).is_err());
+        assert!(catalog
+            .import_browser_document(&serde_json::json!({}))
+            .is_err());
+        assert_eq!(catalog.get(&id).name, "Updated browser theme");
+    }
+
     use super::*;
 
     #[test]

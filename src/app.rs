@@ -619,6 +619,10 @@ pub struct ButtonsApp {
     demo_lines: Vec<String>,
     #[cfg(target_arch = "wasm32")]
     demo_input: String,
+    #[cfg(target_arch = "wasm32")]
+    browser_theme_documents: Vec<serde_json::Value>,
+    #[cfg(target_arch = "wasm32")]
+    browser_ctx: egui::Context,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -1093,6 +1097,19 @@ impl ButtonsApp {
                 log::warn!("font skipped: {warning}");
             }
         }
+        #[cfg(target_arch = "wasm32")]
+        {
+            app.browser_ctx = cc.egui_ctx.clone();
+            let documents: Vec<serde_json::Value> = cc
+                .storage
+                .and_then(|storage| eframe::get_value(storage, "browser-themes"))
+                .unwrap_or_default();
+            for document in documents.into_iter().take(16) {
+                if app.themes.import_browser_document(&document).is_ok() {
+                    app.browser_theme_documents.push(document);
+                }
+            }
+        }
         fonts::install(&cc.egui_ctx, &app.font_catalog);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -1450,6 +1467,10 @@ impl ButtonsApp {
             ],
             #[cfg(target_arch = "wasm32")]
             demo_input: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            browser_theme_documents: Vec::new(),
+            #[cfg(target_arch = "wasm32")]
+            browser_ctx: egui::Context::default(),
         }
     }
 
@@ -2840,12 +2861,20 @@ impl ButtonsApp {
                 "On branch main".into(),
                 "nothing to commit, working tree clean".into(),
             ]),
+            "pwd" => self.demo_lines.push("/home/visitor/buttonscli-demo".into()),
+            "df -h" => self.demo_lines.extend([
+                "Filesystem       Size  Used  Avail  Use%  Mounted on".into(),
+                "browser-demo      1G     0     1G    0%  / (simulated)".into(),
+            ]),
+            value if value.starts_with("echo ") => self
+                .demo_lines
+                .push(value[5..].trim_matches(['\"', '\'']).to_owned()),
             "uname" | "uname -a" => self
                 .demo_lines
                 .push("ButtonsCLI wasm32 browser-demo #1 SMP".into()),
             "colors" => self.demo_lines.extend([
                 "red  green  yellow  blue  magenta  cyan".into(),
-                "Four native themes are available from Settings.".into(),
+                "Browse the theme library in Settings, or load a theme JSON file.".into(),
             ]),
             other => self
                 .demo_lines
@@ -2854,8 +2883,57 @@ impl ButtonsApp {
     }
 
     #[cfg(target_arch = "wasm32")]
+    pub(crate) fn open_browser_settings(&mut self) {
+        self.show_localization_onboarding = false;
+        self.preferences.localization.first_run_language_confirmed = true;
+        self.show_settings = true;
+        self.settings_tab = SettingsTab::Themes;
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn import_browser_theme(&mut self, json: &str) -> Result<String, String> {
+        if json.len() > 1_048_576 {
+            return Err("Theme files must be smaller than 1 MB.".into());
+        }
+        let document: serde_json::Value =
+            serde_json::from_str(json).map_err(|error| format!("Invalid theme JSON: {error}"))?;
+        let existing = self
+            .browser_theme_documents
+            .iter()
+            .position(|saved| saved["metadata"]["id"] == document["metadata"]["id"]);
+        if existing.is_none() && self.browser_theme_documents.len() >= 16 {
+            return Err("This browser preview supports up to 16 imported themes.".into());
+        }
+        let id = self.themes.import_browser_document(&document)?;
+        if let Some(index) = existing {
+            self.browser_theme_documents[index] = document;
+        } else {
+            self.browser_theme_documents.push(document);
+        }
+        let index = self
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == id)
+            .unwrap();
+        let name = self.themes.get(&id).name.clone();
+        self.apply_theme(index, false);
+        self.browser_ctx.request_repaint();
+        Ok(name)
+    }
+
+    #[cfg(target_arch = "wasm32")]
     fn web_demo(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
+        let terminal = &self
+            .themes
+            .get(&self.preferences.terminal_theme_id)
+            .terminal_colors;
+        let foreground = crate::theme::parse_color(&terminal.foreground).unwrap_or(colors.text);
+        let font = self
+            .font_catalog
+            .font_id(&self.preferences.typography.terminal, true);
         ui.spaced_label(
             RichText::new("SANDBOX TERMINAL")
                 .strong()
@@ -2873,7 +2951,7 @@ impl ButtonsApp {
             .max_height((ui.available_height() - 52.0).max(120.0))
             .show(ui, |ui| {
                 for line in &self.demo_lines {
-                    ui.spaced_label(RichText::new(line).monospace().color(colors.text));
+                    ui.spaced_label(RichText::new(line).font(font.clone()).color(foreground));
                 }
             });
         ui.separator();
@@ -2886,7 +2964,7 @@ impl ButtonsApp {
                             .font_id(&self.preferences.typography.terminal, true),
                     )
                     .hint_text(crate::i18n::literal(&self.locale, "type help"))
-                    .desired_width(f32::INFINITY),
+                    .desired_width((ui.available_width() - 64.0).max(40.0)),
             );
             let submit =
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -3483,7 +3561,15 @@ impl ButtonsApp {
                         }
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.spaced_label(RichText::new("NATIVE · RUST").small().color(colors.muted));
+                        ui.spaced_label(
+                            RichText::new(if cfg!(target_arch = "wasm32") {
+                                "WEB · RUST"
+                            } else {
+                                "NATIVE · RUST"
+                            })
+                            .small()
+                            .color(colors.muted),
+                        );
                     });
                 });
             });
@@ -3927,7 +4013,6 @@ impl ButtonsApp {
             });
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn preset_bar(&mut self, ctx: &egui::Context) {
         if !self.preferences.show_presets {
             return;
@@ -12551,7 +12636,6 @@ fn tab_action_menu(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
     if preset.send_enter {
         format!(
@@ -12592,7 +12676,6 @@ fn provider_key(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_button_menu(
     ui: &mut egui::Ui,
     response: &egui::Response,
@@ -12610,7 +12693,6 @@ fn preset_button_menu(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(
     ui: &mut egui::Ui,
     locale: &str,
@@ -13006,7 +13088,10 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         #[cfg(target_arch = "wasm32")]
-        eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
+        {
+            eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
+            eframe::set_value(_storage, "browser-themes", &self.browser_theme_documents);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         self.persist_native_preferences();
     }
@@ -13060,15 +13145,29 @@ impl eframe::App for ButtonsApp {
         self.tab_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.terminal_search_bar(ctx);
-        #[cfg(not(target_arch = "wasm32"))]
         self.preset_bar(ctx);
         self.status_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.sidebar(ctx);
 
         let colors = self.colors();
+        #[cfg(not(target_arch = "wasm32"))]
+        let terminal_background = colors.canvas;
+        #[cfg(target_arch = "wasm32")]
+        let terminal_background = crate::theme::parse_color(
+            &self
+                .themes
+                .get(&self.preferences.terminal_theme_id)
+                .terminal_colors
+                .background,
+        )
+        .unwrap_or(colors.canvas);
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(colors.canvas).inner_margin(8.0))
+            .frame(
+                egui::Frame::new()
+                    .fill(terminal_background)
+                    .inner_margin(8.0),
+            )
             .show(ctx, |ui| {
                 if let Some(notice) = &self.notice {
                     ui.spaced_colored_label(colors.warning, notice);

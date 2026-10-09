@@ -1,35 +1,76 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Try ButtonsCLI</title>
-    <style>
-      html, body { margin: 0; width: 100%; height: 100%; background: #090c16; }
-      body { overflow: hidden; }
-      canvas { width: 100%; height: 100%; display: block; }
-      #fallback { display: none; box-sizing: border-box; height: 100%; padding: 3rem;
-        color: #dce4f2; font: 16px/1.6 system-ui, sans-serif; }
-      #fallback strong { color: #38bdf8; }
-    </style>
-  </head>
-  <body>
-    <canvas id="buttonscli_canvas"></canvas>
-    <div id="fallback"><strong>ButtonsCLI needs WebGL.</strong><br />
-      This browser or virtual machine has graphics acceleration disabled. Try a
-      current hardware-accelerated browser to run the interactive demo.</div>
-    <script type="module">
-      import init, { WebHandle } from "./pkg/buttonscli.js";
-      try {
-        await init();
-        const app = new WebHandle();
-        await app.start(document.getElementById("buttonscli_canvas"));
-        window.buttonscli = app;
-      } catch (error) {
-        document.getElementById("buttonscli_canvas").style.display = "none";
-        document.getElementById("fallback").style.display = "block";
-        console.error("ButtonsCLI web demo failed to start", error);
-      }
-    </script>
-  </body>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<title>Try ButtonsCLI</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; background: #090c16; color: #dce4f2; }
+body { display: flex; flex-direction: column; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #263044; }
+header span { color: #9aaac1; }
+button, .file-button { border: 1px solid #35435a; border-radius: 6px; padding: 6px 10px; background: #182238; color: inherit; font: inherit; cursor: pointer; }
+button:hover, .file-button:hover { background: #263853; }
+button:disabled { opacity: .5; cursor: wait; }
+.file-button:focus-within { outline: 2px solid #38bdf8; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+#stage { position: relative; flex: 1; min-height: 0; }
+canvas { width: 100%; height: 100%; display: block; }
+#status { font-size: 12px; }
+#fallback { display: none; padding: 2rem; max-width: 600px; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: #090c16; }
+</style>
+</head>
+<body>
+<header>
+<strong>ButtonsCLI · browser preview</strong>
+<button id="settings" disabled>Themes &amp; Settings</button>
+<label class="file-button">Load theme JSON<input id="theme-file" type="file" accept=".json,application/json" disabled /></label>
+<span id="status" role="status">Loading app…</span>
+</header>
+<main id="stage">
+<canvas id="buttonscli_canvas" aria-label="Interactive ButtonsCLI preview"></canvas>
+<div id="loading">Starting ButtonsCLI…</div>
+<div id="fallback" role="alert"><strong>The preview could not start.</strong><p id="failure-detail"></p><p>Serve the complete web folder over HTTP(S), with WebGL enabled in your browser.</p><button id="retry">Try again</button></div>
+</main>
+<script type="module">
+const status = document.getElementById("status");
+const file = document.getElementById("theme-file");
+const settings = document.getElementById("settings");
+document.getElementById("retry").addEventListener("click", () => location.reload());
+try {
+  const { default: init, WebHandle } = await import("./pkg/buttonscli.js");
+  await init();
+  const app = new WebHandle();
+  await app.start(document.getElementById("buttonscli_canvas"));
+  window.buttonscli = app;
+  document.getElementById("loading").remove();
+  settings.disabled = file.disabled = false;
+  status.textContent = "Fake shell · settings and themes stay in this browser";
+  settings.addEventListener("click", () => {
+    try { app.open_settings(); } catch (error) { status.textContent = String(error); }
+  });
+  file.addEventListener("change", async () => {
+    const selected = file.files[0];
+    if (!selected) return;
+    try {
+      if (selected.size > 1048576) throw new Error("Theme files must be smaller than 1 MB.");
+      const name = app.import_theme(await selected.text());
+      status.textContent = `Loaded ${name}`;
+    } catch (error) {
+      status.textContent = `Could not load theme: ${error}`;
+    } finally { file.value = ""; }
+  });
+} catch (error) {
+  document.getElementById("loading").remove();
+  document.getElementById("buttonscli_canvas").style.display = "none";
+  document.getElementById("fallback").style.display = "block";
+  document.getElementById("failure-detail").textContent = String(error);
+  status.textContent = "Preview unavailable";
+  console.error("ButtonsCLI web demo failed to start", error);
+}
+</script>
+</body>
 </html>
