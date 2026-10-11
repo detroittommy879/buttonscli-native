@@ -27,4 +27,7 @@
   native/WASM/adapter Clippy pass. Held-parser-lock input/idle work took 0.1 ms.
 - Trap: PowerShell Console.ReadKey is not a raw protocol probe; ConPTY consumes
   some OSC queries. Use parser-event tests plus an owned ConPTY echo fixture.
-- Optimized build/startup check pending. No multi-hour or other-OS certification.
+- Optimized Windows build and isolated release startup pass; smoke teardown logs
+  the expected closed-pipe error. Code commit: `e19772c`.
+- No multi-hour or other-OS certification; use the rebuilt
+  `target/release/buttonscli.exe` for real-use confirmation.
