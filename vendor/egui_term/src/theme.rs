@@ -85,6 +85,35 @@ impl Default for TerminalTheme {
 }
 
 impl TerminalTheme {
+    /// Resolve an ANSI/OSC palette index to the displayed theme color.
+    pub fn query_color(&self, index: usize) -> ansi::Rgb {
+        let color = if index < 256 {
+            ansi::Color::Indexed(index as u8)
+        } else {
+            let named = match index {
+                256 | 258 => NamedColor::Foreground,
+                257 => NamedColor::Background,
+                259 => NamedColor::DimBlack,
+                260 => NamedColor::DimRed,
+                261 => NamedColor::DimGreen,
+                262 => NamedColor::DimYellow,
+                263 => NamedColor::DimBlue,
+                264 => NamedColor::DimMagenta,
+                265 => NamedColor::DimCyan,
+                266 => NamedColor::DimWhite,
+                267 => NamedColor::BrightForeground,
+                _ => NamedColor::DimForeground,
+            };
+            ansi::Color::Named(named)
+        };
+        let color = self.get_color(color);
+        ansi::Rgb {
+            r: color.r(),
+            g: color.g(),
+            b: color.b(),
+        }
+    }
+
     pub fn new(palette: Box<ColorPalette>) -> Self {
         Self {
             palette,

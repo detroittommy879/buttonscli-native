@@ -237,12 +237,21 @@ impl<'a> TerminalView<'a> {
     }
 
     fn focus(self, layout: &Response) -> Self {
-        if self.has_focus
+        let focused = layout.ctx.memory(|memory| memory.focused());
+        // A button can retain focus after an activation click or menu action.
+        // Only an actual text editor (or explicit workspace navigation) may
+        // keep it from the requested terminal. Inspect the pinned egui state
+        // rather than treating every focused control as a keyboard owner.
+        let editing_text = focused.is_some_and(|id| {
+            id != layout.id
+                && egui::text_edit::TextEditState::load(&layout.ctx, id)
+                    .is_some()
+        });
+        if self.interactive
+            && self.has_focus
             && !layout.context_menu_opened()
             && !layout.ctx.memory(|memory| memory.any_popup_open())
-            && layout.ctx.memory(|memory| {
-                memory.focused().is_none() || memory.has_focus(layout.id)
-            })
+            && !editing_text
         {
             // request_focus resets egui's event filter, even when this widget
             // already owns focus. Preserve the filter across terminal frames.
@@ -314,6 +323,19 @@ impl<'a> TerminalView<'a> {
             let mut input_actions = vec![];
 
             match event {
+                // Loss and regain may arrive together, with final focused=true.
+                // Cancel stale composition/drag state at the actual boundary.
+                egui::Event::WindowFocused(focused) => {
+                    if !focused {
+                        state.ime_composing = false;
+                        state.is_dragged = false;
+                        state.is_selecting = false;
+                        state.selection_scroll_at = None;
+                    }
+                    if self.has_focus {
+                        self.backend.report_window_focus(focused);
+                    }
+                },
                 egui::Event::Ime(event)
                     if self.has_focus
                         && layout.has_focus()

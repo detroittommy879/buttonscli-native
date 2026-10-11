@@ -2437,18 +2437,27 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn process_terminal_events(&mut self) {
-        while let Ok((id, event)) = self.events_rx.try_recv() {
+    fn process_terminal_events(&mut self) -> bool {
+        // Leave time for keyboard handling even if a program floods events.
+        for _ in 0..256 {
+            let Ok((id, event)) = self.events_rx.try_recv() else {
+                return false;
+            };
+            let theme = matches!(event, PtyEvent::ColorRequest(..))
+                .then(|| self.terminal_presentation_for(id).terminal());
             if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
+                tab.backend.reply_to_pty_event(&event, theme.as_ref());
                 match event {
                     PtyEvent::Title(title) if !title.trim().is_empty() => {
                         tab.reported_title = Some(title);
                     }
                     PtyEvent::Exit | PtyEvent::ChildExit(_) => tab.exited = true,
+                    PtyEvent::ResetTitle => tab.reported_title = None,
                     _ => {}
                 }
             }
         }
+        true
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -11141,6 +11150,18 @@ impl ButtonsApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.viewport_id() == egui::ViewportId::ROOT
+            && ctx.input(|input| {
+                input
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, egui::Event::WindowFocused(false)))
+            })
+        {
+            // A menu left open while switching apps must not silently gate
+            // terminal keys when this window is activated again.
+            ctx.memory_mut(|memory| memory.close_popup());
+        }
         if self.show_localization_onboarding {
             return;
         }
@@ -13085,6 +13106,10 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
     }
 }
 
+#[cfg(all(test, windows))]
+#[path = "input_recovery_tests.rs"]
+mod input_recovery_tests;
+
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         #[cfg(target_arch = "wasm32")]
@@ -13130,7 +13155,9 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.maintain_quick_secrets(ctx);
         #[cfg(not(target_arch = "wasm32"))]
-        self.process_terminal_events();
+        if self.process_terminal_events() {
+            ctx.request_repaint();
+        }
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -15553,6 +15580,97 @@ Start-Sleep -Seconds 300
         );
         assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
         assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // Activation can leave an ordinary workspace control owning egui focus.
+        // Default terminal ownership must recover on the first returning key.
+        let toolbar_focus = egui::Id::new("keyboard-return-toolbar");
+        ctx.memory_mut(|memory| memory.request_focus(toolbar_focus));
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("returned".into()),
+            ],
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+        assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+
+        // A loss and regain may be batched into one frame after an idle period.
+        render(
+            app,
+            vec![egui::Event::Ime(egui::ImeEvent::Preedit("pending".into()))],
+        );
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(false),
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("after-ime".into()),
+            ],
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // An open menu gates keys, but switching away dismisses that gate.
+        let popup = egui::Id::new("return-popup");
+        ctx.memory_mut(|memory| memory.open_popup(popup));
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(app, vec![egui::Event::Text("menu-owns-this".into())]);
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(false),
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("menu-dismissed".into()),
+            ],
+        );
+        assert!(!ctx.memory(|memory| memory.any_popup_open()));
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // An actual search editor must keep its input while the terminal is
+        // the default owner, including across native-window activation.
+        app.show_terminal_search = true;
+        app.terminal_search_focus = true;
+        render(app, vec![]);
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("find-me".into()),
+            ],
+        );
+        assert_eq!(app.terminal_search_query, "find-me");
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        app.show_terminal_search = false;
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+
+        // Exercise repeated idle returns, key releases, and batched activation.
+        for cycle in 0..100 {
+            let before = app.tabs[0].output.snapshot().input_sequence;
+            render_input(
+                app,
+                vec![
+                    egui::Event::WindowFocused(false),
+                    egui::Event::Text("background".into()),
+                ],
+                false,
+            );
+            assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+            render(
+                app,
+                vec![
+                    egui::Event::WindowFocused(true),
+                    egui::Event::Text(format!("return-{cycle}")),
+                ],
+            );
+            assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+            assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        }
 
         // F6 deliberately transfers ownership to UI controls; F6 returns it.
         let before = app.tabs[0].output.snapshot().input_sequence;
