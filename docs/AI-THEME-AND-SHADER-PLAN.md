@@ -1,5 +1,9 @@
 # Expressive AI themes and generated shaders
 
+October 10: [current roadmap](MIGRATION-AI-ROADMAP-2026-10-10.md) supersedes older
+palette-only and missing-renderer assessments. Typography generation and
+restricted backgrounds exist; screenshot generation and shader editing remain.
+
 Assessment: 2026-10-07, native source at `4f32fde`. **Proposal only; no app or prompt implementation changed.** The legacy app was inspected read-only. `THEME-EVALS.md` describes the previous experiment; its palette-only restrictions are not requirements for this work.
 
 The recommendation is to unlock the full existing appearance format first, give models the complete bundled-font catalog, and make creative controls measurable. Then add restricted, generated WGSL background shaders and overlays. Add true terminal post-processing after an offscreen-rendering prototype proves it can preserve terminal interaction and performance. Both backgrounds and post-effects are feasible, but the second needs substantially more rendering work.

@@ -1,5 +1,9 @@
 # Product parity backlog
 
+October 10 audit: [current roadmap](MIGRATION-AI-ROADMAP-2026-10-10.md).
+Localization, theme CRUD, the agent loop and restricted shader backgrounds exist;
+older missing-feature descriptions below need scoped acceptance updates.
+
 This is the living reconstruction checklist for ButtonsCLI Native. Update it in
 the same commit as the behavior it describes. `PROGRESS.md` is the chronological
 journal, while `LIMITATIONS.md` remains the short user-facing summary of known
@@ -60,7 +64,7 @@ constraints.
 | Online fonts | Deferred | `src/data/fontCatalog.ts`, `src/services/fontLoader.ts` | Any future online download/caching requires a separate explicit opt-in task and offline-safe fallback. |
 | Gradient geometry | Partial | theme terminal gradient fields | Multi-stop linear, radial, conic, and repeating variants preserve type, angle, and named position and can be edited in personal themes; full animation parity remains. |
 | Terminal effects | Partial | `src/plugins/effects/`, `src/theme.rs`, `vendor/egui_term/src/view.rs` | Master-off, calm mode, focused-pane filtering, row banding, and bounded simple noise with idle ramp now work in source. HSync needs an offscreen renderer spike; TV noise has no original runtime implementation; glow belongs with Shader Lab; wallpaper is new feature work. See `docs/migration/OPTIONAL-EFFECTS-DECISION.md`. |
-| Theme CRUD/import/export/share | Missing | `src/services/customThemeStorage.ts`, `shareService.ts` | Create/edit/duplicate/delete themes; validate and round-trip legacy JSON; export/share without losing unknown compatible fields. |
+| Theme CRUD/import/export/share | Partial | `src/services/customThemeStorage.ts`, `shareService.ts` | Native CRUD/import/export exists with unknown-field preservation; sharing and broader GUI acceptance remain. |
 | Random/per-terminal/theme-all | Partial | native theme catalog and terminal palette | Stable-ID overrides, random current/all, persisted global default and theme-all are wired; verify 1/4/10 panes, imported themes and live PTY preservation on Windows. |
 | Colored dividers/rounded chrome | Partial | native pane renderer and theme settings | Visible dividers inherit the app theme or saved native overrides; a 0–16 point tab/chrome radius persists. Verify GUI dragging, scale, contrast and focus; theme editor/export remains. |
 | Theme designer | Partial | `src/services/themeDesignerService.ts`, `themeRecipeDesignerService.ts`, native `src/theme_generation.rs` | V03 generates a constrained palette through the selected provider, validates text contrast, makes at most one correction attempt, preserves non-palette/unknown fields, and offers candidate preview or draft/save with provider/model provenance. Entitlement and live provider/GUI acceptance remain open. |
@@ -92,7 +96,7 @@ preferences JSON.
 | Settings architecture | Partial | `src/components/SettingsDialog.tsx` | Every shipped feature has a discoverable setting; detached native window lets users see changes on the terminal. |
 | Profiles | Deferred | `src/store/profileStore.ts` | Resolve whether disabled legacy profile management should ship before rebuilding it. |
 | Guided onboarding | Missing | `src/components/AppOnboardingTour.tsx` | First-run tour and replay cover buttons, tabs, panes, status, and settings; fully keyboard accessible. |
-| Localization | Missing | `src/i18n/` | Externalize user-facing text, port supported locales, persist locale, and verify long/RTL strings where applicable. |
+| Localization | Partial | `src/i18n/` | 21 locale catalogs exist; finish missing UI literals, English fallbacks and long/RTL review. |
 | Display/web tabs | Deferred | `src/components/DisplayTabPane.tsx`, `src/services/webTabSecurity.ts` | Decide whether a native webview belongs in the lean product; if yes, enforce an explicit navigation/security policy. |
 | Accounts/entitlements/sync | Deferred | auth/entitlement stores | Reconfirm the service contract and open-source boundary before implementation. |
 | Feedback/contact/analytics | Deferred | feedback/contact/analytics services | Make telemetry opt-in and documented; do not silently revive legacy endpoints. |

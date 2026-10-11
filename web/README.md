@@ -1,5 +1,9 @@
 # Interactive browser preview
 
+The Windows builder writes optional `build-info.json` with revision, UTC time and
+WASM hash. Include it when hosting for a visible build stamp and content-hash
+cache invalidation. Manual builds still work without it.
+
 The WASM build runs the shared egui app UI with a fake terminal. Visitors can
 browse/search/apply the 563 bundled themes, change fonts and Settings, and use
 command preset buttons (including adding/editing presets). Theme colors and

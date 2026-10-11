@@ -26,6 +26,7 @@ canvas { width: 100%; height: 100%; display: block; }
 <body>
 <header>
 <strong>ButtonsCLI · browser preview</strong>
+<span id="build" title="Compiled source revision and build time"></span>
 <button id="settings" disabled>Themes &amp; Settings</button>
 <label class="file-button">Load theme JSON<input id="theme-file" type="file" accept=".json,application/json" disabled /></label>
 <span id="status" role="status">Loading app…</span>
@@ -41,8 +42,19 @@ const file = document.getElementById("theme-file");
 const settings = document.getElementById("settings");
 document.getElementById("retry").addEventListener("click", () => location.reload());
 try {
-  const { default: init, WebHandle } = await import("./pkg/buttonscli.js");
-  await init();
+  let version = "";
+  try {
+    const response = await fetch("./build-info.json", { cache: "no-store" });
+    if (response.ok) {
+      const receipt = await response.json();
+      version = receipt.wasmSha256;
+      document.getElementById("build").textContent = receipt.revision.slice(0, 8);
+      document.getElementById("build").title = `Built ${receipt.builtAt} · ${receipt.revision}`;
+    }
+  } catch { /* A receipt is optional for manually built packages. */ }
+  const suffix = version ? `?v=${encodeURIComponent(version)}` : "";
+  const { default: init, WebHandle } = await import(`./pkg/buttonscli.js${suffix}`);
+  await init({ module_or_path: new URL(`./pkg/buttonscli_bg.wasm${suffix}`, import.meta.url) });
   const app = new WebHandle();
   await app.start(document.getElementById("buttonscli_canvas"));
   window.buttonscli = app;
