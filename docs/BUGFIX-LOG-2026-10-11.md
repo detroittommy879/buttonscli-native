@@ -31,3 +31,12 @@
   the expected closed-pipe error. Code commit: `e19772c`.
 - No multi-hour or other-OS certification; use the rebuilt
   `target/release/buttonscli.exe` for real-use confirmation.
+
+## AI and localization implementation
+
+- Priority: translations → task models/retries/fallbacks → isolated LLM simulation. WASM compile/update deferred at user's request; macOS/Linux runtime acceptance deferred.
+- Preserve unrelated untracked 4HUMAN.md.
+- Shader follow-up reported by user: mixed per-pane shaders become inconsistent after controls/theme changes; Edit divider color/thickness has no visible effect; Calm sometimes appears enabled/disabled inconsistently. Reproduce with three tabs, differing shaders, Library/Edit/preview/source switching and Calm. Trace persisted preferences, per-PTY overrides and temporary preview restoration before changing renderer code.
+- Added a separate native translation supplement: 30 task/provider/theme/simulation controls across all 21 locales. Static audit reports missing keys/direct English candidates and locale/placeholder problems; current scan: 150 missing wrapped literals, 41 direct candidates, zero invalid locale/placeholder values. Translation coverage remains incomplete.
+- Restored the earlier keyboard log after initially replacing today's file; retain prior entries when adding work.
+
