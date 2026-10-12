@@ -20,6 +20,8 @@
 
 The old terminal-control skill recommended file/stdin/base64 for multiline/quote-heavy text, then retrying with slow typing if the prompt distorted a large paste. **The CLI/backend did not automatically detect corruption or replay with fallback.** No dedicated bracketed-paste framing is added by these raw/slow control paths. Do not retry a command with uncertain execution: it may already have run.
 
+Two concrete wait pitfalls: `run --tab active` re-resolves active on each poll, so changing focus can change the observed terminal; text matching searches retained history, so an old match can satisfy the wait. Pin the resolved PTY ID and observe only output after submission when improving this.
+
 Source pointers in `G:/ccc/z_terminals/w111erd`: `scripts/buttonsclictl.mjs`; `src-tauri/src/control_api.rs` (`resolve_control_payload`, `write_control_payload`, `wait_for_run_completion`); `src-tauri/src/main.rs:125` (`write_to_pty_bytes`); `src-tauri/src/control_mcp_helper_template.mjs`; `docs/architecture/terminal-control-cli.md`; `.claude/skills/buttonscli-terminal-control/SKILL.md` fallback guidance. The architecture doc has historical omissions; source is authoritative.
 
 ## Better approaches to research next
