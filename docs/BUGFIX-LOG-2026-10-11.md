@@ -53,5 +53,5 @@
 - User authorized OpenAI-det/gpt-5.6-terra. Corrected only that profile's leftover OpenRouter endpoint to https://api.openai.com/v1/responses under the native lock, with atomic replace/backup and unchanged key reference/model/task bindings. Never sent its key to OpenRouter.
 - Live acceptance passed: three gpt-5.6-terra Responses turns create/read/delete a synthetic virtual file; undo retains it. Test reads configured metadata/OS credential but owns all simulation state and does not change real files.
 - Initial fixture assertion used a loopback URL with an example.test-only fake transport; corrected its fixture endpoint. Updated full profile literals for the new API field.
-- Validation: 282 unit + 2 integration tests, 23 ignored; explicit OpenAI-det live simulation passes. Native strict Clippy, format, diff and translation checks pass. Release/startup pending; WASM remains deferred.
+- Validation: 282 unit + 2 integration tests, 23 ignored; explicit OpenAI-det live simulation passes. Native strict Clippy, format, diff and translation checks pass. Optimized Windows build and isolated startup pass (expected closed-pipe teardown). Code commit: 5ed3854. WASM remains deferred; no other-OS acceptance claim.
 
