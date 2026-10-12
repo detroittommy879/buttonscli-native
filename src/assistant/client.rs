@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
-use super::provider::{validate_endpoint, ProviderProfile};
+use super::provider::{validate_endpoint, ProviderApi, ProviderProfile};
 use super::reply::{flatten_content, AnswerBuffer, ReplyError, SseDecoder, StreamItem};
 use super::transport::{HttpTransport, Method, Request, ResponseHead, TransportError};
 
@@ -20,6 +20,7 @@ pub(crate) enum ClientError {
     Endpoint,
     Model,
     Http(u16),
+    HttpDetail(u16, String),
     Transport(TransportError),
     InvalidReply,
     Reply(ReplyError),
@@ -36,6 +37,7 @@ impl std::fmt::Display for ClientError {
             Self::Model => f.write_str("enter a model ID"),
             Self::Http(429) => f.write_str("provider returned HTTP 429 (rate limit or quota); wait or check the provider account"),
             Self::Http(status) => write!(f, "provider returned HTTP {status}"),
+            Self::HttpDetail(status, message) => write!(f, "HTTP {status}: {message}"),
             Self::Transport(error) => write!(f, "{error}"),
             Self::InvalidReply => f.write_str("provider returned an invalid response"),
             Self::Reply(error) => write!(f, "assistant response could not be read: {error:?}"),
@@ -47,34 +49,24 @@ impl std::fmt::Display for ClientError {
     }
 }
 
-pub(crate) fn completion_url(endpoint: &str) -> Result<String, ClientError> {
-    validate_endpoint(endpoint).map_err(|_| ClientError::Endpoint)?;
-    let mut url = url::Url::parse(endpoint).map_err(|_| ClientError::Endpoint)?;
-    let path = url.path().trim_end_matches('/');
-    if path.is_empty() {
-        url.set_path("/v1/chat/completions");
-    } else if path.ends_with("/v1") {
-        let path = format!("{path}/chat/completions");
-        url.set_path(&path);
-    }
-    Ok(url.to_string())
+#[cfg(test)]
+fn completion_url(endpoint: &str) -> Result<String, ClientError> {
+    provider_url(&ProviderProfile {
+        endpoint: endpoint.into(),
+        api: ProviderApi::ChatCompletions,
+        ..Default::default()
+    })
 }
 
-fn provider_url(provider: &ProviderProfile) -> Result<String, ClientError> {
-    let endpoint = completion_url(&provider.endpoint)?;
-    let mut url = url::Url::parse(&endpoint).map_err(|_| ClientError::Endpoint)?;
-    let path = url.path().trim_end_matches('/');
-    let path = if provider.uses_responses() {
-        path.strip_suffix("/chat/completions")
-            .map(|base| format!("{base}/responses"))
-    } else {
-        path.strip_suffix("/responses")
-            .map(|base| format!("{base}/chat/completions"))
+pub(crate) fn provider_url(provider: &ProviderProfile) -> Result<String, ClientError> {
+    validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
+    let base = provider.base_url().ok_or(ClientError::Endpoint)?;
+    let leaf = match provider.resolved_api() {
+        ProviderApi::Responses => "responses",
+        ProviderApi::Anthropic => "messages",
+        _ => "chat/completions",
     };
-    if let Some(path) = path {
-        url.set_path(&path);
-    }
-    Ok(url.into())
+    Ok(format!("{base}/{leaf}"))
 }
 
 fn completion_body(
@@ -84,7 +76,7 @@ fn completion_body(
     stream: bool,
 ) -> Value {
     let mut messages = Vec::with_capacity(history.len() + 2);
-    if !provider.uses_responses() {
+    if provider.resolved_api() == ProviderApi::ChatCompletions {
         messages.push(json!({"role":"system", "content":prompts.0}));
     }
     messages.extend(history.iter().map(|(assistant, content)| {
@@ -93,7 +85,9 @@ fn completion_body(
         })
     }));
     messages.push(json!({"role":"user", "content":prompts.1}));
-    if provider.uses_responses() {
+    if provider.resolved_api() == ProviderApi::Anthropic {
+        json!({"model":provider.model, "system":prompts.0, "messages":messages, "stream":stream, "max_tokens":4096})
+    } else if provider.uses_responses() {
         json!({"model":provider.model, "instructions":prompts.0, "input":messages, "stream":stream, "store":false})
     } else {
         json!({"model":provider.model, "messages":messages, "stream":stream})
@@ -101,37 +95,15 @@ fn completion_body(
 }
 
 pub(crate) fn models_url(endpoint: &str) -> Result<String, ClientError> {
-    let endpoint = completion_url(endpoint)?;
-    let mut url = url::Url::parse(&endpoint).map_err(|_| ClientError::Endpoint)?;
-    let mut segments: Vec<String> = url
-        .path_segments()
-        .ok_or(ClientError::Endpoint)?
-        .filter(|segment| !segment.is_empty())
-        .map(str::to_owned)
-        .collect();
-    if segments.ends_with(&["chat".into(), "completions".into()]) {
-        segments.truncate(segments.len() - 2);
-    } else if matches!(
-        segments.last().map(String::as_str),
-        Some("completions" | "responses")
-    ) {
-        segments.pop();
-    } else if !matches!(segments.last().map(String::as_str), Some("models")) {
-        if let Some(index) = segments.iter().rposition(|segment| segment == "v1") {
-            segments.truncate(index + 1);
-        }
-    }
-    if segments.last().is_none_or(|segment| segment != "models") {
-        segments.push("models".into());
-    }
-    {
-        let mut path = url.path_segments_mut().map_err(|_| ClientError::Endpoint)?;
-        path.clear();
-        for segment in segments {
-            path.push(&segment);
-        }
-    }
-    Ok(url.to_string())
+    validate_endpoint(endpoint).map_err(|_| ClientError::Endpoint)?;
+    let provider = ProviderProfile {
+        endpoint: endpoint.into(),
+        ..Default::default()
+    };
+    Ok(format!(
+        "{}/models",
+        provider.base_url().ok_or(ClientError::Endpoint)?
+    ))
 }
 
 pub(crate) fn collect_models(body: &[u8]) -> Result<Vec<String>, ClientError> {
@@ -144,7 +116,9 @@ pub(crate) fn collect_models(body: &[u8]) -> Result<Vec<String>, ClientError> {
                     .as_str()
                     .or_else(|| entry.get("id").and_then(Value::as_str))
                     .or_else(|| entry.get("name").and_then(Value::as_str));
-                if let Some(id) = id.map(str::trim).filter(|id| !id.is_empty()) {
+                if let Some(id) = id.map(str::trim).filter(|id| {
+                    !id.is_empty() && id.len() <= 256 && !id.chars().any(char::is_control)
+                }) {
                     models.insert(id.to_owned());
                 }
             }
@@ -158,19 +132,50 @@ pub(crate) fn discover_models(
     provider: &ProviderProfile,
     key: Option<Zeroizing<String>>,
 ) -> Result<Vec<String>, ClientError> {
-    let url = models_url(&provider.endpoint)?;
-    let response = transport
-        .execute(Request {
-            method: Method::Get,
-            url,
-            body: None,
-            key,
-        })
-        .map_err(ClientError::Transport)?;
-    if !(200..300).contains(&response.status) {
-        return Err(ClientError::Http(response.status));
+    let primary = match &provider.models_endpoint {
+        Some(endpoint) => {
+            validate_endpoint(endpoint).map_err(|_| ClientError::Endpoint)?;
+            endpoint.clone()
+        }
+        None => models_url(&provider.endpoint)?,
+    };
+    let mut candidates = vec![primary];
+    if provider.models_endpoint.is_none() {
+        let base = provider.base_url().ok_or(ClientError::Endpoint)?;
+        if !base.rsplit('/').next().is_some_and(|segment| {
+            segment
+                .strip_prefix('v')
+                .is_some_and(|v| !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()))
+        }) {
+            candidates.push(format!("{base}/v1/models"));
+        }
     }
-    collect_models(&response.body)
+    for (index, mut url) in candidates.iter().cloned().enumerate() {
+        if provider.resolved_api() == ProviderApi::Anthropic {
+            url.push_str("?limit=500");
+        }
+        let response = transport
+            .execute(Request {
+                anthropic: provider.resolved_api() == ProviderApi::Anthropic,
+                method: Method::Get,
+                url,
+                body: None,
+                key: key.clone(),
+            })
+            .map_err(ClientError::Transport)?;
+        if matches!(response.status, 404 | 405) && index + 1 < candidates.len() {
+            continue;
+        }
+        if !(200..300).contains(&response.status) {
+            return Err(http_error(
+                response.status,
+                &response.body,
+                key.as_deref().map(String::as_str),
+            ));
+        }
+        return collect_models(&response.body);
+    }
+    Err(ClientError::InvalidReply)
 }
 
 pub(crate) fn test_connection(
@@ -183,13 +188,23 @@ pub(crate) fn test_connection(
         return Err(ClientError::Model);
     }
     let mut body = completion_body(provider, ("Reply briefly.", "Reply OK."), &[], false);
-    body[if provider.uses_responses() {
-        "max_output_tokens"
-    } else {
-        "max_tokens"
-    }] = json!(if provider.uses_responses() { 512 } else { 4 });
+    match provider.resolved_api() {
+        ProviderApi::Responses => body["max_output_tokens"] = json!(1024),
+        ProviderApi::Anthropic => body["max_tokens"] = json!(1024),
+        _ => {
+            let official = url::Url::parse(&provider.endpoint)
+                .is_ok_and(|url| url.host_str() == Some("api.openai.com"));
+            body[if official {
+                "max_completion_tokens"
+            } else {
+                "max_tokens"
+            }] = json!(1024);
+        }
+    }
+    let redaction_key = key.clone();
     let response = transport
         .execute(Request {
+            anthropic: provider.resolved_api() == ProviderApi::Anthropic,
             method: Method::Post,
             url: provider_url(provider)?,
             body: Some(body),
@@ -197,9 +212,79 @@ pub(crate) fn test_connection(
         })
         .map_err(ClientError::Transport)?;
     if !(200..300).contains(&response.status) {
-        return Err(ClientError::Http(response.status));
+        return Err(http_error(
+            response.status,
+            &response.body,
+            redaction_key.as_deref().map(String::as_str),
+        ));
     }
-    completion_content(&response.body, provider.uses_responses()).map(|_| ())
+    provider_content(&response.body, provider).map(|_| ())
+}
+
+fn http_error(status: u16, body: &[u8], key: Option<&str>) -> ClientError {
+    let value: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(_) => return ClientError::Http(status),
+    };
+    let message = value["error"]["message"]
+        .as_str()
+        .or_else(|| value["message"].as_str())
+        .or_else(|| value["detail"].as_str());
+    let Some(message) = message else {
+        return ClientError::Http(status);
+    };
+    let message = match key.filter(|key| !key.is_empty()) {
+        Some(key) => message.replace(key, "[redacted]"),
+        None => message.to_owned(),
+    };
+    let message = crate::session::context::redact_obvious_secrets(&message, key);
+    ClientError::HttpDetail(
+        status,
+        message
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(512)
+            .collect(),
+    )
+}
+
+/// Explicit setup probe only; conversation requests never replay across formats.
+pub(crate) fn detect_format(
+    transport: &dyn HttpTransport,
+    provider: &ProviderProfile,
+    key: Option<Zeroizing<String>>,
+) -> Result<ProviderApi, ClientError> {
+    let mut formats = vec![provider.resolved_api()];
+    for api in [
+        ProviderApi::ChatCompletions,
+        ProviderApi::Responses,
+        ProviderApi::Anthropic,
+    ] {
+        if !formats.contains(&api) {
+            formats.push(api);
+        }
+    }
+    let mut error = ClientError::InvalidReply;
+    for api in formats {
+        let mut probe = provider.clone();
+        probe.api = api;
+        match test_connection(transport, &probe, key.clone()) {
+            Ok(()) => return Ok(api),
+            Err(failure) => {
+                let may_probe = matches!(
+                    failure,
+                    ClientError::Http(400 | 401 | 404 | 405 | 415 | 422)
+                        | ClientError::HttpDetail(400 | 401 | 404 | 405 | 415 | 422, _)
+                        | ClientError::InvalidReply
+                );
+                if !may_probe {
+                    return Err(failure);
+                }
+                error = failure;
+            }
+        }
+    }
+    Err(error)
 }
 
 pub(crate) fn stream_completion(
@@ -270,7 +355,9 @@ impl ClientError {
     fn can_retry(&self) -> bool {
         matches!(
             self,
-            Self::Http(408 | 429 | 500..=599) | Self::Transport(TransportError::Network)
+            Self::Http(408 | 429 | 500..=599)
+                | Self::HttpDetail(408 | 429 | 500..=599, _)
+                | Self::Transport(TransportError::Network)
         )
     }
 
@@ -354,6 +441,8 @@ fn completion_attempt(
     let mut raw = Vec::new();
     let mut decoder = if provider.uses_responses() {
         SseDecoder::responses()
+    } else if provider.resolved_api() == ProviderApi::Anthropic {
+        SseDecoder::anthropic()
     } else {
         SseDecoder::default()
     };
@@ -424,7 +513,9 @@ fn completion_attempt(
     {
         return Err(ClientError::RequestTooLarge);
     }
+    let redaction_key = key.clone();
     let request = Request {
+        anthropic: provider.resolved_api() == ProviderApi::Anthropic,
         method: Method::Post,
         url: provider_url(provider)?,
         body: Some(request_body),
@@ -468,7 +559,11 @@ fn completion_attempt(
         return Err(if hints.quota.get() {
             ClientError::Quota
         } else {
-            ClientError::Http(status.get())
+            http_error(
+                status.get(),
+                &raw,
+                redaction_key.as_deref().map(String::as_str),
+            )
         });
     }
     if is_sse.get() {
@@ -478,7 +573,11 @@ fn completion_attempt(
                 on_delta(&delta);
             }
         }
-        if provider.uses_responses() && !decoder.completed() {
+        if matches!(
+            provider.resolved_api(),
+            ProviderApi::Responses | ProviderApi::Anthropic
+        ) && !decoder.completed()
+        {
             return Err(ClientError::Reply(ReplyError::IncompleteResponse));
         }
         if answer.text().is_empty() {
@@ -486,11 +585,36 @@ fn completion_attempt(
         }
         Ok(answer.into_string())
     } else {
-        let body = completion_content(&raw, provider.uses_responses())?;
+        let body = provider_content(&raw, provider)?;
         let mut bounded = AnswerBuffer::default();
         bounded.append(&body).map_err(ClientError::Reply)?;
         on_delta(bounded.text());
         Ok(bounded.into_string())
+    }
+}
+
+fn provider_content(body: &[u8], provider: &ProviderProfile) -> Result<String, ClientError> {
+    if provider.resolved_api() != ProviderApi::Anthropic {
+        return completion_content(body, provider.uses_responses());
+    }
+    let value: Value = serde_json::from_slice(body).map_err(|_| ClientError::InvalidReply)?;
+    if value["type"] != "message" || value["role"] != "assistant" {
+        return Err(ClientError::InvalidReply);
+    }
+    if value["stop_reason"] == "max_tokens" {
+        return Err(ClientError::Reply(ReplyError::IncompleteResponse));
+    }
+    let text: String = value["content"]
+        .as_array()
+        .ok_or(ClientError::InvalidReply)?
+        .iter()
+        .filter(|part| part["type"] == "text")
+        .filter_map(|part| part["text"].as_str())
+        .collect();
+    if text.is_empty() {
+        Err(ClientError::InvalidReply)
+    } else {
+        Ok(text)
     }
 }
 
@@ -984,6 +1108,7 @@ mod tests {
             endpoint: "https://api.mistral.ai/v1/chat/completions".into(),
             model: "codestral-latest".into(),
             credential_ref: None,
+            models_endpoint: None,
             api: Default::default(),
         };
         let transport = super::super::transport::ReqwestTransport;
@@ -1108,7 +1233,7 @@ mod tests {
         println!("Provider 2: AI theme candidate generation and native validation passed; no theme was saved.");
     }
     #[test]
-    fn base_urls_expand_without_changing_custom_completion_paths() {
+    fn base_urls_expand_and_preserve_custom_prefixes() {
         for (input, expected) in [
             (
                 "https://example.test",
@@ -1124,7 +1249,7 @@ mod tests {
             ),
             (
                 "https://example.test/custom/chat",
-                "https://example.test/custom/chat",
+                "https://example.test/custom/chat/chat/completions",
             ),
         ] {
             assert_eq!(super::completion_url(input).unwrap(), expected);
@@ -1385,5 +1510,212 @@ mod tests {
         assert_eq!(answer, "hello from local");
         assert_eq!(deltas.concat(), answer);
         assert!(server.join().unwrap().contains("\"stream\":true"));
+    }
+}
+
+#[cfg(test)]
+mod protocol_tests {
+    use super::super::credentials::{CredentialStore, SystemCredentialStore};
+    use super::*;
+
+    struct Fixture(std::process::Child);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    #[test]
+    fn all_three_protocols_use_real_http_headers_routes_json_and_streams() {
+        use std::io::BufRead;
+        let mut fixture = Fixture(
+            std::process::Command::new("node")
+                .arg(
+                    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                        .join("tests/fixtures/protocol-provider.mjs"),
+                )
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        let mut line = String::new();
+        std::io::BufReader::new(fixture.0.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        let ready: Value = serde_json::from_str(&line).unwrap();
+        let base = ready["base"].as_str().unwrap();
+        for (prefix, api, expected) in [
+            ("chat", ProviderApi::ChatCompletions, "Chat ✓"),
+            ("responses", ProviderApi::Responses, "Responses ✓"),
+            ("anthropic", ProviderApi::Anthropic, "Messages ✓"),
+        ] {
+            let provider = ProviderProfile {
+                endpoint: format!("{base}/{prefix}/v1"),
+                api,
+                model: "fixture-chat".into(),
+                ..Default::default()
+            };
+            let key = || Some(Zeroizing::new("fixture-key".into()));
+            assert_eq!(
+                discover_models(&super::super::transport::ReqwestTransport, &provider, key())
+                    .unwrap()
+                    .len(),
+                3
+            );
+            test_connection(&super::super::transport::ReqwestTransport, &provider, key()).unwrap();
+            let mut streamed = String::new();
+            let answer = stream_completion(
+                &super::super::transport::ReqwestTransport,
+                &provider,
+                key(),
+                ("system", "user"),
+                &[],
+                &AtomicBool::new(false),
+                &mut |delta| streamed.push_str(delta),
+            )
+            .unwrap();
+            assert_eq!(answer, expected);
+            assert_eq!(streamed, expected);
+        }
+        let mut auto = ProviderProfile {
+            endpoint: format!("{base}/anthropic/v1"),
+            api: ProviderApi::Auto,
+            model: "fixture-claude".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            detect_format(
+                &super::super::transport::ReqwestTransport,
+                &auto,
+                Some(Zeroizing::new("fixture-key".into()))
+            )
+            .unwrap(),
+            ProviderApi::Anthropic
+        );
+        auto.endpoint = format!("{base}/discover");
+        auto.api = ProviderApi::ChatCompletions;
+        assert_eq!(
+            discover_models(
+                &super::super::transport::ReqwestTransport,
+                &auto,
+                Some(Zeroizing::new("fixture-key".into()))
+            )
+            .unwrap()
+            .len(),
+            3
+        );
+        let error = http_error(
+            400,
+            br#"{"error":{"message":"bad fixture-key"}}"#,
+            Some("fixture-key"),
+        )
+        .to_string();
+        assert!(!error.contains("fixture-key"));
+    }
+
+    #[test]
+    #[ignore = "explicit user-authorized OpenAI-det key; read-only configuration and short live requests"]
+    fn openai_det_live_chat_responses_and_models() {
+        let (root, legacy) = crate::storage::paths::production_roots().unwrap();
+        let store = crate::storage::store::NativeStore::open(root, legacy.0).unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        let original = loaded
+            .preferences
+            .provider_settings
+            .providers
+            .iter()
+            .find(|provider| provider.name == "OpenAI-det")
+            .unwrap()
+            .clone();
+        let expected = super::super::credentials::reference(store.profile_name(), &original.id);
+        assert_eq!(original.credential_ref.as_deref(), Some(expected.as_str()));
+        let key = SystemCredentialStore.get(&expected).unwrap();
+        let transport = super::super::transport::ReqwestTransport;
+        let models = discover_models(&transport, &original, Some(key.clone())).unwrap();
+        assert!(models.iter().any(|id| id == "gpt-4.1-mini"));
+        let mut chat = original.clone();
+        chat.api = ProviderApi::ChatCompletions;
+        chat.model = "gpt-4.1-mini".into();
+        test_connection(&transport, &chat, Some(key.clone())).unwrap();
+        let mut streamed = String::new();
+        let answer = stream_completion(
+            &transport,
+            &chat,
+            Some(key.clone()),
+            ("Reply briefly.", "Reply OK."),
+            &[],
+            &AtomicBool::new(false),
+            &mut |delta| streamed.push_str(delta),
+        )
+        .unwrap();
+        assert!(!answer.is_empty());
+        assert_eq!(answer, streamed);
+        test_connection(&transport, &original, Some(key)).unwrap();
+        println!("OpenAI-det: models list, GPT-4.1-mini Chat Completions JSON/stream, and existing Responses model passed. No saved configuration changed.");
+    }
+
+    #[test]
+    #[ignore = "explicit configured-provider model discovery only; reads saved OS credentials without writes"]
+    fn configured_provider_model_lists_live() {
+        let (root, legacy) = crate::storage::paths::production_roots().unwrap();
+        let store = crate::storage::store::NativeStore::open(root, legacy.0).unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        for provider in loaded.preferences.provider_settings.providers {
+            if provider.endpoint.is_empty() {
+                println!("{}: missing base URL", provider.name);
+                continue;
+            }
+            let expected = super::super::credentials::reference(store.profile_name(), &provider.id);
+            assert_eq!(provider.credential_ref.as_deref(), Some(expected.as_str()));
+            let key = SystemCredentialStore.get(&expected).unwrap();
+            match discover_models(
+                &super::super::transport::ReqwestTransport,
+                &provider,
+                Some(key),
+            ) {
+                Ok(models) => println!(
+                    "{}: {} models; configured model listed: {}",
+                    provider.name,
+                    models.len(),
+                    models.contains(&provider.model)
+                ),
+                Err(error) => println!("{}: {}", provider.name, error),
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "configured-provider short model requests; explicit diagnosis with saved credentials, no writes"]
+    fn configured_provider_short_requests_live() {
+        let (root, legacy) = crate::storage::paths::production_roots().unwrap();
+        let store = crate::storage::store::NativeStore::open(root, legacy.0).unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        std::thread::scope(|scope| {
+            for provider in loaded.preferences.provider_settings.providers {
+                if provider.endpoint.is_empty() {
+                    continue;
+                }
+                let expected =
+                    super::super::credentials::reference(store.profile_name(), &provider.id);
+                assert_eq!(provider.credential_ref.as_deref(), Some(expected.as_str()));
+                let key = SystemCredentialStore.get(&expected).unwrap();
+                scope.spawn(move || {
+                    let result = test_connection(
+                        &super::super::transport::ReqwestTransport,
+                        &provider,
+                        Some(key),
+                    );
+                    println!(
+                        "{}: {}",
+                        provider.name,
+                        result.map_or_else(
+                            |error| error.to_string(),
+                            |_| "model request passed".into()
+                        )
+                    );
+                });
+            }
+        });
     }
 }

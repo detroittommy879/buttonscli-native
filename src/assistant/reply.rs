@@ -31,9 +31,16 @@ pub(crate) struct SseDecoder {
     buffer: Vec<u8>,
     done: bool,
     responses: bool,
+    anthropic: bool,
 }
 
 impl SseDecoder {
+    pub(crate) fn anthropic() -> Self {
+        Self {
+            anthropic: true,
+            ..Self::default()
+        }
+    }
     pub(crate) fn responses() -> Self {
         Self {
             responses: true,
@@ -92,7 +99,7 @@ impl SseDecoder {
         }
         let payload = data.join("\n");
         if payload.trim() == "[DONE]" {
-            if self.responses {
+            if self.responses || self.anthropic {
                 return Err(ReplyError::IncompleteResponse);
             }
             self.done = true;
@@ -100,7 +107,46 @@ impl SseDecoder {
         }
         let value: Value = serde_json::from_str(&payload).map_err(|_| ReplyError::InvalidEvent)?;
         if value.get("error").is_some() {
-            return Err(ReplyError::InvalidEvent);
+            return Err(if self.anthropic || self.responses {
+                ReplyError::ProviderFailed
+            } else {
+                ReplyError::InvalidEvent
+            });
+        }
+        if self.anthropic {
+            return match value["type"].as_str() {
+                Some("content_block_delta") if value["delta"]["type"] == "text_delta" => {
+                    Ok(vec![StreamItem::Delta(
+                        value["delta"]["text"]
+                            .as_str()
+                            .ok_or(ReplyError::InvalidEvent)?
+                            .into(),
+                    )])
+                }
+                Some("content_block_start") if value["content_block"]["type"] == "text" => {
+                    let text = value["content_block"]["text"]
+                        .as_str()
+                        .ok_or(ReplyError::InvalidEvent)?;
+                    Ok(if text.is_empty() {
+                        vec![]
+                    } else {
+                        vec![StreamItem::Delta(text.into())]
+                    })
+                }
+                Some("message_delta") if value["delta"]["stop_reason"] == "max_tokens" => {
+                    Err(ReplyError::IncompleteResponse)
+                }
+                Some("message_delta") if value["delta"]["stop_reason"] == "refusal" => {
+                    Err(ReplyError::Refused)
+                }
+                Some("message_stop") => {
+                    self.done = true;
+                    Ok(vec![StreamItem::Done])
+                }
+                Some("error") => Err(ReplyError::ProviderFailed),
+                Some(_) => Ok(vec![]),
+                None => Err(ReplyError::InvalidEvent),
+            };
         }
         if self.responses {
             return match value["type"].as_str() {
@@ -153,6 +199,43 @@ impl SseDecoder {
 #[cfg(test)]
 mod responses_tests {
     use super::*;
+
+    #[test]
+    fn anthropic_fragmented_unicode_ignores_thinking_and_requires_message_stop() {
+        let wire = concat!(
+            "data: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"private\"}}\n\n",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello 🦇\"}}\n\n",
+            "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n"
+        );
+        let mut decoder = SseDecoder::anthropic();
+        let mut items = vec![];
+        for byte in wire.as_bytes() {
+            items.extend(decoder.push(&[*byte]).unwrap());
+        }
+        assert_eq!(items, [StreamItem::Delta("hello 🦇".into())]);
+        assert!(!decoder.completed());
+        assert_eq!(
+            decoder
+                .push(b"data: {\"type\":\"message_stop\"}\n\n")
+                .unwrap(),
+            [StreamItem::Done]
+        );
+        assert!(decoder.completed());
+        for (wire, expected) in [
+            ("data: [DONE]\n\n", ReplyError::IncompleteResponse),
+            (
+                "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}\n\n",
+                ReplyError::IncompleteResponse,
+            ),
+            (
+                "data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}\n\n",
+                ReplyError::ProviderFailed,
+            ),
+        ] {
+            assert_eq!(SseDecoder::anthropic().push(wire.as_bytes()), Err(expected));
+        }
+    }
 
     #[test]
     fn responses_events_handle_fragmented_unicode_without_duplicate_final_text() {

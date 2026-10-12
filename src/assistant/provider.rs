@@ -10,10 +10,14 @@ use std::collections::BTreeMap;
 pub(crate) struct ProviderProfile {
     pub id: String,
     pub name: String,
+    #[serde(alias = "base_url")]
     pub endpoint: String,
+    #[serde(alias = "default_model")]
     pub model: String,
     pub credential_ref: Option<String>,
+    #[serde(alias = "format")]
     pub api: ProviderApi,
+    pub models_endpoint: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -23,17 +27,50 @@ pub(crate) enum ProviderApi {
     Auto,
     ChatCompletions,
     Responses,
+    Anthropic,
 }
 
 impl ProviderProfile {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn uses_responses(&self) -> bool {
-        match self.api {
-            ProviderApi::Responses => true,
-            ProviderApi::ChatCompletions => false,
-            ProviderApi::Auto => url::Url::parse(&self.endpoint)
-                .is_ok_and(|url| url.path().trim_end_matches('/').ends_with("/responses")),
+        self.resolved_api() == ProviderApi::Responses
+    }
+
+    pub(crate) fn resolved_api(&self) -> ProviderApi {
+        if self.api != ProviderApi::Auto {
+            return self.api;
         }
+        let Ok(url) = url::Url::parse(&self.endpoint) else {
+            return ProviderApi::ChatCompletions;
+        };
+        let path = url.path().trim_end_matches('/');
+        if path.ends_with("/chat/completions") {
+            ProviderApi::ChatCompletions
+        } else if path.ends_with("/messages") || url.host_str() == Some("api.anthropic.com") {
+            ProviderApi::Anthropic
+        } else if path.ends_with("/responses") || url.host_str() == Some("api.openai.com") {
+            ProviderApi::Responses
+        } else {
+            ProviderApi::ChatCompletions
+        }
+    }
+
+    pub(crate) fn base_url(&self) -> Option<String> {
+        let mut url = url::Url::parse(&self.endpoint).ok()?;
+        let path = url.path().trim_end_matches('/');
+        let base = [
+            "/chat/completions",
+            "/responses",
+            "/messages",
+            "/models",
+            "/completions",
+        ]
+        .iter()
+        .find_map(|suffix| path.strip_suffix(suffix))
+        .unwrap_or(path)
+        .to_owned();
+        url.set_path(if base.is_empty() { "/v1" } else { &base });
+        Some(url.to_string().trim_end_matches('/').into())
     }
 }
 
@@ -42,10 +79,11 @@ impl Default for ProviderProfile {
         Self {
             id: "default-openrouter".into(),
             name: "OpenRouter".into(),
-            endpoint: "https://openrouter.ai/api/v1/chat/completions".into(),
+            endpoint: "https://openrouter.ai/api/v1".into(),
             model: "openai/gpt-4.1-mini".into(),
             credential_ref: None,
             api: ProviderApi::Auto,
+            models_endpoint: None,
         }
     }
 }
@@ -110,6 +148,123 @@ impl Default for ProviderSettings {
 
 impl ProviderSettings {
     #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn configuration_json(&self) -> String {
+        let mut value = serde_json::to_value(self).unwrap();
+        for provider in value["providers"].as_array_mut().unwrap() {
+            let object = provider.as_object_mut().unwrap();
+            object.remove("credential_ref");
+            for (old, new) in [
+                ("endpoint", "base_url"),
+                ("api", "format"),
+                ("model", "default_model"),
+            ] {
+                if let Some(value) = object.remove(old) {
+                    object.insert(new.into(), value);
+                }
+            }
+        }
+        serde_json::to_string_pretty(&value).unwrap()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn apply_configuration_json(&self, raw: &str) -> Result<Self, String> {
+        if raw.len() > 128 * 1024 {
+            return Err("Provider JSON exceeds 128 KiB.".into());
+        }
+        let value: Value = serde_json::from_str(raw).map_err(|error| error.to_string())?;
+        if value.as_object().is_none_or(|object| {
+            object
+                .keys()
+                .any(|key| !["providers", "active_provider_id", "tasks"].contains(&key.as_str()))
+        }) {
+            return Err(
+                "Use providers, active_provider_id and tasks only; API keys stay outside JSON."
+                    .into(),
+            );
+        }
+        let entries = value["providers"]
+            .as_array()
+            .ok_or("Add a providers array.")?;
+        if entries.len() > 32 {
+            return Err("At most 32 provider connections are supported.".into());
+        }
+        let mut ids = std::collections::HashSet::new();
+        for entry in entries {
+            let object = entry
+                .as_object()
+                .ok_or("Each provider must be an object.")?;
+            if object.keys().any(|key| {
+                ![
+                    "id",
+                    "name",
+                    "base_url",
+                    "endpoint",
+                    "format",
+                    "api",
+                    "default_model",
+                    "model",
+                    "models_endpoint",
+                ]
+                .contains(&key.as_str())
+            }) {
+                return Err("Unknown provider field. Keep API keys in the saved-key controls, outside JSON.".into());
+            }
+            let id = entry["id"]
+                .as_str()
+                .ok_or("Every provider needs a stable id.")?;
+            if id.is_empty() || id.len() > 80 || id.chars().any(char::is_control) || !ids.insert(id)
+            {
+                return Err(
+                    "Provider IDs must be unique, nonempty and at most 80 characters.".into(),
+                );
+            }
+        }
+        let mut settings: Self =
+            serde_json::from_value(value).map_err(|error| error.to_string())?;
+        if !settings.active_provider_id.is_empty()
+            && !settings
+                .providers
+                .iter()
+                .any(|provider| provider.id == settings.active_provider_id)
+        {
+            return Err("The main provider ID must refer to a configured provider.".into());
+        }
+        for binding in settings.tasks.values() {
+            if binding.fallbacks.len() > 3
+                || binding
+                    .primary
+                    .iter()
+                    .chain(&binding.fallbacks)
+                    .any(|target| {
+                        !settings
+                            .providers
+                            .iter()
+                            .any(|provider| provider.id == target.provider_id)
+                    })
+            {
+                return Err(
+                    "Task models must use configured providers and at most three fallbacks.".into(),
+                );
+            }
+        }
+        for provider in &mut settings.providers {
+            if !provider.endpoint.is_empty() {
+                validate_endpoint(&provider.endpoint).map_err(str::to_owned)?;
+            }
+            if let Some(endpoint) = &provider.models_endpoint {
+                validate_endpoint(endpoint).map_err(str::to_owned)?;
+            }
+            provider.credential_ref = self
+                .providers
+                .iter()
+                .find(|old| old.id == provider.id)
+                .and_then(|old| old.credential_ref.clone());
+        }
+        let mut warnings = vec![];
+        settings.normalize(&mut warnings);
+        Ok(settings)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn from_legacy(assistant: &Value) -> (Self, Vec<String>) {
         let mut warnings = Vec::new();
         let source = assistant
@@ -150,6 +305,7 @@ impl ProviderSettings {
                     model,
                     credential_ref: None,
                     api: ProviderApi::Auto,
+                    models_endpoint: None,
                 });
             }
         } else if let Some(endpoint) = assistant["endpoint"].as_str().and_then(sanitize_endpoint) {
@@ -163,6 +319,7 @@ impl ProviderSettings {
                 model: assistant["model"].as_str().unwrap_or("").into(),
                 credential_ref: None,
                 api: ProviderApi::Auto,
+                models_endpoint: None,
             });
         }
         let mut settings = Self {
@@ -211,6 +368,14 @@ impl ProviderSettings {
                         index + 1
                     ));
                 }
+                let protocol = provider.resolved_api();
+                if let Some(base) = provider.base_url() {
+                    if base != provider.endpoint {
+                        // Preserve the API formerly selected by a legacy full URL.
+                        provider.api = protocol;
+                        provider.endpoint = base;
+                    }
+                }
             } else {
                 provider.endpoint.clear();
                 warnings.push(format!(
@@ -218,6 +383,10 @@ impl ProviderSettings {
                     index + 1
                 ));
             }
+            provider.models_endpoint = provider
+                .models_endpoint
+                .as_deref()
+                .and_then(sanitize_endpoint);
         }
         if !self
             .providers
@@ -411,5 +580,60 @@ mod tests {
         assert_eq!(warnings.len(), 1);
         assert!(validate_endpoint("https://user:pass@example.test/v1").is_err());
         assert!(validate_endpoint("http://127.0.0.1:11434/v1/chat/completions").is_ok());
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod configuration_tests {
+    use super::*;
+    #[test]
+    fn full_url_migration_and_json_edit_keep_keys_routes_and_custom_prefixes() {
+        let mut settings = ProviderSettings::default();
+        settings.providers[0].endpoint = "https://api.openai.com/v1/chat/completions".into();
+        settings.providers[0].credential_ref = Some(format!("native:v1:{}", "a".repeat(64)));
+        let id = settings.active_provider_id.clone();
+        settings.tasks.insert(
+            AiTask::Simulation,
+            TaskBinding {
+                primary: Some(ModelTarget {
+                    provider_id: id,
+                    model: "custom-model".into(),
+                }),
+                ..Default::default()
+            },
+        );
+        settings.normalize(&mut vec![]);
+        assert_eq!(settings.providers[0].endpoint, "https://api.openai.com/v1");
+        assert_eq!(settings.providers[0].api, ProviderApi::ChatCompletions);
+        let raw = settings.configuration_json();
+        assert!(!raw.contains("credential_ref"));
+        let updated = settings.apply_configuration_json(&raw).unwrap();
+        assert_eq!(updated, settings);
+        let mut value: Value = serde_json::from_str(&raw).unwrap();
+        value["providers"][0]["api_key"] = serde_json::json!("never-store-this");
+        assert!(settings
+            .apply_configuration_json(&value.to_string())
+            .is_err());
+        value["providers"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("api_key");
+        value["active_provider_id"] = serde_json::json!("missing");
+        assert!(settings
+            .apply_configuration_json(&value.to_string())
+            .is_err());
+        let provider = ProviderProfile {
+            endpoint: "https://example.test/proxy/v7/".into(),
+            api: ProviderApi::Anthropic,
+            ..Default::default()
+        };
+        assert_eq!(
+            provider.base_url().unwrap(),
+            "https://example.test/proxy/v7"
+        );
+        assert_eq!(
+            super::super::client::provider_url(&provider).unwrap(),
+            "https://example.test/proxy/v7/messages"
+        );
     }
 }

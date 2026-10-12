@@ -629,6 +629,7 @@ mod tests {
             endpoint: "https://example.test/v1/chat/completions".into(),
             model: "fixture-model".into(),
             credential_ref: None,
+            models_endpoint: None,
             api: Default::default(),
         }
     }

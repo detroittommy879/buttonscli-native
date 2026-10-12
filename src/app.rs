@@ -506,6 +506,12 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_edit_id: String,
     #[cfg(not(target_arch = "wasm32"))]
+    provider_catalogs: std::collections::BTreeMap<String, ProviderCatalog>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_json: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
     account_tx: Sender<AccountEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     account_rx: Receiver<AccountEvent>,
@@ -642,6 +648,8 @@ enum SettingsTab {
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
+    Models,
+    #[cfg(not(target_arch = "wasm32"))]
     Simulation,
     #[cfg(not(target_arch = "wasm32"))]
     Account,
@@ -774,8 +782,16 @@ enum CredentialEvent {
 
 #[cfg(not(target_arch = "wasm32"))]
 enum ProviderEvent {
-    Tested(String, Result<(), String>),
-    Models(String, Result<Vec<String>, String>),
+    Tested(ProviderProfile, u64, Result<(), String>),
+    Models(ProviderProfile, u64, Result<Vec<String>, String>),
+    Detected(ProviderProfile, u64, Result<ProviderApi, String>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct ProviderCatalog {
+    fingerprint: String,
+    models: Vec<String>,
+    error: Option<String>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1353,6 +1369,12 @@ impl ButtonsApp {
             provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             provider_edit_id: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_catalogs: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_json: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_generation: 0,
             #[cfg(not(target_arch = "wasm32"))]
             account_tx,
             #[cfg(not(target_arch = "wasm32"))]
@@ -4905,6 +4927,12 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
+                    SettingsTab::Models,
+                    "AI models",
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
                     SettingsTab::Simulation,
                     crate::i18n::literal(&self.locale, "Simulation setup"),
                 );
@@ -4981,6 +5009,11 @@ impl ButtonsApp {
                 SettingsTab::Keyboard => self.keyboard_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Providers => self.provider_settings(ui, ctx),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Models => {
+                    self.task_model_settings(ui);
+                    self.ensure_provider_catalogs(ctx);
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Simulation => self.simulation_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
@@ -5532,35 +5565,14 @@ impl ButtonsApp {
     fn provider_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey as M};
         let warning_color = self.colors().warning;
-        ui.spaced_heading(text(&self.locale, M::Providers, &[]));
-        ui.spaced_label(text(&self.locale, M::ProviderHelp, &[]));
-        if crate::features::local::enabled() {
-            ui.spaced_label(
-                "Local feature override is enabled. Restart after changing feature-flags.json.",
-            );
-        }
-        let ai_unlocked = ai_help_available();
-        if !ai_unlocked {
-            ui.spaced_label(text(&self.locale, M::AiHelpLockedProvider, &[]));
+        ui.spaced_heading("AI providers");
+        ui.spaced_label(
+            "Connections and saved keys. Choose defaults and task models in AI models.",
+        );
+        if ui.spaced_button("Choose task models →").clicked() {
+            self.settings_tab = SettingsTab::Models;
         }
         let settings = &mut self.preferences.provider_settings;
-        egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "Shared default"))
-            .selected_text(crate::ui_text::spaced_text(
-                ui,
-                settings
-                    .active()
-                    .map(|provider| provider.name.as_str())
-                    .unwrap_or("—"),
-            ))
-            .show_ui(ui, |ui| {
-                for provider in &settings.providers {
-                    ui.spaced_selectable_value(
-                        &mut settings.active_provider_id,
-                        provider.id.clone(),
-                        &provider.name,
-                    );
-                }
-            });
         if !settings
             .providers
             .iter()
@@ -5569,42 +5581,71 @@ impl ButtonsApp {
             self.provider_edit_id = settings.active_provider_id.clone();
         }
         let prior = self.provider_edit_id.clone();
-        egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "Provider to edit"))
-            .selected_text(
-                settings
-                    .providers
-                    .iter()
-                    .find(|p| p.id == self.provider_edit_id)
-                    .map(|p| p.name.as_str())
-                    .unwrap_or("—"),
-            )
-            .show_ui(ui, |ui| {
-                for provider in &settings.providers {
-                    ui.spaced_selectable_value(
-                        &mut self.provider_edit_id,
-                        provider.id.clone(),
-                        &provider.name,
-                    );
-                }
-            });
+        wrapping_row(ui, |ui| {
+            for provider in &settings.providers {
+                let label = if provider.id == settings.active_provider_id {
+                    format!("{} · default", provider.name)
+                } else {
+                    provider.name.clone()
+                };
+                ui.spaced_selectable_value(&mut self.provider_edit_id, provider.id.clone(), label);
+            }
+        });
         if prior != self.provider_edit_id {
             self.credential_draft.zeroize();
             self.credential_message = None;
             self.provider_models.clear();
             self.provider_message = None;
         }
-        if ui
-            .spaced_button(text(&self.locale, M::AddProvider, &[]))
-            .clicked()
-        {
-            let unique = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or_default();
+        let mut add = None;
+        ui.spaced_menu_button("Add connection", |ui| {
+            for (name, endpoint, api) in [
+                ("Custom", "", ProviderApi::Auto),
+                (
+                    "OpenAI",
+                    "https://api.openai.com/v1",
+                    ProviderApi::Responses,
+                ),
+                (
+                    "Anthropic",
+                    "https://api.anthropic.com/v1",
+                    ProviderApi::Anthropic,
+                ),
+                (
+                    "OpenRouter",
+                    "https://openrouter.ai/api/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "Mistral",
+                    "https://api.mistral.ai/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "Groq",
+                    "https://api.groq.com/openai/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "NVIDIA NIM",
+                    "https://integrate.api.nvidia.com/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+            ] {
+                if ui.spaced_button(name).clicked() {
+                    add = Some((name, endpoint, api));
+                    ui.close_menu();
+                }
+            }
+        });
+        if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
-                id: format!("provider-{unique}"),
-                name: format!("Provider {}", settings.providers.len() + 1),
-                ..ProviderProfile::default()
+                id: format!("provider-{:032x}", fastrand::u128(..)),
+                name: name.into(),
+                endpoint: endpoint.into(),
+                model: String::new(),
+                api,
+                ..Default::default()
             };
             if settings.providers.is_empty() {
                 settings.active_provider_id = provider.id.clone();
@@ -5613,6 +5654,8 @@ impl ButtonsApp {
             settings.providers.push(provider);
             self.credential_draft.zeroize();
             self.credential_message = None;
+            self.provider_message = None;
+            self.provider_models.clear();
         }
         let Some(index) = settings
             .providers
@@ -5628,23 +5671,25 @@ impl ButtonsApp {
                 .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            let label = ui.spaced_label(text(&self.locale, M::ProviderEndpoint, &[]));
-            ui.text_edit_singleline(&mut provider.endpoint)
-                .labelled_by(label.id);
+            let label = ui.spaced_label("Base URL");
+            ui.add(
+                egui::TextEdit::singleline(&mut provider.endpoint)
+                    .desired_width(650.0_f32.min(ui.available_width())),
+            )
+            .labelled_by(label.id);
         });
         egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "API format"))
             .selected_text(match provider.api {
-                ProviderApi::Auto => {
-                    crate::i18n::literal(&self.locale, "Automatic (from endpoint)")
-                }
+                ProviderApi::Auto => crate::i18n::literal(&self.locale, "Automatic"),
                 ProviderApi::ChatCompletions => "Chat Completions".into(),
                 ProviderApi::Responses => "Responses API".into(),
+                ProviderApi::Anthropic => "Anthropic Messages".into(),
             })
             .show_ui(ui, |ui| {
                 ui.spaced_selectable_value(
                     &mut provider.api,
                     ProviderApi::Auto,
-                    crate::i18n::literal(&self.locale, "Automatic (from endpoint)"),
+                    crate::i18n::literal(&self.locale, "Automatic"),
                 );
                 ui.spaced_selectable_value(
                     &mut provider.api,
@@ -5656,30 +5701,44 @@ impl ButtonsApp {
                     ProviderApi::Responses,
                     "Responses API",
                 );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Anthropic,
+                    "Anthropic Messages",
+                );
             });
-        if ui
-            .spaced_button(crate::i18n::literal(
-                &self.locale,
-                "Use OpenAI Responses endpoint",
-            ))
-            .clicked()
-        {
-            provider.endpoint = "https://api.openai.com/v1/responses".into();
-            provider.api = ProviderApi::Responses;
-            self.provider_models.clear();
-            self.provider_message = None;
-        }
-        ui.horizontal(|ui| {
-            let label = ui.spaced_label(text(&self.locale, M::ProviderModel, &[]));
-            ui.text_edit_singleline(&mut provider.model)
-                .labelled_by(label.id);
-        });
         if validate_endpoint(&provider.endpoint).is_err() {
             ui.spaced_colored_label(
                 warning_color,
                 text(&self.locale, M::ProviderEndpointInvalid, &[]),
             );
         }
+        ui.spaced_label("Default model for this connection");
+        let models = catalog_models(&self.provider_catalogs, provider);
+        model_picker(ui, "provider-default-model", &mut provider.model, models);
+        if let Some(catalog) = self
+            .provider_catalogs
+            .get(&provider.id)
+            .filter(|c| c.fingerprint == provider_fingerprint(provider))
+        {
+            if let Some(error) = &catalog.error {
+                ui.spaced_label(format!(
+                    "Model list unavailable: {error}. You can type a model ID."
+                ));
+            }
+        }
+        ui.spaced_label(format!(
+            "Requests use {}",
+            api_label(provider.resolved_api())
+        ));
+        egui::CollapsingHeader::new("Advanced connection options").show(ui, |ui| {
+            let mut models_url = provider.models_endpoint.clone().unwrap_or_default();
+            ui.label("Models URL override (optional)");
+            if ui.text_edit_singleline(&mut models_url).changed() {
+                provider.models_endpoint =
+                    (!models_url.trim().is_empty()).then(|| models_url.trim().into());
+            }
+        });
         let profile_name = self
             .native_store
             .as_ref()
@@ -5712,31 +5771,34 @@ impl ButtonsApp {
             text(&self.locale, M::SessionOnlyKey, &[]),
         );
         let provider_id = provider.id.clone();
-        let save = ui
-            .add_enabled(
-                !self.credential_busy && !self.credential_draft.trim().is_empty(),
-                crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
-            )
-            .clicked();
-        let delete = ui
-            .add_enabled(
-                !self.credential_busy && (has_session_key || has_saved_key),
-                crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
-            )
-            .clicked();
-        let remove = ui
-            .add_enabled(
-                !self.credential_busy && !has_session_key && !has_saved_key,
-                crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
-            )
-            .clicked();
+        let (mut save, mut delete, mut remove) = (false, false, false);
+        wrapping_row(ui, |ui| {
+            save = ui
+                .add_enabled(
+                    !self.credential_busy && !self.credential_draft.trim().is_empty(),
+                    crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
+                )
+                .clicked();
+            delete = ui
+                .add_enabled(
+                    !self.credential_busy && (has_session_key || has_saved_key),
+                    crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
+                )
+                .clicked();
+            remove = ui
+                .add_enabled(
+                    !self.credential_busy && !has_session_key && !has_saved_key,
+                    crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
+                )
+                .clicked();
+        });
         let mut test_connection = false;
         let mut discover_models = false;
-        ui.horizontal(|ui| {
+        let mut detect_format = false;
+        wrapping_row(ui, |ui| {
             test_connection = ui
                 .add_enabled(
-                    ai_unlocked
-                        && !self.provider_busy
+                    !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok()
                         && !provider.model.trim().is_empty(),
                     crate::ui_text::button(ui, text(&self.locale, M::TestConnection, &[])),
@@ -5744,22 +5806,12 @@ impl ButtonsApp {
                 .clicked();
             discover_models = ui
                 .add_enabled(
-                    ai_unlocked
-                        && !self.provider_busy
-                        && validate_endpoint(&provider.endpoint).is_ok(),
+                    !self.provider_busy && validate_endpoint(&provider.endpoint).is_ok(),
                     crate::ui_text::button(ui, text(&self.locale, M::DiscoverModels, &[])),
                 )
                 .clicked();
+            detect_format |= ui.add_enabled(!self.provider_busy && validate_endpoint(&provider.endpoint).is_ok() && !provider.model.trim().is_empty(), crate::ui_text::button(ui, "Detect API format")).on_hover_text("Tests up to three formats with a short model request at this base URL. May use provider credits.").clicked();
         });
-        if !self.provider_models.is_empty() {
-            egui::ComboBox::from_label(text(&self.locale, M::ProviderModel, &[]))
-                .selected_text(crate::ui_text::spaced_text(ui, &provider.model))
-                .show_ui(ui, |ui| {
-                    for model in &self.provider_models {
-                        ui.spaced_selectable_value(&mut provider.model, model.clone(), model);
-                    }
-                });
-        }
         if self.provider_busy {
             ui.spinner();
         }
@@ -5769,7 +5821,7 @@ impl ButtonsApp {
         if let Some(message) = &self.credential_message {
             ui.spaced_label(message);
         }
-        if test_connection || discover_models {
+        if test_connection || discover_models || detect_format {
             let profile_name = profile_name.to_owned();
             let provider = provider.clone();
             let reference = credentials::reference(&profile_name, &provider.id);
@@ -5777,6 +5829,7 @@ impl ButtonsApp {
             let session = Arc::clone(&self.credential_session);
             let tx = self.provider_tx.clone();
             let ctx = ctx.clone();
+            let generation = self.provider_generation;
             self.provider_busy = true;
             self.provider_message = None;
             self.provider_models.clear();
@@ -5784,7 +5837,8 @@ impl ButtonsApp {
                 let key = provider_key(&session, &reference, credential_ref.as_deref());
                 let event = match key {
                     Ok(key) if test_connection => ProviderEvent::Tested(
-                        provider.id.clone(),
+                        provider.clone(),
+                        generation,
                         crate::assistant::client::test_connection(
                             &crate::assistant::transport::ReqwestTransport,
                             &provider,
@@ -5792,8 +5846,19 @@ impl ButtonsApp {
                         )
                         .map_err(|error| error.to_string()),
                     ),
+                    Ok(key) if detect_format => ProviderEvent::Detected(
+                        provider.clone(),
+                        generation,
+                        crate::assistant::client::detect_format(
+                            &crate::assistant::transport::ReqwestTransport,
+                            &provider,
+                            key,
+                        )
+                        .map_err(|error| error.to_string()),
+                    ),
                     Ok(key) => ProviderEvent::Models(
-                        provider.id.clone(),
+                        provider.clone(),
+                        generation,
                         crate::assistant::client::discover_models(
                             &crate::assistant::transport::ReqwestTransport,
                             &provider,
@@ -5802,9 +5867,11 @@ impl ButtonsApp {
                         .map_err(|error| error.to_string()),
                     ),
                     Err(error) if test_connection => {
-                        ProviderEvent::Tested(provider.id, Err(error.to_string()))
+                        ProviderEvent::Tested(provider, generation, Err(error.to_string()))
                     }
-                    Err(error) => ProviderEvent::Models(provider.id, Err(error.to_string())),
+                    Err(error) => {
+                        ProviderEvent::Models(provider, generation, Err(error.to_string()))
+                    }
                 };
                 let _ = tx.send(event);
                 ctx.request_repaint();
@@ -5858,88 +5925,242 @@ impl ButtonsApp {
             self.credential_draft.zeroize();
             self.credential_message = None;
         }
-        self.task_model_settings(ui);
+        self.provider_json_settings(ui);
+        self.ensure_provider_catalogs(ctx);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn task_model_settings(&mut self, ui: &mut egui::Ui) {
-        let locale = &self.locale;
+        ui.spaced_heading("AI models");
+        ui.spaced_label(
+            "Choose one main model for everything, then override only the tasks you want.",
+        );
+        if ui.spaced_button("Manage providers →").clicked() {
+            self.settings_tab = SettingsTab::Providers;
+        }
         let settings = &mut self.preferences.provider_settings;
-        ui.separator();
-        ui.spaced_heading(crate::i18n::literal(locale, "Models by task"));
-        ui.spaced_label(crate::i18n::literal(
-            locale,
-            "Tasks inherit the active provider and model unless overridden.",
-        ));
-        if ui
-            .spaced_button(crate::i18n::literal(
-                locale,
-                "Use shared default for all tasks",
-            ))
-            .clicked()
+        let catalogs = &self.provider_catalogs;
+        ui.spaced_label(RichText::new("Main model · default for all tasks").strong());
+        provider_picker(
+            ui,
+            "main-provider",
+            &settings.providers,
+            &mut settings.active_provider_id,
+            false,
+        );
+        if let Some(provider) = settings
+            .providers
+            .iter_mut()
+            .find(|p| p.id == settings.active_provider_id)
         {
+            let models = catalog_models(catalogs, provider);
+            model_picker(ui, "main-model", &mut provider.model, models);
+            catalog_status(ui, catalogs, provider);
+            if validate_endpoint(&provider.endpoint).is_err() {
+                ui.spaced_colored_label(
+                    Color32::LIGHT_RED,
+                    "This provider has no valid base URL. Open Manage providers to complete it.",
+                );
+            }
+        } else {
+            ui.spaced_label("Add a provider connection first.");
+        }
+        if ui.spaced_button("Use main model for every task").clicked() {
             settings.tasks.clear();
         }
         let providers = settings.providers.clone();
         let default_id = settings.active_provider_id.clone();
         for task in AiTask::ALL {
-            let resolved = settings.for_task(task);
+            ui.separator();
             ui.push_id(task.label(), |ui| {
-                ui.spaced_label(crate::i18n::literal(locale, task.label()));
-                if let Some(provider) = resolved {
-                    ui.spaced_label(format!("{} · {}", provider.name, provider.model));
-                }
+                ui.spaced_label(
+                    RichText::new(crate::i18n::literal(&self.locale, task.label())).strong(),
+                );
+                let effective = settings.for_task(task);
                 let binding = settings.tasks.entry(task).or_default();
-                let mut selected = binding.primary.as_ref().map(|p| p.provider_id.clone()).unwrap_or_default();
+                let mut selected = binding
+                    .primary
+                    .as_ref()
+                    .map(|target| target.provider_id.clone())
+                    .unwrap_or_default();
                 let prior = selected.clone();
-                egui::ComboBox::from_id_salt("task-provider")
-                    .selected_text(if selected.is_empty() {
-                        crate::i18n::literal(locale, "Shared default")
-                    } else {
-                        providers.iter().find(|p| p.id == selected).map(|p| p.name.clone()).unwrap_or_default()
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.spaced_selectable_value(&mut selected, String::new(), crate::i18n::literal(locale, "Shared default"));
-                        for provider in &providers {
-                            ui.spaced_selectable_value(&mut selected, provider.id.clone(), &provider.name);
-                        }
-                    });
+                provider_picker(ui, "task-provider", &providers, &mut selected, true);
                 if selected != prior {
-                    binding.primary = (!selected.is_empty()).then_some(ModelTarget { provider_id: selected, model: String::new() });
+                    binding.primary = (!selected.is_empty()).then_some(ModelTarget {
+                        provider_id: selected,
+                        model: String::new(),
+                    });
                 }
                 if let Some(target) = &mut binding.primary {
-                    ui.horizontal(|ui| {
-                        let label = ui.spaced_label(crate::i18n::literal(locale, "Model override (blank uses provider model)"));
-                        ui.text_edit_singleline(&mut target.model).labelled_by(label.id);
-                    });
+                    if let Some(provider) = providers.iter().find(|p| p.id == target.provider_id) {
+                        ui.spaced_label(format!("Blank inherits {}", provider.model));
+                        model_picker(
+                            ui,
+                            "task-model",
+                            &mut target.model,
+                            catalog_models(catalogs, provider),
+                        );
+                        catalog_status(ui, catalogs, provider);
+                    }
                 }
-                ui.collapsing(crate::i18n::literal(locale, "Fallback models"), |ui| {
-                    ui.spaced_label(crate::i18n::literal(locale, "Only configured fallbacks receive your request. Partial answers are never replayed."));
-                    let mut remove = None;
-                    for (index, target) in binding.fallbacks.iter_mut().enumerate() {
-                        ui.push_id(index, |ui| {
-                            egui::ComboBox::from_id_salt("fallback-provider")
-                                .selected_text(providers.iter().find(|p| p.id == target.provider_id).map(|p| p.name.as_str()).unwrap_or("—"))
-                                .show_ui(ui, |ui| {
-                                    for provider in &providers {
-                                        ui.spaced_selectable_value(&mut target.provider_id, provider.id.clone(), &provider.name);
+                if let Some(provider) = effective {
+                    ui.spaced_label(format!(
+                        "Uses {} · {}",
+                        provider.name,
+                        if provider.model.is_empty() {
+                            "choose a model"
+                        } else {
+                            &provider.model
+                        }
+                    ));
+                }
+                egui::CollapsingHeader::new(format!("Fallbacks ({})", binding.fallbacks.len()))
+                    .show(ui, |ui| {
+                        ui.spaced_label(
+                            "Tried in order for temporary failures or exhausted quota, before any answer arrives.",
+                        );
+                        let mut remove = None;
+                        for (index, target) in binding.fallbacks.iter_mut().enumerate() {
+                            ui.push_id(index, |ui| {
+                                ui.label(format!("Fallback {}", index + 1));
+                                provider_picker(
+                                    ui,
+                                    "fallback-provider",
+                                    &providers,
+                                    &mut target.provider_id,
+                                    false,
+                                );
+                                if let Some(provider) =
+                                    providers.iter().find(|p| p.id == target.provider_id)
+                                {
+                                    model_picker(
+                                        ui,
+                                        "fallback-model",
+                                        &mut target.model,
+                                        catalog_models(catalogs, provider),
+                                    );
+                                }
+                                wrapping_row(ui, |ui| {
+                                    if index > 0 && ui.spaced_button("Move up").clicked() {
+                                        remove = Some((index, true));
+                                    }
+                                    if ui.spaced_button("Remove").clicked() {
+                                        remove = Some((index, false));
                                     }
                                 });
-                            ui.horizontal(|ui| {
-                                let label = ui.spaced_label(crate::i18n::literal(locale, "Model override (blank uses provider model)"));
-                                ui.text_edit_singleline(&mut target.model).labelled_by(label.id);
-                                if ui.spaced_button(crate::i18n::literal(locale, "Remove fallback")).clicked() { remove = Some(index); }
                             });
-                        });
-                    }
-                    if let Some(index) = remove { binding.fallbacks.remove(index); }
-                    if binding.fallbacks.len() < 3 && ui.spaced_button(crate::i18n::literal(locale, "Add fallback")).clicked() {
-                        binding.fallbacks.push(ModelTarget { provider_id: default_id.clone(), model: String::new() });
-                    }
-                });
-                ui.separator();
+                        }
+                        if let Some((index, reorder)) = remove {
+                            if reorder {
+                                binding.fallbacks.swap(index, index - 1);
+                            } else {
+                                binding.fallbacks.remove(index);
+                            }
+                        }
+                        if binding.fallbacks.len() < 3
+                            && !providers.is_empty()
+                            && ui.spaced_button("Add fallback").clicked()
+                        {
+                            binding.fallbacks.push(ModelTarget {
+                                provider_id: default_id.clone(),
+                                model: String::new(),
+                            });
+                        }
+                    });
             });
         }
+        if self.provider_busy {
+            ui.spinner();
+            ui.spaced_label("Loading model lists… You can still type any model ID.");
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ensure_provider_catalogs(&mut self, ctx: &egui::Context) {
+        if self.provider_busy
+            || self.credential_busy
+            || ctx.wants_keyboard_input()
+            || !self.credential_draft.trim().is_empty()
+        {
+            return;
+        }
+        let Some(provider) = self
+            .preferences
+            .provider_settings
+            .providers
+            .iter()
+            .find(|provider| {
+                (self.settings_tab != SettingsTab::Providers
+                    || provider.id == self.provider_edit_id)
+                    && validate_endpoint(&provider.endpoint).is_ok()
+                    && self
+                        .provider_catalogs
+                        .get(&provider.id)
+                        .is_none_or(|catalog| catalog.fingerprint != provider_fingerprint(provider))
+            })
+            .cloned()
+        else {
+            return;
+        };
+        self.provider_catalogs.insert(
+            provider.id.clone(),
+            ProviderCatalog {
+                fingerprint: provider_fingerprint(&provider),
+                models: vec![],
+                error: None,
+            },
+        );
+        self.provider_busy = true;
+        let generation = self.provider_generation;
+        let reference = credentials::reference(
+            self.native_store
+                .as_ref()
+                .map_or("default", NativeStore::profile_name),
+            &provider.id,
+        );
+        let session = Arc::clone(&self.credential_session);
+        let tx = self.provider_tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = provider_key(&session, &reference, provider.credential_ref.as_deref())
+                .map_err(|error| error.to_string())
+                .and_then(|key| {
+                    crate::assistant::client::discover_models(
+                        &crate::assistant::transport::ReqwestTransport,
+                        &provider,
+                        key,
+                    )
+                    .map_err(|error| error.to_string())
+                });
+            let _ = tx.send(ProviderEvent::Models(provider, generation, result));
+            ctx.request_repaint();
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn provider_json_settings(&mut self, ui: &mut egui::Ui) {
+        egui::CollapsingHeader::new("Edit providers as JSON").show(ui, |ui| {
+            ui.spaced_label("Keys stay in OS credentials. Keep provider IDs stable to keep saved keys and task assignments.");
+            if let Some(store) = &self.native_store {
+                ui.spaced_label(format!("On disk: {} → preferences.provider_settings. Edit with the app closed, then restart.", store.native_path().display()));
+            }
+            if self.provider_json.is_empty() { self.provider_json = self.preferences.provider_settings.configuration_json(); }
+            wrapping_row(ui, |ui| {
+                if ui.spaced_button("Load current JSON").clicked() { self.provider_json = self.preferences.provider_settings.configuration_json(); }
+                if ui.spaced_button("Copy JSON").clicked() { ui.ctx().copy_text(self.provider_json.clone()); }
+            });
+            ui.add(egui::TextEdit::multiline(&mut self.provider_json).code_editor().desired_rows(10).desired_width(f32::INFINITY).char_limit(128 * 1024));
+            if ui.spaced_button("Apply JSON").clicked() {
+                match self.preferences.provider_settings.apply_configuration_json(&self.provider_json) {
+                    Ok(settings) => {
+                        self.preferences.provider_settings = settings;
+                        self.provider_edit_id = String::new(); self.provider_catalogs.clear(); self.provider_models.clear();
+                        self.credential_draft.zeroize(); self.provider_message = Some("Provider JSON applied. Saved keys were preserved by ID.".into());
+                    },
+                    Err(error) => self.provider_message = Some(format!("JSON error: {error}")),
+                }
+            }
+        });
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -6033,6 +6254,8 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn process_credential_events(&mut self) {
         while let Ok(event) = self.credential_rx.try_recv() {
+            self.provider_generation = self.provider_generation.wrapping_add(1);
+            self.provider_catalogs.clear();
             self.credential_busy = false;
             match event {
                 CredentialEvent::Saved {
@@ -6114,31 +6337,83 @@ impl ButtonsApp {
         while let Ok(event) = self.provider_rx.try_recv() {
             self.provider_busy = false;
             match event {
-                ProviderEvent::Tested(provider_id, result)
-                    if provider_id == self.provider_edit_id =>
+                ProviderEvent::Tested(provider, generation, result)
+                    if generation == self.provider_generation
+                        && provider.id == self.provider_edit_id
+                        && self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter()
+                            .any(|current| {
+                                current.id == provider.id
+                                    && current.endpoint == provider.endpoint
+                                    && current.api == provider.api
+                                    && current.model == provider.model
+                            }) =>
                 {
                     self.provider_message = Some(match result {
-                        Ok(()) => crate::i18n::text(
-                            &self.locale,
-                            crate::i18n::MessageKey::ConnectionSucceeded,
-                            &[],
-                        ),
+                        Ok(()) => "Model request succeeded.".into(),
                         Err(error) => error,
                     });
                 }
-                ProviderEvent::Models(provider_id, result)
-                    if provider_id == self.provider_edit_id =>
+                ProviderEvent::Models(provider, generation, result)
+                    if generation == self.provider_generation
+                        && self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter()
+                            .any(|current| {
+                                current.id == provider.id
+                                    && provider_fingerprint(current)
+                                        == provider_fingerprint(&provider)
+                            }) =>
                 {
-                    match result {
-                        Ok(models) => {
-                            self.provider_message = Some(crate::i18n::text(
-                                &self.locale,
-                                crate::i18n::MessageKey::ModelsFound,
-                                &[("count", &models.len().to_string())],
-                            ));
-                            self.provider_models = models;
-                        }
-                        Err(error) => self.provider_message = Some(error),
+                    let (models, error) = match result {
+                        Ok(models) => (models, None),
+                        Err(error) => (vec![], Some(error)),
+                    };
+                    if provider.id == self.provider_edit_id {
+                        self.provider_message = Some(
+                            error
+                                .clone()
+                                .unwrap_or_else(|| format!("{} models loaded", models.len())),
+                        );
+                        self.provider_models = models.clone();
+                    }
+                    self.provider_catalogs.insert(
+                        provider.id.clone(),
+                        ProviderCatalog {
+                            fingerprint: provider_fingerprint(&provider),
+                            models,
+                            error,
+                        },
+                    );
+                }
+                ProviderEvent::Detected(provider, generation, result)
+                    if generation == self.provider_generation =>
+                {
+                    if let Some(current) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|current| {
+                            current.id == provider.id
+                                && current.endpoint == provider.endpoint
+                                && current.model == provider.model
+                                && current.api == provider.api
+                        })
+                    {
+                        self.provider_message = Some(match result {
+                            Ok(api) => {
+                                current.api = api;
+                                self.provider_catalogs.remove(&current.id);
+                                format!("Detected {}", api_label(api))
+                            }
+                            Err(error) => format!("Format detection failed: {error}"),
+                        });
                     }
                 }
                 _ => {}
@@ -13150,6 +13425,124 @@ fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn api_label(api: ProviderApi) -> &'static str {
+    match api {
+        ProviderApi::Auto => "Automatic",
+        ProviderApi::ChatCompletions => "Chat Completions",
+        ProviderApi::Responses => "Responses API",
+        ProviderApi::Anthropic => "Anthropic Messages",
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn provider_fingerprint(provider: &ProviderProfile) -> String {
+    format!(
+        "{}\n{:?}\n{}\n{}",
+        provider.endpoint,
+        provider.api,
+        provider.models_endpoint.as_deref().unwrap_or(""),
+        provider.credential_ref.as_deref().unwrap_or("")
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn catalog_models<'a>(
+    catalogs: &'a std::collections::BTreeMap<String, ProviderCatalog>,
+    provider: &ProviderProfile,
+) -> &'a [String] {
+    catalogs
+        .get(&provider.id)
+        .filter(|catalog| catalog.fingerprint == provider_fingerprint(provider))
+        .map_or(&[], |catalog| catalog.models.as_slice())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn provider_picker(
+    ui: &mut egui::Ui,
+    id: &str,
+    providers: &[ProviderProfile],
+    selected: &mut String,
+    shared: bool,
+) {
+    egui::ComboBox::from_id_salt(id)
+        .width(280.0)
+        .selected_text(if shared && selected.is_empty() {
+            "Use main model"
+        } else {
+            providers
+                .iter()
+                .find(|p| p.id == *selected)
+                .map_or("Choose provider", |p| p.name.as_str())
+        })
+        .show_ui(ui, |ui| {
+            if shared {
+                ui.spaced_selectable_value(selected, String::new(), "Use main model");
+            }
+            for provider in providers {
+                ui.spaced_selectable_value(selected, provider.id.clone(), &provider.name);
+            }
+        });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn catalog_status(
+    ui: &mut egui::Ui,
+    catalogs: &std::collections::BTreeMap<String, ProviderCatalog>,
+    provider: &ProviderProfile,
+) {
+    if let Some(error) = catalogs
+        .get(&provider.id)
+        .filter(|catalog| catalog.fingerprint == provider_fingerprint(provider))
+        .and_then(|catalog| catalog.error.as_deref())
+    {
+        ui.spaced_label(format!(
+            "Model list unavailable: {error}. You can type a model ID."
+        ));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[String]) {
+    ui.push_id(id, |ui| {
+        wrapping_row(ui, |ui| {
+            ui.add(
+                egui::TextEdit::singleline(model)
+                    .desired_width(300.0)
+                    .hint_text("Type a model ID or choose from the list"),
+            );
+            ui.add_enabled_ui(!models.is_empty(), |ui| {
+                ui.spaced_menu_button(format!("Choose model ({})", models.len()), |ui| {
+                    let search_id = ui.id().with("model-search");
+                    let mut search = ui
+                        .ctx()
+                        .data_mut(|data| data.get_temp::<String>(search_id).unwrap_or_default());
+                    ui.add(egui::TextEdit::singleline(&mut search).hint_text("Search models"));
+                    ui.ctx()
+                        .data_mut(|data| data.insert_temp(search_id, search.clone()));
+                    let search = search.to_lowercase();
+                    egui::ScrollArea::vertical()
+                        .max_height(240.0)
+                        .show(ui, |ui| {
+                            for value in models
+                                .iter()
+                                .filter(|value| value.to_lowercase().contains(&search))
+                            {
+                                if ui
+                                    .spaced_selectable_label(*model == *value, value)
+                                    .clicked()
+                                {
+                                    *model = value.clone();
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                });
+            });
+        });
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn provider_key(
     session: &SessionCredentialStore,
     expected_reference: &str,
@@ -15371,6 +15764,263 @@ Start-Sleep -Seconds 300
         })
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ai_settings_fixture() -> ButtonsApp {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.locale = "en".into();
+        app.preferences.provider_settings = crate::assistant::provider::ProviderSettings {
+            providers: vec![
+                ProviderProfile {
+                    id: "openai".into(),
+                    name: "OpenAI".into(),
+                    endpoint: "https://api.openai.com/v1".into(),
+                    api: ProviderApi::Responses,
+                    model: "gpt-4.1-mini".into(),
+                    ..Default::default()
+                },
+                ProviderProfile {
+                    id: "anthropic".into(),
+                    name: "Anthropic".into(),
+                    endpoint: "https://api.anthropic.com/v1".into(),
+                    api: ProviderApi::Anthropic,
+                    model: "claude-sonnet-4-5".into(),
+                    ..Default::default()
+                },
+                ProviderProfile {
+                    id: "local".into(),
+                    name: "Local server".into(),
+                    endpoint: "http://127.0.0.1:8080/v1".into(),
+                    api: ProviderApi::ChatCompletions,
+                    model: "local-model".into(),
+                    ..Default::default()
+                },
+            ],
+            active_provider_id: "openai".into(),
+            tasks: Default::default(),
+        };
+        app.provider_edit_id = "openai".into();
+        for provider in &app.preferences.provider_settings.providers {
+            app.provider_catalogs.insert(
+                provider.id.clone(),
+                ProviderCatalog {
+                    fingerprint: provider_fingerprint(provider),
+                    models: vec![
+                        provider.model.clone(),
+                        format!("{}-alternative", provider.model),
+                    ],
+                    error: None,
+                },
+            );
+        }
+        app.show_localization_onboarding = false;
+        app.show_settings = true;
+        app.settings_embedded = true;
+        app.settings_tab = SettingsTab::Providers;
+        app
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn ai_connection_selection_is_independent_of_routing_and_stale_catalogs() {
+        let mut app = ai_settings_fixture();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        app.apply_style(&ctx);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1080.0, 1000.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.settings_contents(ui, ctx, &mut None);
+                    });
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let pos = text_position(&output, "Anthropic").expect("connection selector");
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert_eq!(app.provider_edit_id, "anthropic");
+        assert_eq!(
+            app.preferences.provider_settings.active_provider_id,
+            "openai"
+        );
+        let mut old = app.preferences.provider_settings.providers[1].clone();
+        old.endpoint = "https://old.example/v1".into();
+        app.provider_tx
+            .send(ProviderEvent::Models(
+                old,
+                app.provider_generation,
+                Ok(vec!["stale".into()]),
+            ))
+            .unwrap();
+        let provider = app.preferences.provider_settings.providers[0].clone();
+        app.provider_tx
+            .send(ProviderEvent::Models(
+                provider.clone(),
+                app.provider_generation,
+                Ok(vec!["fresh-openai".into()]),
+            ))
+            .unwrap();
+        app.process_provider_events();
+        assert_eq!(
+            catalog_models(&app.provider_catalogs, &provider),
+            ["fresh-openai"]
+        );
+        assert_ne!(app.provider_models, ["fresh-openai"]);
+        assert_eq!(
+            catalog_models(
+                &app.provider_catalogs,
+                &app.preferences.provider_settings.providers[1]
+            )[0],
+            "claude-sonnet-4-5"
+        );
+        app.preferences.provider_settings.tasks.insert(
+            AiTask::Simulation,
+            crate::assistant::provider::TaskBinding {
+                primary: Some(ModelTarget {
+                    provider_id: "anthropic".into(),
+                    model: "custom-model".into(),
+                }),
+                fallbacks: vec![],
+            },
+        );
+        app.settings_tab = SettingsTab::Models;
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        assert!(text_position(&output, "Uses Anthropic · custom-model").is_some());
+        let main = text_position(&output, "Use main model for every task").unwrap();
+        render(
+            &mut app,
+            pointer_events(main, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(main, egui::PointerButton::Primary, false),
+        );
+        assert!(AiTask::ALL.iter().all(|task| app
+            .preferences
+            .provider_settings
+            .for_task(*task)
+            .unwrap()
+            .id
+            == "openai"));
+        // An unfinished main connection is visible even when editing a different provider.
+        app.preferences.provider_settings.providers[0]
+            .endpoint
+            .clear();
+        let output = render(&mut app, vec![]);
+        assert!(text_position(
+            &output,
+            "This provider has no valid base URL. Open Manage providers to complete it."
+        )
+        .is_some());
+        assert!(
+            !app.provider_busy,
+            "fixture must never start network requests"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens isolated AI settings with synthetic catalogs for two native screenshots"]
+    fn native_ai_settings_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            capture: std::path::PathBuf,
+            stage: u8,
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.app.settings_contents(ui, ctx, &mut None);
+                });
+                let elapsed = self.started.elapsed().as_secs_f32();
+                if self.stage == 0 && elapsed > 1.0 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.capture.join("providers.png"),
+                    )));
+                    self.stage = 1;
+                } else if self.stage == 1 && elapsed > 2.0 {
+                    self.app.settings_tab = SettingsTab::Models;
+                    self.stage = 2;
+                } else if self.stage == 2 && elapsed > 3.0 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.capture.join("models.png"),
+                    )));
+                    self.stage = 3;
+                } else if elapsed > 4.0 {
+                    assert!(self.capture.join("providers.png").is_file());
+                    assert!(self.capture.join("models.png").is_file());
+                    assert!(!self.app.provider_busy);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let owned_root =
+            std::env::temp_dir().join(format!("buttonscli-ai-ui-{:032x}", fastrand::u128(..)));
+        std::fs::create_dir_all(&owned_root).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(owned_root.join("native")),
+            owned_root.join("legacy"),
+        )
+        .unwrap();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 1000.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native(
+            "ButtonsCLI AI settings probe",
+            options,
+            Box::new(move |cc| {
+                let mut app = ai_settings_fixture();
+                app.native_store = Some(store);
+                fonts::install(&cc.egui_ctx, &app.font_catalog);
+                app.apply_style(&cc.egui_ctx);
+                Ok(Box::new(Probe {
+                    app,
+                    started: Instant::now(),
+                    capture,
+                    stage: 0,
+                }))
+            }),
+        )
+        .unwrap();
+        assert!(owned_root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(owned_root).unwrap();
+    }
+
     #[test]
     fn plus_menu_opens_independent_simulations_with_normal_pane_themes() {
         let mut app = ButtonsApp::empty(Preferences::default());
@@ -15961,6 +16611,7 @@ Start-Sleep -Seconds 300
             endpoint: ready["endpoint"].as_str().unwrap().into(),
             model: "fake-ok".into(),
             credential_ref: None,
+            models_endpoint: None,
             api: Default::default(),
         };
         preferences
@@ -17673,6 +18324,16 @@ Start-Sleep -Seconds 300
     #[test]
     fn settings_footer_stays_visible_with_large_fonts_at_minimum_window_size() {
         let mut app = ButtonsApp::empty(Preferences::default());
+        for provider in &app.preferences.provider_settings.providers {
+            app.provider_catalogs.insert(
+                provider.id.clone(),
+                ProviderCatalog {
+                    fingerprint: provider_fingerprint(provider),
+                    models: vec![],
+                    error: None,
+                },
+            );
+        }
         app.locale = "en".into();
         app.preferences.typography.settings.size = 24.0;
         let ctx = egui::Context::default();
@@ -17689,6 +18350,7 @@ Start-Sleep -Seconds 300
             SettingsTab::Language,
             SettingsTab::Shortcuts,
             SettingsTab::Providers,
+            SettingsTab::Models,
             SettingsTab::Import,
         ] {
             app.settings_tab = tab;

@@ -236,7 +236,7 @@ impl NativeStore {
         self.delete_quick_secrets(expected)
     }
 
-    fn native_path(&self) -> PathBuf {
+    pub(crate) fn native_path(&self) -> PathBuf {
         self.profile_dir().join("native.json")
     }
 

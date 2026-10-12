@@ -319,6 +319,7 @@ impl<'a> AccountClient<'a> {
             .map_err(|_| AccountError::Endpoint)?;
         self.transport
             .execute(Request {
+                anthropic: false,
                 method,
                 url: url.into(),
                 body,

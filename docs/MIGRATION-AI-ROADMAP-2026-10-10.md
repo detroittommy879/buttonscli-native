@@ -10,7 +10,7 @@ October 11 implementation: [task models and simulation](AI-MODELS-AND-SIMULATION
 | Terminal control | Opt-in bounded 12-step agent, stable target and guarded submission; CLI/MCP | Real-provider GUI and cross-platform acceptance |
 | Theme generation | Palette and seven-zone typography, validation and one correction attempt | Screenshots, full appearance, richer generation and useful gate/provider errors |
 | Shaders | 17 backgrounds; bounded WGSL color-expression editor, four named sliders, RGB controls, diagnostics and gradient fallback | AI generation, unrestricted source/postprocessing, wider GPU acceptance |
-| Providers | Shared default, four task slots, fallbacks, independent editing; Chat Completions and Responses APIs | Vision capabilities, discovery for task overrides, other API dialects |
+| Providers | Separate connections/task screens; shared main model, four slots/fallbacks; base URLs, JSON editing; Chat Completions, Responses and Anthropic; per-provider searchable model lists | Vision capabilities, more dialects, setup-label translations; live Anthropic key acceptance |
 | Simulation | + menu workspace tabs/panes, editable setup, optional output notices/tab badges, virtual files, reset/undo and model chain | Broader real-provider quality and saved sessions |
 | Performance | Output-capture timing experiments | Environment-tagged history, charts and regression detection |
 

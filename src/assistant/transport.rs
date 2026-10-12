@@ -19,6 +19,7 @@ pub(crate) struct Request {
     pub(crate) url: String,
     pub(crate) body: Option<serde_json::Value>,
     pub(crate) key: Option<Zeroizing<String>>,
+    pub(crate) anthropic: bool,
 }
 
 pub(crate) struct Response {
@@ -95,6 +96,40 @@ fn bearer_header(key: &str) -> Result<reqwest::header::HeaderValue, TransportErr
     Ok(value)
 }
 
+fn auth_headers(request: &Request) -> Result<reqwest::header::HeaderMap, TransportError> {
+    let mut headers = reqwest::header::HeaderMap::new();
+    if request.anthropic {
+        headers.insert(
+            "anthropic-version",
+            reqwest::header::HeaderValue::from_static("2023-06-01"),
+        );
+    }
+    if let Some(key) = request.key.as_deref() {
+        if request.anthropic {
+            let key = key.trim();
+            if key.is_empty() || key.chars().any(char::is_control) {
+                return Err(TransportError::InvalidCredential);
+            }
+            let mut value = reqwest::header::HeaderValue::from_str(key)
+                .map_err(|_| TransportError::InvalidCredential)?;
+            value.set_sensitive(true);
+            headers.insert("x-api-key", value);
+        } else {
+            headers.insert(reqwest::header::AUTHORIZATION, bearer_header(key)?);
+        }
+    }
+    Ok(headers)
+}
+
+fn valid_query(request: &Request, url: &url::Url) -> bool {
+    url.query().is_none()
+        || (matches!(request.method, Method::Get)
+            && url.path().ends_with("/models")
+            && url.query_pairs().all(|(key, value)| {
+                matches!(key.as_ref(), "limit" | "after_id") && value.len() <= 256
+            }))
+}
+
 impl HttpTransport for ReqwestTransport {
     fn execute(&self, request: Request) -> Result<Response, TransportError> {
         let parsed = url::Url::parse(&request.url).map_err(|_| TransportError::InvalidEndpoint)?;
@@ -102,7 +137,7 @@ impl HttpTransport for ReqwestTransport {
             || parsed.host_str().is_none()
             || !parsed.username().is_empty()
             || parsed.password().is_some()
-            || parsed.query().is_some()
+            || !valid_query(&request, &parsed)
             || parsed.fragment().is_some()
         {
             return Err(TransportError::InvalidEndpoint);
@@ -119,9 +154,7 @@ impl HttpTransport for ReqwestTransport {
         }
         .header("Accept", "application/json")
         .header("X-Title", "ButtonsCLI Native");
-        if let Some(key) = request.key.as_deref() {
-            builder = builder.header(reqwest::header::AUTHORIZATION, bearer_header(key)?);
-        }
+        builder = builder.headers(auth_headers(&request)?);
         if let Some(body) = request.body {
             builder = builder.json(&body);
         }
@@ -165,7 +198,7 @@ impl HttpTransport for ReqwestTransport {
             || parsed.host_str().is_none()
             || !parsed.username().is_empty()
             || parsed.password().is_some()
-            || parsed.query().is_some()
+            || !valid_query(&request, &parsed)
             || parsed.fragment().is_some()
         {
             return Err(TransportError::InvalidEndpoint);
@@ -187,9 +220,7 @@ impl HttpTransport for ReqwestTransport {
         }
         .header("Accept", "application/json, text/event-stream")
         .header("X-Title", "ButtonsCLI Native");
-        if let Some(key) = request.key.as_deref() {
-            builder = builder.header(reqwest::header::AUTHORIZATION, bearer_header(key)?);
-        }
+        builder = builder.headers(auth_headers(&request)?);
         if let Some(body) = request.body {
             builder = builder.json(&body);
         }
@@ -273,6 +304,42 @@ fn retry_after(value: &str) -> Option<Duration> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn anthropic_headers_use_only_the_expected_auth_and_model_query_is_bounded() {
+        let mut request = Request {
+            method: Method::Get,
+            url: "https://api.anthropic.com/v1/models?limit=500".into(),
+            body: None,
+            key: Some(Zeroizing::new(" fixture-key ".into())),
+            anthropic: true,
+        };
+        let headers = auth_headers(&request).unwrap();
+        assert_eq!(headers["x-api-key"], "fixture-key");
+        assert!(headers["x-api-key"].is_sensitive());
+        assert_eq!(headers["anthropic-version"], "2023-06-01");
+        assert!(!headers.contains_key(reqwest::header::AUTHORIZATION));
+        assert!(valid_query(
+            &request,
+            &url::Url::parse(&request.url).unwrap()
+        ));
+        assert!(!valid_query(
+            &request,
+            &url::Url::parse("https://example.com/v1/models?api_key=secret").unwrap()
+        ));
+        request.anthropic = false;
+        let headers = auth_headers(&request).unwrap();
+        assert_eq!(
+            headers[reqwest::header::AUTHORIZATION],
+            "Bearer fixture-key"
+        );
+        assert!(!headers.contains_key("x-api-key"));
+        request.method = Method::Post;
+        assert!(!valid_query(
+            &request,
+            &url::Url::parse(&request.url).unwrap()
+        ));
+    }
 
     #[test]
     fn pasted_key_whitespace_is_trimmed_and_embedded_controls_are_rejected() {
