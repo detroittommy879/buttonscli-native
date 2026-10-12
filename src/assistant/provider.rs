@@ -13,6 +13,28 @@ pub(crate) struct ProviderProfile {
     pub endpoint: String,
     pub model: String,
     pub credential_ref: Option<String>,
+    pub api: ProviderApi,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ProviderApi {
+    #[default]
+    Auto,
+    ChatCompletions,
+    Responses,
+}
+
+impl ProviderProfile {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn uses_responses(&self) -> bool {
+        match self.api {
+            ProviderApi::Responses => true,
+            ProviderApi::ChatCompletions => false,
+            ProviderApi::Auto => url::Url::parse(&self.endpoint)
+                .is_ok_and(|url| url.path().trim_end_matches('/').ends_with("/responses")),
+        }
+    }
 }
 
 impl Default for ProviderProfile {
@@ -23,6 +45,7 @@ impl Default for ProviderProfile {
             endpoint: "https://openrouter.ai/api/v1/chat/completions".into(),
             model: "openai/gpt-4.1-mini".into(),
             credential_ref: None,
+            api: ProviderApi::Auto,
         }
     }
 }
@@ -126,6 +149,7 @@ impl ProviderSettings {
                     endpoint,
                     model,
                     credential_ref: None,
+                    api: ProviderApi::Auto,
                 });
             }
         } else if let Some(endpoint) = assistant["endpoint"].as_str().and_then(sanitize_endpoint) {
@@ -138,6 +162,7 @@ impl ProviderSettings {
                 endpoint,
                 model: assistant["model"].as_str().unwrap_or("").into(),
                 credential_ref: None,
+                api: ProviderApi::Auto,
             });
         }
         let mut settings = Self {

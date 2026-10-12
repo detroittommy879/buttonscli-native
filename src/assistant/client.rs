@@ -32,7 +32,7 @@ pub(crate) enum ClientError {
 impl std::fmt::Display for ClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Endpoint => f.write_str("configure a valid chat completions endpoint"),
+            Self::Endpoint => f.write_str("configure a valid provider endpoint"),
             Self::Model => f.write_str("enter a model ID"),
             Self::Http(429) => f.write_str("provider returned HTTP 429 (rate limit or quota); wait or check the provider account"),
             Self::Http(status) => write!(f, "provider returned HTTP {status}"),
@@ -58,6 +58,46 @@ pub(crate) fn completion_url(endpoint: &str) -> Result<String, ClientError> {
         url.set_path(&path);
     }
     Ok(url.to_string())
+}
+
+fn provider_url(provider: &ProviderProfile) -> Result<String, ClientError> {
+    let endpoint = completion_url(&provider.endpoint)?;
+    let mut url = url::Url::parse(&endpoint).map_err(|_| ClientError::Endpoint)?;
+    let path = url.path().trim_end_matches('/');
+    let path = if provider.uses_responses() {
+        path.strip_suffix("/chat/completions")
+            .map(|base| format!("{base}/responses"))
+    } else {
+        path.strip_suffix("/responses")
+            .map(|base| format!("{base}/chat/completions"))
+    };
+    if let Some(path) = path {
+        url.set_path(&path);
+    }
+    Ok(url.into())
+}
+
+fn completion_body(
+    provider: &ProviderProfile,
+    prompts: (&str, &str),
+    history: &[(bool, String)],
+    stream: bool,
+) -> Value {
+    let mut messages = Vec::with_capacity(history.len() + 2);
+    if !provider.uses_responses() {
+        messages.push(json!({"role":"system", "content":prompts.0}));
+    }
+    messages.extend(history.iter().map(|(assistant, content)| {
+        json!({
+            "role": if *assistant { "assistant" } else { "user" }, "content": content,
+        })
+    }));
+    messages.push(json!({"role":"user", "content":prompts.1}));
+    if provider.uses_responses() {
+        json!({"model":provider.model, "instructions":prompts.0, "input":messages, "stream":stream, "store":false})
+    } else {
+        json!({"model":provider.model, "messages":messages, "stream":stream})
+    }
 }
 
 pub(crate) fn models_url(endpoint: &str) -> Result<String, ClientError> {
@@ -142,25 +182,24 @@ pub(crate) fn test_connection(
     if provider.model.trim().is_empty() {
         return Err(ClientError::Model);
     }
-    let response = transport.execute(Request {
-        method: Method::Post,
-        url: completion_url(&provider.endpoint)?,
-        body: Some(json!({"model": provider.model, "messages": [{"role": "user", "content": "Reply OK."}], "max_tokens": 4, "stream": false})),
-        key,
-    }).map_err(ClientError::Transport)?;
+    let mut body = completion_body(provider, ("Reply briefly.", "Reply OK."), &[], false);
+    body[if provider.uses_responses() {
+        "max_output_tokens"
+    } else {
+        "max_tokens"
+    }] = json!(if provider.uses_responses() { 512 } else { 4 });
+    let response = transport
+        .execute(Request {
+            method: Method::Post,
+            url: provider_url(provider)?,
+            body: Some(body),
+            key,
+        })
+        .map_err(ClientError::Transport)?;
     if !(200..300).contains(&response.status) {
         return Err(ClientError::Http(response.status));
     }
-    let value: Value =
-        serde_json::from_slice(&response.body).map_err(|_| ClientError::InvalidReply)?;
-    if value["choices"]
-        .as_array()
-        .is_some_and(|choices| !choices.is_empty())
-    {
-        Ok(())
-    } else {
-        Err(ClientError::InvalidReply)
-    }
+    completion_content(&response.body, provider.uses_responses()).map(|_| ())
 }
 
 pub(crate) fn stream_completion(
@@ -306,7 +345,6 @@ fn completion_attempt(
     on_delta: &mut dyn FnMut(&str),
 ) -> Result<String, ClientError> {
     let (cancelled, hints) = control;
-    let (system_prompt, prompt) = prompts;
     validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
     if provider.model.trim().is_empty() {
         return Err(ClientError::Model);
@@ -314,7 +352,11 @@ fn completion_attempt(
     let status = Cell::new(0_u16);
     let is_sse = Cell::new(false);
     let mut raw = Vec::new();
-    let mut decoder = SseDecoder::default();
+    let mut decoder = if provider.uses_responses() {
+        SseDecoder::responses()
+    } else {
+        SseDecoder::default()
+    };
     let mut answer = AnswerBuffer::default();
     let mut parser_error = None;
     let mut on_head = |head: ResponseHead| {
@@ -374,17 +416,7 @@ fn completion_attempt(
         }
         Ok(())
     };
-    let mut messages = Vec::with_capacity(history.len() + 2);
-    messages.push(json!({"role": "system", "content": system_prompt}));
-    messages.extend(history.iter().map(|(assistant, content)| {
-        json!({
-            "role": if *assistant { "assistant" } else { "user" },
-            "content": content,
-        })
-    }));
-    messages.push(json!({"role": "user", "content": prompt}));
-    let request_body =
-        json!({"model": provider.model, "messages": messages, "stream": hints.stream});
+    let request_body = completion_body(provider, prompts, history, hints.stream);
     if serde_json::to_vec(&request_body)
         .map_err(|_| ClientError::InvalidReply)?
         .len()
@@ -394,7 +426,7 @@ fn completion_attempt(
     }
     let request = Request {
         method: Method::Post,
-        url: completion_url(&provider.endpoint)?,
+        url: provider_url(provider)?,
         body: Some(request_body),
         key,
     };
@@ -446,12 +478,15 @@ fn completion_attempt(
                 on_delta(&delta);
             }
         }
+        if provider.uses_responses() && !decoder.completed() {
+            return Err(ClientError::Reply(ReplyError::IncompleteResponse));
+        }
         if answer.text().is_empty() {
             return Err(ClientError::InvalidReply);
         }
         Ok(answer.into_string())
     } else {
-        let body = completion_content(&raw)?;
+        let body = completion_content(&raw, provider.uses_responses())?;
         let mut bounded = AnswerBuffer::default();
         bounded.append(&body).map_err(ClientError::Reply)?;
         on_delta(bounded.text());
@@ -459,8 +494,38 @@ fn completion_attempt(
     }
 }
 
-fn completion_content(body: &[u8]) -> Result<String, ClientError> {
+fn completion_content(body: &[u8], responses: bool) -> Result<String, ClientError> {
     let value: Value = serde_json::from_slice(body).map_err(|_| ClientError::InvalidReply)?;
+    if responses {
+        if value["status"].as_str() != Some("completed") {
+            return Err(ClientError::Reply(ReplyError::IncompleteResponse));
+        }
+        let mut text = String::new();
+        for item in value["output"]
+            .as_array()
+            .ok_or(ClientError::InvalidReply)?
+        {
+            if item["type"] != "message" || item["role"] != "assistant" {
+                continue;
+            }
+            for part in item["content"]
+                .as_array()
+                .ok_or(ClientError::InvalidReply)?
+            {
+                if part["type"] == "refusal" {
+                    return Err(ClientError::Reply(ReplyError::Refused));
+                }
+                if part["type"] == "output_text" {
+                    text.push_str(part["text"].as_str().ok_or(ClientError::InvalidReply)?);
+                }
+            }
+        }
+        return if text.is_empty() {
+            Err(ClientError::InvalidReply)
+        } else {
+            Ok(text)
+        };
+    }
     let choice = value
         .get("choices")
         .and_then(Value::as_array)
@@ -478,6 +543,124 @@ fn completion_content(body: &[u8]) -> Result<String, ClientError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn responses_routes_and_bodies_preserve_history_without_chat_only_fields() {
+        use super::super::provider::ProviderApi;
+        let provider = ProviderProfile {
+            endpoint: "https://api.openai.com/v1".into(),
+            api: ProviderApi::Responses,
+            ..ProviderProfile::default()
+        };
+        assert_eq!(
+            provider_url(&provider).unwrap(),
+            "https://api.openai.com/v1/responses"
+        );
+        let body = completion_body(
+            &provider,
+            ("system instructions", "next"),
+            &[
+                (false, "previous question".into()),
+                (true, "previous answer".into()),
+            ],
+            true,
+        );
+        assert_eq!(body["instructions"], "system instructions");
+        assert_eq!(body["input"][1]["role"], "assistant");
+        assert_eq!(body["input"][2]["content"], "next");
+        assert_eq!(body["store"], false);
+        assert!(body.get("messages").is_none());
+        let automatic = ProviderProfile {
+            endpoint: "https://api.openai.com/v1/responses".into(),
+            ..ProviderProfile::default()
+        };
+        assert!(automatic.uses_responses());
+        assert_eq!(
+            models_url(&automatic.endpoint).unwrap(),
+            "https://api.openai.com/v1/models"
+        );
+        let chat = ProviderProfile {
+            api: ProviderApi::ChatCompletions,
+            ..automatic
+        };
+        assert_eq!(
+            provider_url(&chat).unwrap(),
+            "https://api.openai.com/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn responses_stream_and_json_read_only_output_text_and_require_completion() {
+        let provider = ProviderProfile {
+            endpoint: "https://example.test/v1/responses".into(),
+            ..ProviderProfile::default()
+        };
+        let success = r#"{"status":"completed","output":[{"type":"reasoning","summary":[]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"OK"}]}]}"#;
+        assert_eq!(completion_content(success.as_bytes(), true).unwrap(), "OK");
+        assert!(completion_content(br#"{"status":"incomplete","output":[]}"#, true).is_err());
+        let transport = FakeTransport {
+            status: 200,
+            body: success.as_bytes().to_vec(),
+        };
+        test_connection(&transport, &provider, None).unwrap();
+        assert_eq!(
+            stream_completion(
+                &transport,
+                &provider,
+                None,
+                ("s", "u"),
+                &[],
+                &AtomicBool::new(false),
+                &mut |_| {}
+            )
+            .unwrap(),
+            "OK"
+        );
+        let (endpoint, server) = local_provider_server(200, "text/event-stream", b"data: {\"type\":\"response.output_text.delta\",\"delta\":\"OK\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n".to_vec());
+        let provider = ProviderProfile {
+            endpoint,
+            api: super::super::provider::ProviderApi::Responses,
+            ..ProviderProfile::default()
+        };
+        let mut text = String::new();
+        assert_eq!(
+            stream_completion(
+                &super::super::transport::ReqwestTransport,
+                &provider,
+                None,
+                ("s", "u"),
+                &[],
+                &AtomicBool::new(false),
+                &mut |delta| text.push_str(delta)
+            )
+            .unwrap(),
+            "OK"
+        );
+        assert_eq!(text, "OK");
+        let request = server.join().unwrap();
+        assert!(request.contains("POST /v1/responses"));
+        assert!(request.contains("\"store\":false"));
+        let truncated = FakeTransport {
+            status: 200,
+            body: b"data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n"
+                .to_vec(),
+        };
+        let provider = ProviderProfile {
+            endpoint: "https://example.test/v1/responses".into(),
+            ..provider
+        };
+        assert_eq!(
+            stream_completion(
+                &truncated,
+                &provider,
+                None,
+                ("s", "u"),
+                &[],
+                &AtomicBool::new(false),
+                &mut |_| {}
+            ),
+            Err(ClientError::Reply(ReplyError::IncompleteResponse))
+        );
+    }
     struct Scripted {
         replies: std::sync::Mutex<std::collections::VecDeque<(u16, &'static str)>>,
         calls: std::sync::atomic::AtomicUsize,
@@ -801,6 +984,7 @@ mod tests {
             endpoint: "https://api.mistral.ai/v1/chat/completions".into(),
             model: "codestral-latest".into(),
             credential_ref: None,
+            api: Default::default(),
         };
         let transport = super::super::transport::ReqwestTransport;
         super::test_connection(&transport, &provider, Some(Zeroizing::new(key.to_string())))

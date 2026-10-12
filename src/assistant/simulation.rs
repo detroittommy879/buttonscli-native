@@ -338,6 +338,93 @@ fn generate_turn(
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "explicit OpenAI-det/gpt-5.6-terra requests; synthetic simulation state only"]
+    fn openai_det_responses_live_simulation() {
+        use super::super::credentials::{CredentialStore, SystemCredentialStore};
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_OPENAI_DET").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        // Read only provider metadata from the real profile; state/checkpoints belong to this test.
+        let document: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let settings: super::super::provider::ProviderSettings =
+            serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
+        let provider = settings
+            .for_task(super::super::provider::AiTask::Simulation)
+            .unwrap();
+        assert_eq!(provider.name, "OpenAI-det");
+        assert_eq!(provider.model, "gpt-5.6-terra");
+        assert_eq!(provider.endpoint, "https://api.openai.com/v1/responses");
+        assert!(provider.uses_responses());
+        let reference = super::super::credentials::reference(&profile, &provider.id);
+        assert_eq!(provider.credential_ref.as_deref(), Some(reference.as_str()));
+        let mut simulation = Simulation::default();
+        for command in [
+            "echo native-sim-ok > practice.txt",
+            "cat practice.txt",
+            "rm practice.txt",
+        ] {
+            let prompt = serde_json::json!({"persona":"Linux / Bash", "command":command, "state":simulation.state}).to_string();
+            let turn = generate_turn(
+                &super::super::transport::ReqwestTransport,
+                std::slice::from_ref(&provider),
+                &mut |_| {
+                    SystemCredentialStore
+                        .get(&reference)
+                        .map(Some)
+                        .map_err(|_| ClientError::Credential)
+                },
+                &prompt,
+                &AtomicBool::new(false),
+            )
+            .expect("OpenAI Responses simulation failed");
+            if command.starts_with("echo") {
+                assert!(
+                    turn.state
+                        .files
+                        .iter()
+                        .any(|(path, content)| path.ends_with("practice.txt")
+                            && content.contains("native-sim-ok")),
+                    "Simulation did not create the virtual file"
+                );
+            } else if command.starts_with("cat") {
+                assert!(
+                    turn.output.contains("native-sim-ok"),
+                    "Simulation did not read the virtual file"
+                );
+            } else {
+                assert!(
+                    !turn
+                        .state
+                        .files
+                        .keys()
+                        .any(|path| path.ends_with("practice.txt")),
+                    "Simulation did not delete the virtual file"
+                );
+            }
+            simulation.pending_command = command.into();
+            simulation.commit(turn);
+        }
+        assert!(simulation
+            .undo
+            .last()
+            .unwrap()
+            .0
+            .files
+            .keys()
+            .any(|path| path.ends_with("practice.txt")));
+        println!("OpenAI-det / gpt-5.6-terra: three Responses simulation turns created, read and deleted a virtual file; undo retained it.");
+    }
+    #[test]
     fn simulation_ui_worker_round_trip_uses_only_virtual_files() {
         use std::io::BufRead;
         struct Fixture(std::process::Child);

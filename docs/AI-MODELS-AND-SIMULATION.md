@@ -2,7 +2,20 @@
 
 In **Settings → AI Providers**, choose the shared default provider/model. The
 separate **Provider to edit** selector edits profiles without changing that default.
-Each profile has its own OpenAI-compatible endpoint and credential reference.
+Each profile has its own endpoint, API format and credential reference.
+
+**API format** supports Chat Completions, Responses API, or automatic selection
+from the endpoint (`/responses` selects Responses; old profiles keep Chat behavior).
+**Use OpenAI Responses endpoint** fills `https://api.openai.com/v1/responses`.
+Help, themes, Agent Mode and simulation share this adapter. Requests use the
+existing Rust HTTP client with current retry/cancellation behavior; no extra SDK
+is required. Responses sends local history as `input`, system guidance as
+`instructions` and `store: false`. It reads typed output text and semantic SSE
+events, rejects failed/incomplete/refused responses and avoids duplicate final text.
+No remote tools or conversation persistence are enabled.
+
+Reference: [official Responses migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses)
+and [streaming events](https://developers.openai.com/api/docs/guides/streaming-responses).
 
 **Models by task** has Help, theme, shader and simulated-terminal slots. All
 inherit the shared default until overridden. Select a provider and optionally

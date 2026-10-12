@@ -46,3 +46,12 @@
 - Validation: 278 unit + 2 integration tests pass, 22 ignored; explicit AI Help/ConPTY fixture passes; simulation UI/worker fixture and blocked-network cancellation pass; format, native strict Clippy and Node fake-provider checks pass. Optimized Windows build and isolated startup pass (expected closed-pipe teardown log). WASM deliberately skipped; no other-OS or real-provider acceptance claim.
 - Commits: f0b0b79 translations/audit; ddd6087 task models, transport and initial simulation. Remaining translation coverage, vision input, shader fixes/editor, performance history and simulation workspace tabs stay on the roadmap.
 
+## Responses API
+
+- Added per-provider Auto/Chat Completions/Responses selection and an OpenAI endpoint shortcut; old profiles infer protocol from URL. Shared adapter covers Help, themes, agent and simulation using existing reqwest.
+- Responses uses instructions/input, store:false, typed output and semantic SSE. Failed/incomplete/refused/truncated streams cannot become successful actions or simulation state; final text is not appended twice. API labels translated in all 21 locales.
+- User authorized OpenAI-det/gpt-5.6-terra. Corrected only that profile's leftover OpenRouter endpoint to https://api.openai.com/v1/responses under the native lock, with atomic replace/backup and unchanged key reference/model/task bindings. Never sent its key to OpenRouter.
+- Live acceptance passed: three gpt-5.6-terra Responses turns create/read/delete a synthetic virtual file; undo retains it. Test reads configured metadata/OS credential but owns all simulation state and does not change real files.
+- Initial fixture assertion used a loopback URL with an example.test-only fake transport; corrected its fixture endpoint. Updated full profile literals for the new API field.
+- Validation: 282 unit + 2 integration tests, 23 ignored; explicit OpenAI-det live simulation passes. Native strict Clippy, format, diff and translation checks pass. Release/startup pending; WASM remains deferred.
+

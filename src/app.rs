@@ -4,7 +4,9 @@ use crate::assistant::credentials::{
     SystemCredentialStore,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use crate::assistant::provider::{validate_endpoint, AiTask, ModelTarget, ProviderProfile};
+use crate::assistant::provider::{
+    validate_endpoint, AiTask, ModelTarget, ProviderApi, ProviderProfile,
+};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::control::ControlServer;
 #[cfg(not(target_arch = "wasm32"))]
@@ -5568,6 +5570,43 @@ impl ButtonsApp {
             ui.text_edit_singleline(&mut provider.endpoint)
                 .labelled_by(label.id);
         });
+        egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "API format"))
+            .selected_text(match provider.api {
+                ProviderApi::Auto => {
+                    crate::i18n::literal(&self.locale, "Automatic (from endpoint)")
+                }
+                ProviderApi::ChatCompletions => "Chat Completions".into(),
+                ProviderApi::Responses => "Responses API".into(),
+            })
+            .show_ui(ui, |ui| {
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Auto,
+                    crate::i18n::literal(&self.locale, "Automatic (from endpoint)"),
+                );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::ChatCompletions,
+                    "Chat Completions",
+                );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Responses,
+                    "Responses API",
+                );
+            });
+        if ui
+            .spaced_button(crate::i18n::literal(
+                &self.locale,
+                "Use OpenAI Responses endpoint",
+            ))
+            .clicked()
+        {
+            provider.endpoint = "https://api.openai.com/v1/responses".into();
+            provider.api = ProviderApi::Responses;
+            self.provider_models.clear();
+            self.provider_message = None;
+        }
         ui.horizontal(|ui| {
             let label = ui.spaced_label(text(&self.locale, M::ProviderModel, &[]));
             ui.text_edit_singleline(&mut provider.model)
@@ -15438,6 +15477,7 @@ Start-Sleep -Seconds 300
             endpoint: ready["endpoint"].as_str().unwrap().into(),
             model: "fake-ok".into(),
             credential_ref: None,
+            api: Default::default(),
         };
         preferences
             .provider_settings
