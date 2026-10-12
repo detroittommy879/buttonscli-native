@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -31,6 +32,47 @@ impl Default for ProviderProfile {
 pub(crate) struct ProviderSettings {
     pub providers: Vec<ProviderProfile>,
     pub active_provider_id: String,
+    pub tasks: BTreeMap<AiTask, TaskBinding>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum AiTask {
+    Help,
+    Theme,
+    Shader,
+    Simulation,
+}
+
+impl AiTask {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) const ALL: [Self; 4] = [Self::Help, Self::Theme, Self::Shader, Self::Simulation];
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Help => "AI Help model",
+            Self::Theme => "Theme generation model",
+            Self::Shader => "Shader generation model",
+            Self::Simulation => "Simulated terminal model",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct ModelTarget {
+    pub provider_id: String,
+    /// Empty uses this provider's configured model.
+    pub model: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub(crate) struct TaskBinding {
+    /// None inherits the shared default dynamically, without copying credentials.
+    pub primary: Option<ModelTarget>,
+    pub fallbacks: Vec<ModelTarget>,
 }
 
 impl Default for ProviderSettings {
@@ -38,6 +80,7 @@ impl Default for ProviderSettings {
         Self {
             providers: vec![ProviderProfile::default()],
             active_provider_id: "default-openrouter".into(),
+            tasks: BTreeMap::new(),
         }
     }
 }
@@ -99,6 +142,7 @@ impl ProviderSettings {
         }
         let mut settings = Self {
             providers,
+            tasks: BTreeMap::new(),
             active_provider_id: assistant["activeProviderId"]
                 .as_str()
                 .or_else(|| assistant["activeProfileId"].as_str())
@@ -161,6 +205,70 @@ impl ProviderSettings {
                 .map(|provider| provider.id.clone())
                 .unwrap_or_default();
         }
+        for binding in self.tasks.values_mut() {
+            if binding.primary.as_ref().is_some_and(|target| {
+                !self
+                    .providers
+                    .iter()
+                    .any(|provider| provider.id == target.provider_id)
+            }) {
+                binding.primary = None;
+                warnings.push("Missing task provider reset to shared default".into());
+            }
+            binding.fallbacks.retain(|target| {
+                self.providers
+                    .iter()
+                    .any(|provider| provider.id == target.provider_id)
+            });
+            binding.fallbacks.truncate(3);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn for_task(&self, task: AiTask) -> Option<ProviderProfile> {
+        match self
+            .tasks
+            .get(&task)
+            .and_then(|binding| binding.primary.as_ref())
+        {
+            Some(target) => self.resolve(target),
+            None => self
+                .providers
+                .iter()
+                .find(|p| p.id == self.active_provider_id)
+                .cloned(),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn chain(&self, task: AiTask) -> Vec<ProviderProfile> {
+        let mut chain: Vec<_> = self.for_task(task).into_iter().collect();
+        if let Some(binding) = self.tasks.get(&task) {
+            for target in binding.fallbacks.iter().take(3) {
+                if let Some(provider) = self.resolve(target) {
+                    if !chain
+                        .iter()
+                        .any(|p| p.id == provider.id && p.model == provider.model)
+                    {
+                        chain.push(provider);
+                    }
+                }
+            }
+        }
+        chain
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn resolve(&self, target: &ModelTarget) -> Option<ProviderProfile> {
+        let mut provider = self
+            .providers
+            .iter()
+            .find(|p| p.id == target.provider_id)?
+            .clone();
+        if !target.model.trim().is_empty() {
+            provider.model = target.model.trim().into();
+        }
+        Some(provider)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -203,6 +311,51 @@ pub(crate) fn validate_endpoint(raw: &str) -> Result<(), &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_settings_inherit_live_default_and_task_overrides_keep_credentials() {
+        let mut settings: ProviderSettings = serde_json::from_value(serde_json::json!({
+            "providers": [{"id":"one","model":"first"}], "active_provider_id":"one"
+        }))
+        .unwrap();
+        assert_eq!(settings.for_task(AiTask::Theme).unwrap().model, "first");
+        settings.providers[0].model = "new-default".into();
+        assert!(AiTask::ALL
+            .iter()
+            .all(|task| settings.for_task(*task).unwrap().model == "new-default"));
+        settings.tasks.insert(
+            AiTask::Help,
+            TaskBinding {
+                primary: Some(ModelTarget {
+                    provider_id: "one".into(),
+                    model: "help-only".into(),
+                }),
+                fallbacks: vec![ModelTarget {
+                    provider_id: "one".into(),
+                    model: "new-default".into(),
+                }],
+            },
+        );
+        assert_eq!(
+            settings
+                .chain(AiTask::Help)
+                .iter()
+                .map(|p| p.model.as_str())
+                .collect::<Vec<_>>(),
+            ["help-only", "new-default"]
+        );
+        assert_eq!(
+            settings.for_task(AiTask::Simulation).unwrap().model,
+            "new-default"
+        );
+        let round_trip: ProviderSettings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(round_trip, settings);
+        settings.providers.clear();
+        settings.normalize(&mut Vec::new());
+        assert!(settings.tasks[&AiTask::Help].primary.is_none());
+        assert!(settings.chain(AiTask::Help).is_empty());
+    }
 
     #[test]
     fn legacy_named_and_deprecated_providers_exclude_keys() {

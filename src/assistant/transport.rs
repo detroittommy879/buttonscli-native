@@ -30,6 +30,7 @@ pub(crate) struct Response {
 pub(crate) struct ResponseHead {
     pub(crate) status: u16,
     pub(crate) content_type: Option<String>,
+    pub(crate) retry_after: Option<Duration>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -69,6 +70,7 @@ pub(crate) trait HttpTransport: Send + Sync {
         on_head(ResponseHead {
             status: response.status,
             content_type: response.content_type,
+            retry_after: None,
         });
         for chunk in response.body.chunks(8192) {
             if cancelled.load(Ordering::Relaxed) {
@@ -107,7 +109,7 @@ impl HttpTransport for ReqwestTransport {
         }
         let client = reqwest::blocking::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(60))
             .connect_timeout(Duration::from_secs(5))
             .build()
             .map_err(|_| TransportError::Network)?;
@@ -168,9 +170,14 @@ impl HttpTransport for ReqwestTransport {
         {
             return Err(TransportError::InvalidEndpoint);
         }
-        let client = reqwest::blocking::Client::builder()
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| TransportError::Network)?;
+        let _runtime_context = runtime.enter();
+        let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(60))
             .connect_timeout(Duration::from_secs(5))
             .build()
             .map_err(|_| TransportError::Network)?;
@@ -186,7 +193,8 @@ impl HttpTransport for ReqwestTransport {
         if let Some(body) = request.body {
             builder = builder.json(&body);
         }
-        let mut response = builder.send().map_err(|_| TransportError::Network)?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        let mut response = cancellable(&runtime, cancelled, deadline, builder.send())?;
         if response
             .content_length()
             .is_some_and(|length| length > MAX_REPLY)
@@ -195,6 +203,11 @@ impl HttpTransport for ReqwestTransport {
         }
         let head = ResponseHead {
             status: response.status().as_u16(),
+            retry_after: response
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|value| value.to_str().ok())
+                .and_then(retry_after),
             content_type: response
                 .headers()
                 .get(reqwest::header::CONTENT_TYPE)
@@ -203,25 +216,58 @@ impl HttpTransport for ReqwestTransport {
         };
         on_head(head);
         let mut total = 0_u64;
-        let mut buffer = [0_u8; 8192];
         loop {
             if cancelled.load(Ordering::Relaxed) {
                 return Err(TransportError::Cancelled);
             }
-            let read = response
-                .read(&mut buffer)
-                .map_err(|_| TransportError::Network)?;
-            if read == 0 {
+            let Some(chunk) = cancellable(&runtime, cancelled, deadline, response.chunk())? else {
                 break;
-            }
-            total += read as u64;
+            };
+            total += chunk.len() as u64;
             if total > MAX_REPLY {
                 return Err(TransportError::ResponseTooLarge);
             }
-            on_chunk(&buffer[..read])?;
+            on_chunk(&chunk)?;
         }
         Ok(())
     }
+}
+
+fn cancellable<T>(
+    runtime: &tokio::runtime::Runtime,
+    cancelled: &AtomicBool,
+    deadline: std::time::Instant,
+    future: impl std::future::Future<Output = Result<T, reqwest::Error>>,
+) -> Result<T, TransportError> {
+    runtime.block_on(async {
+        let mut future = std::pin::pin!(future);
+        loop {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(TransportError::Cancelled);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(TransportError::Network);
+            }
+            match tokio::time::timeout(Duration::from_millis(25), future.as_mut()).await {
+                Ok(result) => return result.map_err(|_| TransportError::Network),
+                Err(_) => continue,
+            }
+        }
+    })
+}
+
+fn retry_after(value: &str) -> Option<Duration> {
+    value
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(Duration::from_secs)
+        .or_else(|| {
+            httpdate::parse_http_date(value).ok().map(|date| {
+                date.duration_since(std::time::SystemTime::now())
+                    .unwrap_or_default()
+            })
+        })
 }
 
 #[cfg(test)]

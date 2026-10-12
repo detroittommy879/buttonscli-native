@@ -3,6 +3,7 @@
 use std::cell::Cell;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 use zeroize::Zeroizing;
@@ -10,6 +11,9 @@ use zeroize::Zeroizing;
 use super::provider::{validate_endpoint, ProviderProfile};
 use super::reply::{flatten_content, AnswerBuffer, ReplyError, SseDecoder, StreamItem};
 use super::transport::{HttpTransport, Method, Request, ResponseHead, TransportError};
+
+pub(crate) type KeyLoader<'a> =
+    dyn FnMut(&ProviderProfile) -> Result<Option<Zeroizing<String>>, ClientError> + 'a;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ClientError {
@@ -21,6 +25,8 @@ pub(crate) enum ClientError {
     Reply(ReplyError),
     Cancelled,
     RequestTooLarge,
+    Quota,
+    Credential,
 }
 
 impl std::fmt::Display for ClientError {
@@ -35,6 +41,8 @@ impl std::fmt::Display for ClientError {
             Self::Reply(error) => write!(f, "assistant response could not be read: {error:?}"),
             Self::Cancelled => f.write_str("provider request was cancelled"),
             Self::RequestTooLarge => f.write_str("provider request exceeded 1 MiB"),
+            Self::Quota => f.write_str("provider quota exhausted; check billing or configure a fallback"),
+            Self::Credential => f.write_str("provider credential could not be loaded"),
         }
     }
 }
@@ -164,6 +172,140 @@ pub(crate) fn stream_completion(
     cancelled: &AtomicBool,
     on_delta: &mut dyn FnMut(&str),
 ) -> Result<String, ClientError> {
+    let started = Instant::now();
+    let mut stream = true;
+    let mut attempts = 0;
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ClientError::Cancelled);
+        }
+        attempts += 1;
+        let mut emitted = false;
+        let hints = AttemptHints::new(stream);
+        let result = completion_attempt(
+            transport,
+            provider,
+            key.as_ref()
+                .map(|key| Zeroizing::new(key.as_str().to_owned())),
+            prompts,
+            history,
+            (cancelled, &hints),
+            &mut |delta| {
+                emitted |= !delta.is_empty();
+                on_delta(delta);
+            },
+        );
+        let Err(error) = result else {
+            return result;
+        };
+        if emitted || cancelled.load(Ordering::Relaxed) || attempts >= 3 {
+            return Err(error);
+        }
+        if stream && hints.unsupported_stream.get() {
+            stream = false;
+            continue;
+        }
+        if !error.can_retry() {
+            return Err(error);
+        }
+        let delay = hints.retry_after.get().unwrap_or_else(|| {
+            Duration::from_millis(250 * (1 << (attempts - 1)) + fastrand::u64(0..150))
+        });
+        // Never retry earlier than Retry-After, and never wait without a bound.
+        if delay > Duration::from_secs(30) || started.elapsed() + delay > Duration::from_secs(180) {
+            return Err(error);
+        }
+        let until = Instant::now() + delay;
+        while Instant::now() < until {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(ClientError::Cancelled);
+            }
+            std::thread::sleep(
+                Duration::from_millis(20).min(until.saturating_duration_since(Instant::now())),
+            );
+        }
+    }
+}
+
+impl ClientError {
+    fn can_retry(&self) -> bool {
+        matches!(
+            self,
+            Self::Http(408 | 429 | 500..=599) | Self::Transport(TransportError::Network)
+        )
+    }
+
+    pub(crate) fn can_fallback(&self) -> bool {
+        self.can_retry() || matches!(self, Self::Quota)
+    }
+}
+
+/// Never falls back after any answer text was exposed to the consumer.
+pub(crate) fn complete_with_fallback(
+    transport: &dyn HttpTransport,
+    providers: &[ProviderProfile],
+    load_key: &mut KeyLoader<'_>,
+    prompts: (&str, &str),
+    history: &[(bool, String)],
+    cancelled: &AtomicBool,
+    on_delta: &mut dyn FnMut(&str),
+) -> Result<String, ClientError> {
+    let mut last_error = ClientError::Model;
+    for provider in providers.iter().take(4) {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(ClientError::Cancelled);
+        }
+        let key = load_key(provider)?;
+        let mut emitted = false;
+        let result = stream_completion(
+            transport,
+            provider,
+            key,
+            prompts,
+            history,
+            cancelled,
+            &mut |delta| {
+                emitted |= !delta.is_empty();
+                on_delta(delta);
+            },
+        );
+        match result {
+            Ok(answer) => return Ok(answer),
+            Err(error) if !emitted && error.can_fallback() => last_error = error,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last_error)
+}
+
+struct AttemptHints {
+    stream: bool,
+    retry_after: Cell<Option<Duration>>,
+    quota: Cell<bool>,
+    unsupported_stream: Cell<bool>,
+}
+
+impl AttemptHints {
+    fn new(stream: bool) -> Self {
+        Self {
+            stream,
+            retry_after: Cell::new(None),
+            quota: Cell::new(false),
+            unsupported_stream: Cell::new(false),
+        }
+    }
+}
+
+fn completion_attempt(
+    transport: &dyn HttpTransport,
+    provider: &ProviderProfile,
+    key: Option<Zeroizing<String>>,
+    prompts: (&str, &str),
+    history: &[(bool, String)],
+    control: (&AtomicBool, &AttemptHints),
+    on_delta: &mut dyn FnMut(&str),
+) -> Result<String, ClientError> {
+    let (cancelled, hints) = control;
     let (system_prompt, prompt) = prompts;
     validate_endpoint(&provider.endpoint).map_err(|_| ClientError::Endpoint)?;
     if provider.model.trim().is_empty() {
@@ -177,6 +319,7 @@ pub(crate) fn stream_completion(
     let mut parser_error = None;
     let mut on_head = |head: ResponseHead| {
         status.set(head.status);
+        hints.retry_after.set(head.retry_after);
         is_sse.set(
             head.content_type
                 .as_deref()
@@ -186,6 +329,14 @@ pub(crate) fn stream_completion(
     let mut on_chunk = |chunk: &[u8]| {
         if cancelled.load(Ordering::Relaxed) {
             return Err(TransportError::Cancelled);
+        }
+        if !(200..300).contains(&status.get()) {
+            raw.extend_from_slice(chunk);
+            return if raw.len() > 1024 * 1024 {
+                Err(TransportError::ResponseTooLarge)
+            } else {
+                Ok(())
+            };
         }
         if !is_sse.get() && raw.is_empty() {
             let prefix = String::from_utf8_lossy(chunk)
@@ -232,7 +383,8 @@ pub(crate) fn stream_completion(
         })
     }));
     messages.push(json!({"role": "user", "content": prompt}));
-    let request_body = json!({"model": provider.model, "messages": messages, "stream": true});
+    let request_body =
+        json!({"model": provider.model, "messages": messages, "stream": hints.stream});
     if serde_json::to_vec(&request_body)
         .map_err(|_| ClientError::InvalidReply)?
         .len()
@@ -261,7 +413,31 @@ pub(crate) fn stream_completion(
         return Err(ClientError::Cancelled);
     }
     if !(200..300).contains(&status.get()) {
-        return Err(ClientError::Http(status.get()));
+        if let Ok(value) = serde_json::from_slice::<Value>(&raw) {
+            let error = &value["error"];
+            let code = error["code"]
+                .as_str()
+                .or_else(|| error["type"].as_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            hints.quota.set(matches!(
+                code.as_str(),
+                "insufficient_quota" | "quota_exceeded" | "billing_hard_limit_reached"
+            ));
+            hints.unsupported_stream.set(
+                matches!(status.get(), 400 | 422)
+                    && (matches!(
+                        code.as_str(),
+                        "unsupported_stream" | "streaming_not_supported"
+                    ) || (error["param"].as_str() == Some("stream")
+                        && code == "unsupported_value")),
+            );
+        }
+        return Err(if hints.quota.get() {
+            ClientError::Quota
+        } else {
+            ClientError::Http(status.get())
+        });
     }
     if is_sse.get() {
         for item in decoder.finish().map_err(ClientError::Reply)? {
@@ -302,6 +478,268 @@ fn completion_content(body: &[u8]) -> Result<String, ClientError> {
 
 #[cfg(test)]
 mod tests {
+    struct Scripted {
+        replies: std::sync::Mutex<std::collections::VecDeque<(u16, &'static str)>>,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl HttpTransport for Scripted {
+        fn execute(&self, request: Request) -> Result<Response, TransportError> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            let (status, body) = self
+                .replies
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("unexpected retry");
+            if body == "nonstream" {
+                assert_eq!(request.body.unwrap()["stream"], false);
+                return Ok(Response {
+                    status,
+                    body: br#"{"choices":[{"message":{"content":"OK"}}]}"#.to_vec(),
+                    content_type: None,
+                });
+            }
+            Ok(Response {
+                status,
+                body: body.as_bytes().to_vec(),
+                content_type: None,
+            })
+        }
+    }
+
+    fn scripted(replies: Vec<(u16, &'static str)>) -> Scripted {
+        Scripted {
+            replies: std::sync::Mutex::new(replies.into()),
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+
+    #[test]
+    fn transient_retry_auth_quota_and_stream_fallback_are_classified() {
+        let provider = ProviderProfile::default();
+        let cancel = AtomicBool::new(false);
+        let transport = scripted(vec![(503, "{}"), (200, "nonstream")]);
+        // A transient retry remains streaming; supply ordinary JSON on success.
+        transport.replies.lock().unwrap()[1].1 = r#"{"choices":[{"message":{"content":"OK"}}]}"#;
+        assert_eq!(
+            stream_completion(
+                &transport,
+                &provider,
+                None,
+                ("system", "user"),
+                &[],
+                &cancel,
+                &mut |_| {}
+            )
+            .unwrap(),
+            "OK"
+        );
+        assert_eq!(transport.calls.load(Ordering::Relaxed), 2);
+        for (status, body, expected) in [
+            (401, "{}", ClientError::Http(401)),
+            (
+                429,
+                r#"{"error":{"code":"insufficient_quota"}}"#,
+                ClientError::Quota,
+            ),
+        ] {
+            let transport = scripted(vec![(status, body)]);
+            assert_eq!(
+                stream_completion(
+                    &transport,
+                    &provider,
+                    None,
+                    ("system", "user"),
+                    &[],
+                    &cancel,
+                    &mut |_| {}
+                ),
+                Err(expected)
+            );
+            assert_eq!(transport.calls.load(Ordering::Relaxed), 1);
+        }
+        let transport = scripted(vec![
+            (
+                400,
+                r#"{"error":{"code":"unsupported_value","param":"stream"}}"#,
+            ),
+            (200, "nonstream"),
+        ]);
+        assert_eq!(
+            stream_completion(
+                &transport,
+                &provider,
+                None,
+                ("system", "user"),
+                &[],
+                &cancel,
+                &mut |_| {}
+            )
+            .unwrap(),
+            "OK"
+        );
+    }
+
+    #[test]
+    fn configured_fallback_uses_its_own_provider_key_and_stops_after_partial_output() {
+        let second = ProviderProfile {
+            id: "second".into(),
+            model: "fallback".into(),
+            ..ProviderProfile::default()
+        };
+        let providers = [ProviderProfile::default(), second];
+        let transport = scripted(vec![
+            (429, r#"{"error":{"code":"insufficient_quota"}}"#),
+            (
+                200,
+                r#"{"choices":[{"message":{"content":"fallback OK"}}]}"#,
+            ),
+        ]);
+        let mut loaded = Vec::new();
+        let answer = complete_with_fallback(
+            &transport,
+            &providers,
+            &mut |p| {
+                loaded.push(p.id.clone());
+                Ok(None)
+            },
+            ("s", "u"),
+            &[],
+            &AtomicBool::new(false),
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(answer, "fallback OK");
+        assert_eq!(loaded, ["default-openrouter", "second"]);
+
+        struct Partial(std::sync::atomic::AtomicUsize);
+        impl HttpTransport for Partial {
+            fn execute(&self, _: Request) -> Result<Response, TransportError> {
+                unreachable!()
+            }
+            fn execute_stream(
+                &self,
+                _: Request,
+                _: &AtomicBool,
+                head: &mut dyn FnMut(ResponseHead),
+                chunk: &mut dyn FnMut(&[u8]) -> Result<(), TransportError>,
+            ) -> Result<(), TransportError> {
+                self.0.fetch_add(1, Ordering::Relaxed);
+                head(ResponseHead {
+                    status: 200,
+                    content_type: Some("text/event-stream".into()),
+                    retry_after: None,
+                });
+                chunk(b"data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")?;
+                Err(TransportError::Network)
+            }
+        }
+        let partial = Partial(std::sync::atomic::AtomicUsize::new(0));
+        let mut text = String::new();
+        assert!(complete_with_fallback(
+            &partial,
+            &providers,
+            &mut |_| Ok(None),
+            ("s", "u"),
+            &[],
+            &AtomicBool::new(false),
+            &mut |delta| text.push_str(delta)
+        )
+        .is_err());
+        assert_eq!(partial.0.load(Ordering::Relaxed), 1);
+        assert_eq!(text, "partial");
+    }
+
+    #[test]
+    fn retry_after_and_cancellation_do_not_start_another_request() {
+        struct Limited;
+        impl HttpTransport for Limited {
+            fn execute(&self, _: Request) -> Result<Response, TransportError> {
+                unreachable!()
+            }
+            fn execute_stream(
+                &self,
+                _: Request,
+                _: &AtomicBool,
+                head: &mut dyn FnMut(ResponseHead),
+                _: &mut dyn FnMut(&[u8]) -> Result<(), TransportError>,
+            ) -> Result<(), TransportError> {
+                head(ResponseHead {
+                    status: 429,
+                    content_type: None,
+                    retry_after: Some(Duration::from_secs(120)),
+                });
+                Ok(())
+            }
+        }
+        assert_eq!(
+            stream_completion(
+                &Limited,
+                &ProviderProfile::default(),
+                None,
+                ("s", "u"),
+                &[],
+                &AtomicBool::new(false),
+                &mut |_| {}
+            ),
+            Err(ClientError::Http(429))
+        );
+        let transport = scripted(vec![]);
+        assert_eq!(
+            stream_completion(
+                &transport,
+                &ProviderProfile::default(),
+                None,
+                ("s", "u"),
+                &[],
+                &AtomicBool::new(true),
+                &mut |_| {}
+            ),
+            Err(ClientError::Cancelled)
+        );
+    }
+
+    #[test]
+    fn real_transport_cancels_while_waiting_for_provider_headers() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let endpoint = format!(
+            "http://{}/v1/chat/completions",
+            listener.local_addr().unwrap()
+        );
+        let (accepted_tx, accepted_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            accepted_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            drop(stream);
+        });
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
+        let worker_cancel = cancel.clone();
+        let worker = thread::spawn(move || {
+            stream_completion(
+                &super::super::transport::ReqwestTransport,
+                &ProviderProfile {
+                    endpoint,
+                    ..ProviderProfile::default()
+                },
+                None,
+                ("s", "u"),
+                &[],
+                &worker_cancel,
+                &mut |_| {},
+            )
+        });
+        accepted_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        let started = Instant::now();
+        cancel.store(true, Ordering::Relaxed);
+        assert_eq!(worker.join().unwrap(), Err(ClientError::Cancelled));
+        assert!(started.elapsed() < Duration::from_millis(500));
+        release_tx.send(()).unwrap();
+        server.join().unwrap();
+    }
+
     fn configured_provider_two() -> (super::super::provider::ProviderProfile, Zeroizing<String>) {
         use super::super::credentials::{CredentialStore, SystemCredentialStore};
         assert_eq!(

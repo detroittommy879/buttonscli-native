@@ -709,6 +709,7 @@ dependencies = [
  "fs2",
  "getrandom 0.4.3",
  "home",
+ "httpdate",
  "image",
  "keyring",
  "log",

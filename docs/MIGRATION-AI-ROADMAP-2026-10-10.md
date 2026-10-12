@@ -1,19 +1,25 @@
 # Migration and AI roadmap — 2026-10-10
 
-Source audit; implemented source and provider/platform acceptance are separate. Requested additions below remain planned.
+Source audit; implemented source and provider/platform acceptance are separate.
+October 11 implementation: [task models and simulation](AI-MODELS-AND-SIMULATION.md).
 
 | Area | Exists | Remaining |
 | --- | --- | --- |
-| Languages | 21 locales, 785 messages with all locale fields | English fallback translations and missing UI keys |
-| AI Help | Streaming, cancellation, credentials, bounded context, reviewed actions | Automatic retries, timeouts, provider/model fallbacks |
+| Languages | 21 locales; native supplement adds 30 translated controls and audit tooling | 150 uncatalogued wrapped literals, English fallbacks, direct text and visual review |
+| AI Help | Streaming, interruptible cancellation, credentials, reviewed actions, bounded retries and configured fallbacks | Configurable first-token/idle deadlines, chain-wide budget and real-provider acceptance |
 | Terminal control | Opt-in bounded 12-step agent, stable target and guarded submission; CLI/MCP | Real-provider GUI and cross-platform acceptance |
 | Theme generation | Palette and seven-zone typography, validation and one correction attempt | Screenshots, full appearance, richer generation and useful gate/provider errors |
 | Shaders | Optional restricted procedural backgrounds and gradient fallback | Source editing, compiler diagnostics, preview/recovery and generation |
-| Providers | Single active model/provider; OpenAI-compatible custom URLs | Shared default, task slots, capabilities, fallback chains |
-| Simulation | Scripted browser shell | Native isolated LLM terminal backend |
+| Providers | Shared default, four task slots, ordered fallback chains; independent profile editing | Vision capabilities, discovery for task overrides, other API dialects |
+| Simulation | Native Settings simulation with virtual files, OS/shell brief, reset/undo and model chain | Real-provider quality, separate workspace tabs/panes, saved sessions |
 | Performance | Output-capture timing experiments | Environment-tagged history, charts and regression detection |
 
 ## Task slices and acceptance
+
+The numbered slices retain the original acceptance goals; completed parts are
+recorded above. User-reported shader follow-up: reproduce mixed-pane shader state,
+ineffective Edit divider color/thickness and inconsistent Calm after source/preview
+changes. See the October 11 bugfix log before renderer work.
 
 1. **Localization:** heuristic scan found 153 of 247 wrapped app literals absent from the catalog, plus approximately 42 directly rendered English literals. Same-as-English values: Spanish/Japanese 388 each, French 69, German 71, Arabic 50; these include legitimate technical names. Add audit exemptions, missing keys, translations, placeholder tests and RTL/long-label review. Complete locale fields do not prove translation coverage.
 2. **Models:** shared default plus Help, theme, shader and simulated terminal slots; display inherited defaults, allow overrides/reset/use-for-all. Migrate the current active provider without repeated selection. Keep provider credential references. Custom OpenAI-compatible URLs first; other API dialects require adapters. Agent can inherit Help.
