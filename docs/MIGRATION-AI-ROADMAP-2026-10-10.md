@@ -11,7 +11,7 @@ October 11 implementation: [task models and simulation](AI-MODELS-AND-SIMULATION
 | Theme generation | Palette and seven-zone typography, validation and one correction attempt | Screenshots, full appearance, richer generation and useful gate/provider errors |
 | Shaders | Optional restricted procedural backgrounds and gradient fallback | Source editing, compiler diagnostics, preview/recovery and generation |
 | Providers | Shared default, four task slots, fallbacks, independent editing; Chat Completions and Responses APIs | Vision capabilities, discovery for task overrides, other API dialects |
-| Simulation | Native Settings simulation with virtual files, OS/shell brief, reset/undo and model chain | Real-provider quality, separate workspace tabs/panes, saved sessions |
+| Simulation | + menu workspace tabs/panes, editable saved setup prompt, virtual files, reset/undo and model chain | Broader real-provider quality and saved sessions |
 | Performance | Output-capture timing experiments | Environment-tagged history, charts and regression detection |
 
 ## Task slices and acceptance

@@ -723,6 +723,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ttf-parser",
+ "unicode-width 0.2.2",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",

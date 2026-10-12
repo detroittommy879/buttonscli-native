@@ -11,3 +11,5 @@ pub(crate) mod reply;
 pub(crate) mod simulation;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod transport;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod virtual_terminal;

@@ -180,7 +180,8 @@ pub struct TerminalBackend {
     pub url_regex: RegexSearch,
     term: Arc<FairMutex<Term<EventProxy>>>,
     size: TerminalSize,
-    notifier: Notifier,
+    notifier: Option<Notifier>,
+    virtual_parser: Option<alacritty_terminal::vte::ansi::Processor>,
     #[cfg(windows)]
     child_process_id: Option<std::num::NonZeroU32>,
     last_content: RenderableContent,
@@ -307,7 +308,8 @@ impl TerminalBackend {
             url_regex,
             term: term.clone(),
             size: terminal_size,
-            notifier,
+            notifier: Some(notifier),
+            virtual_parser: None,
             #[cfg(windows)]
             child_process_id,
             last_content: initial_content,
@@ -319,6 +321,63 @@ impl TerminalBackend {
             search_matches: Vec::new(),
             current_search_match: None,
         })
+    }
+
+    /// Use the real terminal grid/widget with application-owned I/O and no PTY.
+    /// Protocol/clipboard events are discarded; only explicit user writes reach
+    /// the input observer. No shell, event loop or child process is created.
+    pub fn new_virtual(id: u64, input_observer: ByteObserver) -> Self {
+        let size = TerminalSize::default();
+        let content_dirty = Arc::new(AtomicBool::new(true));
+        let (sender, _receiver) = mpsc::channel();
+        let proxy = EventProxy(sender, content_dirty.clone());
+        let mut terminal = Term::new(term::Config::default(), &size, proxy);
+        let content = RenderableContent {
+            grid: terminal.grid().clone(),
+            selectable_range: None,
+            terminal_mode: *terminal.mode(),
+            terminal_size: size,
+            cursor: terminal.grid_mut().cursor_cell().clone(),
+            hovered_hyperlink: None,
+            search_highlights: HashSet::new(),
+            current_search_highlights: HashSet::new(),
+        };
+        Self {
+            id,
+            url_regex: RegexSearch::new(r#"https?://[^\s<>\"\x00-\x1f]+"#)
+                .unwrap(),
+            term: Arc::new(FairMutex::new(terminal)),
+            size,
+            notifier: None,
+            virtual_parser: Some(Default::default()),
+            #[cfg(windows)]
+            child_process_id: None,
+            last_content: content,
+            input_observer: Some(input_observer),
+            content_dirty,
+            scroll_to_bottom_pending: false,
+            search_dirty: Arc::new(AtomicBool::new(true)),
+            search_query: None,
+            search_matches: Vec::new(),
+            current_search_match: None,
+        }
+    }
+
+    /// Feed application-owned output through the same ANSI/grid parser as PTYs.
+    pub fn feed_virtual_output(&mut self, bytes: &[u8]) {
+        if let Some(parser) = &mut self.virtual_parser {
+            parser.advance(&mut *self.term.lock(), bytes);
+            self.content_dirty.store(true, Ordering::Release);
+            self.search_dirty.store(true, Ordering::Release);
+        }
+    }
+
+    pub fn is_virtual(&self) -> bool {
+        self.virtual_parser.is_some()
+    }
+
+    pub fn columns(&self) -> usize {
+        self.size.num_cols as usize
     }
 
     pub fn process_command(&mut self, cmd: BackendCommand) {
@@ -335,7 +394,9 @@ impl TerminalBackend {
                 return;
             },
             BackendCommand::WriteSensitive(input) => {
-                self.notifier.notify_sensitive(input);
+                if let Some(notifier) = &self.notifier {
+                    notifier.notify_sensitive(input);
+                }
                 self.scroll_to_bottom_pending = true;
                 self.content_dirty.store(true, Ordering::Release);
                 return;
@@ -408,7 +469,7 @@ impl TerminalBackend {
             Event::ClipboardLoad(_, formatter) => formatter(""),
             _ => return,
         };
-        self.notifier.notify(reply.into_bytes());
+        self.write(reply.into_bytes());
     }
 
     pub(crate) fn report_window_focus(&self, focused: bool) {
@@ -418,7 +479,7 @@ impl TerminalBackend {
             .contains(TermMode::FOCUS_IN_OUT)
         {
             // TUI focus notifications are protocol traffic, not user input.
-            self.notifier.notify(if focused {
+            self.write(if focused {
                 &b"\x1b[I"[..]
             } else {
                 &b"\x1b[O"[..]
@@ -710,6 +771,9 @@ impl TerminalBackend {
     }
 
     fn open_link(&self) {
+        if self.is_virtual() {
+            return;
+        }
         if let Some(range) = &self.last_content.hovered_hyperlink {
             let start = range.start();
             let end = range.end();
@@ -775,7 +839,7 @@ impl TerminalBackend {
             c
         );
 
-        self.notifier.notify(msg.as_bytes().to_vec());
+        self.write(msg.as_bytes().to_vec());
     }
 
     fn normal_mouse_report(&self, point: Point, button: u8, is_utf8: bool) {
@@ -807,7 +871,7 @@ impl TerminalBackend {
             msg.push(32 + 1 + line.0 as u8);
         }
 
-        self.notifier.notify(msg);
+        self.write(msg);
     }
 
     fn start_selection(
@@ -884,7 +948,9 @@ impl TerminalBackend {
             };
 
             if changed {
-                self.notifier.on_resize(self.size.into());
+                if let Some(notifier) = &mut self.notifier {
+                    notifier.on_resize(self.size.into());
+                }
                 terminal.resize(TermSize::new(
                     self.size.num_cols as usize,
                     self.size.num_lines as usize,
@@ -894,7 +960,9 @@ impl TerminalBackend {
     }
 
     fn write<I: Into<Cow<'static, [u8]>>>(&self, input: I) {
-        self.notifier.notify(input);
+        if let Some(notifier) = &self.notifier {
+            notifier.notify(input);
+        }
     }
 
     fn scroll(&mut self, terminal: &mut Term<EventProxy>, delta_value: i32) {
@@ -913,7 +981,7 @@ impl TerminalBackend {
                     content.push(line_cmd);
                 }
 
-                self.notifier.notify(content);
+                self.write(content);
             } else {
                 terminal.grid_mut().scroll_display(scroll);
             }
@@ -1095,7 +1163,9 @@ impl Default for RenderableContent {
 
 impl Drop for TerminalBackend {
     fn drop(&mut self) {
-        let _ = self.notifier.0.send(Msg::Shutdown);
+        if let Some(notifier) = &self.notifier {
+            let _ = notifier.0.send(Msg::Shutdown);
+        }
     }
 }
 
@@ -1114,6 +1184,49 @@ impl EventListener for EventProxy {
     fn send_event(&self, event: Event) {
         self.1.store(true, Ordering::Release);
         let _ = self.0.send(event);
+    }
+}
+
+#[cfg(test)]
+mod virtual_backend_tests {
+    use super::*;
+
+    #[test]
+    fn virtual_grid_has_real_ansi_selection_search_and_no_pty_or_sensitive_sink(
+    ) {
+        let writes = Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+        let observed = Arc::clone(&writes);
+        let mut backend = TerminalBackend::new_virtual(
+            42,
+            Arc::new(move |bytes| {
+                observed.lock().unwrap().extend_from_slice(bytes)
+            }),
+        );
+        assert!(backend.is_virtual());
+        #[cfg(windows)]
+        assert!(backend.child_process_id().is_none());
+        backend.feed_virtual_output(
+            "\x1b[31mvirtual red\x1b[0m 🦇\r\n".as_bytes(),
+        );
+        backend.sync();
+        assert!(backend.plain_text_tail(4096).contains("virtual red"));
+        assert_eq!(backend.search_next("virtual red").unwrap(), Some((1, 1)));
+        backend.select_all();
+        assert!(backend.selectable_content().contains("virtual red"));
+        backend.process_command(BackendCommand::Resize(
+            Size::new(640.0, 320.0),
+            Size::new(8.0, 16.0),
+        ));
+        assert_eq!(backend.columns(), 80);
+        backend.process_command(BackendCommand::Write(b"pwd\r".to_vec()));
+        backend.process_command(BackendCommand::WriteSensitive(
+            SensitiveInput::new(b"never-send-this-key".to_vec()),
+        ));
+        backend.reply_to_pty_event(
+            &Event::PtyWrite("protocol-not-command".into()),
+            None,
+        );
+        assert_eq!(*writes.lock().unwrap(), b"pwd\r");
     }
 }
 

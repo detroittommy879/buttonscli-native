@@ -16,6 +16,7 @@ pub struct TerminalTab {
     pub reported_title: Option<String>,
     pub profile_id: String,
     pub backend: TerminalBackend,
+    pub(crate) simulated: Option<crate::assistant::virtual_terminal::VirtualTerminal>,
     pub(crate) output: Arc<OutputCapture>,
     pub(crate) effect_textures: crate::plugins::effects::simple_noise::NoiseTextures,
     pub exited: bool,
@@ -130,10 +131,52 @@ impl TerminalTab {
             reported_title: None,
             profile_id: launch.profile_id,
             backend,
+            simulated: None,
             output,
             effect_textures: Default::default(),
             exited: false,
         })
+    }
+
+    pub(crate) fn simulated(
+        id: u64,
+        title: String,
+        ctx: egui::Context,
+        config: &crate::settings::SimulationPreferences,
+    ) -> Self {
+        let simulated = crate::assistant::virtual_terminal::VirtualTerminal::new(config);
+        let inbox = simulated.inbox();
+        let output = Arc::new(OutputCapture::default());
+        let input_capture = Arc::clone(&output);
+        let input: ByteObserver = Arc::new(move |bytes| {
+            input_capture.record_input_bytes(bytes);
+            if let Ok(mut pending) = inbox.lock() {
+                if pending.len().saturating_add(bytes.len()) <= 64 * 1024 {
+                    pending.extend_from_slice(bytes);
+                }
+            }
+            ctx.request_repaint();
+        });
+        let mut backend = TerminalBackend::new_virtual(id, input);
+        // Advertise bracketed paste; the adapter keeps multiline pastes in the
+        // input editor until Enter instead of firing multiple model requests.
+        backend.feed_virtual_output(
+            b"\x1b[?2004hAI simulation - virtual files and connections only.\r\n",
+        );
+        Self {
+            id,
+            title,
+            custom_title: None,
+            shell_name: format!("AI simulation · {}", simulated.persona()),
+            working_directory: None,
+            reported_title: None,
+            profile_id: crate::assistant::virtual_terminal::PROFILE_ID.into(),
+            backend,
+            simulated: Some(simulated),
+            output,
+            effect_textures: Default::default(),
+            exited: false,
+        }
     }
 
     pub fn write(&mut self, text: impl AsRef<[u8]>) {
@@ -142,6 +185,11 @@ impl TerminalTab {
     }
 
     pub fn write_sensitive(&mut self, input: egui_term::SensitiveInput) {
+        if self.simulated.is_some() {
+            self.backend
+                .feed_virtual_output(b"\r\nSensitive input is disabled in AI simulations.\r\n");
+            return;
+        }
         self.output.record_sensitive_input();
         self.backend
             .process_command(BackendCommand::WriteSensitive(input));
@@ -157,6 +205,11 @@ impl TerminalTab {
     }
 
     pub fn request_exit(&mut self) {
+        if let Some(simulated) = &self.simulated {
+            simulated.cancel();
+            self.exited = true;
+            return;
+        }
         if !self.exited {
             self.write(b"exit\r");
         }

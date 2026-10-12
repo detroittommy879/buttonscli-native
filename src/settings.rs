@@ -5,6 +5,22 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
+pub(crate) struct SimulationPreferences {
+    pub persona: String,
+    pub prompt: String,
+}
+
+impl Default for SimulationPreferences {
+    fn default() -> Self {
+        Self {
+            persona: "Linux / Bash".into(),
+            prompt: "A disposable Linux workstation for demos. Include a sample project in /home/student/demo with README.md, sample logs and a few example files. All users, accounts, network hosts and credentials are fictional. Simulate common shell commands, SSH sessions and tools without connecting to anything real.".into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub(crate) struct CommandPreset {
     pub(crate) label: String,
     pub(crate) command: String,
@@ -141,6 +157,7 @@ pub(crate) struct Preferences {
     pub(crate) pane_split_ratios: std::collections::BTreeMap<String, f32>,
     pub(crate) pane_divider: PaneDividerAppearance,
     pub(crate) provider_settings: ProviderSettings,
+    pub(crate) simulation: SimulationPreferences,
     pub(crate) shortcuts: ShortcutSettings,
     pub(crate) chrome_corner_radius: u8,
     pub(crate) default_shell_id: String,
@@ -196,6 +213,7 @@ impl Default for Preferences {
             pane_split_ratios: std::collections::BTreeMap::new(),
             pane_divider: PaneDividerAppearance::default(),
             provider_settings: ProviderSettings::default(),
+            simulation: SimulationPreferences::default(),
             shortcuts: ShortcutSettings::default(),
             chrome_corner_radius: 6,
             default_shell_id: "system".into(),
@@ -352,6 +370,8 @@ impl Preferences {
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
+        self.simulation.persona = self.simulation.persona.chars().take(512).collect();
+        self.simulation.prompt = self.simulation.prompt.chars().take(8192).collect();
         self.shortcuts.normalize();
         for source in [
             &mut self.app_theme_id,

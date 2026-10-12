@@ -41,16 +41,32 @@ Separate configurable first-token/idle deadlines and a chain-wide deadline are
 follow-up work. Discovery and connection-test requests are separate from this
 completion retry policy.
 
-Open **Settings → Simulated terminal** for the initial learning mode. Describe any
-OS/shell, enter commands and use Run/Enter. The LLM returns terminal output and a
-bounded virtual filesystem/environment; nothing reaches a real terminal or host
-filesystem. Reset creates fresh state (Windows paths for Windows descriptions);
-Undo retains up to 16 checkpoints. Recent transcript and checkpoints are bounded,
-in memory only, and disappear on restart. Changing persona does not reset state
-until you choose Reset. Provider calls use the existing AI Help access gate and
-may cost money. This is an approximate simulation, not an exact operating system.
+Choose **+ → Simulated terminal** to open a normal workspace tab/pane backed by
+an LLM instead of a shell. It uses the same terminal grid, themes, fonts, effects,
+selection, search, scrollback, presets and pane layout. Each tab has independent
+virtual files, command history and worker state; changing themes does not reset it.
+
+**Settings → Simulation setup** edits the saved OS/shell persona and scenario
+prompt. Describe pretend files, installed tools, commands, users or servers.
+New tabs snapshot this setup and ask the model to initialize the fictional world.
+Edits apply to new tabs; **Reset simulation** in an existing pane's context menu
+reinitializes its original setup. **Undo last command** restores virtual state
+(up to 16 checkpoints); **Cancel** or Ctrl+C interrupts an in-flight request.
+Keyboard editing handles Unicode, arrows/home/end/delete, history and bracketed
+paste. Long inputs scroll horizontally. During a model request, Ctrl+C is accepted
+and other input is ignored, like a foreground command that owns the terminal.
+
+The backend creates no PTY or shell process. Commands and fake SSH sessions never
+reach the host filesystem or network (apart from configured AI provider calls).
+Sensitive vault input, terminal protocol/clipboard requests and link launches are
+disabled for simulated backends. Copy/selection use the normal local UI controls.
+State is bounded, in memory, and disappears on close/restart; reopening starts a
+fresh simulation. Provider calls use the existing AI Help access gate and may cost
+money. This remains an approximate command simulation, not a real OS or exact TUI.
 
 Validation uses a local fake provider, including destructive virtual commands,
 undo checkpoint retention, cancellation, transient failure, quota fallback,
-partial streaming and real ConPTY reviewed-action delivery. Real-provider
-simulation quality and GUI acceptance still need separate review.
+partial streaming and real ConPTY reviewed-action delivery. The + menu/pane routing,
+native rendering/input and no-child-process backend have explicit probes. A live
+OpenAI-det/gpt-5.6-terra test initializes a custom scenario, reads/deletes its virtual
+file and checks undo. Broader simulation quality still needs real-use review.

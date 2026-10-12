@@ -506,8 +506,6 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_edit_id: String,
     #[cfg(not(target_arch = "wasm32"))]
-    simulation: crate::assistant::simulation::Simulation,
-    #[cfg(not(target_arch = "wasm32"))]
     account_tx: Sender<AccountEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     account_rx: Receiver<AccountEvent>,
@@ -944,6 +942,9 @@ enum PaneAction {
     ToggleAutoTile,
     Close,
     ThemeSettings,
+    ResetSimulation,
+    UndoSimulation,
+    CancelSimulation,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1354,8 +1355,6 @@ impl ButtonsApp {
             provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             provider_edit_id: String::new(),
-            #[cfg(not(target_arch = "wasm32"))]
-            simulation: crate::assistant::simulation::Simulation::default(),
             #[cfg(not(target_arch = "wasm32"))]
             account_tx,
             #[cfg(not(target_arch = "wasm32"))]
@@ -1808,6 +1807,23 @@ impl ButtonsApp {
                 self.settings_tab = SettingsTab::Themes;
                 self.show_settings = true;
             }
+            PaneAction::ResetSimulation => {
+                let tab = &mut self.tabs[index];
+                if let Some(simulated) = &mut tab.simulated {
+                    simulated.reset(&mut tab.backend);
+                }
+            }
+            PaneAction::UndoSimulation => {
+                let tab = &mut self.tabs[index];
+                if let Some(simulated) = &mut tab.simulated {
+                    simulated.undo(&mut tab.backend, &tab.output);
+                }
+            }
+            PaneAction::CancelSimulation => {
+                if let Some(simulated) = &self.tabs[index].simulated {
+                    simulated.cancel();
+                }
+            }
         }
     }
 
@@ -2119,18 +2135,32 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn open_tab_with_profile(&mut self, context: egui::Context, profile_id: &str) {
-        let launch = match self.shell_launch(profile_id) {
-            Ok(launch) => launch,
-            Err(error) => {
-                self.notice = Some(format!("Could not use shell profile: {error}"));
-                return;
-            }
+        let simulated = profile_id == crate::assistant::virtual_terminal::PROFILE_ID;
+        let launch = if simulated {
+            None
+        } else {
+            Some(match self.shell_launch(profile_id) {
+                Ok(launch) => launch,
+                Err(error) => {
+                    self.notice = Some(format!("Could not use shell profile: {error}"));
+                    return;
+                }
+            })
         };
         let id = self.next_id;
         self.next_id += 1;
         let taken: Vec<String> = self.tabs.iter().map(|tab| tab.title.clone()).collect();
         let (title, next_title_number) = next_available_title(self.next_title_number, &taken);
-        match TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch) {
+        let result = match launch {
+            Some(launch) => TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch),
+            None => Ok(TerminalTab::simulated(
+                id,
+                format!("{title} · AI"),
+                context,
+                &self.preferences.simulation,
+            )),
+        };
+        match result {
             Ok(mut tab) => {
                 tab.backend
                     .set_scrollback_lines(self.preferences.scrollback_lines);
@@ -2162,6 +2192,16 @@ impl ButtonsApp {
         shell: Option<&str>,
         cwd: Option<&str>,
     ) -> Result<u64, ActionError> {
+        if shell == Some(crate::assistant::virtual_terminal::PROFILE_ID)
+            || (shell.is_none()
+                && self.preferences.default_shell_id
+                    == crate::assistant::virtual_terminal::PROFILE_ID)
+        {
+            self.open_tab_with_profile(context, crate::assistant::virtual_terminal::PROFILE_ID);
+            let tab = self.tabs.last_mut().ok_or(ActionError::LaunchFailed)?;
+            tab.rename(name.trim().into());
+            return Ok(tab.id);
+        }
         let cwd_input = cwd.unwrap_or(&self.preferences.default_working_directory);
         let working_directory =
             resolve_working_directory(cwd_input).map_err(|_| ActionError::LaunchFailed)?;
@@ -2273,6 +2313,17 @@ impl ButtonsApp {
                         profile.command.trim().to_owned(),
                     )
                 }),
+        );
+        options.insert(
+            1,
+            (
+                crate::assistant::virtual_terminal::PROFILE_ID.into(),
+                crate::i18n::literal(&self.locale, "Simulated terminal"),
+                crate::i18n::literal(
+                    &self.locale,
+                    "AI simulation. Virtual files only. Provider requests may incur costs.",
+                ),
+            ),
         );
         options
     }
@@ -4844,7 +4895,7 @@ impl ButtonsApp {
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Simulation,
-                    crate::i18n::literal(&self.locale, "Simulated terminal"),
+                    crate::i18n::literal(&self.locale, "Simulation setup"),
                 );
                 #[cfg(not(target_arch = "wasm32"))]
                 if account_signin_available() {
@@ -5882,31 +5933,75 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn simulation_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if self.simulation.ui(ui, &self.locale) {
-            if !ai_help_available() {
-                self.simulation.error = Some(crate::i18n::text(
-                    &self.locale,
-                    crate::i18n::MessageKey::AiHelpRequiresPro,
-                    &[],
-                ));
-                return;
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Simulation setup"));
+        ui.spaced_label(crate::i18n::literal(
+            &self.locale,
+            "Open a simulated terminal from the + menu. This setup applies to new simulations.",
+        ));
+        let config = &mut self.preferences.simulation;
+        let label = ui.spaced_label(crate::i18n::literal(&self.locale, "OS / shell persona"));
+        ui.add(egui::TextEdit::singleline(&mut config.persona).char_limit(512))
+            .labelled_by(label.id);
+        let label = ui.spaced_label(crate::i18n::literal(&self.locale, "Simulation prompt"));
+        ui.add(
+            egui::TextEdit::multiline(&mut config.prompt)
+                .desired_rows(10)
+                .desired_width(f32::INFINITY)
+                .char_limit(8192),
+        )
+        .labelled_by(label.id);
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Describe fictional files, commands, users, servers and tools. No real files or connections are used."));
+        if ui
+            .spaced_button(crate::i18n::literal(
+                &self.locale,
+                "Restore default simulation prompt",
+            ))
+            .clicked()
+        {
+            *config = Default::default();
+        }
+        let _ = ctx;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_simulated_terminals(&mut self, ctx: &egui::Context) {
+        let providers = self.preferences.provider_settings.chain(AiTask::Simulation);
+        let profile = self
+            .native_store
+            .as_ref()
+            .map_or("default", NativeStore::profile_name)
+            .to_owned();
+        for tab in &mut self.tabs {
+            let Some(simulated) = &mut tab.simulated else {
+                continue;
+            };
+            if simulated.tick(&mut tab.backend, &tab.output, ctx) {
+                if !ai_help_available() {
+                    simulated.fail_request(
+                        &mut tab.backend,
+                        &tab.output,
+                        &crate::i18n::text(
+                            &self.locale,
+                            crate::i18n::MessageKey::AiHelpRequiresPro,
+                            &[],
+                        ),
+                    );
+                    continue;
+                }
+                let profile = profile.clone();
+                let session = Arc::clone(&self.credential_session);
+                simulated.start(
+                    providers.clone(),
+                    move |provider| {
+                        let reference = credentials::reference(&profile, &provider.id);
+                        provider_key(&session, &reference, provider.credential_ref.as_deref())
+                            .map_err(|_| crate::assistant::client::ClientError::Credential)
+                    },
+                    ctx.clone(),
+                    &mut tab.backend,
+                    &tab.output,
+                );
             }
-            let providers = self.preferences.provider_settings.chain(AiTask::Simulation);
-            let profile = self
-                .native_store
-                .as_ref()
-                .map_or("default", NativeStore::profile_name)
-                .to_owned();
-            let session = Arc::clone(&self.credential_session);
-            self.simulation.start(
-                providers,
-                move |provider| {
-                    let reference = credentials::reference(&profile, &provider.id);
-                    provider_key(&session, &reference, provider.credential_ref.as_deref())
-                        .map_err(|_| crate::assistant::client::ClientError::Credential)
-                },
-                ctx.clone(),
-            );
         }
     }
 
@@ -12378,6 +12473,32 @@ fn render_pane_tree(
                                     state.auto_tile.includes(tab.id),
                                     &mut action,
                                 );
+                                if let Some(simulated) = &tab.simulated {
+                                    ui.separator();
+                                    ui.spaced_label(crate::i18n::literal(
+                                        state.locale,
+                                        "Simulated terminal",
+                                    ));
+                                    if !simulated.model().is_empty() {
+                                        ui.spaced_label(simulated.model());
+                                    }
+                                    for (label, operation) in [
+                                        ("Reset simulation", PaneAction::ResetSimulation),
+                                        ("Undo last command", PaneAction::UndoSimulation),
+                                        ("Cancel", PaneAction::CancelSimulation),
+                                    ] {
+                                        if ui
+                                            .spaced_button(crate::i18n::literal(
+                                                state.locale,
+                                                label,
+                                            ))
+                                            .clicked()
+                                        {
+                                            action = Some(operation);
+                                            ui.close_menu();
+                                        }
+                                    }
+                                }
                                 ui.separator();
                                 egui::CollapsingHeader::new(crate::ui_text::spaced_text(
                                     ui,
@@ -13462,6 +13583,8 @@ impl eframe::App for ButtonsApp {
         self.about_window(ctx);
         self.localization_onboarding(ctx);
         self.refresh_locale();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_simulated_terminals(ctx);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -15085,6 +15208,184 @@ Start-Sleep -Seconds 300
             }
             None
         })
+    }
+
+    #[test]
+    fn plus_menu_opens_independent_simulations_with_normal_pane_themes() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.preferences.simulation.prompt = "Demo A: a fictional server with reports.".into();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 800.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.tab_bar(ctx);
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.terminal_workspace(ui, ctx);
+                    });
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let plus = text_position(&output, "+").expect("new-tab button visible");
+        render(
+            &mut app,
+            pointer_events(plus, egui::PointerButton::Primary, true),
+        );
+        let output = render(
+            &mut app,
+            pointer_events(plus, egui::PointerButton::Primary, false),
+        );
+        let option = text_position(&output, "Simulated terminal")
+            .or_else(|| text_position(&render(&mut app, vec![]), "Simulated terminal"))
+            .expect("simulation option in + menu");
+        render(
+            &mut app,
+            pointer_events(option, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(option, egui::PointerButton::Primary, false),
+        );
+        assert_eq!(app.tabs.len(), 1, "{:?}", app.notice);
+        assert!(app.tabs[0].backend.is_virtual());
+        let first = app.tabs[0].id;
+        app.preferences.simulation.prompt = "Demo B: pretend Windows.".into();
+        app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        assert_eq!(app.tabs.len(), 2);
+        let second = app.tabs[1].id;
+        app.pane_layout = PaneLayout::Columns;
+        app.visible_panes = vec![0, 1];
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        app.tabs[1].run("echo only-second");
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        assert!(app.tabs[1]
+            .output
+            .snapshot()
+            .last_input
+            .contains("only-second"));
+        let theme = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| theme.id != app.preferences.terminal_theme_id)
+            .unwrap()
+            .id
+            .clone();
+        app.set_theme_for_tab(1, &theme);
+        assert_eq!(app.theme_overrides.get(&second), Some(&theme));
+        assert!(!app.theme_overrides.contains_key(&first));
+        render(&mut app, vec![]);
+        assert_eq!(app.rendered_panes, [0, 1]);
+        app.move_tab(1, 0);
+        assert_eq!(app.tabs[0].id, second);
+        assert_eq!(app.theme_overrides.get(&second), Some(&theme));
+        app.close_tab(0);
+        assert_eq!(app.tabs[0].id, first);
+        assert!(!app.tabs[0].exited);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens an owned native window with two PTY-free panes and captures rendering/input"]
+    fn native_simulation_panes_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            image: std::path::PathBuf,
+            pending: Vec<egui::Event>,
+            step: u8,
+        }
+        impl eframe::App for Probe {
+            fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+                input.focused = true;
+                input.events.append(&mut self.pending);
+            }
+            fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                self.app.tab_bar(ctx);
+                self.app.preset_bar(ctx);
+                self.app.status_bar(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| self.app.terminal_workspace(ui, ctx));
+                let elapsed = self.started.elapsed();
+                if self.step == 0 && elapsed > Duration::from_millis(600) {
+                    assert_eq!(self.app.rendered_panes, [0, 1]);
+                    self.pending
+                        .push(egui::Event::Text("echo keyboard-only-second".into()));
+                    self.pending.push(egui::Event::Key {
+                        key: egui::Key::Enter,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    });
+                    self.step = 1;
+                }
+                if self.step == 1 && elapsed > Duration::from_millis(1000) {
+                    assert_eq!(self.app.tabs[0].output.snapshot().input_sequence, 0);
+                    let inbox = self.app.tabs[1].simulated.as_ref().unwrap().inbox();
+                    assert_eq!(&*inbox.lock().unwrap(), b"echo keyboard-only-second\r");
+                    for tab in &self.app.tabs {
+                        assert!(tab.backend.is_virtual());
+                        assert!(tab.backend.child_process_id().is_none());
+                    }
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.image.clone(),
+                    )));
+                    self.step = 2;
+                }
+                if elapsed > Duration::from_secs(2) {
+                    assert!(self.image.is_file());
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let image = capture.join("simulation-panes.png");
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1200.0, 750.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI simulated pane probe", options, Box::new(move |cc| {
+            let mut app = ButtonsApp::empty(Preferences::default());
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            app.open_tab_with_profile(cc.egui_ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            app.open_tab_with_profile(cc.egui_ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            let base_background = app.themes.get(app.theme_for_tab(0)).terminal_colors.background.clone();
+            let alternative = app.themes.all().iter().find(|theme| theme.terminal_colors.background != base_background && theme.colors.canvas.r() < 96).unwrap().id.clone();
+            app.set_theme_for_tab(1, &alternative);
+            let second_id = app.tabs[1].id;
+            let mut second_font = app.font_for_pane(second_id);
+            second_font.zone.size = 16.0;
+            app.pane_fonts.insert(second_id, second_font);
+            app.pane_layout = PaneLayout::Columns; app.visible_panes = vec![0, 1];
+            for (index, tab) in app.tabs.iter_mut().enumerate() {
+                tab.backend.feed_virtual_output(format!("\x1b[2J\x1b[HAI simulation - fictional demo server {}\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mls -la\r\n\x1b[34mdrwxr-xr-x  src/\r\ndrwxr-xr-x  docs/\x1b[0m\r\n-rw-r--r--  README.md\r\n-rw-r--r--  package.json\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mgit status\r\nOn branch main\r\n\x1b[32mnothing to commit, working tree clean\x1b[0m\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0m", index + 1).as_bytes());
+            }
+            Ok(Box::new(Probe { app, started: Instant::now(), image, pending: Vec::new(), step: 0 }))
+        })).unwrap();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
