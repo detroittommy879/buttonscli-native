@@ -64,6 +64,12 @@ State is bounded, in memory, and disappears on close/restart; reopening starts a
 fresh simulation. Provider calls use the existing AI Help access gate and may cost
 money. This remains an approximate command simulation, not a real OS or exact TUI.
 
+**Settings → Simulation setup** can hide output notices and AI tab badges separately.
+Display toggles affect open tabs; old scrollback remains. Hidden notices also ask
+the model to stay in character without simulation disclaimers (model compliance is
+not guaranteed). Persona/scenario changes still apply to new tabs. Isolation and
+error reporting remain active.
+
 Validation uses a local fake provider, including destructive virtual commands,
 undo checkpoint retention, cancellation, transient failure, quota fallback,
 partial streaming and real ConPTY reviewed-action delivery. The + menu/pane routing,

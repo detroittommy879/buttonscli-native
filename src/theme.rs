@@ -385,7 +385,7 @@ impl Default for TerminalEffects {
     }
 }
 
-/// Versioned, app-owned procedural backgrounds. Imported source code stays inert.
+/// Versioned backgrounds. Custom expressions use a bounded, resource-free dialect.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct ShaderBackground {
@@ -395,6 +395,44 @@ pub struct ShaderBackground {
     pub speed: f32,
     pub scale: f32,
     pub animated: bool,
+    pub colors: Option<[String; 3]>,
+    pub custom: Option<CustomShader>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ShaderVariable {
+    pub name: String,
+    pub min: f32,
+    pub max: f32,
+    pub value: f32,
+}
+
+impl Default for ShaderVariable {
+    fn default() -> Self {
+        Self {
+            name: "amount".into(),
+            min: 0.0,
+            max: 10.0,
+            value: 3.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct CustomShader {
+    pub expression: String,
+    pub variables: Vec<ShaderVariable>,
+}
+
+impl Default for CustomShader {
+    fn default() -> Self {
+        Self {
+            expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
+            variables: vec![ShaderVariable::default()],
+        }
+    }
 }
 
 impl Default for ShaderBackground {
@@ -406,6 +444,8 @@ impl Default for ShaderBackground {
             speed: 0.3,
             scale: 1.0,
             animated: true,
+            colors: None,
+            custom: None,
         }
     }
 }
@@ -420,6 +460,16 @@ impl ShaderBackground {
         ("starfield", "Starfield"),
         ("circuit", "Circuit"),
         ("caustics", "Water caustics"),
+        ("prism", "Prism ribbons"),
+        ("lava", "Lava lamp"),
+        ("kaleidoscope", "Kaleidoscope"),
+        ("rainbow", "Rainbow mist"),
+        ("tunnel", "Chromatic tunnel"),
+        ("fireflies", "Fireflies"),
+        ("sunset", "Sunset dunes"),
+        ("ocean", "Ocean currents"),
+        ("hex", "Hex bloom"),
+        ("silk", "Electric silk"),
     ];
 
     pub fn preset_index(&self) -> Option<usize> {
@@ -439,6 +489,30 @@ impl ShaderBackground {
         shader.strength = shader.strength.clamp(0.0, 0.65);
         shader.speed = shader.speed.clamp(0.0, 2.0);
         shader.scale = shader.scale.clamp(0.25, 4.0);
+        if shader
+            .colors
+            .as_ref()
+            .is_some_and(|colors| colors.iter().any(|color| parse_color(color).is_none()))
+        {
+            return None;
+        }
+        if let Some(custom) = &mut shader.custom {
+            if custom.expression.len() > 2048 || custom.variables.len() > 4 {
+                return None;
+            }
+            for variable in &mut custom.variables {
+                if ![variable.min, variable.max, variable.value]
+                    .into_iter()
+                    .all(f32::is_finite)
+                    || variable.min >= variable.max
+                    || variable.min < -100.0
+                    || variable.max > 100.0
+                {
+                    return None;
+                }
+                variable.value = variable.value.clamp(variable.min, variable.max);
+            }
+        }
         Some(shader)
     }
 }

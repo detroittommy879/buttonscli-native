@@ -1,4 +1,4 @@
-//! Fixed, loop-free backgrounds; no imported source reaches the GPU.
+//! Bounded background patterns and validated resource-free color expressions.
 
 use std::collections::HashMap;
 
@@ -21,7 +21,7 @@ pub(crate) fn callback(
     shader: &ShaderBackground,
     terminal: u64,
     time: f32,
-    colors: [Color32; 4],
+    mut colors: [Color32; 4],
 ) -> Option<egui::PaintCallback> {
     if ui.input(|input| input.viewport().minimized.unwrap_or(false)) {
         return None;
@@ -29,6 +29,23 @@ pub(crate) fn callback(
     let format = ui
         .ctx()
         .data(|data| data.get_temp::<wgpu::TextureFormat>(Id::new(FORMAT_ID)))?;
+    if let Some(palette) = &shader.colors {
+        for (target, color) in colors[1..].iter_mut().zip(palette) {
+            *target = crate::theme::parse_color(color)?;
+        }
+    }
+    let mut knobs = [0.0; 4];
+    let custom_source = if let Some(custom) = &shader.custom {
+        // The editor can temporarily contain an inverted range while typing.
+        // Validate before clamping, since f32::clamp panics on invalid bounds.
+        let source = custom_source(custom).ok()?;
+        for (target, variable) in knobs.iter_mut().zip(&custom.variables) {
+            *target = variable.value.clamp(variable.min, variable.max);
+        }
+        Some(source)
+    } else {
+        None
+    };
     Some(egui_wgpu::Callback::new_paint_callback(
         rect,
         Background {
@@ -47,6 +64,8 @@ pub(crate) fn callback(
                 shader.preset_index()? as f32,
             ],
             colors,
+            knobs,
+            custom_source,
         },
     ))
 }
@@ -58,6 +77,8 @@ struct Background {
     frame: u64,
     values: [f32; 4],
     colors: [Color32; 4],
+    knobs: [f32; 4],
+    custom_source: Option<String>,
 }
 
 struct PaneUniform {
@@ -70,6 +91,7 @@ struct Resources {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     panes: HashMap<u64, PaneUniform>,
+    custom_pipelines: HashMap<String, (wgpu::RenderPipeline, u64)>,
 }
 
 impl Resources {
@@ -87,46 +109,65 @@ impl Resources {
                 count: None,
             }],
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("shader background pipeline layout"),
-            bind_group_layouts: &[&layout],
-            push_constant_ranges: &[],
-        });
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("shader background shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader_background.wgsl").into()),
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("shader background screen overlay"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vertex"),
-                buffers: &[],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fragment"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            multiview: None,
-            cache: None,
-        });
+        let pipeline = pipeline(
+            device,
+            format,
+            &layout,
+            include_str!("shader_background.wgsl"),
+        );
         Self {
             pipeline,
             layout,
             panes: HashMap::new(),
+            custom_pipelines: HashMap::new(),
         }
     }
+}
+
+fn custom_source(custom: &crate::theme::CustomShader) -> Result<String, String> {
+    super::shader_expression::program(custom)
+}
+
+fn pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::BindGroupLayout,
+    source: &str,
+) -> wgpu::RenderPipeline {
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("shader background pipeline layout"),
+        bind_group_layouts: &[layout],
+        push_constant_ranges: &[],
+    });
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("shader background shader"),
+        source: wgpu::ShaderSource::Wgsl(source.into()),
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("shader background screen overlay"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vertex"),
+            buffers: &[],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fragment"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: Default::default(),
+        depth_stencil: None,
+        multisample: Default::default(),
+        multiview: None,
+        cache: None,
+    })
 }
 
 impl egui_wgpu::CallbackTrait for Background {
@@ -144,6 +185,28 @@ impl egui_wgpu::CallbackTrait for Background {
         let resources = resources
             .get_mut::<Resources>()
             .expect("initialized shader background resources");
+        if let Some(source) = &self.custom_source {
+            if !resources.custom_pipelines.contains_key(source) {
+                if resources.custom_pipelines.len() >= MAX_BUFFERS {
+                    if let Some(oldest) = resources
+                        .custom_pipelines
+                        .iter()
+                        .min_by_key(|(_, (_, frame))| *frame)
+                        .map(|(source, _)| source.clone())
+                    {
+                        resources.custom_pipelines.remove(&oldest);
+                    }
+                }
+                resources.custom_pipelines.insert(
+                    source.clone(),
+                    (
+                        pipeline(device, self.format, &resources.layout, source),
+                        self.frame,
+                    ),
+                );
+            }
+            resources.custom_pipelines.get_mut(source).unwrap().1 = self.frame;
+        }
         if !resources.panes.contains_key(&self.terminal) {
             // Only tiny uniform buffers are cached, with a hard bound even
             // after many tab-close/reopen cycles. No pane image is retained.
@@ -159,7 +222,7 @@ impl egui_wgpu::CallbackTrait for Background {
             }
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("shader background pane"),
-                size: 96,
+                size: 112,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -206,6 +269,7 @@ impl egui_wgpu::CallbackTrait for Background {
                     1.0,
                 ]
             }))
+            .chain(self.knobs)
             .flat_map(f32::to_le_bytes)
             .collect();
         queue.write_buffer(&pane.buffer, 0, &bytes);
@@ -224,7 +288,12 @@ impl egui_wgpu::CallbackTrait for Background {
         let Some(pane) = resources.panes.get(&self.terminal) else {
             return;
         };
-        pass.set_pipeline(&resources.pipeline);
+        let selected = self
+            .custom_source
+            .as_ref()
+            .and_then(|source| resources.custom_pipelines.get(source))
+            .map_or(&resources.pipeline, |(pipeline, _)| pipeline);
+        pass.set_pipeline(selected);
         pass.set_bind_group(0, &pane.bind_group, &[]);
         pass.draw(0..3, 0..1);
     }
@@ -234,6 +303,28 @@ impl egui_wgpu::CallbackTrait for Background {
 mod tests {
     use super::*;
 
+    #[test]
+    fn invalid_editor_ranges_use_fallback_without_panicking() {
+        let ctx = Context::default();
+        register(&ctx, wgpu::TextureFormat::Rgba8Unorm);
+        let mut shader = ShaderBackground {
+            custom: Some(Default::default()),
+            ..Default::default()
+        };
+        for (min, max) in [(8.0, 2.0), (1.0, 1.0), (f32::NAN, 2.0)] {
+            let variable = &mut shader.custom.as_mut().unwrap().variables[0];
+            variable.min = min;
+            variable.max = max;
+            let _ = ctx.run(Default::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    assert!(
+                        callback(ui, ui.max_rect(), &shader, 1, 0.0, [Color32::BLACK; 4]).is_none()
+                    );
+                });
+            });
+        }
+    }
+
     fn render_sample(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -241,11 +332,23 @@ mod tests {
         preset: f32,
         time: f32,
     ) -> Vec<u8> {
+        render_sample_with_knob(device, queue, resources, preset, time, 3.0)
+    }
+
+    fn render_sample_with_knob(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        resources: &Resources,
+        preset: f32,
+        time: f32,
+        knob: f32,
+    ) -> Vec<u8> {
         use wgpu::util::DeviceExt;
-        let values: [f32; 24] = [
+        let mut values: [f32; 28] = [
             0.0, 0.0, 64.0, 32.0, time, 0.6, 1.0, preset, 0.02, 0.03, 0.05, 1.0, 0.1, 0.7, 0.5,
-            1.0, 0.4, 0.1, 0.8, 1.0, 0.2, 0.3, 0.6, 1.0,
+            1.0, 0.4, 0.1, 0.8, 1.0, 0.2, 0.3, 0.6, 1.0, 3.0, 0.0, 0.0, 0.0,
         ];
+        values[24] = knob;
         let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
         let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("test background"),
@@ -384,6 +487,29 @@ mod tests {
                     assert_ne!(frame, other, "presets produce distinct GPU pixels");
                 }
             }
+            let mut custom_resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
+            let source = custom_source(&crate::theme::CustomShader::default()).unwrap();
+            custom_resources.pipeline = pipeline(
+                &device,
+                wgpu::TextureFormat::Rgba8Unorm,
+                &custom_resources.layout,
+                &source,
+            );
+            let first = render_sample_with_knob(&device, &queue, &custom_resources, 0.0, 0.0, 3.0);
+            assert_ne!(
+                first,
+                render_sample_with_knob(&device, &queue, &custom_resources, 0.0, 0.0, 8.0),
+                "custom variable changes actual GPU pixels"
+            );
+            assert_ne!(
+                first,
+                render_sample_with_knob(&device, &queue, &custom_resources, 0.0, 1.0, 3.0),
+                "custom shader animates"
+            );
+            assert_eq!(
+                first,
+                render_sample_with_knob(&device, &queue, &custom_resources, 0.0, 0.0, 3.0)
+            );
             assert!(
                 device.pop_error_scope().await.is_none(),
                 "shader background pipeline validation failed"

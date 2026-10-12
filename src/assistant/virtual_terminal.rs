@@ -17,6 +17,7 @@ pub(crate) struct VirtualTerminal {
     requests: VecDeque<String>,
     initialize: bool,
     columns: usize,
+    show_notices: bool,
 }
 
 impl VirtualTerminal {
@@ -28,6 +29,7 @@ impl VirtualTerminal {
             requests: VecDeque::new(),
             initialize: true,
             columns: 0,
+            show_notices: config.show_notices,
         }
     }
 
@@ -44,6 +46,11 @@ impl VirtualTerminal {
         self.engine.cancel();
     }
 
+    pub(crate) fn set_show_notices(&mut self, show: bool) {
+        self.show_notices = show;
+        self.engine.set_show_notices(show);
+    }
+
     pub(crate) fn reset(&mut self, backend: &mut TerminalBackend) {
         self.engine.reset();
         self.editor = LineEditor::default();
@@ -55,7 +62,9 @@ impl VirtualTerminal {
 
     pub(crate) fn undo(&mut self, backend: &mut TerminalBackend, capture: &OutputCapture) {
         if self.engine.undo() {
-            Self::emit(backend, capture, "\r\n[virtual state restored]\r\n");
+            if self.show_notices {
+                Self::emit(backend, capture, "\r\n[virtual state restored]\r\n");
+            }
             self.draw_input(backend);
         }
     }
@@ -118,7 +127,18 @@ impl VirtualTerminal {
         };
         if let Some(command) = command {
             let prompt = self.prompt(backend.columns());
-            Self::emit(backend, capture, &format!("\r\x1b[2K\x1b[32m{prompt}\x1b[0m{command}\r\n\x1b[90mAI simulation · Ctrl+C cancels\x1b[0m\r\n"));
+            Self::emit(
+                backend,
+                capture,
+                &format!("\r\x1b[2K\x1b[32m{prompt}\x1b[0m{command}\r\n"),
+            );
+            if self.show_notices {
+                Self::emit(
+                    backend,
+                    capture,
+                    "\x1b[90mAI simulation · Ctrl+C cancels\x1b[0m\r\n",
+                );
+            }
             self.engine.set_command(command);
             return true;
         }
@@ -394,6 +414,31 @@ impl LineEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn demo_display_can_hide_notices_and_change_live_without_a_process() {
+        let config = SimulationPreferences {
+            show_notices: false,
+            show_badges: false,
+            ..Default::default()
+        };
+        let ctx = egui::Context::default();
+        let mut tab =
+            crate::terminal::TerminalTab::simulated(91, "demo".into(), ctx.clone(), &config);
+        assert_eq!(tab.shell_name, "Linux / Bash");
+        assert!(tab.backend.child_process_id().is_none());
+        let simulated = tab.simulated.as_mut().unwrap();
+        assert!(simulated.tick(&mut tab.backend, &tab.output, &ctx));
+        assert!(!tab.output.read_chars(8192, false).contains("simulation"));
+        simulated.set_show_notices(true);
+        simulated.inbox.lock().unwrap().extend_from_slice(b"ls\r");
+        assert!(simulated.tick(&mut tab.backend, &tab.output, &ctx));
+        assert!(tab.output.read_chars(8192, false).contains("AI simulation"));
+        let serialized = serde_json::to_value(&config).unwrap();
+        assert_eq!(
+            serde_json::from_value::<SimulationPreferences>(serialized).unwrap(),
+            config
+        );
+    }
 
     #[test]
     fn editor_preserves_utf8_arrows_history_and_bracketed_multiline_paste() {
@@ -452,6 +497,7 @@ mod tests {
             &SimulationPreferences {
                 persona: "Linux / Bash".into(),
                 prompt: "Include only fictional files.".into(),
+                ..Default::default()
             },
         );
         let poll = |tab: &mut TerminalTab| {

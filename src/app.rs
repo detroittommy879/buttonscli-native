@@ -688,7 +688,8 @@ fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePr
     let applied = serde_json::to_value(&snapshot.applied_preferences).unwrap();
     let original = serde_json::to_value(&snapshot.preferences).unwrap();
     for (key, _) in NATIVE_APPEARANCE_FIELDS {
-        if current[*key] == applied[*key] {
+        // Calm is a live presentation toggle, not preview-owned state.
+        if *key != "calm_mode" && current[*key] == applied[*key] {
             current[*key] = original[*key].clone();
         }
     }
@@ -712,9 +713,6 @@ fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePr
     }
     if preferences.typography == snapshot.applied_preferences.typography {
         preferences.typography = snapshot.preferences.typography.clone();
-    }
-    if preferences.calm_mode == snapshot.applied_preferences.calm_mode {
-        preferences.calm_mode = snapshot.preferences.calm_mode;
     }
     if preferences.dock_background_override == snapshot.applied_preferences.dock_background_override
     {
@@ -891,8 +889,8 @@ fn locale_selector(ui: &mut egui::Ui, id: &'static str, locale: &mut String) {
 impl PresetCollection {
     fn label(self) -> &'static str {
         match self {
-            Self::Commands => "Command",
-            Self::Ssh => "SSH",
+            Self::Commands => "Top commands",
+            Self::Ssh => "Left commands",
         }
     }
 }
@@ -2155,7 +2153,7 @@ impl ButtonsApp {
             Some(launch) => TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch),
             None => Ok(TerminalTab::simulated(
                 id,
-                format!("{title} · AI"),
+                title,
                 context,
                 &self.preferences.simulation,
             )),
@@ -3468,8 +3466,14 @@ impl ButtonsApp {
                         }
                     });
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
-                        ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Command dock");
-                        ui.spaced_checkbox(&mut self.preferences.show_presets, "Preset bar");
+                        ui.spaced_checkbox(
+                            &mut self.preferences.show_sidebar,
+                            crate::i18n::literal(&self.locale, "Left commands"),
+                        );
+                        ui.spaced_checkbox(
+                            &mut self.preferences.show_presets,
+                            crate::i18n::literal(&self.locale, "Top commands"),
+                        );
                         #[cfg(not(target_arch = "wasm32"))]
                         if quick_secrets_available() {
                             ui.separator();
@@ -3947,6 +3951,9 @@ impl ButtonsApp {
                             .position(|slot| *slot == index)
                             .map(|slot| slot + 1);
                         let mut label = tab.title.clone();
+                        if tab.simulated.is_some() && self.preferences.simulation.show_badges {
+                            label.push_str(" · AI");
+                        }
                         if let Some(number) = pane_number {
                             label.push_str(&format!(" · P{number}"));
                         }
@@ -4281,9 +4288,13 @@ impl ButtonsApp {
         );
         ui.horizontal(|ui| {
             ui.spaced_label(
-                RichText::new(&self.preferences.dock_title)
-                    .strong()
-                    .color(colors.accent_alt),
+                RichText::new(if self.preferences.dock_title == "Left commands" {
+                    crate::i18n::literal(&self.locale, "Left commands")
+                } else {
+                    self.preferences.dock_title.clone()
+                })
+                .strong()
+                .color(colors.accent_alt),
             );
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
@@ -4319,7 +4330,7 @@ impl ButtonsApp {
         let mut action = None;
         if presets.is_empty() {
             ui.spaced_label(
-                RichText::new("No SSH presets yet")
+                RichText::new("No left commands yet")
                     .small()
                     .color(colors.muted),
             );
@@ -4378,7 +4389,7 @@ impl ButtonsApp {
         if ui
             .add_sized(
                 [ui.available_width(), 28.0],
-                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+ Add SSH preset")),
+                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Add left command")),
             )
             .clicked()
         {
@@ -4861,7 +4872,7 @@ impl ButtonsApp {
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Commands,
-                    crate::i18n::literal(&self.locale, "Commands"),
+                    crate::i18n::literal(&self.locale, "Pre-typed commands"),
                 );
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
@@ -5939,6 +5950,12 @@ impl ButtonsApp {
             "Open a simulated terminal from the + menu. This setup applies to new simulations.",
         ));
         let config = &mut self.preferences.simulation;
+        ui.spaced_checkbox(
+            &mut config.show_notices,
+            "Show simulation notices in terminal output",
+        );
+        ui.spaced_checkbox(&mut config.show_badges, "Show AI badges on simulated tabs");
+        ui.spaced_label("Display changes apply to open tabs; existing scrollback is kept.");
         let label = ui.spaced_label(crate::i18n::literal(&self.locale, "OS / shell persona"));
         ui.add(egui::TextEdit::singleline(&mut config.persona).char_limit(512))
             .labelled_by(label.id);
@@ -5958,7 +5975,9 @@ impl ButtonsApp {
             ))
             .clicked()
         {
-            *config = Default::default();
+            let defaults = crate::settings::SimulationPreferences::default();
+            config.persona = defaults.persona;
+            config.prompt = defaults.prompt;
         }
         let _ = ctx;
     }
@@ -5974,6 +5993,12 @@ impl ButtonsApp {
         for tab in &mut self.tabs {
             let Some(simulated) = &mut tab.simulated else {
                 continue;
+            };
+            simulated.set_show_notices(self.preferences.simulation.show_notices);
+            tab.shell_name = if self.preferences.simulation.show_badges {
+                format!("AI simulation · {}", simulated.persona())
+            } else {
+                simulated.persona().into()
             };
             if simulated.tick(&mut tab.backend, &tab.output, ctx) {
                 if !ai_help_available() {
@@ -8044,7 +8069,7 @@ impl ButtonsApp {
             self.persist_native_preferences();
             ui.ctx().request_repaint();
         }
-        ui.spaced_label(RichText::new("Turn off for older computers or lower power use. Custom shader source and terminal post-processing are planned.").small());
+        ui.spaced_label(RichText::new("Turn off for older computers or lower power use.").small());
         if !personal_theme_editor_available() {
             return;
         }
@@ -8070,10 +8095,11 @@ impl ButtonsApp {
         let before = document.clone();
         let mut enabled = document["effects"]["shaderBackground"].is_object();
         ui.spaced_checkbox(&mut enabled, "Use a shader in this theme");
-        let mut shader =
-            crate::theme::ShaderBackground::from_value(&document["effects"]["shaderBackground"])
+        let mut shader: crate::theme::ShaderBackground =
+            serde_json::from_value(document["effects"]["shaderBackground"].clone())
                 .unwrap_or_default();
         if enabled {
+            let old_preset = shader.preset.clone();
             egui::ComboBox::from_id_salt("shader-preset")
                 .selected_text(
                     crate::theme::ShaderBackground::PRESETS[shader.preset_index().unwrap_or(0)].1,
@@ -8083,6 +8109,9 @@ impl ButtonsApp {
                         ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
                     }
                 });
+            if shader.preset != old_preset && shader.preset_index().unwrap_or(0) >= 7 {
+                shader.colors = Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
+            }
             ui.add(egui::Slider::new(&mut shader.strength, 0.0..=0.65).text("Strength"));
             ui.add(egui::Slider::new(&mut shader.scale, 0.25..=4.0).text("Scale"));
             ui.spaced_checkbox(&mut shader.animated, "Animate background");
@@ -8090,6 +8119,102 @@ impl ButtonsApp {
                 shader.animated,
                 egui::Slider::new(&mut shader.speed, 0.0..=2.0).text("Speed"),
             );
+            let mut own_colors = shader.colors.is_some();
+            if ui
+                .spaced_checkbox(&mut own_colors, "Custom shader colors")
+                .changed()
+            {
+                shader.colors =
+                    own_colors.then(|| ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
+            }
+            if let Some(colors) = &mut shader.colors {
+                ui.horizontal(|ui| {
+                    for (index, color) in colors.iter_mut().enumerate() {
+                        ui.push_id(index, |ui| {
+                            ui.label(format!("c{}", index + 1));
+                            let mut value =
+                                crate::theme::parse_color(color).unwrap_or(Color32::WHITE);
+                            if ui.color_edit_button_srgba(&mut value).changed() {
+                                *color = crate::theme::to_hex(value);
+                            }
+                        });
+                    }
+                });
+            }
+            let mut custom = shader.custom.is_some();
+            if ui
+                .spaced_checkbox(&mut custom, "Edit custom shader expression")
+                .changed()
+            {
+                shader.custom = custom.then(Default::default);
+            }
+            if let Some(custom) = &mut shader.custom {
+                ui.spaced_label("WGSL color expression returning vec3<f32>. p = coordinates, t = time, c1–c3 = colors. Use sin, cos, mix, length, etc. Loops and resources are disabled.");
+                ui.add(
+                    egui::TextEdit::multiline(&mut custom.expression)
+                        .code_editor()
+                        .desired_rows(4)
+                        .desired_width(f32::INFINITY)
+                        .char_limit(2048),
+                );
+                ui.spaced_label("Attach up to four named sliders; use their names in the expression. Speed, scale and colors above also apply.");
+                let mut remove = None;
+                for (index, variable) in custom.variables.iter_mut().enumerate() {
+                    ui.push_id(("shader-variable", index), |ui| {
+                        wrapping_row(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut variable.name)
+                                    .desired_width(90.0)
+                                    .char_limit(32),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut variable.min)
+                                    .range(-100.0..=100.0)
+                                    .prefix("Min "),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut variable.max)
+                                    .range(-100.0..=100.0)
+                                    .prefix("Max "),
+                            );
+                            if ui.button("Remove").clicked() {
+                                remove = Some(index);
+                            }
+                        });
+                        if variable.min < variable.max {
+                            ui.add(
+                                egui::Slider::new(&mut variable.value, variable.min..=variable.max)
+                                    .text(&variable.name),
+                            );
+                        }
+                    });
+                }
+                if let Some(index) = remove {
+                    custom.variables.remove(index);
+                }
+                if custom.variables.len() < 4 && ui.spaced_button("Add variable slider").clicked() {
+                    let mut suffix = 1;
+                    while custom
+                        .variables
+                        .iter()
+                        .any(|variable| variable.name == format!("param{suffix}"))
+                    {
+                        suffix += 1;
+                    }
+                    custom.variables.push(crate::theme::ShaderVariable {
+                        name: format!("param{suffix}"),
+                        ..Default::default()
+                    });
+                }
+                if let Err(error) = crate::plugins::effects::shader_expression::function(custom) {
+                    ui.spaced_label(
+                        RichText::new(format!("Shader error: {error}")).color(Color32::LIGHT_RED),
+                    );
+                    ui.spaced_label(
+                        "Fix the expression to resume preview. The gradient remains available.",
+                    );
+                }
+            }
         }
         if enabled {
             crate::theme_files::overlay_appearance(
@@ -9423,7 +9548,11 @@ impl ButtonsApp {
                     if let Some(snapshot) = &self.theme_editor_preview_snapshot {
                         restore_preview_preferences(&mut self.preferences, snapshot);
                     }
-                    self.apply_theme_sources(theme, self.preferences.calm_mode);
+                    let calm = self.preferences.calm_mode;
+                    self.apply_theme_sources(theme, calm);
+                    // A copied theme's saved Calm value must not undo a live
+                    // toggle whenever a new editor preview is applied.
+                    self.preferences.calm_mode = calm;
                     if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
                         snapshot.applied_preferences = self.preferences.clone();
                     }
@@ -9706,6 +9835,7 @@ impl ButtonsApp {
         self.preferences.theme_id = id.clone();
         if self.preferences.theme_apply.app {
             self.preferences.app_theme_id = id.clone();
+            self.preferences.pane_divider = Default::default();
             self.preferences.dock_background_override = None;
             self.preferences.status_background_override = None;
         }
@@ -9745,6 +9875,11 @@ impl ButtonsApp {
                 preferences.normalize_theme_sources();
                 self.preferences = preferences;
             }
+        }
+        // The portable divider in the theme is authoritative. Old appearance
+        // copies can contain a stale native override of the same fields.
+        if self.preferences.theme_apply.app {
+            self.preferences.pane_divider = Default::default();
         }
     }
 
@@ -10525,7 +10660,7 @@ impl ButtonsApp {
                 );
             }
             ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-            ui.spaced_checkbox(&mut self.preferences.show_presets, "Show preset bar");
+            ui.spaced_checkbox(&mut self.preferences.show_presets, crate::i18n::literal(&self.locale, "Top commands"));
             ui.spaced_checkbox(
                 &mut self.preferences.show_action_buttons,
                 crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
@@ -10792,10 +10927,10 @@ impl ButtonsApp {
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.spaced_heading(crate::i18n::literal(&self.locale, "Saved Presets"));
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Pre-typed commands"));
         ui.spaced_label(
             RichText::new(
-                "Command and SSH buttons are stored separately. Both target the focused terminal and can either type text or also press Enter.",
+                "Top and left commands target the focused terminal. Each can type text or also press Enter.",
             )
             .color(colors.muted),
         );
@@ -10804,12 +10939,20 @@ impl ButtonsApp {
             ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Commands,
-                format!("Commands ({})", self.preferences.presets.len()),
+                format!(
+                    "{} ({})",
+                    crate::i18n::literal(&self.locale, "Top commands"),
+                    self.preferences.presets.len()
+                ),
             );
             ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Ssh,
-                format!("SSH ({})", self.preferences.ssh_presets.len()),
+                format!(
+                    "{} ({})",
+                    crate::i18n::literal(&self.locale, "Left commands"),
+                    self.preferences.ssh_presets.len()
+                ),
             );
         });
         ui.add_space(8.0);
@@ -13080,6 +13223,7 @@ fn preset_action_menu(
 
 #[cfg(not(target_arch = "wasm32"))]
 const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
+    ("pane_divider", "app"),
     ("dock_opacity", "app"),
     ("window_opacity", "app"),
     ("chrome_corner_radius", "app"),
@@ -14762,7 +14906,7 @@ Start-Sleep -Seconds 300
         let image = capture.join("shader-settings.png");
         let expected = image.clone();
         let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 800.0]),
+            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 1000.0]),
             persist_window: false,
             event_loop_builder: Some(Box::new(|builder| {
                 winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
@@ -14794,7 +14938,11 @@ Start-Sleep -Seconds 300
                 app.ensure_appearance_baseline();
                 app.start_current_appearance_draft();
                 app.theme_editor_document.as_mut().unwrap()["effects"]["shaderBackground"] =
-                    json!(crate::theme::ShaderBackground::default());
+                    json!(crate::theme::ShaderBackground {
+                        custom: Some(Default::default()),
+                        colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+                        ..Default::default()
+                    });
                 fonts::install(&cc.egui_ctx, &app.font_catalog);
                 app.apply_style(&cc.egui_ctx);
                 Ok(Box::new(Probe {
@@ -15152,6 +15300,19 @@ Start-Sleep -Seconds 300
         assert_eq!(persisted.theme_id, original);
         assert!(persisted.calm_mode);
         assert_eq!(persisted.dock_width, 222.0);
+        document["nativeAppearance"]["calm_mode"] = json!(false);
+        app.theme_editor_document = Some(document.clone());
+        app.preferences.calm_mode = false;
+        app.preview_personal_theme_draft();
+        assert!(!app.preferences.calm_mode);
+        app.preferences.calm_mode = true;
+        app.preview_personal_theme_draft();
+        app.preview_personal_theme_draft();
+        assert!(
+            app.preferences.calm_mode,
+            "repeated previews keep the live toggle"
+        );
+        assert!(app.preferences_to_save().calm_mode);
         // Disabling automatic preview restores appearance while retaining editable data.
         app.preferences.theme_editor_live_preview = false;
         app.restore_personal_theme_preview();
@@ -15320,6 +15481,8 @@ Start-Sleep -Seconds 300
                 let elapsed = self.started.elapsed();
                 if self.step == 0 && elapsed > Duration::from_millis(600) {
                     assert_eq!(self.app.rendered_panes, [0, 1]);
+                    self.app.preferences.pane_divider.color_override = Some("#0088ff".into());
+                    self.app.preferences.pane_divider.thickness_override = Some(6.0);
                     self.pending
                         .push(egui::Event::Text("echo keyboard-only-second".into()));
                     self.pending.push(egui::Event::Key {
@@ -15346,6 +15509,24 @@ Start-Sleep -Seconds 300
                 }
                 if elapsed > Duration::from_secs(2) {
                     assert!(self.image.is_file());
+                    let pixels = image::ImageReader::open(&self.image)
+                        .unwrap()
+                        .decode()
+                        .unwrap()
+                        .to_rgba8();
+                    let mut longest: u32 = 0;
+                    let mut run = 0;
+                    for x in 0..pixels.width() {
+                        let pixel = pixels.get_pixel(x, pixels.height() / 2).0;
+                        if pixel[0] <= 2 && pixel[1].abs_diff(136) <= 2 && pixel[2] >= 253 {
+                            run += 1;
+                            longest = longest.max(run);
+                        } else {
+                            run = 0;
+                        }
+                    }
+                    let expected = (6.0 * ctx.pixels_per_point()).round() as u32;
+                    assert!(longest.abs_diff(expected) <= 1, "divider pixels should use the changed blue color and six-point width: {longest}, expected {expected}");
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 ctx.request_repaint_after(Duration::from_millis(40));
@@ -15367,7 +15548,9 @@ Start-Sleep -Seconds 300
             ..Default::default()
         };
         eframe::run_native("ButtonsCLI simulated pane probe", options, Box::new(move |cc| {
-            let mut app = ButtonsApp::empty(Preferences::default());
+            let mut preferences = Preferences::default();
+            preferences.simulation.show_notices = false; preferences.simulation.show_badges = false;
+            let mut app = ButtonsApp::empty(preferences);
             app.show_localization_onboarding = false;
             fonts::install(&cc.egui_ctx, &app.font_catalog);
             app.apply_style(&cc.egui_ctx);
@@ -15382,7 +15565,7 @@ Start-Sleep -Seconds 300
             app.pane_fonts.insert(second_id, second_font);
             app.pane_layout = PaneLayout::Columns; app.visible_panes = vec![0, 1];
             for (index, tab) in app.tabs.iter_mut().enumerate() {
-                tab.backend.feed_virtual_output(format!("\x1b[2J\x1b[HAI simulation - fictional demo server {}\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mls -la\r\n\x1b[34mdrwxr-xr-x  src/\r\ndrwxr-xr-x  docs/\x1b[0m\r\n-rw-r--r--  README.md\r\n-rw-r--r--  package.json\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mgit status\r\nOn branch main\r\n\x1b[32mnothing to commit, working tree clean\x1b[0m\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0m", index + 1).as_bytes());
+                tab.backend.feed_virtual_output(format!("\x1b[2J\x1b[Hstaging server {}\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mls -la\r\n\x1b[34mdrwxr-xr-x  src/\r\ndrwxr-xr-x  docs/\x1b[0m\r\n-rw-r--r--  README.md\r\n-rw-r--r--  package.json\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mgit status\r\nOn branch main\r\n\x1b[32mnothing to commit, working tree clean\x1b[0m\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0m", index + 1).as_bytes());
             }
             Ok(Box::new(Probe { app, started: Instant::now(), image, pending: Vec::new(), step: 0 }))
         })).unwrap();
@@ -16240,7 +16423,11 @@ Start-Sleep -Seconds 300
         );
         app.preferences.shader_backgrounds_enabled = true;
         let mut document = app.shared_appearance_document();
-        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
         app.preferences.effects_theme_id = app
             .themes
             .preview_personal_document("input-probe", "shader", &document)
@@ -17333,7 +17520,11 @@ Start-Sleep -Seconds 300
     fn shader_background_uses_effects_scope_and_calm_freezes_global_and_per_pane_motion() {
         let mut app = ButtonsApp::empty(Preferences::default());
         let mut document = app.shared_appearance_document();
-        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
         let id = app
             .themes
             .preview_personal_document("shader-test", "test", &document)
@@ -17385,7 +17576,11 @@ Start-Sleep -Seconds 300
     fn shaders_page_renders_shared_draft_controls_and_synthetic_preview() {
         let mut app = ButtonsApp::empty(Preferences::default());
         let mut document = app.shared_appearance_document();
-        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground::default());
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
         app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
         app.theme_editor_document = Some(document.clone());
         app.theme_editor_original_document = Some(document);
@@ -17840,9 +18035,16 @@ Start-Sleep -Seconds 300
         let original_next_id = app.next_id;
         let original_tab_count = app.tabs.len();
 
+        let original_divider = crate::settings::PaneDividerAppearance {
+            color_override: Some("#ffff00".into()),
+            thickness_override: Some(2.0),
+        };
+        app.preferences.pane_divider = original_divider.clone();
         app.start_personal_theme_draft();
         let file_name = app.theme_editor_file_name.clone().unwrap();
         let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["theme"]["app"]["shell"]["paneDivider"] = json!({"color":"#0088ff", "thickness":6.0});
+        draft["nativeAppearance"]["pane_divider"] = json!(original_divider);
         set_theme_document_value(
             &mut draft,
             "/theme/terminal/background",
@@ -17852,12 +18054,16 @@ Start-Sleep -Seconds 300
         app.preview_personal_theme_draft();
 
         let preview_id = format!("preview:default:{}", file_name.trim_end_matches(".json"));
+        let divider = resolve_pane_divider(&app.preferences.pane_divider, app.active_app_theme());
+        assert_eq!(divider.color, Color32::from_rgb(0, 136, 255));
+        assert_eq!(divider.thickness, 6.0);
         assert_eq!(app.preferences.theme_id, preview_id);
         assert_eq!(
             app.themes.get(&preview_id).terminal_colors.background,
             "#123456"
         );
         app.cancel_personal_theme_draft();
+        assert_eq!(app.preferences.pane_divider, original_divider);
         assert_eq!(app.preferences.theme_id, prior_theme);
         assert!(!app.themes.all().iter().any(|theme| theme.id == preview_id));
         assert_eq!(app.next_id, original_next_id);
@@ -17894,6 +18100,14 @@ Start-Sleep -Seconds 300
         let file_name = app.theme_editor_file_name.clone().unwrap();
         let mut draft = app.theme_editor_document.clone().unwrap();
         draft["futureRoot"] = serde_json::json!({"keep": "on restart"});
+        let mut shader = crate::theme::ShaderBackground {
+            preset: "prism".into(),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            custom: Some(Default::default()),
+            ..Default::default()
+        };
+        shader.custom.as_mut().unwrap().variables[0].value = 8.0;
+        draft["effects"]["shaderBackground"] = json!(shader);
         app.theme_editor_document = Some(draft);
         app.save_personal_theme_draft();
 
@@ -17903,6 +18117,10 @@ Start-Sleep -Seconds 300
         let mut catalog = ThemeCatalog::load();
         assert!(catalog.load_personal("default", &profile_dir).is_empty());
         let identity = format!("personal:default:{}", file_name.trim_end_matches(".json"));
+        assert_eq!(
+            catalog.get(&identity).effects.shader_background.as_ref(),
+            Some(&shader)
+        );
         assert_eq!(
             catalog.personal_document(&identity).unwrap()["futureRoot"]["keep"],
             "on restart"

@@ -160,14 +160,19 @@ impl TerminalTab {
         let mut backend = TerminalBackend::new_virtual(id, input);
         // Advertise bracketed paste; the adapter keeps multiline pastes in the
         // input editor until Enter instead of firing multiple model requests.
-        backend.feed_virtual_output(
-            b"\x1b[?2004hAI simulation - virtual files and connections only.\r\n",
-        );
+        backend.feed_virtual_output(b"\x1b[?2004h");
+        if config.show_notices {
+            backend.feed_virtual_output(b"AI simulation - virtual files and connections only.\r\n");
+        }
         Self {
             id,
             title,
             custom_title: None,
-            shell_name: format!("AI simulation · {}", simulated.persona()),
+            shell_name: if config.show_badges {
+                format!("AI simulation · {}", simulated.persona())
+            } else {
+                simulated.persona().into()
+            },
             working_directory: None,
             reported_title: None,
             profile_id: crate::assistant::virtual_terminal::PROFILE_ID.into(),

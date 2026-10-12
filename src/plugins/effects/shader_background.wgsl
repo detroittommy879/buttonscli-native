@@ -6,6 +6,7 @@ struct Uniforms {
     first: vec4<f32>,
     second: vec4<f32>,
     third: vec4<f32>,
+    knobs: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
@@ -83,7 +84,7 @@ fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
         let pulse = pow(0.5 + 0.5 * sin(grid.x * 0.8 + grid.y * 1.3 - t * 2.0), 8.0);
         glow = clamp(max(horizontal, vertical) * (0.25 + pulse * 0.75) + node * 0.5, 0.0, 1.0);
         field = pulse;
-    } else if u.settings.w > 5.5 {
+    } else if u.settings.w > 5.5 && u.settings.w < 6.5 {
         let q = p * 12.0;
         let warp = vec2<f32>(sin(q.y * 1.3 + t * 0.4), cos(q.x * 1.1 - t * 0.3));
         let a = sin(q.x + warp.x + t * 0.6) + cos(q.y + warp.y - t * 0.5);
@@ -94,6 +95,43 @@ fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
         let aa = max(fwidth(ridge), 0.01);
         glow = 0.08 + 0.92 * (1.0 - smoothstep(0.04, 0.14 + aa, ridge));
         field = 0.5 + 0.5 * sin(q.y * 0.4 + t * 0.2);
+    }
+    if u.settings.w > 6.5 {
+        let kind = u.settings.w;
+        if kind < 7.5 { // Prism ribbons
+            field = fract(p.x * 1.8 + sin(p.y * 4.0 + t) * 0.4 + t * 0.1);
+            glow = 0.35 + 0.65 * pow(sin(field * 3.14159), 2.0);
+        } else if kind < 8.5 { // Lava lamp
+            field = cloud(p * 4.0 + vec2<f32>(sin(t * 0.4), t * 0.12));
+            glow = smoothstep(0.25, 0.7, field);
+        } else if kind < 9.5 { // Kaleidoscope
+            let angle = atan2(p.y, p.x);
+            field = 0.5 + 0.5 * sin(angle * 6.0 + length(p) * 8.0 - t);
+            glow = 0.3 + 0.7 * abs(cos(angle * 3.0 - t * 0.2));
+        } else if kind < 10.5 { // Rainbow mist
+            field = 0.5 + 0.5 * sin(p.x * 3.0 + p.y * 2.0 + cloud(p * 4.0) * 3.0 + t * 0.7);
+            glow = cloud(p * 3.0 + vec2<f32>(t * 0.1, 7.0));
+        } else if kind < 11.5 { // Chromatic tunnel
+            field = fract(length(p) * 3.0 - t * 0.3);
+            glow = 0.2 + 0.8 * pow(0.5 + 0.5 * cos(length(p) * 18.0 - t * 2.0), 3.0);
+        } else if kind < 12.5 { // Fireflies
+            field = noise(p * 5.0 + t * 0.1);
+            glow = clamp(stars(p * 8.0 + vec2<f32>(sin(t * 0.3), t * 0.1), t) + stars(p * 13.0 + 19.0, t) * 0.5, 0.0, 1.0);
+        } else if kind < 13.5 { // Sunset dunes
+            field = clamp(uv.y + sin(p.x * 4.0 + t * 0.3) * 0.2, 0.0, 1.0);
+            glow = 0.25 + 0.75 * pow(0.5 + 0.5 * sin(p.y * 15.0 + sin(p.x * 2.0 + t) * 2.0), 2.0);
+        } else if kind < 14.5 { // Ocean currents
+            field = noise(p * 5.0 + vec2<f32>(t * 0.2, sin(t * 0.3)));
+            glow = 0.25 + 0.75 * (0.5 + 0.5 * sin((p.x + p.y) * 10.0 + field * 5.0 - t));
+        } else if kind < 15.5 { // Hex bloom
+            let q = vec2<f32>(p.x * 10.0 + p.y * 5.0, p.y * 8.66);
+            let cell = fract(q) - 0.5;
+            field = 0.5 + 0.5 * sin(floor(q.x) + floor(q.y) + t);
+            glow = exp(-length(cell) * 8.0) * (0.3 + 0.7 * field);
+        } else { // Electric silk
+            field = 0.5 + 0.5 * sin(p.x * 6.0 + sin(p.y * 4.0 - t) * 4.0);
+            glow = pow(0.5 + 0.5 * cos(p.y * 18.0 + field * 5.0 + t), 6.0);
+        }
     }
     let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);
     // Bound strength in the host and keep the base color dominant for legibility.

@@ -8,12 +8,16 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct SimulationPreferences {
     pub persona: String,
     pub prompt: String,
+    pub show_notices: bool,
+    pub show_badges: bool,
 }
 
 impl Default for SimulationPreferences {
     fn default() -> Self {
         Self {
             persona: "Linux / Bash".into(),
+            show_notices: true,
+            show_badges: true,
             prompt: "A disposable Linux workstation for demos. Include a sample project in /home/student/demo with README.md, sample logs and a few example files. All users, accounts, network hosts and credentials are fictional. Simulate common shell commands, SSH sessions and tools without connecting to anything real.".into(),
         }
     }
@@ -187,7 +191,7 @@ impl Default for Preferences {
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
-            dock_title: "SSH DOCK".into(),
+            dock_title: "Left commands".into(),
             advanced_effects: true,
             shader_backgrounds_enabled: false,
             ai_theme_allow_system_fonts: false,
@@ -349,8 +353,8 @@ impl Preferences {
             .filter(|ch| !ch.is_control())
             .take(60)
             .collect();
-        if self.dock_title.is_empty() {
-            self.dock_title = "SSH DOCK".into();
+        if self.dock_title.is_empty() || self.dock_title == "SSH DOCK" {
+            self.dock_title = "Left commands".into();
         }
         self.localization.manual_locale =
             crate::i18n::resolve_locale(&self.localization.manual_locale).to_owned();

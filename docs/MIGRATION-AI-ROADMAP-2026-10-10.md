@@ -9,9 +9,9 @@ October 11 implementation: [task models and simulation](AI-MODELS-AND-SIMULATION
 | AI Help | Streaming, interruptible cancellation, credentials, reviewed actions, bounded retries and configured fallbacks | Configurable first-token/idle deadlines, chain-wide budget and real-provider acceptance |
 | Terminal control | Opt-in bounded 12-step agent, stable target and guarded submission; CLI/MCP | Real-provider GUI and cross-platform acceptance |
 | Theme generation | Palette and seven-zone typography, validation and one correction attempt | Screenshots, full appearance, richer generation and useful gate/provider errors |
-| Shaders | Optional restricted procedural backgrounds and gradient fallback | Source editing, compiler diagnostics, preview/recovery and generation |
+| Shaders | 17 backgrounds; bounded WGSL color-expression editor, four named sliders, RGB controls, diagnostics and gradient fallback | AI generation, unrestricted source/postprocessing, wider GPU acceptance |
 | Providers | Shared default, four task slots, fallbacks, independent editing; Chat Completions and Responses APIs | Vision capabilities, discovery for task overrides, other API dialects |
-| Simulation | + menu workspace tabs/panes, editable saved setup prompt, virtual files, reset/undo and model chain | Broader real-provider quality and saved sessions |
+| Simulation | + menu workspace tabs/panes, editable setup, optional output notices/tab badges, virtual files, reset/undo and model chain | Broader real-provider quality and saved sessions |
 | Performance | Output-capture timing experiments | Environment-tagged history, charts and regression detection |
 
 ## Task slices and acceptance
@@ -19,7 +19,9 @@ October 11 implementation: [task models and simulation](AI-MODELS-AND-SIMULATION
 The numbered slices retain the original acceptance goals; completed parts are
 recorded above. User-reported shader follow-up: reproduce mixed-pane shader state,
 ineffective Edit divider color/thickness and inconsistent Calm after source/preview
-changes. See the October 11 bugfix log before renderer work.
+changes. October 12 fixes remove stale divider overrides during app-theme preview
+and preserve live Calm during copied-theme previews. Mixed-pane source switching
+still needs broader interaction review. See [shader editor](SHADER-EDITOR.md).
 
 1. **Localization:** heuristic scan found 153 of 247 wrapped app literals absent from the catalog, plus approximately 42 directly rendered English literals. Same-as-English values: Spanish/Japanese 388 each, French 69, German 71, Arabic 50; these include legitimate technical names. Add audit exemptions, missing keys, translations, placeholder tests and RTL/long-label review. Complete locale fields do not prove translation coverage.
 2. **Models:** shared default plus Help, theme, shader and simulated terminal slots; display inherited defaults, allow overrides/reset/use-for-all. Migrate the current active provider without repeated selection. Keep provider credential references. Custom OpenAI-compatible URLs first; other API dialects require adapters. Agent can inherit Help.
