@@ -4607,13 +4607,18 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 self.appearance_background_menu(ui, false);
                 wrapping_row(ui, |ui| {
-                    ui.spaced_label(RichText::new("SHELL READY").small().color(colors.accent));
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let status_label = "SHELL READY";
+                    #[cfg(target_arch = "wasm32")]
+                    let status_label = if self.browser_simulator.busy() { "THINKING" } else { "READY" };
+                    ui.spaced_label(RichText::new(status_label).small().color(colors.accent));
                     ui.separator();
                     ui.spaced_label(
-                        RichText::new(if cfg!(target_arch = "wasm32") {
-                            "sandbox replay engine"
-                        } else {
-                            "Alacritty engine"
+                        RichText::new({
+                            #[cfg(not(target_arch = "wasm32"))]
+                            { "Alacritty engine" }
+                            #[cfg(target_arch = "wasm32")]
+                            { if self.browser_simulator.ai { "AI simulator" } else { "Offline practice" } }
                         })
                         .small()
                         .color(colors.status_text),
@@ -6298,10 +6303,13 @@ impl ButtonsApp {
 
     fn simulation_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Simulation setup"));
+        #[cfg(not(target_arch = "wasm32"))]
         ui.spaced_label(crate::i18n::literal(
             &self.locale,
             "Open a simulated terminal from the + menu. This setup applies to new simulations.",
         ));
+        #[cfg(target_arch = "wasm32")]
+        ui.spaced_label("Browser prompts apply to the next AI request. Restart below to begin a fresh fictional world.");
         let config = &mut self.preferences.simulation;
         ui.spaced_label("Prompts below are the complete messages sent to the model. Output still has to match the fictional state JSON format; no tools or shell are attached.");
         let mut load = None;
