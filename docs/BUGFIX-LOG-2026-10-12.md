@@ -36,3 +36,4 @@
 ## GitHub main promotion
 
 - User authorized publishing/merging this branch to main. Fetched origin: 19 commits ahead, none behind; no existing open PR. Preserved untracked 4HUMAN.md. Added-line credential pattern scan across all 19 commits found zero candidates; removed one trailing documentation blank line. Native release/tests already validated above. Publish a PR, require GitHub checks on its final commit, then merge with a matching-head guard and verify remote/local main. GitHub PR/check records provide the merge outcome; no force push or branch-protection changes.
+- PR #3's first browser Clippy/WASM build passed. Linux exposed one test calling Windows-only child_process_id; retain the PID assertion under cfg(windows) and assert the virtual backend on every platform. Application code is unchanged. Rerun checks on the corrected head before merging; this platform trap belongs in future simulation tests.

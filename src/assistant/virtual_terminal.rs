@@ -425,6 +425,8 @@ mod tests {
         let mut tab =
             crate::terminal::TerminalTab::simulated(91, "demo".into(), ctx.clone(), &config);
         assert_eq!(tab.shell_name, "Linux / Bash");
+        assert!(tab.backend.is_virtual());
+        #[cfg(windows)]
         assert!(tab.backend.child_process_id().is_none());
         let simulated = tab.simulated.as_mut().unwrap();
         assert!(simulated.tick(&mut tab.backend, &tab.output, &ctx));
