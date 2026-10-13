@@ -1,0 +1,22 @@
+# Appearance saving / Settings
+
+- Added a green-dot **Save copy** footer button, disabled until appearance differs from the session baseline. Saves `Theme v1`, `v2`, etc.; original files remain intact. Existing editor buttons remain for comparison during user testing.
+- Capture resolved shared colors/fonts/effects plus pending editor deltas; unchanged draft fields must not overwrite newer font settings. Native appearance controls (opacity, corner radius, hover label, effect switches) use a whitelisted `nativeAppearance` extension and obey Library Apply scopes when loaded.
+- Personal themes have a separate **Rename theme** menu; rename changes metadata while preserving file identity and pending edits.
+- Right-click empty dock/status-bar space for background color/reset. Overrides persist in preferences, participate in Revert/preview restoration, and become ordinary theme colors when copied. No save prompts outside Settings.
+- Preserve per-PTY themes/fonts and sessions. A shared theme still does not package mixed-tab arrangements or per-session font overrides. Dirty tracking is session-local; restarting establishes a fresh baseline.
+- Fixed Calm snapshotting: export underlying effects rather than temporarily suppressed opacity/animation values.
+- Tests cover disabled/enabled footer clicks, both background menus/reset, numbered saves, mixed draft/font edits, reload, rename, failed-save retention, and Revert. Extended minimum-size/large-font footer bounds coverage.
+- Test setup corrections: Preferences comparisons require serialized values; invalid palette strings are normalized by the existing parser, so failure tests use an invalid document version; UI tests require font installation; storage directories are created lazily. Existing incremental-cache/PDB warnings are nonfatal.
+- Validation: 268 unit + 2 integration tests passed (20 explicit native tests ignored); footer/context-menu click tests passed; native shader Settings capture and mixed-theme/spacing probes passed. Screenshot inspected (`.private/appearance-save-validation/shader-settings.png`). Formatting, strict native/WASM Clippy, release build, and isolated release startup smoke passed. Smoke teardown logged a closed ConPTY pipe after the successful startup check; no normal profile was used.
+- Implementation commit: `b5d1f27`. Ready for user workflow testing before retiring the older save/variant buttons. Native smoke is startup evidence, not a multi-hour or cross-platform certification.
+
+
+# Interactive WASM preview
+
+- Existing release WASM compiled; regenerated stale ignored `web/pkg` with wasm-pack 0.15.0 (npm fallback). No desktop shells or production services changed.
+- Added a dark host page with Settings shortcut, local JSON file loading, loading/error/retry states. Imported version 1 themes retain full documents and preferences in browser storage; same metadata ID replaces only its browser copy (16 imports, 1 MB/file).
+- Fake terminal now uses selected terminal colors/fonts; reserved space makes Run visible. Shared preset bar/context menus now work in WASM. GPU effects, native theme editor and real multi-pane PTYs remain desktop-only.
+- Added `scripts/build-web.ps1` and hosting notes; CI now packages JS bindings/WASM as a downloadable artifact instead of checking only raw Rust output. Hosted deployment was not performed.
+- Traps: Python on Windows needs UTF-8 for app.rs (default cp1252 failed before app edits); use PYTHONUTF8 or explicit encoding. Browser coordinate clicks were unreliable with a temporary viewport override; normal viewport worked. An initial tab opened before server startup hit connection refused; a fresh tab recovered.
+- Validation so far: release wasm-pack build; 269 unit + 2 integration tests passed (20 native probes ignored); format and strict native/WASM Clippy passed. Browser clicks applied a bundled theme, Keep changes closed Settings, help command returned fake output, local April Arctic Orchid import changed colors/fonts and survived reload (library 563 → 564); invalid version rejected without changing app. Browser warning/error console empty. Final build script regenerated JS/WASM successfully; Current Folder and Git Status preset clicks returned simulated output, and desktop release build passed. Static hosting ZIP: `dist/buttonscli-web-preview.zip` (17.5 MB); screenshot: `.private/web-preview-final.png`. CI workflow edited locally, not run remotely. Loopback preview remains at port 8080 (test server PID 3828).

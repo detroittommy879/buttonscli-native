@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-circuit",
+    "name": "Shader Circuit",
+    "nativeThemeVersion": 1,
+    "description": "Animated background example. Enable GPU shader backgrounds in Themes > Shaders; solid/gradient fallback is available."
+  },
+  "theme": {
+    "mode": "dark",
+    "terminal": {
+      "background": "#080d18",
+      "foreground": "#e4ecff",
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 16,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#080d18",
+        "#17a882",
+        "#38a7d8",
+        "#175768"
+      ],
+      "gradientType": "radial",
+      "ansiColors": {
+        "black": "#697386",
+        "red": "#ff7c91",
+        "green": "#9fd586",
+        "yellow": "#ffd27c",
+        "blue": "#83bff1",
+        "magenta": "#d7a2f6",
+        "cyan": "#81d8d6",
+        "white": "#e4ecff",
+        "brightBlack": "#95a4bb",
+        "brightRed": "#ffa1ae",
+        "brightGreen": "#bcea9e",
+        "brightYellow": "#ffe0a3",
+        "brightBlue": "#acd9ff",
+        "brightMagenta": "#e9c6ff",
+        "brightCyan": "#a4efea",
+        "brightWhite": "#ffffff"
+      }
+    },
+    "app": {
+      "shell": {
+        "background": "#080d18",
+        "textMain": "#e4ecff",
+        "accent": "#40e6ad"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "circuit",
+      "strength": 0.6,
+      "speed": 0.5,
+      "scale": 1.0,
+      "animated": true
+    }
+  }
+}

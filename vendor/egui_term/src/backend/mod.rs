@@ -180,11 +180,14 @@ pub struct TerminalBackend {
     pub url_regex: RegexSearch,
     term: Arc<FairMutex<Term<EventProxy>>>,
     size: TerminalSize,
-    notifier: Notifier,
+    notifier: Option<Notifier>,
+    virtual_parser: Option<alacritty_terminal::vte::ansi::Processor>,
     #[cfg(windows)]
     child_process_id: Option<std::num::NonZeroU32>,
     last_content: RenderableContent,
     input_observer: Option<ByteObserver>,
+    content_dirty: Arc<AtomicBool>,
+    scroll_to_bottom_pending: bool,
     search_dirty: Arc<AtomicBool>,
     search_query: Option<String>,
     search_matches: Vec<Match>,
@@ -228,7 +231,12 @@ impl TerminalBackend {
             ]),
             ..tty::Options::default()
         };
-        let config = term::Config::default();
+        // Surface clipboard queries so the adapter can explicitly reply empty.
+        // The UI never supplies OS clipboard contents to these requests.
+        let config = term::Config {
+            osc52: term::Osc52::CopyPaste,
+            ..term::Config::default()
+        };
         let terminal_size = TerminalSize::default();
         let pty = tty::new(&pty_config, terminal_size.into(), id)?;
         #[cfg(windows)]
@@ -245,7 +253,8 @@ impl TerminalBackend {
             }) as ByteObserver)
         };
         let (event_sender, event_receiver) = mpsc::channel();
-        let event_proxy = EventProxy(event_sender);
+        let content_dirty = Arc::new(AtomicBool::new(true));
+        let event_proxy = EventProxy(event_sender, content_dirty.clone());
         let mut term = Term::new(config, &terminal_size, event_proxy.clone());
         let initial_content = RenderableContent {
             grid: term.grid().clone(),
@@ -273,6 +282,16 @@ impl TerminalBackend {
             .name(format!("pty_event_subscription_{}", id))
             .spawn(move || {
                 while let Ok(event) = event_receiver.recv() {
+                    // Wakeups need a repaint, not a second unbounded UI queue.
+                    if matches!(
+                        event,
+                        Event::Wakeup
+                            | Event::MouseCursorDirty
+                            | Event::CursorBlinkingChange
+                    ) {
+                        app_context.request_repaint();
+                        continue;
+                    }
                     if pty_event_proxy_sender.send((id, event.clone())).is_err()
                     {
                         break;
@@ -289,11 +308,14 @@ impl TerminalBackend {
             url_regex,
             term: term.clone(),
             size: terminal_size,
-            notifier,
+            notifier: Some(notifier),
+            virtual_parser: None,
             #[cfg(windows)]
             child_process_id,
             last_content: initial_content,
             input_observer,
+            content_dirty,
+            scroll_to_bottom_pending: false,
             search_dirty,
             search_query: None,
             search_matches: Vec::new(),
@@ -301,20 +323,104 @@ impl TerminalBackend {
         })
     }
 
+    /// Use the real terminal grid/widget with application-owned I/O and no PTY.
+    /// Protocol/clipboard events are discarded; only explicit user writes reach
+    /// the input observer. No shell, event loop or child process is created.
+    pub fn new_virtual(id: u64, input_observer: ByteObserver) -> Self {
+        let size = TerminalSize::default();
+        let content_dirty = Arc::new(AtomicBool::new(true));
+        let (sender, _receiver) = mpsc::channel();
+        let proxy = EventProxy(sender, content_dirty.clone());
+        let mut terminal = Term::new(term::Config::default(), &size, proxy);
+        let content = RenderableContent {
+            grid: terminal.grid().clone(),
+            selectable_range: None,
+            terminal_mode: *terminal.mode(),
+            terminal_size: size,
+            cursor: terminal.grid_mut().cursor_cell().clone(),
+            hovered_hyperlink: None,
+            search_highlights: HashSet::new(),
+            current_search_highlights: HashSet::new(),
+        };
+        Self {
+            id,
+            url_regex: RegexSearch::new(r#"https?://[^\s<>\"\x00-\x1f]+"#)
+                .unwrap(),
+            term: Arc::new(FairMutex::new(terminal)),
+            size,
+            notifier: None,
+            virtual_parser: Some(Default::default()),
+            #[cfg(windows)]
+            child_process_id: None,
+            last_content: content,
+            input_observer: Some(input_observer),
+            content_dirty,
+            scroll_to_bottom_pending: false,
+            search_dirty: Arc::new(AtomicBool::new(true)),
+            search_query: None,
+            search_matches: Vec::new(),
+            current_search_match: None,
+        }
+    }
+
+    /// Feed application-owned output through the same ANSI/grid parser as PTYs.
+    pub fn feed_virtual_output(&mut self, bytes: &[u8]) {
+        if let Some(parser) = &mut self.virtual_parser {
+            parser.advance(&mut *self.term.lock(), bytes);
+            self.content_dirty.store(true, Ordering::Release);
+            self.search_dirty.store(true, Ordering::Release);
+        }
+    }
+
+    pub fn is_virtual(&self) -> bool {
+        self.virtual_parser.is_some()
+    }
+
+    pub fn columns(&self) -> usize {
+        self.size.num_cols as usize
+    }
+
     pub fn process_command(&mut self, cmd: BackendCommand) {
-        let term = self.term.clone();
-        let mut term = term.lock();
-        match cmd {
+        // Queue keyboard input before taking the renderer/parser lock. A busy
+        // output stream must not prevent interrupt or ordinary typing delivery.
+        let cmd = match cmd {
             BackendCommand::Write(input) => {
                 if let Some(observer) = &self.input_observer {
                     observer(&input);
                 }
                 self.write(input);
-                term.scroll_display(Scroll::Bottom);
+                self.scroll_to_bottom_pending = true;
+                self.content_dirty.store(true, Ordering::Release);
+                return;
             },
             BackendCommand::WriteSensitive(input) => {
-                self.notifier.notify_sensitive(input);
-                term.scroll_display(Scroll::Bottom);
+                if let Some(notifier) = &self.notifier {
+                    notifier.notify_sensitive(input);
+                }
+                self.scroll_to_bottom_pending = true;
+                self.content_dirty.store(true, Ordering::Release);
+                return;
+            },
+            BackendCommand::Resize(layout, font)
+                if layout == self.size.layout_size
+                    && font.width as u16 == self.size.cell_width
+                    && font.height as u16 == self.size.cell_height =>
+            {
+                return
+            },
+            cmd => cmd,
+        };
+        if !matches!(
+            &cmd,
+            BackendCommand::ProcessLink(..) | BackendCommand::MouseReport(..)
+        ) {
+            self.content_dirty.store(true, Ordering::Release);
+        }
+        let term = self.term.clone();
+        let mut term = term.lock();
+        match cmd {
+            BackendCommand::Write(_) | BackendCommand::WriteSensitive(_) => {
+                unreachable!()
             },
             BackendCommand::Scroll(delta) => {
                 self.scroll(&mut term, delta);
@@ -335,6 +441,50 @@ impl TerminalBackend {
                 self.process_mouse_report(button, modifiers, point, pressed);
             },
         };
+    }
+
+    /// Respond to terminal protocol requests without recording a user command,
+    /// scrolling the viewport, or requiring this pane to own keyboard focus.
+    pub fn reply_to_pty_event(
+        &self,
+        event: &PtyEvent,
+        theme: Option<&crate::TerminalTheme>,
+    ) {
+        let reply = match event {
+            Event::PtyWrite(text) => text.clone(),
+            Event::TextAreaSizeRequest(formatter) => {
+                formatter(self.size.into())
+            },
+            Event::ColorRequest(index, formatter) => {
+                if *index >= alacritty_terminal::term::color::COUNT {
+                    return;
+                }
+                let Some(theme) = theme else { return };
+                let color = self.term.lock().colors()[*index]
+                    .unwrap_or_else(|| theme.query_color(*index));
+                formatter(color)
+            },
+            // Deny remote clipboard reads with an empty, correctly formatted
+            // reply. Never disclose the OS clipboard or leave a TUI waiting.
+            Event::ClipboardLoad(_, formatter) => formatter(""),
+            _ => return,
+        };
+        self.write(reply.into_bytes());
+    }
+
+    pub(crate) fn report_window_focus(&self, focused: bool) {
+        if self
+            .last_content
+            .terminal_mode
+            .contains(TermMode::FOCUS_IN_OUT)
+        {
+            // TUI focus notifications are protocol traffic, not user input.
+            self.write(if focused {
+                &b"\x1b[I"[..]
+            } else {
+                &b"\x1b[O"[..]
+            });
+        }
     }
 
     pub fn selection_point(
@@ -379,6 +529,7 @@ impl TerminalBackend {
         query: &str,
         forward: bool,
     ) -> std::result::Result<Option<(usize, usize)>, String> {
+        self.content_dirty.store(true, Ordering::Release);
         let query = query.trim();
         if query.is_empty() {
             self.clear_search();
@@ -422,6 +573,7 @@ impl TerminalBackend {
     }
 
     pub fn clear_search(&mut self) {
+        self.content_dirty.store(true, Ordering::Release);
         self.search_query = None;
         self.search_matches.clear();
         self.current_search_match = None;
@@ -439,6 +591,7 @@ impl TerminalBackend {
 
     /// Select every retained line in this terminal, including scrollback.
     pub fn select_all(&mut self) {
+        self.content_dirty.store(true, Ordering::Release);
         let term = self.term.clone();
         let mut terminal = term.lock();
         select_all_in_term(&mut terminal);
@@ -455,8 +608,17 @@ impl TerminalBackend {
     }
 
     pub fn sync(&mut self) -> &RenderableContent {
+        // Deep scrollback is expensive to clone. Idle paints and focus changes
+        // can reuse the snapshot until output or a local grid mutation arrives.
+        if !self.content_dirty.swap(false, Ordering::AcqRel) {
+            return self.last_content();
+        }
         let term = self.term.clone();
         let mut terminal = term.lock();
+        if self.scroll_to_bottom_pending {
+            terminal.scroll_display(Scroll::Bottom);
+            self.scroll_to_bottom_pending = false;
+        }
         if self.search_dirty.swap(false, Ordering::Relaxed) {
             if let Some(query) = self.search_query.as_deref() {
                 let selected_match = self
@@ -508,6 +670,7 @@ impl TerminalBackend {
     pub fn set_scrollback_lines(&mut self, lines: usize) {
         self.term.lock().set_options(term::Config {
             scrolling_history: lines.min(100_000),
+            osc52: term::Osc52::CopyPaste,
             ..term::Config::default()
         });
         self.clear_search();
@@ -608,6 +771,9 @@ impl TerminalBackend {
     }
 
     fn open_link(&self) {
+        if self.is_virtual() {
+            return;
+        }
         if let Some(range) = &self.last_content.hovered_hyperlink {
             let start = range.start();
             let end = range.end();
@@ -673,7 +839,7 @@ impl TerminalBackend {
             c
         );
 
-        self.notifier.notify(msg.as_bytes().to_vec());
+        self.write(msg.as_bytes().to_vec());
     }
 
     fn normal_mouse_report(&self, point: Point, button: u8, is_utf8: bool) {
@@ -705,7 +871,7 @@ impl TerminalBackend {
             msg.push(32 + 1 + line.0 as u8);
         }
 
-        self.notifier.notify(msg);
+        self.write(msg);
     }
 
     fn start_selection(
@@ -769,6 +935,10 @@ impl TerminalBackend {
         let lines = (layout_size.height / font_size.height.floor()) as u16;
         let cols = (layout_size.width / font_size.width.floor()) as u16;
         if lines > 0 && cols > 0 {
+            let changed = self.size.num_cols != cols
+                || self.size.num_lines != lines
+                || self.size.cell_height != font_size.height as u16
+                || self.size.cell_width != font_size.width as u16;
             self.size = TerminalSize {
                 layout_size,
                 cell_height: font_size.height as u16,
@@ -777,16 +947,22 @@ impl TerminalBackend {
                 num_cols: cols,
             };
 
-            self.notifier.on_resize(self.size.into());
-            terminal.resize(TermSize::new(
-                self.size.num_cols as usize,
-                self.size.num_lines as usize,
-            ));
+            if changed {
+                if let Some(notifier) = &mut self.notifier {
+                    notifier.on_resize(self.size.into());
+                }
+                terminal.resize(TermSize::new(
+                    self.size.num_cols as usize,
+                    self.size.num_lines as usize,
+                ));
+            }
         }
     }
 
     fn write<I: Into<Cow<'static, [u8]>>>(&self, input: I) {
-        self.notifier.notify(input);
+        if let Some(notifier) = &self.notifier {
+            notifier.notify(input);
+        }
     }
 
     fn scroll(&mut self, terminal: &mut Term<EventProxy>, delta_value: i32) {
@@ -805,7 +981,7 @@ impl TerminalBackend {
                     content.push(line_cmd);
                 }
 
-                self.notifier.notify(content);
+                self.write(content);
             } else {
                 terminal.grid_mut().scroll_display(scroll);
             }
@@ -987,7 +1163,9 @@ impl Default for RenderableContent {
 
 impl Drop for TerminalBackend {
     fn drop(&mut self) {
-        let _ = self.notifier.0.send(Msg::Shutdown);
+        if let Some(notifier) = &self.notifier {
+            let _ = notifier.0.send(Msg::Shutdown);
+        }
     }
 }
 
@@ -1000,11 +1178,55 @@ impl TerminalBackend {
 }
 
 #[derive(Clone)]
-pub struct EventProxy(mpsc::Sender<Event>);
+pub struct EventProxy(mpsc::Sender<Event>, Arc<AtomicBool>);
 
 impl EventListener for EventProxy {
     fn send_event(&self, event: Event) {
-        let _ = self.0.send(event.clone());
+        self.1.store(true, Ordering::Release);
+        let _ = self.0.send(event);
+    }
+}
+
+#[cfg(test)]
+mod virtual_backend_tests {
+    use super::*;
+
+    #[test]
+    fn virtual_grid_has_real_ansi_selection_search_and_no_pty_or_sensitive_sink(
+    ) {
+        let writes = Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+        let observed = Arc::clone(&writes);
+        let mut backend = TerminalBackend::new_virtual(
+            42,
+            Arc::new(move |bytes| {
+                observed.lock().unwrap().extend_from_slice(bytes)
+            }),
+        );
+        assert!(backend.is_virtual());
+        #[cfg(windows)]
+        assert!(backend.child_process_id().is_none());
+        backend.feed_virtual_output(
+            "\x1b[31mvirtual red\x1b[0m 🦇\r\n".as_bytes(),
+        );
+        backend.sync();
+        assert!(backend.plain_text_tail(4096).contains("virtual red"));
+        assert_eq!(backend.search_next("virtual red").unwrap(), Some((1, 1)));
+        backend.select_all();
+        assert!(backend.selectable_content().contains("virtual red"));
+        backend.process_command(BackendCommand::Resize(
+            Size::new(640.0, 320.0),
+            Size::new(8.0, 16.0),
+        ));
+        assert_eq!(backend.columns(), 80);
+        backend.process_command(BackendCommand::Write(b"pwd\r".to_vec()));
+        backend.process_command(BackendCommand::WriteSensitive(
+            SensitiveInput::new(b"never-send-this-key".to_vec()),
+        ));
+        backend.reply_to_pty_event(
+            &Event::PtyWrite("protocol-not-command".into()),
+            None,
+        );
+        assert_eq!(*writes.lock().unwrap(), b"pwd\r");
     }
 }
 
@@ -1120,5 +1342,126 @@ mod scrollback_tests {
         let terminal = mock_term("content");
         assert!(collect_search_matches(&terminal, "[").is_err());
         assert!(collect_search_matches(&terminal, "").unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod input_recovery_tests {
+    use super::*;
+
+    #[test]
+    fn parser_requests_include_status_color_size_and_safe_clipboard_replies() {
+        let (tx, rx) = mpsc::channel();
+        let proxy = EventProxy(tx, Arc::new(AtomicBool::new(true)));
+        let mut terminal = Term::new(
+            term::Config {
+                osc52: term::Osc52::CopyPaste,
+                ..term::Config::default()
+            },
+            &TermSize::new(80, 24),
+            proxy,
+        );
+        let mut parser: alacritty_terminal::vte::ansi::Processor =
+            Default::default();
+        parser.advance(
+            &mut terminal,
+            b"\x1b[5n\x1b[6n\x1b[c\x1b]11;?\x07\x1b[18t\x1b]52;c;?\x07",
+        );
+        let mut replies = Vec::new();
+        let size = WindowSize {
+            num_lines: 24,
+            num_cols: 80,
+            cell_width: 8,
+            cell_height: 16,
+        };
+        for event in rx.try_iter() {
+            match event {
+                Event::PtyWrite(reply) => replies.push(reply),
+                Event::ColorRequest(index, formatter) => {
+                    assert_eq!(index, 257);
+                    replies.push(formatter(
+                        alacritty_terminal::vte::ansi::Rgb {
+                            r: 0x12,
+                            g: 0x34,
+                            b: 0x56,
+                        },
+                    ));
+                },
+                Event::TextAreaSizeRequest(formatter) => {
+                    replies.push(formatter(size))
+                },
+                Event::ClipboardLoad(_, formatter) => {
+                    replies.push(formatter(""))
+                },
+                _ => {},
+            }
+        }
+        for expected in [
+            "\x1b[0n",
+            "\x1b[1;1R",
+            "\x1b[?6c",
+            "\x1b]11;rgb:1212/3434/5656\x07",
+            "\x1b[8;24;80t",
+            "\x1b]52;c;\x07",
+        ] {
+            assert!(
+                replies.iter().any(|reply| reply == expected),
+                "missing {expected:?}: {replies:?}"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "holds an owned ConPTY parser lock to check keyboard/idle latency"]
+    fn keyboard_and_idle_frames_do_not_wait_for_parser_lock() {
+        use std::time::{Duration, Instant};
+        let (tx, _rx) = mpsc::channel();
+        let mut backend = TerminalBackend::new(
+            900_001,
+            egui::Context::default(),
+            tx,
+            BackendSettings {
+                shell: "powershell.exe".into(),
+                args: vec![
+                    "-NoLogo".into(),
+                    "-NoProfile".into(),
+                    "-Command".into(),
+                    "Start-Sleep -Seconds 30".into(),
+                ],
+                working_directory: None,
+            },
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        backend.sync();
+        let term = backend.term.clone();
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let _guard = term.lock();
+            locked_tx.send(()).unwrap();
+            // Bound a failing old implementation so it cannot hang the suite.
+            let _ = release_rx.recv_timeout(Duration::from_secs(3));
+        });
+        locked_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        let started = Instant::now();
+        backend.sync();
+        backend.process_command(BackendCommand::Resize(
+            Size::default(),
+            Size::new(1.0, 1.0),
+        ));
+        backend.process_command(BackendCommand::Write(vec![3]));
+        let elapsed = started.elapsed();
+        let _ = release_tx.send(());
+        worker.join().unwrap();
+        assert!(
+            elapsed < Duration::from_millis(100),
+            "keyboard blocked on the parser for {elapsed:?}"
+        );
+        assert!(backend.scroll_to_bottom_pending);
+        backend.sync();
+        assert!(!backend.scroll_to_bottom_pending);
+        println!("parser lock held; cached paint, unchanged resize and keyboard enqueue={}us", elapsed.as_micros());
     }
 }

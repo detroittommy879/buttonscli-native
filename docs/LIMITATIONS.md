@@ -12,10 +12,9 @@ not a backlog disguised as release notes.
   acceptance remain open; see [the verification record](VERIFICATION.md).
 - Windows validation is local; GitHub CI covers Linux and the browser target.
   macOS still needs native CI and manual interaction tests.
-- The browser package compiles and packages successfully. The available VM
-  browser has WebGL disabled, so it exercised the explicit compatibility
-  fallback rather than rendering the canvas. Test the canvas on a
-  hardware-accelerated browser before publishing the demo.
+- The current browser package compiles and renders the shared UI. Local checks
+  cover theme apply/import, persistence, invalid imports and preset clicks.
+  Native AI, editor and GPU feature acceptance remains separate.
 
 ## Product surface
 

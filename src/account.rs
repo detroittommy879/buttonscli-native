@@ -124,6 +124,7 @@ impl<'a> RuntimeConfigClient<'a> {
         let response = self
             .transport
             .execute(Request {
+                anthropic: false,
                 method: Method::Get,
                 url: self.endpoint.to_string(),
                 body: None,

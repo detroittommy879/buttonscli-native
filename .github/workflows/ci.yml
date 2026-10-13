@@ -32,4 +32,14 @@ jobs:
           targets: wasm32-unknown-unknown
           components: clippy
       - run: cargo clippy --target wasm32-unknown-unknown --no-default-features -- -D warnings
-      - run: cargo build --target wasm32-unknown-unknown --release --no-default-features
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes wasm-pack@0.15.0 build --target web --out-dir web/pkg --no-default-features -- --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buttonscli-web-preview
+          path: |
+            web/index.html
+            web/pkg/buttonscli.js
+            web/pkg/buttonscli_bg.wasm

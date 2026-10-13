@@ -1,6 +1,7 @@
 /target/
 /dist/
 /web/pkg/
+/web/build-info.json
 /.idea/
 /.vscode/
 /.aicp/

@@ -91,6 +91,24 @@ mod web {
                 .await
         }
 
+        pub fn open_settings(&self) -> Result<(), JsValue> {
+            let mut app = self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("The preview is still starting."))?;
+            app.open_browser_settings();
+            Ok(())
+        }
+
+        pub fn import_theme(&self, json: &str) -> Result<String, JsValue> {
+            let mut app = self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("The preview is still starting."))?;
+            app.import_browser_theme(json)
+                .map_err(|error| JsValue::from_str(&error))
+        }
+
         pub fn destroy(&self) {
             self.runner.destroy();
         }

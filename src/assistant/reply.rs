@@ -14,6 +14,9 @@ pub(crate) enum ReplyError {
     InvalidUtf8,
     InvalidEvent,
     AnswerTooLarge,
+    IncompleteResponse,
+    ProviderFailed,
+    Refused,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -27,9 +30,27 @@ pub(crate) enum StreamItem {
 pub(crate) struct SseDecoder {
     buffer: Vec<u8>,
     done: bool,
+    responses: bool,
+    anthropic: bool,
 }
 
 impl SseDecoder {
+    pub(crate) fn anthropic() -> Self {
+        Self {
+            anthropic: true,
+            ..Self::default()
+        }
+    }
+    pub(crate) fn responses() -> Self {
+        Self {
+            responses: true,
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn completed(&self) -> bool {
+        self.done
+    }
     pub(crate) fn push(&mut self, bytes: &[u8]) -> Result<Vec<StreamItem>, ReplyError> {
         if self.done {
             return Ok(Vec::new());
@@ -78,12 +99,76 @@ impl SseDecoder {
         }
         let payload = data.join("\n");
         if payload.trim() == "[DONE]" {
+            if self.responses || self.anthropic {
+                return Err(ReplyError::IncompleteResponse);
+            }
             self.done = true;
             return Ok(vec![StreamItem::Done]);
         }
         let value: Value = serde_json::from_str(&payload).map_err(|_| ReplyError::InvalidEvent)?;
         if value.get("error").is_some() {
-            return Err(ReplyError::InvalidEvent);
+            return Err(if self.anthropic || self.responses {
+                ReplyError::ProviderFailed
+            } else {
+                ReplyError::InvalidEvent
+            });
+        }
+        if self.anthropic {
+            return match value["type"].as_str() {
+                Some("content_block_delta") if value["delta"]["type"] == "text_delta" => {
+                    Ok(vec![StreamItem::Delta(
+                        value["delta"]["text"]
+                            .as_str()
+                            .ok_or(ReplyError::InvalidEvent)?
+                            .into(),
+                    )])
+                }
+                Some("content_block_start") if value["content_block"]["type"] == "text" => {
+                    let text = value["content_block"]["text"]
+                        .as_str()
+                        .ok_or(ReplyError::InvalidEvent)?;
+                    Ok(if text.is_empty() {
+                        vec![]
+                    } else {
+                        vec![StreamItem::Delta(text.into())]
+                    })
+                }
+                Some("message_delta") if value["delta"]["stop_reason"] == "max_tokens" => {
+                    Err(ReplyError::IncompleteResponse)
+                }
+                Some("message_delta") if value["delta"]["stop_reason"] == "refusal" => {
+                    Err(ReplyError::Refused)
+                }
+                Some("message_stop") => {
+                    self.done = true;
+                    Ok(vec![StreamItem::Done])
+                }
+                Some("error") => Err(ReplyError::ProviderFailed),
+                Some(_) => Ok(vec![]),
+                None => Err(ReplyError::InvalidEvent),
+            };
+        }
+        if self.responses {
+            return match value["type"].as_str() {
+                Some("response.output_text.delta") => {
+                    let delta = value["delta"].as_str().ok_or(ReplyError::InvalidEvent)?;
+                    Ok(vec![StreamItem::Delta(delta.into())])
+                }
+                Some("response.completed") => {
+                    if value["response"]["status"].as_str() != Some("completed") {
+                        return Err(ReplyError::IncompleteResponse);
+                    }
+                    self.done = true;
+                    Ok(vec![StreamItem::Done])
+                }
+                Some("response.failed" | "error") => Err(ReplyError::ProviderFailed),
+                Some("response.incomplete") => Err(ReplyError::IncompleteResponse),
+                Some("response.refusal.delta" | "response.refusal.done") => {
+                    Err(ReplyError::Refused)
+                }
+                Some(_) => Ok(Vec::new()),
+                None => Err(ReplyError::InvalidEvent),
+            };
         }
         let mut items = Vec::new();
         if let Some(model) = value
@@ -108,6 +193,84 @@ impl SseDecoder {
             }
         }
         Ok(items)
+    }
+}
+
+#[cfg(test)]
+mod responses_tests {
+    use super::*;
+
+    #[test]
+    fn anthropic_fragmented_unicode_ignores_thinking_and_requires_message_stop() {
+        let wire = concat!(
+            "data: {\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"private\"}}\n\n",
+            "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello 🦇\"}}\n\n",
+            "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n"
+        );
+        let mut decoder = SseDecoder::anthropic();
+        let mut items = vec![];
+        for byte in wire.as_bytes() {
+            items.extend(decoder.push(&[*byte]).unwrap());
+        }
+        assert_eq!(items, [StreamItem::Delta("hello 🦇".into())]);
+        assert!(!decoder.completed());
+        assert_eq!(
+            decoder
+                .push(b"data: {\"type\":\"message_stop\"}\n\n")
+                .unwrap(),
+            [StreamItem::Done]
+        );
+        assert!(decoder.completed());
+        for (wire, expected) in [
+            ("data: [DONE]\n\n", ReplyError::IncompleteResponse),
+            (
+                "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}\n\n",
+                ReplyError::IncompleteResponse,
+            ),
+            (
+                "data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}\n\n",
+                ReplyError::ProviderFailed,
+            ),
+        ] {
+            assert_eq!(SseDecoder::anthropic().push(wire.as_bytes()), Err(expected));
+        }
+    }
+
+    #[test]
+    fn responses_events_handle_fragmented_unicode_without_duplicate_final_text() {
+        let wire = concat!(
+            "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"model\":\"test-model\"}}\n\n",
+            "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"hello 🦇\"}\n\n",
+            "data: {\"type\":\"response.output_text.done\",\"text\":\"hello 🦇\"}\n\n",
+            "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"
+        );
+        let mut decoder = SseDecoder::responses();
+        let mut items = Vec::new();
+        for byte in wire.as_bytes() {
+            items.extend(decoder.push(&[*byte]).unwrap());
+        }
+        assert_eq!(
+            items,
+            [StreamItem::Delta("hello 🦇".into()), StreamItem::Done]
+        );
+        assert!(decoder.completed());
+    }
+
+    #[test]
+    fn responses_failure_incomplete_and_refusal_are_not_success() {
+        for (kind, expected) in [
+            ("response.failed", ReplyError::ProviderFailed),
+            ("response.incomplete", ReplyError::IncompleteResponse),
+            ("response.refusal.delta", ReplyError::Refused),
+        ] {
+            let wire = format!("data: {{\"type\":\"{kind}\"}}\n\n");
+            assert_eq!(SseDecoder::responses().push(wire.as_bytes()), Err(expected));
+        }
+        assert_eq!(
+            SseDecoder::responses().push(b"data: [DONE]\n\n"),
+            Err(ReplyError::IncompleteResponse)
+        );
     }
 }
 

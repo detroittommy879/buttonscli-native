@@ -2,7 +2,7 @@
 import http from 'node:http';
 import { pathToFileURL } from 'node:url';
 
-export const models = ['fake-ok', 'fake-slow', 'fake-error-once', 'fake-quota', 'fake-malformed', 'fake-disconnect'];
+export const models = ['fake-ok', 'fake-slow', 'fake-error-once', 'fake-quota', 'fake-malformed', 'fake-disconnect', 'fake-simulation'];
 
 export function createFakeProvider({ delayMs = 25 } = {}) {
   const counts = new Map();
@@ -37,6 +37,13 @@ export function createFakeProvider({ delayMs = 25 } = {}) {
     if (context) stats.contextRequests++;
     if (body.model === 'fake-quota') return send(429, { error: { message: 'Fixture quota rejection' } });
     if (body.model === 'fake-error-once' && count === 1) return send(503, { error: { message: 'Fixture failure; retry succeeds' } });
+    if (body.model === 'fake-simulation') {
+      const input = JSON.parse(body.messages.at(-1).content);
+      const state = structuredClone(input.state);
+      if (input.command.startsWith('rm ')) state.files = {};
+      const content = JSON.stringify({ output: `Simulated: ${input.command}`, state });
+      return send(200, { choices: [{ message: { content } }] });
+    }
     const answer = `<answer>Local test response 🦇. This is a deterministic fixture, not an AI answer. Terminal context detected: ${context ? 'yes' : 'no'}. Review the harmless echo suggestion before inserting it.</answer><commands>${JSON.stringify([{ label: 'Local echo test', command: 'echo ButtonsCLI-local-test', description: 'Print a test marker in the reviewed target only.', sendEnter: false }])}</commands>`;
     if (!body.stream) return send(200, { model: body.model, choices: [{ message: { role: 'assistant', content: answer } }] });
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });

@@ -4,7 +4,9 @@ use crate::assistant::credentials::{
     SystemCredentialStore,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use crate::assistant::provider::{validate_endpoint, ProviderProfile};
+use crate::assistant::provider::{
+    validate_endpoint, AiTask, ModelTarget, ProviderApi, ProviderProfile,
+};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::control::ControlServer;
 #[cfg(not(target_arch = "wasm32"))]
@@ -358,6 +360,12 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_source_id: Option<String>,
     settings_snapshot: Option<SettingsSnapshot>,
+    #[cfg(not(target_arch = "wasm32"))]
+    appearance_baseline: Option<Value>,
+    #[cfg(not(target_arch = "wasm32"))]
+    appearance_save_status: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_rename: String,
     shortcut_capture: Option<ShortcutAction>,
     shortcut_feedback: Option<ShortcutFeedback>,
     show_settings: bool,
@@ -496,6 +504,14 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     provider_models: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
+    provider_edit_id: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_catalogs: std::collections::BTreeMap<String, ProviderCatalog>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_json: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider_generation: u64,
+    #[cfg(not(target_arch = "wasm32"))]
     account_tx: Sender<AccountEvent>,
     #[cfg(not(target_arch = "wasm32"))]
     account_rx: Receiver<AccountEvent>,
@@ -613,6 +629,10 @@ pub struct ButtonsApp {
     demo_lines: Vec<String>,
     #[cfg(target_arch = "wasm32")]
     demo_input: String,
+    #[cfg(target_arch = "wasm32")]
+    browser_theme_documents: Vec<serde_json::Value>,
+    #[cfg(target_arch = "wasm32")]
+    browser_ctx: egui::Context,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -627,6 +647,10 @@ enum SettingsTab {
     Keyboard,
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
+    #[cfg(not(target_arch = "wasm32"))]
+    Models,
+    #[cfg(not(target_arch = "wasm32"))]
+    Simulation,
     #[cfg(not(target_arch = "wasm32"))]
     Account,
     #[cfg(not(target_arch = "wasm32"))]
@@ -646,10 +670,14 @@ enum ThemeSettingsTab {
     Edit,
     #[cfg(not(target_arch = "wasm32"))]
     Generate,
+    #[cfg(not(target_arch = "wasm32"))]
+    Shaders,
 }
 
 struct SettingsSnapshot {
     preferences: Preferences,
+    #[cfg(not(target_arch = "wasm32"))]
+    appearance_baseline: Option<Value>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -664,6 +692,18 @@ struct ThemePreviewSnapshot {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePreviewSnapshot) {
+    let mut current = serde_json::to_value(&*preferences).unwrap();
+    let applied = serde_json::to_value(&snapshot.applied_preferences).unwrap();
+    let original = serde_json::to_value(&snapshot.preferences).unwrap();
+    for (key, _) in NATIVE_APPEARANCE_FIELDS {
+        // Calm is a live presentation toggle, not preview-owned state.
+        if *key != "calm_mode" && current[*key] == applied[*key] {
+            current[*key] = original[*key].clone();
+        }
+    }
+    if let Ok(restored) = serde_json::from_value(current) {
+        *preferences = restored;
+    }
     if preferences.theme_id == snapshot.applied_preferences.theme_id {
         preferences.theme_id = snapshot.preferences.theme_id.clone();
     }
@@ -682,8 +722,16 @@ fn restore_preview_preferences(preferences: &mut Preferences, snapshot: &ThemePr
     if preferences.typography == snapshot.applied_preferences.typography {
         preferences.typography = snapshot.preferences.typography.clone();
     }
-    if preferences.calm_mode == snapshot.applied_preferences.calm_mode {
-        preferences.calm_mode = snapshot.preferences.calm_mode;
+    if preferences.dock_background_override == snapshot.applied_preferences.dock_background_override
+    {
+        preferences.dock_background_override =
+            snapshot.preferences.dock_background_override.clone();
+    }
+    if preferences.status_background_override
+        == snapshot.applied_preferences.status_background_override
+    {
+        preferences.status_background_override =
+            snapshot.preferences.status_background_override.clone();
     }
 }
 
@@ -734,8 +782,16 @@ enum CredentialEvent {
 
 #[cfg(not(target_arch = "wasm32"))]
 enum ProviderEvent {
-    Tested(String, Result<(), String>),
-    Models(String, Result<Vec<String>, String>),
+    Tested(ProviderProfile, u64, Result<(), String>),
+    Models(ProviderProfile, u64, Result<Vec<String>, String>),
+    Detected(ProviderProfile, u64, Result<ProviderApi, String>),
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct ProviderCatalog {
+    fingerprint: String,
+    models: Vec<String>,
+    error: Option<String>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -849,8 +905,8 @@ fn locale_selector(ui: &mut egui::Ui, id: &'static str, locale: &mut String) {
 impl PresetCollection {
     fn label(self) -> &'static str {
         match self {
-            Self::Commands => "Command",
-            Self::Ssh => "SSH",
+            Self::Commands => "Top commands",
+            Self::Ssh => "Left commands",
         }
     }
 }
@@ -900,6 +956,9 @@ enum PaneAction {
     ToggleAutoTile,
     Close,
     ThemeSettings,
+    ResetSimulation,
+    UndoSimulation,
+    CancelSimulation,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -989,6 +1048,10 @@ impl ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(render_state) = &cc.wgpu_render_state {
+            crate::plugins::effects::shader_background::register(
+                &cc.egui_ctx,
+                render_state.target_format,
+            );
             crate::plugins::effects::analog_static::register(
                 &cc.egui_ctx,
                 render_state.target_format,
@@ -1055,6 +1118,19 @@ impl ButtonsApp {
             app.font_catalog = catalog;
             for warning in warnings {
                 log::warn!("font skipped: {warning}");
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            app.browser_ctx = cc.egui_ctx.clone();
+            let documents: Vec<serde_json::Value> = cc
+                .storage
+                .and_then(|storage| eframe::get_value(storage, "browser-themes"))
+                .unwrap_or_default();
+            for document in documents.into_iter().take(16) {
+                if app.themes.import_browser_document(&document).is_ok() {
+                    app.browser_theme_documents.push(document);
+                }
             }
         }
         fonts::install(&cc.egui_ctx, &app.font_catalog);
@@ -1147,6 +1223,12 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_source_id: None,
             settings_snapshot: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            appearance_baseline: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            appearance_save_status: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_rename: String::new(),
             shortcut_capture: None,
             shortcut_feedback: None,
             show_settings: false,
@@ -1286,6 +1368,14 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             provider_models: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            provider_edit_id: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_catalogs: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_json: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            provider_generation: 0,
+            #[cfg(not(target_arch = "wasm32"))]
             account_tx,
             #[cfg(not(target_arch = "wasm32"))]
             account_rx,
@@ -1408,6 +1498,10 @@ impl ButtonsApp {
             ],
             #[cfg(target_arch = "wasm32")]
             demo_input: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            browser_theme_documents: Vec::new(),
+            #[cfg(target_arch = "wasm32")]
+            browser_ctx: egui::Context::default(),
         }
     }
 
@@ -1476,7 +1570,24 @@ impl ButtonsApp {
     }
 
     fn colors(&self) -> AppColors {
-        self.active_app_theme().colors.clone()
+        let mut colors = self.active_app_theme().colors.clone();
+        if let Some(color) = self
+            .preferences
+            .dock_background_override
+            .as_deref()
+            .and_then(crate::theme::parse_color)
+        {
+            colors.dock_background = color;
+        }
+        if let Some(color) = self
+            .preferences
+            .status_background_override
+            .as_deref()
+            .and_then(crate::theme::parse_color)
+        {
+            colors.status_background = color;
+        }
+        colors
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1485,6 +1596,10 @@ impl ButtonsApp {
         let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
         let effects = &self.themes.get(&self.preferences.effects_theme_id).effects;
         theme.effects = TerminalEffects {
+            shader_background: effects.shader_background.clone().map(|mut shader| {
+                shader.animated &= !self.preferences.calm_mode;
+                shader
+            }),
             gradient: gradient.gradient,
             gradient_geometry: gradient.gradient_geometry,
             gradient_animation: gradient.gradient_animation
@@ -1533,6 +1648,9 @@ impl ButtonsApp {
             if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
                 let mut theme = theme.clone();
                 if self.preferences.calm_mode {
+                    if let Some(shader) = &mut theme.effects.shader_background {
+                        shader.animated = false;
+                    }
                     theme.effects.gradient_animation = false;
                     theme.effects.static_opacity = 0.0;
                     theme.effects.scanlines_strength = 0.0;
@@ -1708,6 +1826,23 @@ impl ButtonsApp {
                 self.focused = index;
                 self.settings_tab = SettingsTab::Themes;
                 self.show_settings = true;
+            }
+            PaneAction::ResetSimulation => {
+                let tab = &mut self.tabs[index];
+                if let Some(simulated) = &mut tab.simulated {
+                    simulated.reset(&mut tab.backend);
+                }
+            }
+            PaneAction::UndoSimulation => {
+                let tab = &mut self.tabs[index];
+                if let Some(simulated) = &mut tab.simulated {
+                    simulated.undo(&mut tab.backend, &tab.output);
+                }
+            }
+            PaneAction::CancelSimulation => {
+                if let Some(simulated) = &self.tabs[index].simulated {
+                    simulated.cancel();
+                }
             }
         }
     }
@@ -2020,18 +2155,32 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn open_tab_with_profile(&mut self, context: egui::Context, profile_id: &str) {
-        let launch = match self.shell_launch(profile_id) {
-            Ok(launch) => launch,
-            Err(error) => {
-                self.notice = Some(format!("Could not use shell profile: {error}"));
-                return;
-            }
+        let simulated = profile_id == crate::assistant::virtual_terminal::PROFILE_ID;
+        let launch = if simulated {
+            None
+        } else {
+            Some(match self.shell_launch(profile_id) {
+                Ok(launch) => launch,
+                Err(error) => {
+                    self.notice = Some(format!("Could not use shell profile: {error}"));
+                    return;
+                }
+            })
         };
         let id = self.next_id;
         self.next_id += 1;
         let taken: Vec<String> = self.tabs.iter().map(|tab| tab.title.clone()).collect();
         let (title, next_title_number) = next_available_title(self.next_title_number, &taken);
-        match TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch) {
+        let result = match launch {
+            Some(launch) => TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch),
+            None => Ok(TerminalTab::simulated(
+                id,
+                title,
+                context,
+                &self.preferences.simulation,
+            )),
+        };
+        match result {
             Ok(mut tab) => {
                 tab.backend
                     .set_scrollback_lines(self.preferences.scrollback_lines);
@@ -2063,6 +2212,16 @@ impl ButtonsApp {
         shell: Option<&str>,
         cwd: Option<&str>,
     ) -> Result<u64, ActionError> {
+        if shell == Some(crate::assistant::virtual_terminal::PROFILE_ID)
+            || (shell.is_none()
+                && self.preferences.default_shell_id
+                    == crate::assistant::virtual_terminal::PROFILE_ID)
+        {
+            self.open_tab_with_profile(context, crate::assistant::virtual_terminal::PROFILE_ID);
+            let tab = self.tabs.last_mut().ok_or(ActionError::LaunchFailed)?;
+            tab.rename(name.trim().into());
+            return Ok(tab.id);
+        }
         let cwd_input = cwd.unwrap_or(&self.preferences.default_working_directory);
         let working_directory =
             resolve_working_directory(cwd_input).map_err(|_| ActionError::LaunchFailed)?;
@@ -2174,6 +2333,17 @@ impl ButtonsApp {
                         profile.command.trim().to_owned(),
                     )
                 }),
+        );
+        options.insert(
+            1,
+            (
+                crate::assistant::virtual_terminal::PROFILE_ID.into(),
+                crate::i18n::literal(&self.locale, "Simulated terminal"),
+                crate::i18n::literal(
+                    &self.locale,
+                    "AI simulation. Virtual files only. Provider requests may incur costs.",
+                ),
+            ),
         );
         options
     }
@@ -2350,18 +2520,27 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn process_terminal_events(&mut self) {
-        while let Ok((id, event)) = self.events_rx.try_recv() {
+    fn process_terminal_events(&mut self) -> bool {
+        // Leave time for keyboard handling even if a program floods events.
+        for _ in 0..256 {
+            let Ok((id, event)) = self.events_rx.try_recv() else {
+                return false;
+            };
+            let theme = matches!(event, PtyEvent::ColorRequest(..))
+                .then(|| self.terminal_presentation_for(id).terminal());
             if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
+                tab.backend.reply_to_pty_event(&event, theme.as_ref());
                 match event {
                     PtyEvent::Title(title) if !title.trim().is_empty() => {
                         tab.reported_title = Some(title);
                     }
                     PtyEvent::Exit | PtyEvent::ChildExit(_) => tab.exited = true,
+                    PtyEvent::ResetTitle => tab.reported_title = None,
                     _ => {}
                 }
             }
         }
+        true
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2733,6 +2912,7 @@ impl ButtonsApp {
             indicator_colors,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
+            shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps: self.preferences.animation_fps,
@@ -2773,12 +2953,20 @@ impl ButtonsApp {
                 "On branch main".into(),
                 "nothing to commit, working tree clean".into(),
             ]),
+            "pwd" => self.demo_lines.push("/home/visitor/buttonscli-demo".into()),
+            "df -h" => self.demo_lines.extend([
+                "Filesystem       Size  Used  Avail  Use%  Mounted on".into(),
+                "browser-demo      1G     0     1G    0%  / (simulated)".into(),
+            ]),
+            value if value.starts_with("echo ") => self
+                .demo_lines
+                .push(value[5..].trim_matches(['\"', '\'']).to_owned()),
             "uname" | "uname -a" => self
                 .demo_lines
                 .push("ButtonsCLI wasm32 browser-demo #1 SMP".into()),
             "colors" => self.demo_lines.extend([
                 "red  green  yellow  blue  magenta  cyan".into(),
-                "Four native themes are available from Settings.".into(),
+                "Browse the theme library in Settings, or load a theme JSON file.".into(),
             ]),
             other => self
                 .demo_lines
@@ -2787,8 +2975,57 @@ impl ButtonsApp {
     }
 
     #[cfg(target_arch = "wasm32")]
+    pub(crate) fn open_browser_settings(&mut self) {
+        self.show_localization_onboarding = false;
+        self.preferences.localization.first_run_language_confirmed = true;
+        self.show_settings = true;
+        self.settings_tab = SettingsTab::Themes;
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn import_browser_theme(&mut self, json: &str) -> Result<String, String> {
+        if json.len() > 1_048_576 {
+            return Err("Theme files must be smaller than 1 MB.".into());
+        }
+        let document: serde_json::Value =
+            serde_json::from_str(json).map_err(|error| format!("Invalid theme JSON: {error}"))?;
+        let existing = self
+            .browser_theme_documents
+            .iter()
+            .position(|saved| saved["metadata"]["id"] == document["metadata"]["id"]);
+        if existing.is_none() && self.browser_theme_documents.len() >= 16 {
+            return Err("This browser preview supports up to 16 imported themes.".into());
+        }
+        let id = self.themes.import_browser_document(&document)?;
+        if let Some(index) = existing {
+            self.browser_theme_documents[index] = document;
+        } else {
+            self.browser_theme_documents.push(document);
+        }
+        let index = self
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == id)
+            .unwrap();
+        let name = self.themes.get(&id).name.clone();
+        self.apply_theme(index, false);
+        self.browser_ctx.request_repaint();
+        Ok(name)
+    }
+
+    #[cfg(target_arch = "wasm32")]
     fn web_demo(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
+        let terminal = &self
+            .themes
+            .get(&self.preferences.terminal_theme_id)
+            .terminal_colors;
+        let foreground = crate::theme::parse_color(&terminal.foreground).unwrap_or(colors.text);
+        let font = self
+            .font_catalog
+            .font_id(&self.preferences.typography.terminal, true);
         ui.spaced_label(
             RichText::new("SANDBOX TERMINAL")
                 .strong()
@@ -2806,7 +3043,7 @@ impl ButtonsApp {
             .max_height((ui.available_height() - 52.0).max(120.0))
             .show(ui, |ui| {
                 for line in &self.demo_lines {
-                    ui.spaced_label(RichText::new(line).monospace().color(colors.text));
+                    ui.spaced_label(RichText::new(line).font(font.clone()).color(foreground));
                 }
             });
         ui.separator();
@@ -2819,7 +3056,7 @@ impl ButtonsApp {
                             .font_id(&self.preferences.typography.terminal, true),
                     )
                     .hint_text(crate::i18n::literal(&self.locale, "type help"))
-                    .desired_width(f32::INFINITY),
+                    .desired_width((ui.available_width() - 64.0).max(40.0)),
             );
             let submit =
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -3251,8 +3488,14 @@ impl ButtonsApp {
                         }
                     });
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
-                        ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Command dock");
-                        ui.spaced_checkbox(&mut self.preferences.show_presets, "Preset bar");
+                        ui.spaced_checkbox(
+                            &mut self.preferences.show_sidebar,
+                            crate::i18n::literal(&self.locale, "Left commands"),
+                        );
+                        ui.spaced_checkbox(
+                            &mut self.preferences.show_presets,
+                            crate::i18n::literal(&self.locale, "Top commands"),
+                        );
                         #[cfg(not(target_arch = "wasm32"))]
                         if quick_secrets_available() {
                             ui.separator();
@@ -3416,7 +3659,15 @@ impl ButtonsApp {
                         }
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.spaced_label(RichText::new("NATIVE · RUST").small().color(colors.muted));
+                        ui.spaced_label(
+                            RichText::new(if cfg!(target_arch = "wasm32") {
+                                "WEB · RUST"
+                            } else {
+                                "NATIVE · RUST"
+                            })
+                            .small()
+                            .color(colors.muted),
+                        );
                     });
                 });
             });
@@ -3722,6 +3973,9 @@ impl ButtonsApp {
                             .position(|slot| *slot == index)
                             .map(|slot| slot + 1);
                         let mut label = tab.title.clone();
+                        if tab.simulated.is_some() && self.preferences.simulation.show_badges {
+                            label.push_str(" · AI");
+                        }
                         if let Some(number) = pane_number {
                             label.push_str(&format!(" · P{number}"));
                         }
@@ -3860,7 +4114,6 @@ impl ButtonsApp {
             });
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn preset_bar(&mut self, ctx: &egui::Context) {
         if !self.preferences.show_presets {
             return;
@@ -4042,6 +4295,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn command_dock_contents(&mut self, ui: &mut egui::Ui, controls_available: bool) {
+        self.appearance_background_menu(ui, true);
         let colors = self.colors();
         ui.visuals_mut().widgets.inactive.bg_fill = colors.dock_button;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = colors.dock_button;
@@ -4056,9 +4310,13 @@ impl ButtonsApp {
         );
         ui.horizontal(|ui| {
             ui.spaced_label(
-                RichText::new(&self.preferences.dock_title)
-                    .strong()
-                    .color(colors.accent_alt),
+                RichText::new(if self.preferences.dock_title == "Left commands" {
+                    crate::i18n::literal(&self.locale, "Left commands")
+                } else {
+                    self.preferences.dock_title.clone()
+                })
+                .strong()
+                .color(colors.accent_alt),
             );
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
@@ -4094,7 +4352,7 @@ impl ButtonsApp {
         let mut action = None;
         if presets.is_empty() {
             ui.spaced_label(
-                RichText::new("No SSH presets yet")
+                RichText::new("No left commands yet")
                     .small()
                     .color(colors.muted),
             );
@@ -4153,7 +4411,7 @@ impl ButtonsApp {
         if ui
             .add_sized(
                 [ui.available_width(), 28.0],
-                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+ Add SSH preset")),
+                crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Add left command")),
             )
             .clicked()
         {
@@ -4211,6 +4469,8 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
+                #[cfg(not(target_arch = "wasm32"))]
+                self.appearance_background_menu(ui, false);
                 wrapping_row(ui, |ui| {
                     ui.spaced_label(RichText::new("SHELL READY").small().color(colors.accent));
                     ui.separator();
@@ -4413,6 +4673,8 @@ impl ButtonsApp {
         SettingsSnapshot {
             preferences: self.preferences.clone(),
             #[cfg(not(target_arch = "wasm32"))]
+            appearance_baseline: self.appearance_baseline.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: self.theme_overrides.clone(),
             #[cfg(not(target_arch = "wasm32"))]
             pane_fonts: self.pane_fonts.clone(),
@@ -4425,6 +4687,11 @@ impl ButtonsApp {
         {
             self.theme_overrides = snapshot.theme_overrides;
             self.pane_fonts = snapshot.pane_fonts;
+            self.appearance_baseline = snapshot.appearance_baseline;
+            self.theme_editor_document = None;
+            self.theme_editor_original_document = None;
+            self.theme_editor_source_id = None;
+            self.appearance_save_status = None;
         }
     }
 
@@ -4467,6 +4734,8 @@ impl ButtonsApp {
             return;
         }
         if self.settings_snapshot.is_none() {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.ensure_appearance_baseline();
             self.settings_snapshot = Some(self.capture_settings_snapshot());
         }
         let old_app_theme = self.preferences.app_theme_id.clone();
@@ -4625,7 +4894,7 @@ impl ButtonsApp {
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Commands,
-                    crate::i18n::literal(&self.locale, "Commands"),
+                    crate::i18n::literal(&self.locale, "Pre-typed commands"),
                 );
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
@@ -4654,6 +4923,18 @@ impl ButtonsApp {
                     &mut self.settings_tab,
                     SettingsTab::Providers,
                     crate::i18n::text(&self.locale, crate::i18n::MessageKey::Providers, &[]),
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Models,
+                    "AI models",
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Simulation,
+                    crate::i18n::literal(&self.locale, "Simulation setup"),
                 );
                 #[cfg(not(target_arch = "wasm32"))]
                 if account_signin_available() {
@@ -4695,6 +4976,11 @@ impl ButtonsApp {
                         ThemeSettingsTab::Generate,
                         "Generate",
                     );
+                    ui.spaced_selectable_value(
+                        &mut self.theme_settings_tab,
+                        ThemeSettingsTab::Shaders,
+                        "Shaders",
+                    );
                 }
             });
             ui.separator();
@@ -4723,6 +5009,13 @@ impl ButtonsApp {
                 SettingsTab::Keyboard => self.keyboard_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Providers => self.provider_settings(ui, ctx),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Models => {
+                    self.task_model_settings(ui);
+                    self.ensure_provider_catalogs(ctx);
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Simulation => self.simulation_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Account if account_signin_available() => {
                     self.account_settings(ui, ctx)
@@ -4765,6 +5058,19 @@ impl ButtonsApp {
                     .clicked()
                 {
                     *close_action = Some(SettingsCloseAction::Revert);
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let dirty = self.appearance_is_dirty();
+                    let color = if dirty { Color32::from_rgb(100, 245, 175) } else { ui.visuals().weak_text_color() };
+                    let response = ui.add_enabled(dirty && self.native_store.is_some(), egui::Button::new(RichText::new("● Save copy").color(color)));
+                    if response.on_hover_text("Save current shared appearance and pending editor changes as the next numbered version. Individual terminal overrides stay in place.").clicked() {
+                        self.save_appearance_copy();
+                        ctx.request_repaint();
+                    }
+                    if let Some(status) = &self.appearance_save_status {
+                        ui.label(if status.contains("failed:") { "Save failed" } else { "Saved" }).on_hover_text(status);
+                    }
                 }
             },
         );
@@ -5259,62 +5565,102 @@ impl ButtonsApp {
     fn provider_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         use crate::i18n::{text, MessageKey as M};
         let warning_color = self.colors().warning;
-        ui.spaced_heading(text(&self.locale, M::Providers, &[]));
-        ui.spaced_label(text(&self.locale, M::ProviderHelp, &[]));
-        if crate::features::local::enabled() {
-            ui.spaced_label(
-                "Local feature override is enabled. Restart after changing feature-flags.json.",
-            );
-        }
-        let ai_unlocked = ai_help_available();
-        if !ai_unlocked {
-            ui.spaced_label(text(&self.locale, M::AiHelpLockedProvider, &[]));
+        ui.spaced_heading("AI providers");
+        ui.spaced_label(
+            "Connections and saved keys. Choose defaults and task models in AI models.",
+        );
+        if ui.spaced_button("Choose task models →").clicked() {
+            self.settings_tab = SettingsTab::Models;
         }
         let settings = &mut self.preferences.provider_settings;
-        let prior = settings.active_provider_id.clone();
-        egui::ComboBox::from_label(text(&self.locale, M::ActiveProvider, &[]))
-            .selected_text(crate::ui_text::spaced_text(
-                ui,
-                settings
-                    .active()
-                    .map(|provider| provider.name.as_str())
-                    .unwrap_or("—"),
-            ))
-            .show_ui(ui, |ui| {
-                for provider in &settings.providers {
-                    ui.spaced_selectable_value(
-                        &mut settings.active_provider_id,
-                        provider.id.clone(),
-                        &provider.name,
-                    );
-                }
-            });
-        if prior != settings.active_provider_id {
+        if !settings
+            .providers
+            .iter()
+            .any(|p| p.id == self.provider_edit_id)
+        {
+            self.provider_edit_id = settings.active_provider_id.clone();
+        }
+        let prior = self.provider_edit_id.clone();
+        wrapping_row(ui, |ui| {
+            for provider in &settings.providers {
+                let label = if provider.id == settings.active_provider_id {
+                    format!("{} · default", provider.name)
+                } else {
+                    provider.name.clone()
+                };
+                ui.spaced_selectable_value(&mut self.provider_edit_id, provider.id.clone(), label);
+            }
+        });
+        if prior != self.provider_edit_id {
             self.credential_draft.zeroize();
             self.credential_message = None;
+            self.provider_models.clear();
+            self.provider_message = None;
         }
-        if ui
-            .spaced_button(text(&self.locale, M::AddProvider, &[]))
-            .clicked()
-        {
-            let unique = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or_default();
+        let mut add = None;
+        ui.spaced_menu_button("Add connection", |ui| {
+            for (name, endpoint, api) in [
+                ("Custom", "", ProviderApi::Auto),
+                (
+                    "OpenAI",
+                    "https://api.openai.com/v1",
+                    ProviderApi::Responses,
+                ),
+                (
+                    "Anthropic",
+                    "https://api.anthropic.com/v1",
+                    ProviderApi::Anthropic,
+                ),
+                (
+                    "OpenRouter",
+                    "https://openrouter.ai/api/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "Mistral",
+                    "https://api.mistral.ai/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "Groq",
+                    "https://api.groq.com/openai/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+                (
+                    "NVIDIA NIM",
+                    "https://integrate.api.nvidia.com/v1",
+                    ProviderApi::ChatCompletions,
+                ),
+            ] {
+                if ui.spaced_button(name).clicked() {
+                    add = Some((name, endpoint, api));
+                    ui.close_menu();
+                }
+            }
+        });
+        if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
-                id: format!("provider-{unique}"),
-                name: format!("Provider {}", settings.providers.len() + 1),
-                ..ProviderProfile::default()
+                id: format!("provider-{:032x}", fastrand::u128(..)),
+                name: name.into(),
+                endpoint: endpoint.into(),
+                model: String::new(),
+                api,
+                ..Default::default()
             };
-            settings.active_provider_id = provider.id.clone();
+            if settings.providers.is_empty() {
+                settings.active_provider_id = provider.id.clone();
+            }
+            self.provider_edit_id = provider.id.clone();
             settings.providers.push(provider);
             self.credential_draft.zeroize();
             self.credential_message = None;
+            self.provider_message = None;
+            self.provider_models.clear();
         }
         let Some(index) = settings
             .providers
             .iter()
-            .position(|provider| provider.id == settings.active_provider_id)
+            .position(|provider| provider.id == self.provider_edit_id)
         else {
             return;
         };
@@ -5325,21 +5671,74 @@ impl ButtonsApp {
                 .labelled_by(label.id);
         });
         ui.horizontal(|ui| {
-            let label = ui.spaced_label(text(&self.locale, M::ProviderEndpoint, &[]));
-            ui.text_edit_singleline(&mut provider.endpoint)
-                .labelled_by(label.id);
+            let label = ui.spaced_label("Base URL");
+            ui.add(
+                egui::TextEdit::singleline(&mut provider.endpoint)
+                    .desired_width(650.0_f32.min(ui.available_width())),
+            )
+            .labelled_by(label.id);
         });
-        ui.horizontal(|ui| {
-            let label = ui.spaced_label(text(&self.locale, M::ProviderModel, &[]));
-            ui.text_edit_singleline(&mut provider.model)
-                .labelled_by(label.id);
-        });
+        egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "API format"))
+            .selected_text(match provider.api {
+                ProviderApi::Auto => crate::i18n::literal(&self.locale, "Automatic"),
+                ProviderApi::ChatCompletions => "Chat Completions".into(),
+                ProviderApi::Responses => "Responses API".into(),
+                ProviderApi::Anthropic => "Anthropic Messages".into(),
+            })
+            .show_ui(ui, |ui| {
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Auto,
+                    crate::i18n::literal(&self.locale, "Automatic"),
+                );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::ChatCompletions,
+                    "Chat Completions",
+                );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Responses,
+                    "Responses API",
+                );
+                ui.spaced_selectable_value(
+                    &mut provider.api,
+                    ProviderApi::Anthropic,
+                    "Anthropic Messages",
+                );
+            });
         if validate_endpoint(&provider.endpoint).is_err() {
             ui.spaced_colored_label(
                 warning_color,
                 text(&self.locale, M::ProviderEndpointInvalid, &[]),
             );
         }
+        ui.spaced_label("Default model for this connection");
+        let models = catalog_models(&self.provider_catalogs, provider);
+        model_picker(ui, "provider-default-model", &mut provider.model, models);
+        if let Some(catalog) = self
+            .provider_catalogs
+            .get(&provider.id)
+            .filter(|c| c.fingerprint == provider_fingerprint(provider))
+        {
+            if let Some(error) = &catalog.error {
+                ui.spaced_label(format!(
+                    "Model list unavailable: {error}. You can type a model ID."
+                ));
+            }
+        }
+        ui.spaced_label(format!(
+            "Requests use {}",
+            api_label(provider.resolved_api())
+        ));
+        egui::CollapsingHeader::new("Advanced connection options").show(ui, |ui| {
+            let mut models_url = provider.models_endpoint.clone().unwrap_or_default();
+            ui.label("Models URL override (optional)");
+            if ui.text_edit_singleline(&mut models_url).changed() {
+                provider.models_endpoint =
+                    (!models_url.trim().is_empty()).then(|| models_url.trim().into());
+            }
+        });
         let profile_name = self
             .native_store
             .as_ref()
@@ -5372,31 +5771,34 @@ impl ButtonsApp {
             text(&self.locale, M::SessionOnlyKey, &[]),
         );
         let provider_id = provider.id.clone();
-        let save = ui
-            .add_enabled(
-                !self.credential_busy && !self.credential_draft.trim().is_empty(),
-                crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
-            )
-            .clicked();
-        let delete = ui
-            .add_enabled(
-                !self.credential_busy && (has_session_key || has_saved_key),
-                crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
-            )
-            .clicked();
-        let remove = ui
-            .add_enabled(
-                !self.credential_busy && !has_session_key && !has_saved_key,
-                crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
-            )
-            .clicked();
+        let (mut save, mut delete, mut remove) = (false, false, false);
+        wrapping_row(ui, |ui| {
+            save = ui
+                .add_enabled(
+                    !self.credential_busy && !self.credential_draft.trim().is_empty(),
+                    crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
+                )
+                .clicked();
+            delete = ui
+                .add_enabled(
+                    !self.credential_busy && (has_session_key || has_saved_key),
+                    crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
+                )
+                .clicked();
+            remove = ui
+                .add_enabled(
+                    !self.credential_busy && !has_session_key && !has_saved_key,
+                    crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
+                )
+                .clicked();
+        });
         let mut test_connection = false;
         let mut discover_models = false;
-        ui.horizontal(|ui| {
+        let mut detect_format = false;
+        wrapping_row(ui, |ui| {
             test_connection = ui
                 .add_enabled(
-                    ai_unlocked
-                        && !self.provider_busy
+                    !self.provider_busy
                         && validate_endpoint(&provider.endpoint).is_ok()
                         && !provider.model.trim().is_empty(),
                     crate::ui_text::button(ui, text(&self.locale, M::TestConnection, &[])),
@@ -5404,22 +5806,12 @@ impl ButtonsApp {
                 .clicked();
             discover_models = ui
                 .add_enabled(
-                    ai_unlocked
-                        && !self.provider_busy
-                        && validate_endpoint(&provider.endpoint).is_ok(),
+                    !self.provider_busy && validate_endpoint(&provider.endpoint).is_ok(),
                     crate::ui_text::button(ui, text(&self.locale, M::DiscoverModels, &[])),
                 )
                 .clicked();
+            detect_format |= ui.add_enabled(!self.provider_busy && validate_endpoint(&provider.endpoint).is_ok() && !provider.model.trim().is_empty(), crate::ui_text::button(ui, "Detect API format")).on_hover_text("Tests up to three formats with a short model request at this base URL. May use provider credits.").clicked();
         });
-        if !self.provider_models.is_empty() {
-            egui::ComboBox::from_label(text(&self.locale, M::ProviderModel, &[]))
-                .selected_text(crate::ui_text::spaced_text(ui, &provider.model))
-                .show_ui(ui, |ui| {
-                    for model in &self.provider_models {
-                        ui.spaced_selectable_value(&mut provider.model, model.clone(), model);
-                    }
-                });
-        }
         if self.provider_busy {
             ui.spinner();
         }
@@ -5429,7 +5821,7 @@ impl ButtonsApp {
         if let Some(message) = &self.credential_message {
             ui.spaced_label(message);
         }
-        if test_connection || discover_models {
+        if test_connection || discover_models || detect_format {
             let profile_name = profile_name.to_owned();
             let provider = provider.clone();
             let reference = credentials::reference(&profile_name, &provider.id);
@@ -5437,6 +5829,7 @@ impl ButtonsApp {
             let session = Arc::clone(&self.credential_session);
             let tx = self.provider_tx.clone();
             let ctx = ctx.clone();
+            let generation = self.provider_generation;
             self.provider_busy = true;
             self.provider_message = None;
             self.provider_models.clear();
@@ -5444,7 +5837,8 @@ impl ButtonsApp {
                 let key = provider_key(&session, &reference, credential_ref.as_deref());
                 let event = match key {
                     Ok(key) if test_connection => ProviderEvent::Tested(
-                        provider.id.clone(),
+                        provider.clone(),
+                        generation,
                         crate::assistant::client::test_connection(
                             &crate::assistant::transport::ReqwestTransport,
                             &provider,
@@ -5452,8 +5846,19 @@ impl ButtonsApp {
                         )
                         .map_err(|error| error.to_string()),
                     ),
+                    Ok(key) if detect_format => ProviderEvent::Detected(
+                        provider.clone(),
+                        generation,
+                        crate::assistant::client::detect_format(
+                            &crate::assistant::transport::ReqwestTransport,
+                            &provider,
+                            key,
+                        )
+                        .map_err(|error| error.to_string()),
+                    ),
                     Ok(key) => ProviderEvent::Models(
-                        provider.id.clone(),
+                        provider.clone(),
+                        generation,
                         crate::assistant::client::discover_models(
                             &crate::assistant::transport::ReqwestTransport,
                             &provider,
@@ -5462,9 +5867,11 @@ impl ButtonsApp {
                         .map_err(|error| error.to_string()),
                     ),
                     Err(error) if test_connection => {
-                        ProviderEvent::Tested(provider.id, Err(error.to_string()))
+                        ProviderEvent::Tested(provider, generation, Err(error.to_string()))
                     }
-                    Err(error) => ProviderEvent::Models(provider.id, Err(error.to_string())),
+                    Err(error) => {
+                        ProviderEvent::Models(provider, generation, Err(error.to_string()))
+                    }
                 };
                 let _ = tx.send(event);
                 ctx.request_repaint();
@@ -5511,19 +5918,344 @@ impl ButtonsApp {
             });
         } else if remove {
             settings.providers.remove(index);
-            settings.active_provider_id = settings
-                .providers
-                .first()
-                .map(|provider| provider.id.clone())
-                .unwrap_or_default();
+            settings.normalize(&mut Vec::new());
+            self.provider_edit_id = settings.active_provider_id.clone();
+            self.provider_models.clear();
+            self.provider_message = None;
             self.credential_draft.zeroize();
             self.credential_message = None;
+        }
+        self.provider_json_settings(ui);
+        self.ensure_provider_catalogs(ctx);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn task_model_settings(&mut self, ui: &mut egui::Ui) {
+        ui.spaced_heading("AI models");
+        ui.spaced_label(
+            "Choose one main model for everything, then override only the tasks you want.",
+        );
+        if ui.spaced_button("Manage providers →").clicked() {
+            self.settings_tab = SettingsTab::Providers;
+        }
+        let settings = &mut self.preferences.provider_settings;
+        let catalogs = &self.provider_catalogs;
+        ui.spaced_label(RichText::new("Main model · default for all tasks").strong());
+        provider_picker(
+            ui,
+            "main-provider",
+            &settings.providers,
+            &mut settings.active_provider_id,
+            false,
+        );
+        if let Some(provider) = settings
+            .providers
+            .iter_mut()
+            .find(|p| p.id == settings.active_provider_id)
+        {
+            let models = catalog_models(catalogs, provider);
+            model_picker(ui, "main-model", &mut provider.model, models);
+            catalog_status(ui, catalogs, provider);
+            if validate_endpoint(&provider.endpoint).is_err() {
+                ui.spaced_colored_label(
+                    Color32::LIGHT_RED,
+                    "This provider has no valid base URL. Open Manage providers to complete it.",
+                );
+            }
+        } else {
+            ui.spaced_label("Add a provider connection first.");
+        }
+        if ui.spaced_button("Use main model for every task").clicked() {
+            settings.tasks.clear();
+        }
+        let providers = settings.providers.clone();
+        let default_id = settings.active_provider_id.clone();
+        for task in AiTask::ALL {
+            ui.separator();
+            ui.push_id(task.label(), |ui| {
+                ui.spaced_label(
+                    RichText::new(crate::i18n::literal(&self.locale, task.label())).strong(),
+                );
+                let effective = settings.for_task(task);
+                let binding = settings.tasks.entry(task).or_default();
+                let mut selected = binding
+                    .primary
+                    .as_ref()
+                    .map(|target| target.provider_id.clone())
+                    .unwrap_or_default();
+                let prior = selected.clone();
+                provider_picker(ui, "task-provider", &providers, &mut selected, true);
+                if selected != prior {
+                    binding.primary = (!selected.is_empty()).then_some(ModelTarget {
+                        provider_id: selected,
+                        model: String::new(),
+                    });
+                }
+                if let Some(target) = &mut binding.primary {
+                    if let Some(provider) = providers.iter().find(|p| p.id == target.provider_id) {
+                        ui.spaced_label(format!("Blank inherits {}", provider.model));
+                        model_picker(
+                            ui,
+                            "task-model",
+                            &mut target.model,
+                            catalog_models(catalogs, provider),
+                        );
+                        catalog_status(ui, catalogs, provider);
+                    }
+                }
+                if let Some(provider) = effective {
+                    ui.spaced_label(format!(
+                        "Uses {} · {}",
+                        provider.name,
+                        if provider.model.is_empty() {
+                            "choose a model"
+                        } else {
+                            &provider.model
+                        }
+                    ));
+                }
+                egui::CollapsingHeader::new(format!("Fallbacks ({})", binding.fallbacks.len()))
+                    .show(ui, |ui| {
+                        ui.spaced_label(
+                            "Tried in order for temporary failures or exhausted quota, before any answer arrives.",
+                        );
+                        let mut remove = None;
+                        for (index, target) in binding.fallbacks.iter_mut().enumerate() {
+                            ui.push_id(index, |ui| {
+                                ui.label(format!("Fallback {}", index + 1));
+                                provider_picker(
+                                    ui,
+                                    "fallback-provider",
+                                    &providers,
+                                    &mut target.provider_id,
+                                    false,
+                                );
+                                if let Some(provider) =
+                                    providers.iter().find(|p| p.id == target.provider_id)
+                                {
+                                    model_picker(
+                                        ui,
+                                        "fallback-model",
+                                        &mut target.model,
+                                        catalog_models(catalogs, provider),
+                                    );
+                                }
+                                wrapping_row(ui, |ui| {
+                                    if index > 0 && ui.spaced_button("Move up").clicked() {
+                                        remove = Some((index, true));
+                                    }
+                                    if ui.spaced_button("Remove").clicked() {
+                                        remove = Some((index, false));
+                                    }
+                                });
+                            });
+                        }
+                        if let Some((index, reorder)) = remove {
+                            if reorder {
+                                binding.fallbacks.swap(index, index - 1);
+                            } else {
+                                binding.fallbacks.remove(index);
+                            }
+                        }
+                        if binding.fallbacks.len() < 3
+                            && !providers.is_empty()
+                            && ui.spaced_button("Add fallback").clicked()
+                        {
+                            binding.fallbacks.push(ModelTarget {
+                                provider_id: default_id.clone(),
+                                model: String::new(),
+                            });
+                        }
+                    });
+            });
+        }
+        if self.provider_busy {
+            ui.spinner();
+            ui.spaced_label("Loading model lists… You can still type any model ID.");
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ensure_provider_catalogs(&mut self, ctx: &egui::Context) {
+        if self.provider_busy
+            || self.credential_busy
+            || ctx.wants_keyboard_input()
+            || !self.credential_draft.trim().is_empty()
+        {
+            return;
+        }
+        let Some(provider) = self
+            .preferences
+            .provider_settings
+            .providers
+            .iter()
+            .find(|provider| {
+                (self.settings_tab != SettingsTab::Providers
+                    || provider.id == self.provider_edit_id)
+                    && validate_endpoint(&provider.endpoint).is_ok()
+                    && self
+                        .provider_catalogs
+                        .get(&provider.id)
+                        .is_none_or(|catalog| catalog.fingerprint != provider_fingerprint(provider))
+            })
+            .cloned()
+        else {
+            return;
+        };
+        self.provider_catalogs.insert(
+            provider.id.clone(),
+            ProviderCatalog {
+                fingerprint: provider_fingerprint(&provider),
+                models: vec![],
+                error: None,
+            },
+        );
+        self.provider_busy = true;
+        let generation = self.provider_generation;
+        let reference = credentials::reference(
+            self.native_store
+                .as_ref()
+                .map_or("default", NativeStore::profile_name),
+            &provider.id,
+        );
+        let session = Arc::clone(&self.credential_session);
+        let tx = self.provider_tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = provider_key(&session, &reference, provider.credential_ref.as_deref())
+                .map_err(|error| error.to_string())
+                .and_then(|key| {
+                    crate::assistant::client::discover_models(
+                        &crate::assistant::transport::ReqwestTransport,
+                        &provider,
+                        key,
+                    )
+                    .map_err(|error| error.to_string())
+                });
+            let _ = tx.send(ProviderEvent::Models(provider, generation, result));
+            ctx.request_repaint();
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn provider_json_settings(&mut self, ui: &mut egui::Ui) {
+        egui::CollapsingHeader::new("Edit providers as JSON").show(ui, |ui| {
+            ui.spaced_label("Keys stay in OS credentials. Keep provider IDs stable to keep saved keys and task assignments.");
+            if let Some(store) = &self.native_store {
+                ui.spaced_label(format!("On disk: {} → preferences.provider_settings. Edit with the app closed, then restart.", store.native_path().display()));
+            }
+            if self.provider_json.is_empty() { self.provider_json = self.preferences.provider_settings.configuration_json(); }
+            wrapping_row(ui, |ui| {
+                if ui.spaced_button("Load current JSON").clicked() { self.provider_json = self.preferences.provider_settings.configuration_json(); }
+                if ui.spaced_button("Copy JSON").clicked() { ui.ctx().copy_text(self.provider_json.clone()); }
+            });
+            ui.add(egui::TextEdit::multiline(&mut self.provider_json).code_editor().desired_rows(10).desired_width(f32::INFINITY).char_limit(128 * 1024));
+            if ui.spaced_button("Apply JSON").clicked() {
+                match self.preferences.provider_settings.apply_configuration_json(&self.provider_json) {
+                    Ok(settings) => {
+                        self.preferences.provider_settings = settings;
+                        self.provider_edit_id = String::new(); self.provider_catalogs.clear(); self.provider_models.clear();
+                        self.credential_draft.zeroize(); self.provider_message = Some("Provider JSON applied. Saved keys were preserved by ID.".into());
+                    },
+                    Err(error) => self.provider_message = Some(format!("JSON error: {error}")),
+                }
+            }
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn simulation_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Simulation setup"));
+        ui.spaced_label(crate::i18n::literal(
+            &self.locale,
+            "Open a simulated terminal from the + menu. This setup applies to new simulations.",
+        ));
+        let config = &mut self.preferences.simulation;
+        ui.spaced_checkbox(
+            &mut config.show_notices,
+            "Show simulation notices in terminal output",
+        );
+        ui.spaced_checkbox(&mut config.show_badges, "Show AI badges on simulated tabs");
+        ui.spaced_label("Display changes apply to open tabs; existing scrollback is kept.");
+        let label = ui.spaced_label(crate::i18n::literal(&self.locale, "OS / shell persona"));
+        ui.add(egui::TextEdit::singleline(&mut config.persona).char_limit(512))
+            .labelled_by(label.id);
+        let label = ui.spaced_label(crate::i18n::literal(&self.locale, "Simulation prompt"));
+        ui.add(
+            egui::TextEdit::multiline(&mut config.prompt)
+                .desired_rows(10)
+                .desired_width(f32::INFINITY)
+                .char_limit(8192),
+        )
+        .labelled_by(label.id);
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Describe fictional files, commands, users, servers and tools. No real files or connections are used."));
+        if ui
+            .spaced_button(crate::i18n::literal(
+                &self.locale,
+                "Restore default simulation prompt",
+            ))
+            .clicked()
+        {
+            let defaults = crate::settings::SimulationPreferences::default();
+            config.persona = defaults.persona;
+            config.prompt = defaults.prompt;
+        }
+        let _ = ctx;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_simulated_terminals(&mut self, ctx: &egui::Context) {
+        let providers = self.preferences.provider_settings.chain(AiTask::Simulation);
+        let profile = self
+            .native_store
+            .as_ref()
+            .map_or("default", NativeStore::profile_name)
+            .to_owned();
+        for tab in &mut self.tabs {
+            let Some(simulated) = &mut tab.simulated else {
+                continue;
+            };
+            simulated.set_show_notices(self.preferences.simulation.show_notices);
+            tab.shell_name = if self.preferences.simulation.show_badges {
+                format!("AI simulation · {}", simulated.persona())
+            } else {
+                simulated.persona().into()
+            };
+            if simulated.tick(&mut tab.backend, &tab.output, ctx) {
+                if !ai_help_available() {
+                    simulated.fail_request(
+                        &mut tab.backend,
+                        &tab.output,
+                        &crate::i18n::text(
+                            &self.locale,
+                            crate::i18n::MessageKey::AiHelpRequiresPro,
+                            &[],
+                        ),
+                    );
+                    continue;
+                }
+                let profile = profile.clone();
+                let session = Arc::clone(&self.credential_session);
+                simulated.start(
+                    providers.clone(),
+                    move |provider| {
+                        let reference = credentials::reference(&profile, &provider.id);
+                        provider_key(&session, &reference, provider.credential_ref.as_deref())
+                            .map_err(|_| crate::assistant::client::ClientError::Credential)
+                    },
+                    ctx.clone(),
+                    &mut tab.backend,
+                    &tab.output,
+                );
+            }
         }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn process_credential_events(&mut self) {
         while let Ok(event) = self.credential_rx.try_recv() {
+            self.provider_generation = self.provider_generation.wrapping_add(1);
+            self.provider_catalogs.clear();
             self.credential_busy = false;
             match event {
                 CredentialEvent::Saved {
@@ -5605,31 +6337,83 @@ impl ButtonsApp {
         while let Ok(event) = self.provider_rx.try_recv() {
             self.provider_busy = false;
             match event {
-                ProviderEvent::Tested(provider_id, result)
-                    if provider_id == self.preferences.provider_settings.active_provider_id =>
+                ProviderEvent::Tested(provider, generation, result)
+                    if generation == self.provider_generation
+                        && provider.id == self.provider_edit_id
+                        && self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter()
+                            .any(|current| {
+                                current.id == provider.id
+                                    && current.endpoint == provider.endpoint
+                                    && current.api == provider.api
+                                    && current.model == provider.model
+                            }) =>
                 {
                     self.provider_message = Some(match result {
-                        Ok(()) => crate::i18n::text(
-                            &self.locale,
-                            crate::i18n::MessageKey::ConnectionSucceeded,
-                            &[],
-                        ),
+                        Ok(()) => "Model request succeeded.".into(),
                         Err(error) => error,
                     });
                 }
-                ProviderEvent::Models(provider_id, result)
-                    if provider_id == self.preferences.provider_settings.active_provider_id =>
+                ProviderEvent::Models(provider, generation, result)
+                    if generation == self.provider_generation
+                        && self
+                            .preferences
+                            .provider_settings
+                            .providers
+                            .iter()
+                            .any(|current| {
+                                current.id == provider.id
+                                    && provider_fingerprint(current)
+                                        == provider_fingerprint(&provider)
+                            }) =>
                 {
-                    match result {
-                        Ok(models) => {
-                            self.provider_message = Some(crate::i18n::text(
-                                &self.locale,
-                                crate::i18n::MessageKey::ModelsFound,
-                                &[("count", &models.len().to_string())],
-                            ));
-                            self.provider_models = models;
-                        }
-                        Err(error) => self.provider_message = Some(error),
+                    let (models, error) = match result {
+                        Ok(models) => (models, None),
+                        Err(error) => (vec![], Some(error)),
+                    };
+                    if provider.id == self.provider_edit_id {
+                        self.provider_message = Some(
+                            error
+                                .clone()
+                                .unwrap_or_else(|| format!("{} models loaded", models.len())),
+                        );
+                        self.provider_models = models.clone();
+                    }
+                    self.provider_catalogs.insert(
+                        provider.id.clone(),
+                        ProviderCatalog {
+                            fingerprint: provider_fingerprint(&provider),
+                            models,
+                            error,
+                        },
+                    );
+                }
+                ProviderEvent::Detected(provider, generation, result)
+                    if generation == self.provider_generation =>
+                {
+                    if let Some(current) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|current| {
+                            current.id == provider.id
+                                && current.endpoint == provider.endpoint
+                                && current.model == provider.model
+                                && current.api == provider.api
+                        })
+                    {
+                        self.provider_message = Some(match result {
+                            Ok(api) => {
+                                current.api = api;
+                                self.provider_catalogs.remove(&current.id);
+                                format!("Detected {}", api_label(api))
+                            }
+                            Err(error) => format!("Format detection failed: {error}"),
+                        });
                     }
                 }
                 _ => {}
@@ -6730,7 +7514,7 @@ impl ButtonsApp {
                         .as_ref()
                         .map_or("default", NativeStore::profile_name)
                         .to_owned();
-                    let provider = self.preferences.provider_settings.active().cloned();
+                    let provider = self.preferences.provider_settings.for_task(AiTask::Help);
                     let session = Arc::clone(&self.credential_session);
                     let shared = Arc::clone(&self.ai_help_state);
                     let ctx = ctx.clone();
@@ -6778,7 +7562,7 @@ impl ButtonsApp {
                         }
                         continue;
                     }
-                    let Some(provider) = self.preferences.provider_settings.active().cloned()
+                    let Some(provider) = self.preferences.provider_settings.for_task(AiTask::Help)
                     else {
                         if let Ok(mut state) = self.ai_help_state.lock() {
                             state.error = Some(crate::i18n::text(
@@ -6873,6 +7657,7 @@ impl ButtonsApp {
                             state.agent_mode,
                         )
                     };
+                    let providers = self.preferences.provider_settings.chain(AiTask::Help);
                     let expected_reference = credentials::reference(&profile_name, &provider.id);
                     let session = Arc::clone(&self.credential_session);
                     let state = Arc::clone(&self.ai_help_state);
@@ -6924,10 +7709,24 @@ impl ButtonsApp {
                                     },
                                 );
                             }
-                            crate::assistant::client::stream_completion(
+                            crate::assistant::client::complete_with_fallback(
                                 &crate::assistant::transport::ReqwestTransport,
-                                &provider,
-                                key,
+                                &providers,
+                                &mut |provider| {
+                                    if let Ok(mut state) = state.lock() {
+                                        state.status =
+                                            Some(format!("{} · {}", provider.name, provider.model));
+                                    }
+                                    ctx.request_repaint_of(help_viewport);
+                                    let reference =
+                                        credentials::reference(&profile_name, &provider.id);
+                                    provider_key(
+                                        &session,
+                                        &reference,
+                                        provider.credential_ref.as_deref(),
+                                    )
+                                    .map_err(|_| crate::assistant::client::ClientError::Credential)
+                                },
                                 (&system_prompt, &prompt),
                                 &history,
                                 &cancel,
@@ -6998,12 +7797,38 @@ impl ButtonsApp {
     }
 
     fn theme_settings(&mut self, ui: &mut egui::Ui) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self
+            .themes
+            .personal_document(&self.preferences.theme_id)
+            .is_some()
+        {
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "Loaded: {}",
+                    self.themes.get(&self.preferences.theme_id).name
+                ));
+                ui.menu_button("Rename theme…", |ui| {
+                    if self.theme_rename.is_empty() {
+                        self.theme_rename =
+                            self.themes.get(&self.preferences.theme_id).name.clone();
+                    }
+                    ui.text_edit_singleline(&mut self.theme_rename);
+                    if ui.button("Save name").clicked() {
+                        self.rename_loaded_theme();
+                        ui.close_menu();
+                    }
+                });
+            });
+        }
         match self.theme_settings_tab {
             ThemeSettingsTab::Library => self.theme_library_settings(ui),
             #[cfg(not(target_arch = "wasm32"))]
             ThemeSettingsTab::Edit => self.personal_theme_editor(ui),
             #[cfg(not(target_arch = "wasm32"))]
             ThemeSettingsTab::Generate => self.theme_generator(ui),
+            #[cfg(not(target_arch = "wasm32"))]
+            ThemeSettingsTab::Shaders => self.shader_settings(ui),
         }
     }
 
@@ -7502,6 +8327,250 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn shader_settings(&mut self, ui: &mut egui::Ui) {
+        if !local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds) {
+            return;
+        }
+        self.sync_theme_editor_to_current();
+        ui.spaced_heading("Shader backgrounds");
+        ui.spaced_label("Procedural backgrounds behind terminal text. Gradients remain the fallback. Calm freezes motion.");
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.shader_backgrounds_enabled,
+                "Enable GPU shader backgrounds",
+            )
+            .changed()
+        {
+            self.persist_native_preferences();
+            ui.ctx().request_repaint();
+        }
+        ui.spaced_label(RichText::new("Turn off for older computers or lower power use.").small());
+        if !personal_theme_editor_available() {
+            return;
+        }
+        if ui
+            .spaced_button("New shader variant from current appearance")
+            .clicked()
+        {
+            self.start_current_appearance_draft();
+        }
+        let Some(mut document) = self.theme_editor_document.clone() else {
+            ui.spaced_label(
+                "Create a variant here, or open a theme in Edit, to configure its background.",
+            );
+            return;
+        };
+        ui.spaced_label(format!(
+            "Editing: {}",
+            document["metadata"]["name"]
+                .as_str()
+                .unwrap_or("Theme draft")
+        ));
+        self.theme_apply_controls(ui);
+        let before = document.clone();
+        let mut enabled = document["effects"]["shaderBackground"].is_object();
+        ui.spaced_checkbox(&mut enabled, "Use a shader in this theme");
+        let mut shader: crate::theme::ShaderBackground =
+            serde_json::from_value(document["effects"]["shaderBackground"].clone())
+                .unwrap_or_default();
+        if enabled {
+            let old_preset = shader.preset.clone();
+            egui::ComboBox::from_id_salt("shader-preset")
+                .selected_text(
+                    crate::theme::ShaderBackground::PRESETS[shader.preset_index().unwrap_or(0)].1,
+                )
+                .show_ui(ui, |ui| {
+                    for &(value, label) in crate::theme::ShaderBackground::PRESETS {
+                        ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
+                    }
+                });
+            if shader.preset != old_preset && shader.preset_index().unwrap_or(0) >= 7 {
+                shader.colors = Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
+            }
+            ui.add(egui::Slider::new(&mut shader.strength, 0.0..=0.65).text("Strength"));
+            ui.add(egui::Slider::new(&mut shader.scale, 0.25..=4.0).text("Scale"));
+            ui.spaced_checkbox(&mut shader.animated, "Animate background");
+            ui.add_enabled(
+                shader.animated,
+                egui::Slider::new(&mut shader.speed, 0.0..=2.0).text("Speed"),
+            );
+            let mut own_colors = shader.colors.is_some();
+            if ui
+                .spaced_checkbox(&mut own_colors, "Custom shader colors")
+                .changed()
+            {
+                shader.colors =
+                    own_colors.then(|| ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
+            }
+            if let Some(colors) = &mut shader.colors {
+                ui.horizontal(|ui| {
+                    for (index, color) in colors.iter_mut().enumerate() {
+                        ui.push_id(index, |ui| {
+                            ui.label(format!("c{}", index + 1));
+                            let mut value =
+                                crate::theme::parse_color(color).unwrap_or(Color32::WHITE);
+                            if ui.color_edit_button_srgba(&mut value).changed() {
+                                *color = crate::theme::to_hex(value);
+                            }
+                        });
+                    }
+                });
+            }
+            let mut custom = shader.custom.is_some();
+            if ui
+                .spaced_checkbox(&mut custom, "Edit custom shader expression")
+                .changed()
+            {
+                shader.custom = custom.then(Default::default);
+            }
+            if let Some(custom) = &mut shader.custom {
+                ui.spaced_label("WGSL color expression returning vec3<f32>. p = coordinates, t = time, c1–c3 = colors. Use sin, cos, mix, length, etc. Loops and resources are disabled.");
+                ui.add(
+                    egui::TextEdit::multiline(&mut custom.expression)
+                        .code_editor()
+                        .desired_rows(4)
+                        .desired_width(f32::INFINITY)
+                        .char_limit(2048),
+                );
+                ui.spaced_label("Attach up to four named sliders; use their names in the expression. Speed, scale and colors above also apply.");
+                let mut remove = None;
+                for (index, variable) in custom.variables.iter_mut().enumerate() {
+                    ui.push_id(("shader-variable", index), |ui| {
+                        wrapping_row(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut variable.name)
+                                    .desired_width(90.0)
+                                    .char_limit(32),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut variable.min)
+                                    .range(-100.0..=100.0)
+                                    .prefix("Min "),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut variable.max)
+                                    .range(-100.0..=100.0)
+                                    .prefix("Max "),
+                            );
+                            if ui.button("Remove").clicked() {
+                                remove = Some(index);
+                            }
+                        });
+                        if variable.min < variable.max {
+                            ui.add(
+                                egui::Slider::new(&mut variable.value, variable.min..=variable.max)
+                                    .text(&variable.name),
+                            );
+                        }
+                    });
+                }
+                if let Some(index) = remove {
+                    custom.variables.remove(index);
+                }
+                if custom.variables.len() < 4 && ui.spaced_button("Add variable slider").clicked() {
+                    let mut suffix = 1;
+                    while custom
+                        .variables
+                        .iter()
+                        .any(|variable| variable.name == format!("param{suffix}"))
+                    {
+                        suffix += 1;
+                    }
+                    custom.variables.push(crate::theme::ShaderVariable {
+                        name: format!("param{suffix}"),
+                        ..Default::default()
+                    });
+                }
+                if let Err(error) = crate::plugins::effects::shader_expression::function(custom) {
+                    ui.spaced_label(
+                        RichText::new(format!("Shader error: {error}")).color(Color32::LIGHT_RED),
+                    );
+                    ui.spaced_label(
+                        "Fix the expression to resume preview. The gradient remains available.",
+                    );
+                }
+            }
+        }
+        if enabled {
+            crate::theme_files::overlay_appearance(
+                &mut document["effects"]["shaderBackground"],
+                &json!(shader),
+            );
+        } else {
+            set_theme_document_value(&mut document, "/effects/shaderBackground", Value::Null);
+        }
+        if document != before {
+            self.theme_editor_document = Some(document.clone());
+            self.queue_theme_editor_preview(ui.ctx());
+        }
+        // Preview uses synthetic text only and stays outside the live PTY.
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width().max(1.0), 140.0),
+            egui::Sense::hover(),
+        );
+        if let Ok(theme) = ThemeDefinition::editor_document(&document) {
+            ui.painter()
+                .rect_filled(rect, 0.0, shader_palette(&theme)[0]);
+            if enabled
+                && self.preferences.shader_backgrounds_enabled
+                && !theme.effects.master_disabled
+            {
+                shader.animated &= !self.preferences.calm_mode;
+                let time = ui.input(|i| i.time) as f32;
+                if let Some(callback) = crate::plugins::effects::shader_background::callback(
+                    ui,
+                    rect,
+                    &shader,
+                    u64::MAX,
+                    time,
+                    shader_palette(&theme),
+                ) {
+                    ui.painter().add(egui::Shape::Callback(callback));
+                    if shader.animated && shader.speed > 0.0 {
+                        ui.ctx()
+                            .request_repaint_after(std::time::Duration::from_millis(
+                                1000_u64
+                                    .div_ceil(self.preferences.animation_fps.clamp(1, 30) as u64),
+                            ));
+                    }
+                }
+            }
+            ui.painter().text(
+                rect.min + egui::vec2(14.0, 18.0),
+                egui::Align2::LEFT_TOP,
+                "Synthetic preview\n$ echo Hello, shaders\nHello, shaders",
+                FontId::monospace(16.0),
+                crate::theme::parse_color(&theme.terminal_colors.foreground)
+                    .unwrap_or(Color32::WHITE),
+            );
+        }
+        wrapping_row(ui, |ui| {
+            if ui.spaced_button("Preview on shared terminals").clicked() {
+                self.preview_personal_theme_draft();
+            }
+            if ui
+                .spaced_button(if self.theme_editor_file_exists {
+                    "Save theme"
+                } else {
+                    "Save variant"
+                })
+                .clicked()
+            {
+                self.save_personal_theme_draft();
+            }
+            if ui.spaced_button("Cancel draft").clicked() {
+                self.cancel_personal_theme_draft();
+            }
+            if ui.spaced_button("Edit full theme").clicked() {
+                self.theme_settings_tab = ThemeSettingsTab::Edit;
+            }
+        });
+        if let Some(status) = &self.theme_editor_status {
+            ui.spaced_label(status);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn theme_generator(&mut self, ui: &mut egui::Ui) {
         let locale = self.locale.clone();
         ui.separator();
@@ -7509,7 +8578,7 @@ impl ButtonsApp {
         ui.spaced_label(
             RichText::new(crate::i18n::literal(
                 &locale,
-                "Describe a color direction. The active provider receives your brief and the selected theme's color palette; terminal contents and API keys are not included.",
+                "Describe colors and typography. The provider receives your brief, the selected palette and allowed font names/weights. Installed font names are shared only when enabled.",
             ))
             .small()
             .color(self.colors().muted),
@@ -7522,6 +8591,11 @@ impl ButtonsApp {
                     "For example: deep ocean blues, warm amber highlights, readable ANSI colors",
                 )),
         );
+        ui.spaced_checkbox(
+            &mut self.preferences.ai_theme_allow_system_fonts,
+            "Allow installed and custom fonts (less portable)",
+        );
+        ui.spaced_label(RichText::new("Off uses bundled fonts only. Missing fonts on another computer fall back to bundled faces.").small());
         let available = theme_generation_available();
         if !available {
             ui.spaced_label(crate::i18n::literal(
@@ -8220,7 +9294,7 @@ impl ButtonsApp {
             ));
             return;
         }
-        let Some(provider) = self.preferences.provider_settings.active().cloned() else {
+        let Some(provider) = self.preferences.provider_settings.for_task(AiTask::Theme) else {
             self.theme_generation_message = Some(crate::i18n::literal(
                 &self.locale,
                 "Choose an AI provider in the Providers settings first.",
@@ -8235,7 +9309,10 @@ impl ButtonsApp {
             return;
         }
         let base_document = self.shared_appearance_document();
-        let seed = crate::theme_generation::seed_palette(&base_document);
+        let mut seed = crate::theme_generation::seed_palette(&base_document);
+        seed["fontCatalog"] = self
+            .font_catalog
+            .generation_catalog(self.preferences.ai_theme_allow_system_fonts);
         let profile = self
             .native_store
             .as_ref()
@@ -8251,25 +9328,24 @@ impl ButtonsApp {
             &self.locale,
             "The candidate will stay a draft until you choose to preview or edit it.",
         ));
+        let providers = self.preferences.provider_settings.chain(AiTask::Theme);
         let session = Arc::clone(&self.credential_session);
-        let expected_reference = credentials::reference(&profile, &provider.id);
-        let stored_reference = provider.credential_ref.clone();
         let sender = self.theme_generation_tx.clone();
         let context = ctx.clone();
         std::thread::spawn(move || {
-            let result = provider_key(&session, &expected_reference, stored_reference.as_deref())
-                .map_err(|error| error.to_string())
-                .and_then(|key| {
-                    crate::theme_generation::generate_candidate(
-                        &crate::assistant::transport::ReqwestTransport,
-                        &provider,
-                        key,
-                        &request,
-                        &seed,
-                        &base_document,
-                        &cancel,
-                    )
-                });
+            let result = crate::theme_generation::generate_with_fallback(
+                &crate::assistant::transport::ReqwestTransport,
+                &providers,
+                &mut |provider| {
+                    let reference = credentials::reference(&profile, &provider.id);
+                    provider_key(&session, &reference, provider.credential_ref.as_deref())
+                        .map_err(|_| crate::assistant::client::ClientError::Credential)
+                },
+                &request,
+                &seed,
+                &base_document,
+                &cancel,
+            );
             let _ = sender.send(ThemeGenerationEvent { generation, result });
             context.request_repaint();
         });
@@ -8347,20 +9423,210 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn shared_appearance_document(&self) -> Value {
         let mut resolved = self.terminal_presentation();
-        resolved.colors = self.active_app_theme().colors.clone();
+        // Calm changes presentation only, never saved effect strengths or animation.
+        resolved.effects = self
+            .themes
+            .get(&self.preferences.effects_theme_id)
+            .effects
+            .clone();
+        let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
+        resolved.effects.gradient = gradient.gradient;
+        resolved.effects.gradient_geometry = gradient.gradient_geometry;
+        resolved.effects.gradient_animation = gradient.gradient_animation;
+        resolved.colors = self.colors();
         resolved.pane_divider =
             resolve_pane_divider(&self.preferences.pane_divider, self.active_app_theme());
         resolved.typography = Some(self.preferences.typography.clone());
-        let appearance = crate::theme_files::document_from_theme(&resolved, &resolved.name);
+        let mut appearance = crate::theme_files::document_from_theme(&resolved, &resolved.name);
         let mut document = self
             .themes
             .personal_document(&self.preferences.theme_id)
             .cloned()
             .unwrap_or_else(|| appearance.clone());
+        if resolved.effects.shader_background.is_none()
+            && crate::theme::ShaderBackground::from_value(&document["effects"]["shaderBackground"])
+                .is_none()
+        {
+            // An unsupported extension remains inert metadata in a new draft.
+            appearance["effects"]
+                .as_object_mut()
+                .unwrap()
+                .remove("shaderBackground");
+        }
         for key in ["theme", "effects"] {
             crate::theme_files::overlay_appearance(&mut document[key], &appearance[key]);
         }
         document
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_copy_document(&self) -> Value {
+        let mut document = self.shared_appearance_document();
+        if let (Some(original), Some(draft)) = (
+            &self.theme_editor_original_document,
+            &self.theme_editor_document,
+        ) {
+            // Only overlay edited fields: a stale draft must not replace newer font
+            // or quick-color settings merely because it contains their old values.
+            merge_theme_edits(&mut document, original, draft);
+        }
+        // Native-only appearance controls supplement the portable palette schema.
+        let preferences = serde_json::to_value(&self.preferences).unwrap();
+        for (key, _) in NATIVE_APPEARANCE_FIELDS {
+            document["nativeAppearance"][*key] = preferences[*key].clone();
+        }
+        document
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_background_menu(&mut self, ui: &mut egui::Ui, dock: bool) {
+        self.ensure_appearance_baseline();
+        // Register behind the controls so their normal input keeps precedence.
+        let response = ui.interact(
+            ui.max_rect(),
+            ui.id().with("background-color-menu"),
+            egui::Sense::click(),
+        );
+        response.context_menu(|ui| {
+            ui.label(if dock {
+                "Dock background"
+            } else {
+                "Status bar background"
+            });
+            let colors = self.colors();
+            let mut color = if dock {
+                colors.dock_background
+            } else {
+                colors.status_background
+            };
+            let target = if dock {
+                &mut self.preferences.dock_background_override
+            } else {
+                &mut self.preferences.status_background_override
+            };
+            if ui.color_edit_button_srgba(&mut color).changed() {
+                *target = Some(crate::theme::to_hex(color));
+                ui.ctx().request_repaint();
+            }
+            if ui
+                .add_enabled(target.is_some(), egui::Button::new("Use theme color"))
+                .clicked()
+            {
+                *target = None;
+                ui.close_menu();
+            }
+            ui.small("Save a copy later in Settings.");
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_fingerprint(&self) -> Value {
+        let document = self.appearance_copy_document();
+        json!({"theme": document["theme"], "effects": document["effects"],
+            "nativeAppearance": document["nativeAppearance"],
+            "paneFonts": self.pane_fonts, "paneThemes": self.theme_overrides,
+            "shadersEnabled": self.preferences.shader_backgrounds_enabled,
+            "calm": self.preferences.calm_mode})
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ensure_appearance_baseline(&mut self) {
+        if self.appearance_baseline.is_none() {
+            self.appearance_baseline = Some(self.appearance_fingerprint());
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn appearance_is_dirty(&self) -> bool {
+        self.appearance_baseline
+            .as_ref()
+            .is_some_and(|baseline| baseline != &self.appearance_fingerprint())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_appearance_copy(&mut self) {
+        let Some(store) = &self.native_store else {
+            return;
+        };
+        let mut document = self.appearance_copy_document();
+        let source = self
+            .theme_editor_preview_snapshot
+            .as_ref()
+            .map(|snapshot| &snapshot.preferences.theme_id)
+            .unwrap_or(&self.preferences.theme_id);
+        let name = next_theme_version(
+            &self.themes.get(source).name,
+            self.themes.all().iter().map(|theme| theme.name.as_str()),
+        );
+        document["metadata"]["name"] = json!(name);
+        let file_name =
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
+        document["metadata"]["createdAt"] = Value::Null;
+        document["metadata"]["updatedAt"] = Value::Null;
+        let profile = store.profile_name().to_owned();
+        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
+            crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, false)
+        });
+        match result {
+            Ok(file) => {
+                self.theme_editor_preview_due = None;
+                self.theme_editor_preview_snapshot = None;
+                self.reload_personal_themes();
+                let id = format!("personal:{profile}:{}", file.trim_end_matches(".json"));
+                // This snapshot includes every shared section, independently of the
+                // Library's selective Apply controls. Keep per-PTY overrides intact.
+                let scopes = self.preferences.theme_apply.clone();
+                self.preferences.theme_apply = crate::settings::ThemeApplyScopes::default();
+                self.apply_theme_sources(self.themes.get(&id).clone(), self.preferences.calm_mode);
+                self.preferences.theme_apply = scopes;
+                self.load_personal_theme_draft(&id);
+                self.appearance_baseline = Some(self.appearance_fingerprint());
+                self.appearance_save_status = Some(format!("Saved {name}"));
+                self.persist_native_preferences();
+            }
+            Err(error) => self.appearance_save_status = Some(format!("Save failed: {error}")),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn rename_loaded_theme(&mut self) {
+        let id = self.preferences.theme_id.clone();
+        let (Some(store), Some(mut document)) = (
+            &self.native_store,
+            self.themes.personal_document(&id).cloned(),
+        ) else {
+            return;
+        };
+        let name = self.theme_rename.trim();
+        if name.is_empty() {
+            self.appearance_save_status = Some("Enter a theme name.".into());
+            return;
+        }
+        document["metadata"]["name"] = json!(name);
+        let file = format!("{}.json", id.rsplit(':').next().unwrap());
+        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
+            crate::theme_files::save_theme_file(store, &file, name, &bytes, true)
+        });
+        match result {
+            Ok(_) => {
+                // Rename only metadata, without discarding a pending editor draft.
+                if self.theme_editor_source_id.as_deref() == Some(&id) {
+                    for value in [
+                        &mut self.theme_editor_document,
+                        &mut self.theme_editor_original_document,
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        value["metadata"]["name"] = json!(name);
+                    }
+                }
+                self.appearance_save_status = Some(format!("Renamed to {name}"));
+                self.reload_personal_themes();
+            }
+            Err(error) => self.appearance_save_status = Some(format!("Rename failed: {error}")),
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -8557,7 +9823,11 @@ impl ButtonsApp {
                     if let Some(snapshot) = &self.theme_editor_preview_snapshot {
                         restore_preview_preferences(&mut self.preferences, snapshot);
                     }
-                    self.apply_theme_sources(theme, self.preferences.calm_mode);
+                    let calm = self.preferences.calm_mode;
+                    self.apply_theme_sources(theme, calm);
+                    // A copied theme's saved Calm value must not undo a live
+                    // toggle whenever a new editor preview is applied.
+                    self.preferences.calm_mode = calm;
                     if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
                         snapshot.applied_preferences = self.preferences.clone();
                     }
@@ -8669,9 +9939,13 @@ impl ButtonsApp {
                         .trim_end_matches(".json")
                 );
                 if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
-                    self.apply_theme(index, self.preferences.calm_mode);
+                    self.apply_theme_sources(
+                        self.themes.all()[index].clone(),
+                        self.preferences.calm_mode,
+                    );
                 }
                 self.theme_editor_source_id = Some(id);
+                self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.persist_native_preferences();
                 self.theme_editor_status = Some(crate::i18n::literal(
                     &self.locale,
@@ -8820,6 +10094,15 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.restore_personal_theme_preview();
         self.apply_theme_sources(theme, calm);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.theme_editor_document = None;
+            self.theme_editor_original_document = None;
+            self.theme_editor_source_id = None;
+            self.theme_rename.clear();
+            self.appearance_save_status = None;
+            self.appearance_baseline = Some(self.appearance_fingerprint());
+        }
     }
 
     fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
@@ -8827,6 +10110,9 @@ impl ButtonsApp {
         self.preferences.theme_id = id.clone();
         if self.preferences.theme_apply.app {
             self.preferences.app_theme_id = id.clone();
+            self.preferences.pane_divider = Default::default();
+            self.preferences.dock_background_override = None;
+            self.preferences.status_background_override = None;
         }
         if self.preferences.theme_apply.terminal {
             self.preferences.terminal_theme_id = id.clone();
@@ -8844,6 +10130,31 @@ impl ButtonsApp {
         }
         if self.preferences.theme_apply.gradient || self.preferences.theme_apply.effects {
             self.preferences.calm_mode = calm;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(document) = self.themes.personal_document(&self.preferences.theme_id) {
+            let mut value = serde_json::to_value(&self.preferences).unwrap();
+            for (key, scope) in NATIVE_APPEARANCE_FIELDS {
+                let enabled = match *scope {
+                    "app" => self.preferences.theme_apply.app,
+                    "fonts" => self.preferences.theme_apply.fonts,
+                    _ => self.preferences.theme_apply.effects,
+                };
+                if enabled {
+                    if let Some(saved) = document["nativeAppearance"].get(*key) {
+                        value[*key] = saved.clone();
+                    }
+                }
+            }
+            if let Ok(mut preferences) = serde_json::from_value::<Preferences>(value) {
+                preferences.normalize_theme_sources();
+                self.preferences = preferences;
+            }
+        }
+        // The portable divider in the theme is authoritative. Old appearance
+        // copies can contain a stale native override of the same fields.
+        if self.preferences.theme_apply.app {
+            self.preferences.pane_divider = Default::default();
         }
     }
 
@@ -8898,6 +10209,8 @@ impl ButtonsApp {
     }
 
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let original_terminal_defaults = fonts::PaneFont::from(&self.preferences.typography);
         #[cfg(target_arch = "wasm32")]
         let _ = ctx;
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Fonts"));
@@ -8962,9 +10275,11 @@ impl ButtonsApp {
                     );
                     if edited != original {
                         self.pane_fonts.insert(id, edited);
+                        ctx.request_repaint_of(egui::ViewportId::ROOT);
                     }
                     if ui.spaced_button("Use theme / default font").clicked() {
                         self.pane_fonts.remove(&id);
+                        ctx.request_repaint_of(egui::ViewportId::ROOT);
                     }
                 }
             });
@@ -9050,11 +10365,14 @@ impl ButtonsApp {
                 &mut self.preferences.typography.status_bar,
                 false,
             );
+            ui.spaced_label(
+                "Changes below apply to all open terminals and become the default for new ones.",
+            );
             font_zone_editor(
                 ui,
                 &locale,
                 &font_catalog,
-                "Terminal",
+                "All terminals",
                 &mut self.preferences.typography.terminal,
                 true,
             );
@@ -9094,6 +10412,19 @@ impl ButtonsApp {
                     });
                 });
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let apply_terminal_defaults = ui.spaced_button("Apply to all terminals").clicked();
+            let edited = fonts::PaneFont::from(&self.preferences.typography);
+            if apply_terminal_defaults || edited != original_terminal_defaults {
+                // An explicit font edit takes precedence over theme/session fonts;
+                // colors, shaders and stable PTY ownership remain independent.
+                for tab in &self.tabs {
+                    self.pane_fonts.insert(tab.id, edited.clone());
+                }
+                ctx.request_repaint_of(egui::ViewportId::ROOT);
+            }
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -9604,7 +10935,7 @@ impl ButtonsApp {
                 );
             }
             ui.spaced_checkbox(&mut self.preferences.show_sidebar, "Show command dock");
-            ui.spaced_checkbox(&mut self.preferences.show_presets, "Show preset bar");
+            ui.spaced_checkbox(&mut self.preferences.show_presets, crate::i18n::literal(&self.locale, "Top commands"));
             ui.spaced_checkbox(
                 &mut self.preferences.show_action_buttons,
                 crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
@@ -9871,10 +11202,10 @@ impl ButtonsApp {
 
     fn command_settings(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        ui.spaced_heading(crate::i18n::literal(&self.locale, "Saved Presets"));
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Pre-typed commands"));
         ui.spaced_label(
             RichText::new(
-                "Command and SSH buttons are stored separately. Both target the focused terminal and can either type text or also press Enter.",
+                "Top and left commands target the focused terminal. Each can type text or also press Enter.",
             )
             .color(colors.muted),
         );
@@ -9883,12 +11214,20 @@ impl ButtonsApp {
             ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Commands,
-                format!("Commands ({})", self.preferences.presets.len()),
+                format!(
+                    "{} ({})",
+                    crate::i18n::literal(&self.locale, "Top commands"),
+                    self.preferences.presets.len()
+                ),
             );
             ui.spaced_selectable_value(
                 &mut self.preset_settings_collection,
                 PresetCollection::Ssh,
-                format!("SSH ({})", self.preferences.ssh_presets.len()),
+                format!(
+                    "{} ({})",
+                    crate::i18n::literal(&self.locale, "Left commands"),
+                    self.preferences.ssh_presets.len()
+                ),
             );
         });
         ui.add_space(8.0);
@@ -10536,6 +11875,18 @@ impl ButtonsApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.viewport_id() == egui::ViewportId::ROOT
+            && ctx.input(|input| {
+                input
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, egui::Event::WindowFocused(false)))
+            })
+        {
+            // A menu left open while switching apps must not silently gate
+            // terminal keys when this window is activated again.
+            ctx.memory_mut(|memory| memory.close_popup());
+        }
         if self.show_localization_onboarding {
             return;
         }
@@ -10788,7 +12139,7 @@ fn settings_scroll_style() -> egui::style::ScrollStyle {
     }
 }
 
-fn wrapping_row<R>(
+pub(crate) fn wrapping_row<R>(
     ui: &mut egui::Ui,
     add_contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
@@ -10926,6 +12277,19 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn shader_palette(theme: &ThemeDefinition) -> [Color32; 4] {
+    let base =
+        crate::theme::parse_color(&theme.terminal_colors.background).unwrap_or(Color32::BLACK);
+    let colors = theme.effects.gradient.unwrap_or([
+        base,
+        theme.colors.accent,
+        theme.colors.accent_hover,
+        theme.colors.muted,
+    ]);
+    [base, colors[1], colors[2], colors[3]]
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     row_brightness: u8,
@@ -10933,6 +12297,7 @@ struct TerminalInteraction {
     focused: bool,
     enabled: bool,
     advanced_effects: bool,
+    shader_backgrounds_enabled: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -11000,12 +12365,40 @@ fn terminal_surface(
         });
     let available = ui.available_size();
     let scrollbar_width = if available.x >= 80.0 { 14.0 } else { 0.0 };
+    let shader_rect = egui::Rect::from_min_size(
+        ui.available_rect_before_wrap().min,
+        egui::vec2((available.x - scrollbar_width).max(1.0), available.y),
+    );
+    let shader = theme.effects.shader_background.as_ref().filter(|shader| {
+        interaction.shader_backgrounds_enabled
+            && local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds)
+            && !theme.effects.master_disabled
+            && shader.strength > 0.0
+    });
+    let background_callback = shader.and_then(|shader| {
+        crate::plugins::effects::shader_background::callback(
+            ui,
+            shader_rect,
+            shader,
+            tab.id,
+            time,
+            shader_palette(theme),
+        )
+    });
+    let shader_active = background_callback.is_some();
+    if background_callback.is_some() && shader.is_some_and(|s| s.animated && s.speed > 0.0) {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(
+                1000_u64.div_ceil(interaction.animation_fps.clamp(1, 30) as u64),
+            ));
+    }
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(interaction.focused)
         .set_interactive(interaction.enabled)
         .set_font(terminal_font)
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
+        .set_background_callback(background_callback)
         .set_keyboard_options(
             interaction.keyboard.ctrl_c_copies_selection,
             interaction.keyboard.copy_on_selection,
@@ -11050,6 +12443,7 @@ fn terminal_surface(
             time,
             interaction.advanced_effects,
             interaction.animation_fps,
+            shader_active,
         ),
         &mut tab.effect_textures,
     );
@@ -11138,12 +12532,12 @@ fn paint_terminal_effects(
     theme: &ThemeDefinition,
     terminal_id: u64,
     latest_activity_at_ms: u64,
-    rendering: (f32, bool, u32),
+    rendering: (f32, bool, u32, bool),
     textures: &mut crate::plugins::effects::simple_noise::NoiseTextures,
 ) {
     use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
-    let (time, advanced, animation_fps) = rendering;
+    let (time, advanced, animation_fps, shader_active) = rendering;
     if effects.master_disabled {
         *textures = Default::default();
         return;
@@ -11216,7 +12610,8 @@ fn paint_terminal_effects(
     let mut repaint_after_ms = if static_active {
         Some(34)
     } else {
-        crate::dock::effects_need_repaint(effects.gradient_animation, 0.0).then_some(80)
+        crate::dock::effects_need_repaint(effects.gradient_animation && !shader_active, 0.0)
+            .then_some(80)
     };
     if let Some(noise_delay) = noise_plan.repaint_after_ms {
         repaint_after_ms =
@@ -11378,6 +12773,7 @@ struct PaneRenderState<'a> {
     animation_fps: u32,
     right_click_copies_selection: bool,
     advanced_effects: bool,
+    shader_backgrounds_enabled: bool,
     keyboard_navigation: bool,
     ratios: &'a mut std::collections::BTreeMap<String, f32>,
     tabs: &'a mut [TerminalTab],
@@ -11436,6 +12832,7 @@ fn render_pane_tree(
                         && !state.keyboard_navigation,
                     enabled: !state.modal_open,
                     advanced_effects: state.advanced_effects,
+                    shader_backgrounds_enabled: state.shader_backgrounds_enabled,
                 },
                 (
                     state.font_catalog.font_id(&font.zone, true),
@@ -11494,6 +12891,32 @@ fn render_pane_tree(
                                     state.auto_tile.includes(tab.id),
                                     &mut action,
                                 );
+                                if let Some(simulated) = &tab.simulated {
+                                    ui.separator();
+                                    ui.spaced_label(crate::i18n::literal(
+                                        state.locale,
+                                        "Simulated terminal",
+                                    ));
+                                    if !simulated.model().is_empty() {
+                                        ui.spaced_label(simulated.model());
+                                    }
+                                    for (label, operation) in [
+                                        ("Reset simulation", PaneAction::ResetSimulation),
+                                        ("Undo last command", PaneAction::UndoSimulation),
+                                        ("Cancel", PaneAction::CancelSimulation),
+                                    ] {
+                                        if ui
+                                            .spaced_button(crate::i18n::literal(
+                                                state.locale,
+                                                label,
+                                            ))
+                                            .clicked()
+                                        {
+                                            action = Some(operation);
+                                            ui.close_menu();
+                                        }
+                                    }
+                                }
                                 ui.separator();
                                 egui::CollapsingHeader::new(crate::ui_text::spaced_text(
                                     ui,
@@ -11985,7 +13408,6 @@ fn tab_action_menu(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
     if preset.send_enter {
         format!(
@@ -12000,6 +13422,124 @@ fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
             crate::i18n::literal(locale, "Types without pressing Enter")
         )
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn api_label(api: ProviderApi) -> &'static str {
+    match api {
+        ProviderApi::Auto => "Automatic",
+        ProviderApi::ChatCompletions => "Chat Completions",
+        ProviderApi::Responses => "Responses API",
+        ProviderApi::Anthropic => "Anthropic Messages",
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn provider_fingerprint(provider: &ProviderProfile) -> String {
+    format!(
+        "{}\n{:?}\n{}\n{}",
+        provider.endpoint,
+        provider.api,
+        provider.models_endpoint.as_deref().unwrap_or(""),
+        provider.credential_ref.as_deref().unwrap_or("")
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn catalog_models<'a>(
+    catalogs: &'a std::collections::BTreeMap<String, ProviderCatalog>,
+    provider: &ProviderProfile,
+) -> &'a [String] {
+    catalogs
+        .get(&provider.id)
+        .filter(|catalog| catalog.fingerprint == provider_fingerprint(provider))
+        .map_or(&[], |catalog| catalog.models.as_slice())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn provider_picker(
+    ui: &mut egui::Ui,
+    id: &str,
+    providers: &[ProviderProfile],
+    selected: &mut String,
+    shared: bool,
+) {
+    egui::ComboBox::from_id_salt(id)
+        .width(280.0)
+        .selected_text(if shared && selected.is_empty() {
+            "Use main model"
+        } else {
+            providers
+                .iter()
+                .find(|p| p.id == *selected)
+                .map_or("Choose provider", |p| p.name.as_str())
+        })
+        .show_ui(ui, |ui| {
+            if shared {
+                ui.spaced_selectable_value(selected, String::new(), "Use main model");
+            }
+            for provider in providers {
+                ui.spaced_selectable_value(selected, provider.id.clone(), &provider.name);
+            }
+        });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn catalog_status(
+    ui: &mut egui::Ui,
+    catalogs: &std::collections::BTreeMap<String, ProviderCatalog>,
+    provider: &ProviderProfile,
+) {
+    if let Some(error) = catalogs
+        .get(&provider.id)
+        .filter(|catalog| catalog.fingerprint == provider_fingerprint(provider))
+        .and_then(|catalog| catalog.error.as_deref())
+    {
+        ui.spaced_label(format!(
+            "Model list unavailable: {error}. You can type a model ID."
+        ));
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[String]) {
+    ui.push_id(id, |ui| {
+        wrapping_row(ui, |ui| {
+            ui.add(
+                egui::TextEdit::singleline(model)
+                    .desired_width(300.0)
+                    .hint_text("Type a model ID or choose from the list"),
+            );
+            ui.add_enabled_ui(!models.is_empty(), |ui| {
+                ui.spaced_menu_button(format!("Choose model ({})", models.len()), |ui| {
+                    let search_id = ui.id().with("model-search");
+                    let mut search = ui
+                        .ctx()
+                        .data_mut(|data| data.get_temp::<String>(search_id).unwrap_or_default());
+                    ui.add(egui::TextEdit::singleline(&mut search).hint_text("Search models"));
+                    ui.ctx()
+                        .data_mut(|data| data.insert_temp(search_id, search.clone()));
+                    let search = search.to_lowercase();
+                    egui::ScrollArea::vertical()
+                        .max_height(240.0)
+                        .show(ui, |ui| {
+                            for value in models
+                                .iter()
+                                .filter(|value| value.to_lowercase().contains(&search))
+                            {
+                                if ui
+                                    .spaced_selectable_label(*model == *value, value)
+                                    .clicked()
+                                {
+                                    *model = value.clone();
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                });
+            });
+        });
+    });
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -12026,7 +13566,6 @@ fn provider_key(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_button_menu(
     ui: &mut egui::Ui,
     response: &egui::Response,
@@ -12044,7 +13583,6 @@ fn preset_button_menu(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn preset_action_menu(
     ui: &mut egui::Ui,
     locale: &str,
@@ -12074,6 +13612,64 @@ fn preset_action_menu(
         *action = Some(PresetAction::Delete(collection, index));
         ui.close_menu();
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
+    ("pane_divider", "app"),
+    ("dock_opacity", "app"),
+    ("window_opacity", "app"),
+    ("chrome_corner_radius", "app"),
+    ("pane_hover_label", "fonts"),
+    ("row_banding_brightness", "effects"),
+    ("animation_fps", "effects"),
+    ("advanced_effects", "effects"),
+    ("shader_backgrounds_enabled", "effects"),
+    ("calm_mode", "effects"),
+    ("effects_focused_pane_only", "effects"),
+];
+
+#[cfg(not(target_arch = "wasm32"))]
+fn merge_theme_edits(target: &mut Value, original: &Value, edited: &Value) {
+    if original == edited {
+        return;
+    }
+    if let (Some(old), Some(new)) = (original.as_object(), edited.as_object()) {
+        if !target.is_object() {
+            *target = json!({});
+        }
+        for (key, value) in new {
+            merge_theme_edits(
+                &mut target[key],
+                old.get(key).unwrap_or(&Value::Null),
+                value,
+            );
+        }
+        for key in old.keys().filter(|key| !new.contains_key(*key)) {
+            target.as_object_mut().unwrap().remove(key);
+        }
+    } else {
+        *target = edited.clone();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn next_theme_version<'a>(name: &str, existing: impl Iterator<Item = &'a str>) -> String {
+    fn split(name: &str) -> (&str, u64) {
+        name.rsplit_once(" v")
+            .and_then(|(base, version)| version.parse().ok().map(|version| (base, version)))
+            .unwrap_or((name, 0))
+    }
+    let (base, initial) = split(name);
+    let highest = existing
+        .filter_map(|name| {
+            let (other, version) = split(name);
+            (other == base).then_some(version)
+        })
+        .max()
+        .unwrap_or(0)
+        .max(initial);
+    format!("{base} v{}", highest.saturating_add(1))
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -12380,15 +13976,24 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
     }
 }
 
+#[cfg(all(test, windows))]
+#[path = "input_recovery_tests.rs"]
+mod input_recovery_tests;
+
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         #[cfg(target_arch = "wasm32")]
-        eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
+        {
+            eframe::set_value(_storage, eframe::APP_KEY, &self.preferences);
+            eframe::set_value(_storage, "browser-themes", &self.browser_theme_documents);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         self.persist_native_preferences();
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.ensure_appearance_baseline();
         #[cfg(target_arch = "wasm32")]
         let _ = frame;
         self.refresh_locale();
@@ -12420,7 +14025,9 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.maintain_quick_secrets(ctx);
         #[cfg(not(target_arch = "wasm32"))]
-        self.process_terminal_events();
+        if self.process_terminal_events() {
+            ctx.request_repaint();
+        }
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -12435,15 +14042,29 @@ impl eframe::App for ButtonsApp {
         self.tab_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.terminal_search_bar(ctx);
-        #[cfg(not(target_arch = "wasm32"))]
         self.preset_bar(ctx);
         self.status_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.sidebar(ctx);
 
         let colors = self.colors();
+        #[cfg(not(target_arch = "wasm32"))]
+        let terminal_background = colors.canvas;
+        #[cfg(target_arch = "wasm32")]
+        let terminal_background = crate::theme::parse_color(
+            &self
+                .themes
+                .get(&self.preferences.terminal_theme_id)
+                .terminal_colors
+                .background,
+        )
+        .unwrap_or(colors.canvas);
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(colors.canvas).inner_margin(8.0))
+            .frame(
+                egui::Frame::new()
+                    .fill(terminal_background)
+                    .inner_margin(8.0),
+            )
             .show(ctx, |ui| {
                 if let Some(notice) = &self.notice {
                     ui.spaced_colored_label(colors.warning, notice);
@@ -12499,6 +14120,8 @@ impl eframe::App for ButtonsApp {
         self.about_window(ctx);
         self.localization_onboarding(ctx);
         self.refresh_locale();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_simulated_terminals(ctx);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -12532,6 +14155,286 @@ impl eframe::App for ButtonsApp {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_copy_versions_merge_edits_rename_and_reload_without_losing_overrides() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-appearance-copy-{:032x}",
+            fastrand::u128(..)
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut preferences = Preferences::default();
+        preferences.normalize_theme_sources();
+        let mut app = ButtonsApp::empty(preferences);
+        app.native_store = Some(store);
+        app.ensure_appearance_baseline();
+        assert!(!app.appearance_is_dirty());
+        app.preferences.dock_title = "Unrelated workspace edit".into();
+        assert!(!app.appearance_is_dirty());
+        app.start_personal_theme_draft();
+        assert!(
+            !app.appearance_is_dirty(),
+            "creating a draft alone is not an appearance change"
+        );
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("#123456");
+        app.theme_editor_document.as_mut().unwrap()["futureExtension"] = json!({"keep": true});
+        app.preferences.typography.shell.size = 21.0;
+        app.preferences.dock_background_override = Some("#234567".into());
+        app.preferences.status_background_override = Some("#345678".into());
+        app.preferences.window_opacity = 0.8;
+        app.preferences.shader_backgrounds_enabled = true;
+        app.theme_overrides.insert(42, "aurora".into());
+        app.pane_fonts
+            .insert(42, fonts::PaneFont::from(&app.preferences.typography));
+        let overrides = app.theme_overrides.clone();
+        let pane_fonts = app.pane_fonts.clone();
+        assert!(app.appearance_is_dirty());
+        app.preferences.theme_apply.app = false;
+        app.preferences.theme_apply.fonts = false;
+        let source_name = app.themes.get(&app.preferences.theme_id).name.clone();
+        app.save_appearance_copy();
+        let first = app.preferences.theme_id.clone();
+        let saved = app.themes.personal_document(&first).unwrap();
+        assert_eq!(saved["metadata"]["name"], format!("{source_name} v1"));
+        assert_eq!(saved["theme"]["terminal"]["background"], "#123456");
+        assert_eq!(saved["theme"]["typography"]["shell"]["fontSize"], 21.0);
+        assert_eq!(saved["futureExtension"]["keep"], true);
+        assert_eq!(
+            saved["nativeAppearance"]["shader_backgrounds_enabled"],
+            true
+        );
+        assert_eq!(
+            app.colors().dock_background,
+            crate::theme::parse_color("#234567").unwrap()
+        );
+        assert_eq!(
+            app.colors().status_background,
+            crate::theme::parse_color("#345678").unwrap()
+        );
+        assert_eq!(app.theme_overrides, overrides);
+        assert_eq!(app.pane_fonts, pane_fonts);
+        assert!(!app.preferences.theme_apply.app);
+        assert!(!app.appearance_is_dirty());
+        app.preferences.typography.shell.size = 22.0;
+        app.save_appearance_copy();
+        assert_eq!(
+            app.themes.get(&app.preferences.theme_id).name,
+            format!("{source_name} v2")
+        );
+        assert_eq!(
+            app.themes
+                .get(&first)
+                .typography
+                .as_ref()
+                .unwrap()
+                .shell
+                .size,
+            21.0
+        );
+        let id = app.preferences.theme_id.clone();
+        app.theme_rename = "My renamed theme".into();
+        app.rename_loaded_theme();
+        assert_eq!(app.preferences.theme_id, id);
+        assert_eq!(app.themes.get(&id).name, "My renamed theme");
+        let mut catalog = ThemeCatalog::load();
+        assert!(catalog
+            .load_personal("default", &app.native_store.as_ref().unwrap().profile_dir())
+            .is_empty());
+        assert_eq!(catalog.get(&id).name, "My renamed theme");
+        app.preferences.window_opacity = 1.0;
+        app.preferences.shader_backgrounds_enabled = false;
+        app.preferences.theme_apply = ThemeApplyScopes::default();
+        let index = app
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == id)
+            .unwrap();
+        app.apply_theme(index, false);
+        assert_eq!(app.preferences.window_opacity, 0.8);
+        assert!(app.preferences.shader_backgrounds_enabled);
+        assert_eq!(
+            catalog.get(&id).colors.status_background,
+            crate::theme::parse_color("#345678").unwrap()
+        );
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_dirty_revert_and_failed_save_preserve_pending_changes() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-appearance-failure-{:032x}",
+            fastrand::u128(..)
+        ));
+        std::fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.ensure_appearance_baseline();
+        let snapshot = app.capture_settings_snapshot();
+        app.preferences.typography.shell.size += 2.0;
+        assert!(app.appearance_is_dirty());
+        app.restore_settings_snapshot(snapshot);
+        assert!(!app.appearance_is_dirty());
+        app.start_personal_theme_draft();
+        app.theme_editor_document.as_mut().unwrap()["version"] = json!(99999);
+        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+            json!("invalid color");
+        let before = app.preferences.clone();
+        app.save_appearance_copy();
+        assert!(app
+            .appearance_save_status
+            .as_deref()
+            .unwrap()
+            .starts_with("Save failed:"));
+        assert!(app.appearance_is_dirty());
+        assert_eq!(
+            serde_json::to_value(&app.preferences).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+        assert_eq!(
+            next_theme_version(
+                "Theme v2",
+                ["Theme v1", "Theme v7", "Other v90"].into_iter()
+            ),
+            "Theme v8"
+        );
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_background_context_menu_opens_and_resets_the_right_surface() {
+        for dock in [true, false] {
+            let mut app = ButtonsApp::empty(Preferences::default());
+            app.ensure_appearance_baseline();
+            app.preferences.dock_background_override = Some("#123456".into());
+            app.preferences.status_background_override = Some("#345678".into());
+            let ctx = egui::Context::default();
+            fonts::install(&ctx, &app.font_catalog);
+            let mut render = |events| {
+                ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(900.0, 700.0),
+                        )),
+                        events,
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        if dock {
+                            egui::SidePanel::left("test-dock")
+                                .show(ctx, |ui| app.command_dock_contents(ui, true));
+                        } else {
+                            app.status_bar(ctx);
+                        }
+                    },
+                )
+            };
+            render(vec![]);
+            let pos = if dock {
+                egui::pos2(40.0, 650.0)
+            } else {
+                egui::pos2(850.0, 680.0)
+            };
+            render(pointer_events(pos, egui::PointerButton::Secondary, true));
+            render(pointer_events(pos, egui::PointerButton::Secondary, false));
+            let menu = render(vec![]);
+            assert!(text_position(
+                &menu,
+                if dock {
+                    "Dock background"
+                } else {
+                    "Status bar background"
+                }
+            )
+            .is_some());
+            let reset =
+                text_position(&menu, "Use theme color").expect("background reset menu item");
+            render(pointer_events(reset, egui::PointerButton::Primary, true));
+            render(pointer_events(reset, egui::PointerButton::Primary, false));
+            assert_eq!(app.preferences.dock_background_override.is_none(), dock);
+            assert_eq!(app.preferences.status_background_override.is_none(), !dock);
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn appearance_footer_button_saves_only_after_a_change() {
+        let base =
+            std::env::temp_dir().join(format!("buttonscli-footer-{:032x}", fastrand::u128(..)));
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(
+            NativeStore::open(
+                crate::storage::paths::NativeDataRoot(base.join("native")),
+                base.join("legacy"),
+            )
+            .unwrap(),
+        );
+        app.ensure_appearance_baseline();
+        app.settings_tab = SettingsTab::Fonts;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(720.0, 520.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default()
+                        .show(ctx, |ui| app.settings_contents(ui, ctx, &mut None));
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let pos = text_position(&output, "● Save copy").expect("footer button visible");
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert!(app.appearance_save_status.is_none());
+        app.preferences.typography.shell.size += 2.0;
+        render(&mut app, vec![]);
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert!(app
+            .appearance_save_status
+            .as_deref()
+            .unwrap()
+            .starts_with("Saved "));
+        assert!(!app.appearance_is_dirty());
+        drop(app);
+        std::fs::remove_dir_all(base).unwrap();
+    }
     use super::*;
 
     #[cfg(target_os = "windows")]
@@ -12815,6 +14718,276 @@ mod tests {
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
+    fn font_family_selectors_change_terminal_and_all_ui_zones() {
+        for (label, mono) in [
+            ("This terminal", true),
+            ("Terminal", true),
+            ("Shell / UI", false),
+            ("Tabs", false),
+            ("Command Dock", false),
+            ("Settings Dialog", false),
+            ("AI Help Window", false),
+            ("Status Bar", false),
+        ] {
+            let ctx = egui::Context::default();
+            let catalog = fonts::FontCatalog::bundled();
+            fonts::install(&ctx, &catalog);
+            let mut zone = if mono {
+                fonts::Typography::default().terminal
+            } else {
+                fonts::Typography::default().shell
+            };
+            let original = zone.family.clone();
+            let target = catalog
+                .family_names(mono)
+                .into_iter()
+                .find(|family| *family != original)
+                .unwrap();
+            let mut render = |events| {
+                ctx.run(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1000.0, 750.0),
+                        )),
+                        events,
+                        ..Default::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            font_zone_editor(ui, "en", &catalog, label, &mut zone, mono);
+                        });
+                    },
+                )
+            };
+            render(vec![]);
+            let initial = render(vec![]);
+            let pos = text_position(&initial, &original).expect("family dropdown");
+            render(pointer_events(pos, egui::PointerButton::Primary, true));
+            render(pointer_events(pos, egui::PointerButton::Primary, false));
+            let popup = render(vec![]);
+            let pos = text_position(&popup, &target).expect("font choice");
+            render(pointer_events(pos, egui::PointerButton::Primary, true));
+            render(pointer_events(pos, egui::PointerButton::Primary, false));
+            let output = render(vec![]);
+            assert_eq!(zone.family, target, "{label} selector must update its font");
+            assert!(
+                output.shapes.iter().any(|clipped| matches!(&clipped.shape,
+                egui::Shape::Text(text) if text.galley.job.text.starts_with("The quick brown fox")
+                    && text.galley.job.sections[0].format.font_id == catalog.font_id(&zone, mono))),
+                "{label} preview must use the chosen face"
+            );
+            if !mono {
+                let output = ctx.run(egui::RawInput::default(), |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        apply_zone_style(ui, &catalog, &zone);
+                        ui.spaced_button("Font zone widget");
+                    });
+                });
+                assert!(output.shapes.iter().any(|clipped| matches!(&clipped.shape,
+                    egui::Shape::Text(text) if text.galley.job.text == "Font zone widget"
+                        && text.galley.job.sections[0].format.font_id == catalog.font_id(&zone, false))),
+                    "{label} widgets must use the selected UI face");
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens two finite test-owned ConPTY sessions; run explicitly on Windows"]
+    fn shader_theme_fonts_can_be_changed_from_settings_and_pane_controls() {
+        struct Workspace(ButtonsApp);
+        impl Drop for Workspace {
+            fn drop(&mut self) {
+                while !self.0.tabs.is_empty() {
+                    self.0.close_tab(0);
+                }
+            }
+        }
+        let mut workspace = Workspace(ButtonsApp::empty(Preferences {
+            default_shell_id: "font-probe".into(),
+            custom_shell_profiles: vec![ShellProfile {
+                id: "font-probe".into(), label: "Font probe".into(),
+                command: "powershell.exe -NoLogo -NoProfile -Command \"Write-Output 'font-probe-text'; Start-Sleep -Seconds 60\"".into(),
+                working_directory: String::new(),
+            }], ..Default::default()
+        }));
+        let app = &mut workspace.0;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        app.preferences.shader_backgrounds_enabled = true;
+        for theme in ["shader-nebula", "shader-circuit"] {
+            app.open_tab(ctx.clone());
+            app.set_theme_for_tab(app.tabs.len() - 1, theme);
+        }
+        app.focused = 0;
+        let ids = app.tab_ids();
+        let themes = app.theme_overrides.clone();
+        let snapshot = app.capture_settings_snapshot();
+        fn render(
+            app: &mut ButtonsApp,
+            ctx: &egui::Context,
+            events: Vec<egui::Event>,
+        ) -> egui::FullOutput {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 2600.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.font_settings(ui, ctx));
+                },
+            )
+        }
+        fn select(app: &mut ButtonsApp, ctx: &egui::Context, old: &str, next: &str, last: bool) {
+            render(app, ctx, vec![]);
+            let output = render(app, ctx, vec![]);
+            let positions: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) if text.galley.job.text == old => {
+                        Some(clipped.shape.visual_bounding_rect().center())
+                    }
+                    _ => None,
+                })
+                .collect();
+            let pos = if last {
+                *positions.last().unwrap()
+            } else {
+                positions[0]
+            };
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, true),
+            );
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+            let output = render(app, ctx, vec![]);
+            let pos = text_position(&output, next).expect("font popup option");
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, true),
+            );
+            render(
+                app,
+                ctx,
+                pointer_events(pos, egui::PointerButton::Primary, false),
+            );
+        }
+        let old = app.preferences.typography.terminal.family.clone();
+        select(app, &ctx, &old, "Commit Mono Bundled", true);
+        assert_eq!(
+            app.preferences.typography.terminal.family,
+            "Commit Mono Bundled"
+        );
+        for id in &ids {
+            assert_eq!(
+                app.font_for_pane(*id).zone.family,
+                "Commit Mono Bundled",
+                "editing the all-terminal font must override shader theme fonts"
+            );
+        }
+        select(app, &ctx, "Commit Mono Bundled", "Fira Code Bundled", false);
+        assert_eq!(app.font_for_pane(ids[0]).zone.family, "Fira Code Bundled");
+        assert_eq!(app.font_for_pane(ids[1]).zone.family, "Commit Mono Bundled");
+        let mut pane_font = app.font_for_pane(ids[1]);
+        pane_font.zone.family = "JetBrains Mono Bundled".into();
+        pane_font.zone.size = 24.0;
+        app.perform_pane_action(ids[1], PaneAction::Font(pane_font.clone()), &ctx);
+        assert_eq!(app.font_for_pane(ids[1]), pane_font);
+        assert_eq!(
+            app.theme_overrides, themes,
+            "fonts must preserve shaders/colors"
+        );
+        assert_eq!(app.tab_ids(), ids, "fonts must preserve PTY sessions");
+        app.set_pane_layout(PaneLayout::Columns, &ctx);
+        app.show_all_auto_tiles();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+        loop {
+            app.process_terminal_events();
+            let output = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            );
+            let painted: Vec<_> = output
+                .shapes
+                .iter()
+                .filter_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) if text.galley.job.text == "f" => {
+                        Some(text.galley.job.sections[0].format.font_id.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+            if ids.iter().all(|id| {
+                painted.contains(&app.font_catalog.font_id(&app.font_for_pane(*id).zone, true))
+            }) {
+                assert_eq!(
+                    output
+                        .shapes
+                        .iter()
+                        .filter(|clipped| matches!(clipped.shape, egui::Shape::Callback(_)))
+                        .count(),
+                    2
+                );
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "actual terminal glyphs must use both selected faces/sizes: {painted:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(40));
+        }
+        let output = render(app, &ctx, vec![]);
+        let pos = text_position(&output, "Apply to all terminals").unwrap();
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            app,
+            &ctx,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        for id in &ids {
+            assert_eq!(
+                app.font_for_pane(*id).zone.family,
+                "Commit Mono Bundled",
+                "apply must also work when the default family was already selected"
+            );
+        }
+        assert_eq!(app.theme_overrides, themes);
+        app.restore_settings_snapshot(snapshot);
+        for id in &ids {
+            assert_eq!(app.font_for_pane(*id).zone.family, "Fira Code Bundled");
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
     fn pane_fonts_follow_distinct_theme_fonts_and_allow_manual_override() {
         let mut app = ButtonsApp::empty(Preferences::default());
         for (id, stem, family, size) in [
@@ -12984,6 +15157,8 @@ for ($row = 0; $row -lt 2; $row++) {
 }
 [Console]::WriteLine("${esc}[36mfn${esc}[0m main() { ${esc}[35mprintln!${esc}[0m(${esc}[32m`"Hello, palette!`"${esc}[0m); }")
 [Console]::WriteLine('')
+[Console]::WriteLine("${esc}[48;2;40;60;100m Explicit cell background stays above the shader ${esc}[0m")
+[Console]::WriteLine("${esc}[48;2;8;13;24m Explicit base-color background also stays solid ${esc}[0m")
 [Console]::WriteLine('Readability first. Judge theme fit, distinct colors, and long-session comfort.')
 Start-Sleep -Seconds 300
 "#).unwrap();
@@ -13004,7 +15179,14 @@ Start-Sleep -Seconds 300
             "ButtonsCLI theme evaluation",
             options,
             Box::new(move |cc| {
+                if let Some(render) = &cc.wgpu_render_state {
+                    crate::plugins::effects::shader_background::register(
+                        &cc.egui_ctx,
+                        render.target_format,
+                    );
+                }
                 let mut preferences = Preferences {
+                    shader_backgrounds_enabled: true,
                     show_sidebar: false,
                     show_presets: true,
                     ..Default::default()
@@ -13070,6 +15252,107 @@ Start-Sleep -Seconds 300
             .starts_with(std::env::temp_dir().canonicalize().unwrap()));
         std::fs::remove_dir_all(&owned_root).unwrap();
         println!("Native theme imports/captures passed: {}", expected.len());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens a test-owned shader Settings window for visual verification"]
+    fn native_shader_settings_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            image: std::path::PathBuf,
+            requested: bool,
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.app.settings_contents(ui, ctx, &mut None);
+                });
+                if !self.requested && self.started.elapsed() > Duration::from_secs(1) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.image.clone(),
+                    )));
+                    self.requested = true;
+                }
+                if self.started.elapsed() > Duration::from_secs(2) {
+                    assert!(self.image.is_file());
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let owned_root =
+            std::env::temp_dir().join(format!("buttonscli-shader-ui-{:032x}", fastrand::u128(..)));
+        std::fs::create_dir_all(&owned_root).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(owned_root.join("native")),
+            owned_root.join("legacy"),
+        )
+        .unwrap();
+        let image = capture.join("shader-settings.png");
+        let expected = image.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 1000.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native(
+            "ButtonsCLI shader UI probe",
+            options,
+            Box::new(move |cc| {
+                if let Some(render) = &cc.wgpu_render_state {
+                    crate::plugins::effects::shader_background::register(
+                        &cc.egui_ctx,
+                        render.target_format,
+                    );
+                }
+                let mut app = ButtonsApp::empty(Preferences {
+                    shader_backgrounds_enabled: true,
+                    ..Default::default()
+                });
+                app.native_store = Some(store);
+                app.show_localization_onboarding = false;
+                app.show_settings = true;
+                app.settings_embedded = true;
+                app.settings_tab = SettingsTab::Themes;
+                app.theme_settings_tab = ThemeSettingsTab::Shaders;
+                app.ensure_appearance_baseline();
+                app.start_current_appearance_draft();
+                app.theme_editor_document.as_mut().unwrap()["effects"]["shaderBackground"] =
+                    json!(crate::theme::ShaderBackground {
+                        custom: Some(Default::default()),
+                        colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+                        ..Default::default()
+                    });
+                fonts::install(&cc.egui_ctx, &app.font_catalog);
+                app.apply_style(&cc.egui_ctx);
+                Ok(Box::new(Probe {
+                    app,
+                    started: Instant::now(),
+                    image,
+                    requested: false,
+                }))
+            }),
+        )
+        .unwrap();
+        assert!(expected.is_file());
+        assert!(owned_root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(owned_root).unwrap();
     }
 
     #[cfg(windows)]
@@ -13410,6 +15693,19 @@ Start-Sleep -Seconds 300
         assert_eq!(persisted.theme_id, original);
         assert!(persisted.calm_mode);
         assert_eq!(persisted.dock_width, 222.0);
+        document["nativeAppearance"]["calm_mode"] = json!(false);
+        app.theme_editor_document = Some(document.clone());
+        app.preferences.calm_mode = false;
+        app.preview_personal_theme_draft();
+        assert!(!app.preferences.calm_mode);
+        app.preferences.calm_mode = true;
+        app.preview_personal_theme_draft();
+        app.preview_personal_theme_draft();
+        assert!(
+            app.preferences.calm_mode,
+            "repeated previews keep the live toggle"
+        );
+        assert!(app.preferences_to_save().calm_mode);
         // Disabling automatic preview restores appearance while retaining editable data.
         app.preferences.theme_editor_live_preview = false;
         app.restore_personal_theme_preview();
@@ -13466,6 +15762,463 @@ Start-Sleep -Seconds 300
             }
             None
         })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn ai_settings_fixture() -> ButtonsApp {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.locale = "en".into();
+        app.preferences.provider_settings = crate::assistant::provider::ProviderSettings {
+            providers: vec![
+                ProviderProfile {
+                    id: "openai".into(),
+                    name: "OpenAI".into(),
+                    endpoint: "https://api.openai.com/v1".into(),
+                    api: ProviderApi::Responses,
+                    model: "gpt-4.1-mini".into(),
+                    ..Default::default()
+                },
+                ProviderProfile {
+                    id: "anthropic".into(),
+                    name: "Anthropic".into(),
+                    endpoint: "https://api.anthropic.com/v1".into(),
+                    api: ProviderApi::Anthropic,
+                    model: "claude-sonnet-4-5".into(),
+                    ..Default::default()
+                },
+                ProviderProfile {
+                    id: "local".into(),
+                    name: "Local server".into(),
+                    endpoint: "http://127.0.0.1:8080/v1".into(),
+                    api: ProviderApi::ChatCompletions,
+                    model: "local-model".into(),
+                    ..Default::default()
+                },
+            ],
+            active_provider_id: "openai".into(),
+            tasks: Default::default(),
+        };
+        app.provider_edit_id = "openai".into();
+        for provider in &app.preferences.provider_settings.providers {
+            app.provider_catalogs.insert(
+                provider.id.clone(),
+                ProviderCatalog {
+                    fingerprint: provider_fingerprint(provider),
+                    models: vec![
+                        provider.model.clone(),
+                        format!("{}-alternative", provider.model),
+                    ],
+                    error: None,
+                },
+            );
+        }
+        app.show_localization_onboarding = false;
+        app.show_settings = true;
+        app.settings_embedded = true;
+        app.settings_tab = SettingsTab::Providers;
+        app
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn ai_connection_selection_is_independent_of_routing_and_stale_catalogs() {
+        let mut app = ai_settings_fixture();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        app.apply_style(&ctx);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1080.0, 1000.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.settings_contents(ui, ctx, &mut None);
+                    });
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let pos = text_position(&output, "Anthropic").expect("connection selector");
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(pos, egui::PointerButton::Primary, false),
+        );
+        assert_eq!(app.provider_edit_id, "anthropic");
+        assert_eq!(
+            app.preferences.provider_settings.active_provider_id,
+            "openai"
+        );
+        let mut old = app.preferences.provider_settings.providers[1].clone();
+        old.endpoint = "https://old.example/v1".into();
+        app.provider_tx
+            .send(ProviderEvent::Models(
+                old,
+                app.provider_generation,
+                Ok(vec!["stale".into()]),
+            ))
+            .unwrap();
+        let provider = app.preferences.provider_settings.providers[0].clone();
+        app.provider_tx
+            .send(ProviderEvent::Models(
+                provider.clone(),
+                app.provider_generation,
+                Ok(vec!["fresh-openai".into()]),
+            ))
+            .unwrap();
+        app.process_provider_events();
+        assert_eq!(
+            catalog_models(&app.provider_catalogs, &provider),
+            ["fresh-openai"]
+        );
+        assert_ne!(app.provider_models, ["fresh-openai"]);
+        assert_eq!(
+            catalog_models(
+                &app.provider_catalogs,
+                &app.preferences.provider_settings.providers[1]
+            )[0],
+            "claude-sonnet-4-5"
+        );
+        app.preferences.provider_settings.tasks.insert(
+            AiTask::Simulation,
+            crate::assistant::provider::TaskBinding {
+                primary: Some(ModelTarget {
+                    provider_id: "anthropic".into(),
+                    model: "custom-model".into(),
+                }),
+                fallbacks: vec![],
+            },
+        );
+        app.settings_tab = SettingsTab::Models;
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        assert!(text_position(&output, "Uses Anthropic · custom-model").is_some());
+        let main = text_position(&output, "Use main model for every task").unwrap();
+        render(
+            &mut app,
+            pointer_events(main, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(main, egui::PointerButton::Primary, false),
+        );
+        assert!(AiTask::ALL.iter().all(|task| app
+            .preferences
+            .provider_settings
+            .for_task(*task)
+            .unwrap()
+            .id
+            == "openai"));
+        // An unfinished main connection is visible even when editing a different provider.
+        app.preferences.provider_settings.providers[0]
+            .endpoint
+            .clear();
+        let output = render(&mut app, vec![]);
+        assert!(text_position(
+            &output,
+            "This provider has no valid base URL. Open Manage providers to complete it."
+        )
+        .is_some());
+        assert!(
+            !app.provider_busy,
+            "fixture must never start network requests"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens isolated AI settings with synthetic catalogs for two native screenshots"]
+    fn native_ai_settings_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            capture: std::path::PathBuf,
+            stage: u8,
+        }
+        impl eframe::App for Probe {
+            fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    self.app.settings_contents(ui, ctx, &mut None);
+                });
+                let elapsed = self.started.elapsed().as_secs_f32();
+                if self.stage == 0 && elapsed > 1.0 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.capture.join("providers.png"),
+                    )));
+                    self.stage = 1;
+                } else if self.stage == 1 && elapsed > 2.0 {
+                    self.app.settings_tab = SettingsTab::Models;
+                    self.stage = 2;
+                } else if self.stage == 2 && elapsed > 3.0 {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.capture.join("models.png"),
+                    )));
+                    self.stage = 3;
+                } else if elapsed > 4.0 {
+                    assert!(self.capture.join("providers.png").is_file());
+                    assert!(self.capture.join("models.png").is_file());
+                    assert!(!self.app.provider_busy);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let owned_root =
+            std::env::temp_dir().join(format!("buttonscli-ai-ui-{:032x}", fastrand::u128(..)));
+        std::fs::create_dir_all(&owned_root).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(owned_root.join("native")),
+            owned_root.join("legacy"),
+        )
+        .unwrap();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1080.0, 1000.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native(
+            "ButtonsCLI AI settings probe",
+            options,
+            Box::new(move |cc| {
+                let mut app = ai_settings_fixture();
+                app.native_store = Some(store);
+                fonts::install(&cc.egui_ctx, &app.font_catalog);
+                app.apply_style(&cc.egui_ctx);
+                Ok(Box::new(Probe {
+                    app,
+                    started: Instant::now(),
+                    capture,
+                    stage: 0,
+                }))
+            }),
+        )
+        .unwrap();
+        assert!(owned_root
+            .canonicalize()
+            .unwrap()
+            .starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(owned_root).unwrap();
+    }
+
+    #[test]
+    fn plus_menu_opens_independent_simulations_with_normal_pane_themes() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.preferences.simulation.prompt = "Demo A: a fictional server with reports.".into();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, events| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 800.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    app.tab_bar(ctx);
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        app.terminal_workspace(ui, ctx);
+                    });
+                },
+            )
+        };
+        render(&mut app, vec![]);
+        let output = render(&mut app, vec![]);
+        let plus = text_position(&output, "+").expect("new-tab button visible");
+        render(
+            &mut app,
+            pointer_events(plus, egui::PointerButton::Primary, true),
+        );
+        let output = render(
+            &mut app,
+            pointer_events(plus, egui::PointerButton::Primary, false),
+        );
+        let option = text_position(&output, "Simulated terminal")
+            .or_else(|| text_position(&render(&mut app, vec![]), "Simulated terminal"))
+            .expect("simulation option in + menu");
+        render(
+            &mut app,
+            pointer_events(option, egui::PointerButton::Primary, true),
+        );
+        render(
+            &mut app,
+            pointer_events(option, egui::PointerButton::Primary, false),
+        );
+        assert_eq!(app.tabs.len(), 1, "{:?}", app.notice);
+        assert!(app.tabs[0].backend.is_virtual());
+        let first = app.tabs[0].id;
+        app.preferences.simulation.prompt = "Demo B: pretend Windows.".into();
+        app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        assert_eq!(app.tabs.len(), 2);
+        let second = app.tabs[1].id;
+        app.pane_layout = PaneLayout::Columns;
+        app.visible_panes = vec![0, 1];
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        app.tabs[1].run("echo only-second");
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        assert!(app.tabs[1]
+            .output
+            .snapshot()
+            .last_input
+            .contains("only-second"));
+        let theme = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| theme.id != app.preferences.terminal_theme_id)
+            .unwrap()
+            .id
+            .clone();
+        app.set_theme_for_tab(1, &theme);
+        assert_eq!(app.theme_overrides.get(&second), Some(&theme));
+        assert!(!app.theme_overrides.contains_key(&first));
+        render(&mut app, vec![]);
+        assert_eq!(app.rendered_panes, [0, 1]);
+        app.move_tab(1, 0);
+        assert_eq!(app.tabs[0].id, second);
+        assert_eq!(app.theme_overrides.get(&second), Some(&theme));
+        app.close_tab(0);
+        assert_eq!(app.tabs[0].id, first);
+        assert!(!app.tabs[0].exited);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "opens an owned native window with two PTY-free panes and captures rendering/input"]
+    fn native_simulation_panes_capture() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            started: Instant,
+            image: std::path::PathBuf,
+            pending: Vec<egui::Event>,
+            step: u8,
+        }
+        impl eframe::App for Probe {
+            fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+                input.focused = true;
+                input.events.append(&mut self.pending);
+            }
+            fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+                save_probe_screenshots(ctx);
+                self.app.tab_bar(ctx);
+                self.app.preset_bar(ctx);
+                self.app.status_bar(ctx);
+                egui::CentralPanel::default().show(ctx, |ui| self.app.terminal_workspace(ui, ctx));
+                let elapsed = self.started.elapsed();
+                if self.step == 0 && elapsed > Duration::from_millis(600) {
+                    assert_eq!(self.app.rendered_panes, [0, 1]);
+                    self.app.preferences.pane_divider.color_override = Some("#0088ff".into());
+                    self.app.preferences.pane_divider.thickness_override = Some(6.0);
+                    self.pending
+                        .push(egui::Event::Text("echo keyboard-only-second".into()));
+                    self.pending.push(egui::Event::Key {
+                        key: egui::Key::Enter,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::NONE,
+                    });
+                    self.step = 1;
+                }
+                if self.step == 1 && elapsed > Duration::from_millis(1000) {
+                    assert_eq!(self.app.tabs[0].output.snapshot().input_sequence, 0);
+                    let inbox = self.app.tabs[1].simulated.as_ref().unwrap().inbox();
+                    assert_eq!(&*inbox.lock().unwrap(), b"echo keyboard-only-second\r");
+                    for tab in &self.app.tabs {
+                        assert!(tab.backend.is_virtual());
+                        assert!(tab.backend.child_process_id().is_none());
+                    }
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(
+                        self.image.clone(),
+                    )));
+                    self.step = 2;
+                }
+                if elapsed > Duration::from_secs(2) {
+                    assert!(self.image.is_file());
+                    let pixels = image::ImageReader::open(&self.image)
+                        .unwrap()
+                        .decode()
+                        .unwrap()
+                        .to_rgba8();
+                    let mut longest: u32 = 0;
+                    let mut run = 0;
+                    for x in 0..pixels.width() {
+                        let pixel = pixels.get_pixel(x, pixels.height() / 2).0;
+                        if pixel[0] <= 2 && pixel[1].abs_diff(136) <= 2 && pixel[2] >= 253 {
+                            run += 1;
+                            longest = longest.max(run);
+                        } else {
+                            run = 0;
+                        }
+                    }
+                    let expected = (6.0 * ctx.pixels_per_point()).round() as u32;
+                    assert!(longest.abs_diff(expected) <= 1, "divider pixels should use the changed blue color and six-point width: {longest}, expected {expected}");
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let capture = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_NATIVE_PROBE_CAPTURE_DIR").expect("capture directory"),
+        );
+        std::fs::create_dir_all(&capture).unwrap();
+        let image = capture.join("simulation-panes.png");
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default().with_inner_size([1200.0, 750.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI simulated pane probe", options, Box::new(move |cc| {
+            let mut preferences = Preferences::default();
+            preferences.simulation.show_notices = false; preferences.simulation.show_badges = false;
+            let mut app = ButtonsApp::empty(preferences);
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            app.open_tab_with_profile(cc.egui_ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            app.open_tab_with_profile(cc.egui_ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            let base_background = app.themes.get(app.theme_for_tab(0)).terminal_colors.background.clone();
+            let alternative = app.themes.all().iter().find(|theme| theme.terminal_colors.background != base_background && theme.colors.canvas.r() < 96).unwrap().id.clone();
+            app.set_theme_for_tab(1, &alternative);
+            let second_id = app.tabs[1].id;
+            let mut second_font = app.font_for_pane(second_id);
+            second_font.zone.size = 16.0;
+            app.pane_fonts.insert(second_id, second_font);
+            app.pane_layout = PaneLayout::Columns; app.visible_panes = vec![0, 1];
+            for (index, tab) in app.tabs.iter_mut().enumerate() {
+                tab.backend.feed_virtual_output(format!("\x1b[2J\x1b[Hstaging server {}\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mls -la\r\n\x1b[34mdrwxr-xr-x  src/\r\ndrwxr-xr-x  docs/\x1b[0m\r\n-rw-r--r--  README.md\r\n-rw-r--r--  package.json\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0mgit status\r\nOn branch main\r\n\x1b[32mnothing to commit, working tree clean\x1b[0m\r\n\r\n\x1b[32mdemo@staging:~/project$ \x1b[0m", index + 1).as_bytes());
+            }
+            Ok(Box::new(Probe { app, started: Instant::now(), image, pending: Vec::new(), step: 0 }))
+        })).unwrap();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -13858,6 +16611,8 @@ Start-Sleep -Seconds 300
             endpoint: ready["endpoint"].as_str().unwrap().into(),
             model: "fake-ok".into(),
             credential_ref: None,
+            models_endpoint: None,
+            api: Default::default(),
         };
         preferences
             .provider_settings
@@ -13997,6 +16752,10 @@ Start-Sleep -Seconds 300
         app.preferences.provider_settings.providers[0].model = "fake-error-once".into();
         submit(app, None);
         wait(app);
+        assert!(app.ai_help_state.lock().unwrap().error.is_none());
+        app.preferences.provider_settings.providers[0].model = "fake-malformed".into();
+        submit(app, None);
+        wait(app);
         assert!(app.ai_help_state.lock().unwrap().error.is_some());
         let (question, context, target) = app
             .ai_help_state
@@ -14008,6 +16767,7 @@ Start-Sleep -Seconds 300
         app.ai_help_tx
             .send(AiHelpCommand::Submit(question, context, target))
             .unwrap();
+        app.preferences.provider_settings.providers[0].model = "fake-ok".into();
         app.process_ai_help_commands(&ctx);
         wait(app);
         assert!(app.ai_help_state.lock().unwrap().error.is_none());
@@ -14174,6 +16934,97 @@ Start-Sleep -Seconds 300
         assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
         assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
 
+        // Activation can leave an ordinary workspace control owning egui focus.
+        // Default terminal ownership must recover on the first returning key.
+        let toolbar_focus = egui::Id::new("keyboard-return-toolbar");
+        ctx.memory_mut(|memory| memory.request_focus(toolbar_focus));
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("returned".into()),
+            ],
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+        assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+
+        // A loss and regain may be batched into one frame after an idle period.
+        render(
+            app,
+            vec![egui::Event::Ime(egui::ImeEvent::Preedit("pending".into()))],
+        );
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(false),
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("after-ime".into()),
+            ],
+        );
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // An open menu gates keys, but switching away dismisses that gate.
+        let popup = egui::Id::new("return-popup");
+        ctx.memory_mut(|memory| memory.open_popup(popup));
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(app, vec![egui::Event::Text("menu-owns-this".into())]);
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(false),
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("menu-dismissed".into()),
+            ],
+        );
+        assert!(!ctx.memory(|memory| memory.any_popup_open()));
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+
+        // An actual search editor must keep its input while the terminal is
+        // the default owner, including across native-window activation.
+        app.show_terminal_search = true;
+        app.terminal_search_focus = true;
+        render(app, vec![]);
+        let before = app.tabs[0].output.snapshot().input_sequence;
+        render(
+            app,
+            vec![
+                egui::Event::WindowFocused(true),
+                egui::Event::Text("find-me".into()),
+            ],
+        );
+        assert_eq!(app.terminal_search_query, "find-me");
+        assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+        app.show_terminal_search = false;
+        for _ in 0..3 {
+            render(app, vec![]);
+        }
+
+        // Exercise repeated idle returns, key releases, and batched activation.
+        for cycle in 0..100 {
+            let before = app.tabs[0].output.snapshot().input_sequence;
+            render_input(
+                app,
+                vec![
+                    egui::Event::WindowFocused(false),
+                    egui::Event::Text("background".into()),
+                ],
+                false,
+            );
+            assert_eq!(app.tabs[0].output.snapshot().input_sequence, before);
+            render(
+                app,
+                vec![
+                    egui::Event::WindowFocused(true),
+                    egui::Event::Text(format!("return-{cycle}")),
+                ],
+            );
+            assert_eq!(app.tabs[0].output.snapshot().input_sequence, before + 1);
+            assert_eq!(ctx.memory(|memory| memory.focused()), Some(terminal_focus));
+        }
+
         // F6 deliberately transfers ownership to UI controls; F6 returns it.
         let before = app.tabs[0].output.snapshot().input_sequence;
         render(app, vec![key_event(egui::Key::F6, egui::Modifiers::NONE)]);
@@ -14217,6 +17068,21 @@ Start-Sleep -Seconds 300
         let mut workspace = Workspace(ButtonsApp::empty(preferences));
         let app = &mut workspace.0;
         let ctx = egui::Context::default();
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        app.preferences.shader_backgrounds_enabled = true;
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
+        app.preferences.effects_theme_id = app
+            .themes
+            .preview_personal_document("input-probe", "shader", &document)
+            .unwrap();
         fonts::install(&ctx, &app.font_catalog);
         for _ in 0..3 {
             app.open_tab(ctx.clone());
@@ -14271,6 +17137,15 @@ Start-Sleep -Seconds 300
             );
             std::thread::sleep(std::time::Duration::from_millis(25));
         };
+        assert_eq!(
+            output
+                .shapes
+                .iter()
+                .filter(|shape| matches!(shape.shape, egui::Shape::Callback(_)))
+                .count(),
+            3,
+            "each interactive pane has its own background callback"
+        );
         let border = app.terminal_presentation().colors.border;
         for tab in &app.tabs {
             let tail = tab.backend.plain_text_tail(80);
@@ -15293,6 +18168,109 @@ Start-Sleep -Seconds 300
     }
 
     #[test]
+    fn shader_background_uses_effects_scope_and_calm_freezes_global_and_per_pane_motion() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
+        let id = app
+            .themes
+            .preview_personal_document("shader-test", "test", &document)
+            .unwrap();
+        app.preferences.effects_theme_id = id.clone();
+        app.theme_overrides.insert(77, id);
+        let shader = app
+            .terminal_presentation()
+            .effects
+            .shader_background
+            .unwrap();
+        assert!(shader.animated);
+        app.preferences.calm_mode = true;
+        assert!(
+            !app.terminal_presentation()
+                .effects
+                .shader_background
+                .unwrap()
+                .animated
+        );
+        assert!(
+            !app.terminal_presentation_for(77)
+                .effects
+                .shader_background
+                .unwrap()
+                .animated
+        );
+        assert_eq!(
+            app.shared_appearance_document()["effects"]["shaderBackground"]["animated"],
+            true,
+            "saving current appearance while Calm is on preserves animation preference"
+        );
+        let round_trip = crate::theme_files::document_from_theme(
+            &ThemeDefinition::editor_document(&document).unwrap(),
+            "Shader",
+        );
+        assert_eq!(
+            round_trip["effects"]["shaderBackground"],
+            document["effects"]["shaderBackground"]
+        );
+        assert!(
+            !app.preferences.shader_backgrounds_enabled,
+            "GPU backgrounds are explicitly opt-in"
+        );
+        assert!(!app.preferences.ai_theme_allow_system_fonts);
+    }
+
+    #[test]
+    fn shaders_page_renders_shared_draft_controls_and_synthetic_preview() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut document = app.shared_appearance_document();
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            ..Default::default()
+        });
+        app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
+        app.theme_editor_document = Some(document.clone());
+        app.theme_editor_original_document = Some(document);
+        app.preferences.shader_backgrounds_enabled = true;
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let output = ctx.run(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1000.0, 900.0),
+                )),
+                ..Default::default()
+            },
+            |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| app.shader_settings(ui));
+            },
+        );
+        assert!(text_position(&output, "Shader backgrounds").is_some());
+        assert!(text_position(&output, "Preview on shared terminals").is_some());
+        assert_eq!(
+            output
+                .shapes
+                .iter()
+                .filter(|shape| matches!(shape.shape, egui::Shape::Callback(_)))
+                .count(),
+            1
+        );
+        assert!(
+            app.tabs.is_empty(),
+            "synthetic preview must not spawn a shell"
+        );
+    }
+
+    #[test]
     fn old_preferences_migrate_one_theme_to_all_sources() {
         let mut preferences = Preferences {
             theme_id: "aurora".into(),
@@ -15346,6 +18324,16 @@ Start-Sleep -Seconds 300
     #[test]
     fn settings_footer_stays_visible_with_large_fonts_at_minimum_window_size() {
         let mut app = ButtonsApp::empty(Preferences::default());
+        for provider in &app.preferences.provider_settings.providers {
+            app.provider_catalogs.insert(
+                provider.id.clone(),
+                ProviderCatalog {
+                    fingerprint: provider_fingerprint(provider),
+                    models: vec![],
+                    error: None,
+                },
+            );
+        }
         app.locale = "en".into();
         app.preferences.typography.settings.size = 24.0;
         let ctx = egui::Context::default();
@@ -15362,6 +18350,7 @@ Start-Sleep -Seconds 300
             SettingsTab::Language,
             SettingsTab::Shortcuts,
             SettingsTab::Providers,
+            SettingsTab::Models,
             SettingsTab::Import,
         ] {
             app.settings_tab = tab;
@@ -15384,7 +18373,7 @@ Start-Sleep -Seconds 300
                         !text.contains("use of") || !text.contains(" ID "),
                         "duplicate widget ID: {text}"
                     );
-                    if text == &revert_label {
+                    if text == &revert_label || text == "● Save copy" {
                         footer_found = true;
                         let bounds = clipped.shape.visual_bounding_rect();
                         assert!(
@@ -15708,9 +18697,16 @@ Start-Sleep -Seconds 300
         let original_next_id = app.next_id;
         let original_tab_count = app.tabs.len();
 
+        let original_divider = crate::settings::PaneDividerAppearance {
+            color_override: Some("#ffff00".into()),
+            thickness_override: Some(2.0),
+        };
+        app.preferences.pane_divider = original_divider.clone();
         app.start_personal_theme_draft();
         let file_name = app.theme_editor_file_name.clone().unwrap();
         let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["theme"]["app"]["shell"]["paneDivider"] = json!({"color":"#0088ff", "thickness":6.0});
+        draft["nativeAppearance"]["pane_divider"] = json!(original_divider);
         set_theme_document_value(
             &mut draft,
             "/theme/terminal/background",
@@ -15720,12 +18716,16 @@ Start-Sleep -Seconds 300
         app.preview_personal_theme_draft();
 
         let preview_id = format!("preview:default:{}", file_name.trim_end_matches(".json"));
+        let divider = resolve_pane_divider(&app.preferences.pane_divider, app.active_app_theme());
+        assert_eq!(divider.color, Color32::from_rgb(0, 136, 255));
+        assert_eq!(divider.thickness, 6.0);
         assert_eq!(app.preferences.theme_id, preview_id);
         assert_eq!(
             app.themes.get(&preview_id).terminal_colors.background,
             "#123456"
         );
         app.cancel_personal_theme_draft();
+        assert_eq!(app.preferences.pane_divider, original_divider);
         assert_eq!(app.preferences.theme_id, prior_theme);
         assert!(!app.themes.all().iter().any(|theme| theme.id == preview_id));
         assert_eq!(app.next_id, original_next_id);
@@ -15762,6 +18762,14 @@ Start-Sleep -Seconds 300
         let file_name = app.theme_editor_file_name.clone().unwrap();
         let mut draft = app.theme_editor_document.clone().unwrap();
         draft["futureRoot"] = serde_json::json!({"keep": "on restart"});
+        let mut shader = crate::theme::ShaderBackground {
+            preset: "prism".into(),
+            colors: Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
+            custom: Some(Default::default()),
+            ..Default::default()
+        };
+        shader.custom.as_mut().unwrap().variables[0].value = 8.0;
+        draft["effects"]["shaderBackground"] = json!(shader);
         app.theme_editor_document = Some(draft);
         app.save_personal_theme_draft();
 
@@ -15771,6 +18779,10 @@ Start-Sleep -Seconds 300
         let mut catalog = ThemeCatalog::load();
         assert!(catalog.load_personal("default", &profile_dir).is_empty());
         let identity = format!("personal:default:{}", file_name.trim_end_matches(".json"));
+        assert_eq!(
+            catalog.get(&identity).effects.shader_background.as_ref(),
+            Some(&shader)
+        );
         assert_eq!(
             catalog.personal_document(&identity).unwrap()["futureRoot"]["keep"],
             "on restart"

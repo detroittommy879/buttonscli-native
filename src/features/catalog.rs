@@ -25,6 +25,7 @@ pub enum FeatureKey {
     CalmThemeApply,
     WindowTransparency,
     ShaderLab,
+    ShaderBackgrounds,
     AiHelp,
     AiAgent,
     AutomationRemoteControl,
@@ -38,7 +39,7 @@ pub enum FeatureKey {
 }
 
 impl FeatureKey {
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 36] = [
         Self::PaneLayout,
         Self::TabNaming,
         Self::StartupTabs,
@@ -64,6 +65,7 @@ impl FeatureKey {
         Self::CalmThemeApply,
         Self::WindowTransparency,
         Self::ShaderLab,
+        Self::ShaderBackgrounds,
         Self::AiHelp,
         Self::AiAgent,
         Self::AutomationRemoteControl,
@@ -103,6 +105,7 @@ impl FeatureKey {
             Self::CalmThemeApply => "calmThemeApply",
             Self::WindowTransparency => "windowTransparency",
             Self::ShaderLab => "shaderLab",
+            Self::ShaderBackgrounds => "shaderBackgrounds",
             Self::AiHelp => "aiHelp",
             Self::AiAgent => "aiAgent",
             Self::AutomationRemoteControl => "automationRemoteControl",
@@ -146,6 +149,7 @@ impl FeatureKey {
             K::EffectsMasterSwitch => (T::Free, true, R::Active, "effects"),
             K::WindowTransparency => (T::Free, true, R::Active, "appearance"),
             K::ShaderLab => (T::Free, false, R::Planned, "effects"),
+            K::ShaderBackgrounds => (T::Free, true, R::Active, "effects"),
             K::AiHelp => (T::Pro, false, R::Planned, "assistant"),
             K::AiAgent => (T::Pro, false, R::Planned, "assistant"),
             K::AutomationRemoteControl => (T::Pro, false, R::Planned, "automation"),

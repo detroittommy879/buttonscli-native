@@ -156,8 +156,13 @@ static LITERAL_CATALOG: OnceLock<LiteralCatalog> = OnceLock::new();
 
 fn literal_catalog() -> &'static LiteralCatalog {
     LITERAL_CATALOG.get_or_init(|| {
-        serde_json::from_str(include_str!("i18n/literals.json"))
-            .expect("bundled native literal catalog is valid JSON")
+        let mut catalog: LiteralCatalog = serde_json::from_str(include_str!("i18n/literals.json"))
+            .expect("bundled native literal catalog is valid JSON");
+        let additions: LiteralCatalog =
+            serde_json::from_str(include_str!("i18n/native-additions.json"))
+                .expect("bundled native additions are valid JSON");
+        catalog.messages.extend(additions.messages);
+        catalog
     })
 }
 
@@ -1538,6 +1543,21 @@ mod tests {
                     locale == "en" || translated != english,
                     "missing translation for {locale}: {english}"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn native_task_and_simulation_controls_are_translated_with_matching_placeholders() {
+        let additions: LiteralCatalog =
+            serde_json::from_str(include_str!("i18n/native-additions.json")).unwrap();
+        for (english, translations) in additions.messages {
+            for locale in SUPPORTED_LOCALES {
+                let value = &translations[locale];
+                assert!(!value.trim().is_empty(), "{locale}: {english}");
+                if locale != "en" {
+                    assert_ne!(literal(locale, &english), english, "{locale}: {english}");
+                }
             }
         }
     }

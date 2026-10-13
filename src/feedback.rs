@@ -160,6 +160,7 @@ fn submit_feedback_with(
     });
     let response = transport
         .execute(Request {
+            anthropic: false,
             method: Method::Post,
             url: endpoint.to_string(),
             body: Some(body),

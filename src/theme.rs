@@ -88,6 +88,22 @@ impl ThemeCatalog {
         }
     }
 
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn import_browser_document(&mut self, document: &Value) -> Result<String, String> {
+        validate_personal_document(document)?;
+        let source_id = document["metadata"]["id"].as_str().unwrap();
+        let identity = format!("browser:{source_id}");
+        let mut theme = parse_legacy_value(source_id, document, ThemeSource::Personal)
+            .map_err(|error| error.to_string())?;
+        theme.id.clone_from(&identity);
+        if let Some(existing) = self.themes.iter_mut().find(|theme| theme.id == identity) {
+            *existing = theme;
+        } else {
+            self.themes.push(theme);
+        }
+        Ok(identity)
+    }
+
     pub fn all(&self) -> &[ThemeDefinition] {
         &self.themes
     }
@@ -243,7 +259,6 @@ impl ThemeCatalog {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
     let valid_metadata = |key: &str| {
         document["metadata"][key]
@@ -311,6 +326,7 @@ pub struct TerminalColors {
 
 #[derive(Clone, Debug)]
 pub struct TerminalEffects {
+    pub shader_background: Option<ShaderBackground>,
     pub gradient: Option<[Color32; 4]>,
     pub gradient_geometry: GradientGeometry,
     pub gradient_animation: bool,
@@ -340,6 +356,7 @@ pub struct TerminalEffects {
 impl Default for TerminalEffects {
     fn default() -> Self {
         Self {
+            shader_background: None,
             gradient: None,
             gradient_geometry: GradientGeometry::default(),
             gradient_animation: false,
@@ -365,6 +382,138 @@ impl Default for TerminalEffects {
             simple_noise_idle_delay_seconds: 60.0,
             simple_noise_idle_ramp_seconds: 6.0,
         }
+    }
+}
+
+/// Versioned backgrounds. Custom expressions use a bounded, resource-free dialect.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ShaderBackground {
+    pub version: u32,
+    pub preset: String,
+    pub strength: f32,
+    pub speed: f32,
+    pub scale: f32,
+    pub animated: bool,
+    pub colors: Option<[String; 3]>,
+    pub custom: Option<CustomShader>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ShaderVariable {
+    pub name: String,
+    pub min: f32,
+    pub max: f32,
+    pub value: f32,
+}
+
+impl Default for ShaderVariable {
+    fn default() -> Self {
+        Self {
+            name: "amount".into(),
+            min: 0.0,
+            max: 10.0,
+            value: 3.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct CustomShader {
+    pub expression: String,
+    pub variables: Vec<ShaderVariable>,
+}
+
+impl Default for CustomShader {
+    fn default() -> Self {
+        Self {
+            expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
+            variables: vec![ShaderVariable::default()],
+        }
+    }
+}
+
+impl Default for ShaderBackground {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            preset: "aurora".into(),
+            strength: 0.35,
+            speed: 0.3,
+            scale: 1.0,
+            animated: true,
+            colors: None,
+            custom: None,
+        }
+    }
+}
+
+impl ShaderBackground {
+    // Order is the GPU preset index; keep existing entries stable.
+    pub const PRESETS: &'static [(&'static str, &'static str)] = &[
+        ("aurora", "Aurora"),
+        ("ink", "Flowing ink"),
+        ("waves", "Waves"),
+        ("nebula", "Nebula"),
+        ("starfield", "Starfield"),
+        ("circuit", "Circuit"),
+        ("caustics", "Water caustics"),
+        ("prism", "Prism ribbons"),
+        ("lava", "Lava lamp"),
+        ("kaleidoscope", "Kaleidoscope"),
+        ("rainbow", "Rainbow mist"),
+        ("tunnel", "Chromatic tunnel"),
+        ("fireflies", "Fireflies"),
+        ("sunset", "Sunset dunes"),
+        ("ocean", "Ocean currents"),
+        ("hex", "Hex bloom"),
+        ("silk", "Electric silk"),
+    ];
+
+    pub fn preset_index(&self) -> Option<usize> {
+        Self::PRESETS.iter().position(|(id, _)| *id == self.preset)
+    }
+
+    pub fn from_value(value: &Value) -> Option<Self> {
+        let mut shader: Self = serde_json::from_value(value.clone()).ok()?;
+        if shader.version != 1
+            || shader.preset_index().is_none()
+            || ![shader.strength, shader.speed, shader.scale]
+                .into_iter()
+                .all(f32::is_finite)
+        {
+            return None;
+        }
+        shader.strength = shader.strength.clamp(0.0, 0.65);
+        shader.speed = shader.speed.clamp(0.0, 2.0);
+        shader.scale = shader.scale.clamp(0.25, 4.0);
+        if shader
+            .colors
+            .as_ref()
+            .is_some_and(|colors| colors.iter().any(|color| parse_color(color).is_none()))
+        {
+            return None;
+        }
+        if let Some(custom) = &mut shader.custom {
+            if custom.expression.len() > 2048 || custom.variables.len() > 4 {
+                return None;
+            }
+            for variable in &mut custom.variables {
+                if ![variable.min, variable.max, variable.value]
+                    .into_iter()
+                    .all(f32::is_finite)
+                    || variable.min >= variable.max
+                    || variable.min < -100.0
+                    || variable.max > 100.0
+                {
+                    return None;
+                }
+                variable.value = variable.value.clamp(variable.min, variable.max);
+            }
+        }
+        Some(shader)
     }
 }
 
@@ -717,6 +866,7 @@ fn parse_effects(terminal: &Value, effects: &Value) -> TerminalEffects {
     let percent = |key: &str, fallback: f32| number(key, fallback) / 100.0;
 
     TerminalEffects {
+        shader_background: ShaderBackground::from_value(&effects["shaderBackground"]),
         gradient,
         gradient_geometry: parse_gradient_geometry(terminal),
         gradient_animation: gradient_enabled
@@ -866,7 +1016,12 @@ fn parse_typography(value: &Value, terminal_theme: &Value) -> Option<Typography>
 
 fn parse_zone(value: &Value, mut fallback: FontZone, monospace_only: bool) -> FontZone {
     if let Some(family) = string_at(value, "fontFamily") {
-        fallback.family = fonts::resolve_bundled_family(&normalize_family(family), monospace_only);
+        let family = normalize_family(family);
+        fallback.family = if family.ends_with(" (System)") || family.ends_with(" (Custom)") {
+            family
+        } else {
+            fonts::resolve_bundled_family(&family, monospace_only)
+        };
     }
     if let Some(size) = number_at(value, "fontSize") {
         fallback.size = size as f32;
@@ -997,6 +1152,27 @@ fn dim_hex(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn browser_import_preserves_identity_and_rejects_invalid_documents() {
+        let mut catalog = super::ThemeCatalog::load();
+        let count = catalog.all().len();
+        let mut document: serde_json::Value =
+            serde_json::from_str(super::BUNDLED_THEME_JSON[0].1).unwrap();
+        let id = catalog.import_browser_document(&document).unwrap();
+        assert!(id.starts_with("browser:"));
+        assert_eq!(catalog.all().len(), count + 1);
+        document["metadata"]["name"] = serde_json::json!("Updated browser theme");
+        assert_eq!(catalog.import_browser_document(&document).unwrap(), id);
+        assert_eq!(catalog.all().len(), count + 1);
+        assert_eq!(catalog.get(&id).name, "Updated browser theme");
+        document["version"] = serde_json::json!(2);
+        assert!(catalog.import_browser_document(&document).is_err());
+        assert!(catalog
+            .import_browser_document(&serde_json::json!({}))
+            .is_err());
+        assert_eq!(catalog.get(&id).name, "Updated browser theme");
+    }
+
     use super::*;
 
     #[test]
@@ -1007,6 +1183,43 @@ mod tests {
             BUNDLED_THEME_JSON.len() >= 127,
             "retain the original bundle when adding themes"
         );
+    }
+
+    #[test]
+    fn shader_background_contract_bounds_parameters_and_leaves_other_versions_inert() {
+        let shader = ShaderBackground::from_value(
+            &serde_json::json!({"version":1,"preset":"ink","strength":9,"speed":-5,"scale":99}),
+        )
+        .unwrap();
+        assert_eq!(
+            (shader.strength, shader.speed, shader.scale),
+            (0.65, 0.0, 4.0)
+        );
+        assert!(
+            ShaderBackground::from_value(&serde_json::json!({"version":2,"preset":"ink"}))
+                .is_none()
+        );
+        assert!(ShaderBackground::from_value(
+            &serde_json::json!({"preset":"arbitrary-source","source":"loop {}"})
+        )
+        .is_none());
+        assert!(ShaderBackground::from_value(
+            &serde_json::json!({"preset":"ink","strength":"NaN"})
+        )
+        .is_none());
+        for family in ["My Mono (System)", "My UI (Custom)"] {
+            let theme = parse_legacy_value(
+                "fonts",
+                &serde_json::json!({"theme":{"terminal":{"fontFamily":family}}}),
+                ThemeSource::Personal,
+            )
+            .unwrap();
+            assert_eq!(
+                theme.typography.unwrap().terminal.family,
+                family,
+                "external face identity must survive import for runtime resolution"
+            );
+        }
     }
 
     #[test]

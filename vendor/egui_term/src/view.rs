@@ -50,6 +50,7 @@ pub struct TerminalView<'a> {
     font: TerminalFont,
     theme: TerminalTheme,
     background_gradient: Option<BackgroundGradient>,
+    background_callback: Option<egui::PaintCallback>,
     row_banding_color: Option<Color32>,
     row_brightness: u8,
     ctrl_c_copies_selection: bool,
@@ -130,6 +131,7 @@ impl<'a> TerminalView<'a> {
             font: TerminalFont::default(),
             theme: TerminalTheme::default(),
             background_gradient: None,
+            background_callback: None,
             row_banding_color: None,
             row_brightness: 0,
             ctrl_c_copies_selection: true,
@@ -155,6 +157,16 @@ impl<'a> TerminalView<'a> {
         gradient: Option<BackgroundGradient>,
     ) -> Self {
         self.background_gradient = gradient;
+        self
+    }
+
+    /// Paint a procedural background above the fallback fill but below all
+    /// cells, selection and cursor. The host owns the callback and resources.
+    pub fn set_background_callback(
+        mut self,
+        callback: Option<egui::PaintCallback>,
+    ) -> Self {
+        self.background_callback = callback;
         self
     }
 
@@ -225,12 +237,21 @@ impl<'a> TerminalView<'a> {
     }
 
     fn focus(self, layout: &Response) -> Self {
-        if self.has_focus
+        let focused = layout.ctx.memory(|memory| memory.focused());
+        // A button can retain focus after an activation click or menu action.
+        // Only an actual text editor (or explicit workspace navigation) may
+        // keep it from the requested terminal. Inspect the pinned egui state
+        // rather than treating every focused control as a keyboard owner.
+        let editing_text = focused.is_some_and(|id| {
+            id != layout.id
+                && egui::text_edit::TextEditState::load(&layout.ctx, id)
+                    .is_some()
+        });
+        if self.interactive
+            && self.has_focus
             && !layout.context_menu_opened()
             && !layout.ctx.memory(|memory| memory.any_popup_open())
-            && layout.ctx.memory(|memory| {
-                memory.focused().is_none() || memory.has_focus(layout.id)
-            })
+            && !editing_text
         {
             // request_focus resets egui's event filter, even when this widget
             // already owns focus. Preserve the filter across terminal frames.
@@ -302,6 +323,19 @@ impl<'a> TerminalView<'a> {
             let mut input_actions = vec![];
 
             match event {
+                // Loss and regain may arrive together, with final focused=true.
+                // Cancel stale composition/drag state at the actual boundary.
+                egui::Event::WindowFocused(focused) => {
+                    if !focused {
+                        state.ime_composing = false;
+                        state.is_dragged = false;
+                        state.is_selecting = false;
+                        state.selection_scroll_at = None;
+                    }
+                    if self.has_focus {
+                        self.backend.report_window_focus(focused);
+                    }
+                },
                 egui::Event::Ime(event)
                     if self.has_focus
                         && layout.has_focus()
@@ -523,7 +557,12 @@ impl<'a> TerminalView<'a> {
                 global_bg,
             ))
         };
+        let procedural_background = self.background_callback.is_some()
+            || self.background_gradient.is_some();
         let mut shapes = vec![background];
+        if let Some(callback) = self.background_callback {
+            shapes.push(Shape::Callback(callback));
+        }
         if self.row_brightness > 0 {
             shapes.extend(brightness_banding_shapes(
                 layout.rect,
@@ -595,7 +634,18 @@ impl<'a> TerminalView<'a> {
                 fg = Color32::WHITE;
             }
 
-            if global_bg != bg {
+            // An explicitly requested base color must also cover a procedural
+            // background; equality of the resolved RGB is not a default cell.
+            if global_bg != bg
+                || (procedural_background
+                    && (!matches!(
+                        indexed.bg,
+                        Color::Named(NamedColor::Background)
+                    ) || is_inverse
+                        || is_selected
+                        || is_current_search_match
+                        || is_search_match))
+            {
                 shapes.push(Shape::Rect(RectShape::filled(
                     Rect::from_min_size(
                         Pos2::new(x, y),

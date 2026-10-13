@@ -33,6 +33,10 @@
   F6 intentionally transfers focus to workspace controls.
 - Detached **ButtonsCLI Settings** must leave terminal input enabled. Embedded Settings
   and actual modal dialogs block it. Match that full title in window probes.
+- Reclaim ordinary control focus, but preserve active TextEdit/F6 ownership. Clear
+  popup and IME state on focus loss, including loss/regain batched in one frame.
+- PTY replies/focus reports bypass user-input capture and scrolling. Invalidate the
+  cached grid snapshot for every local grid/selection/search mutation.
 
 ## Themes and profiles
 
@@ -69,6 +73,9 @@ cargo build --locked --release --bin buttonscli
   `three_panes_select_copy_scroll_and_route_keyboard_independently`,
   `terminal_keys_do_not_navigate_or_activate_workspace_controls`,
   `native_clipboard_and_detached_settings_probe`.
+  Idle return/latency: `native_keyboard_recovers_after_idle_window_switches`;
+  adapter lock checks: `cargo test --locked -p egui_term --lib input_recovery_tests
+  -- --include-ignored --test-threads=1` (uses owned Windows shells).
 - `scripts/native-smoke.ps1 -SkipBuild -Release` checks isolated startup, not interactive
   acceptance. Do not rebuild a running test executable; Windows locks it.
 - Existing incremental-cache/PDB-collision warnings are nonfatal. Fix actual errors;
