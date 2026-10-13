@@ -24,7 +24,9 @@ use crate::session::actions::{
 use crate::settings::ShellProfile;
 #[cfg(test)]
 use crate::settings::ThemeApplyScopes;
-use crate::settings::{default_presets, CommandPreset, LocalizationMode, Preferences};
+use crate::settings::{
+    default_left_presets, default_presets, CommandPreset, LocalizationMode, Preferences,
+};
 use crate::shortcuts::{ShortcutAction, ShortcutAssignError, ShortcutChord};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage::import::{self, ImportCommit, ImportPreview};
@@ -450,6 +452,8 @@ pub struct ButtonsApp {
     preset_editor_error: Option<String>,
     confirm_preset_reset: bool,
     preset_settings_collection: PresetCollection,
+    simulation_preset_name: String,
+    simulation_prompt_message: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
@@ -626,7 +630,7 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     events_rx: Receiver<(u64, PtyEvent)>,
     #[cfg(target_arch = "wasm32")]
-    demo_lines: Vec<String>,
+    browser_simulator: crate::assistant::browser_simulator::BrowserSimulator,
     #[cfg(target_arch = "wasm32")]
     demo_input: String,
     #[cfg(target_arch = "wasm32")]
@@ -649,7 +653,6 @@ enum SettingsTab {
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
     Models,
-    #[cfg(not(target_arch = "wasm32"))]
     Simulation,
     #[cfg(not(target_arch = "wasm32"))]
     Account,
@@ -1314,6 +1317,8 @@ impl ButtonsApp {
             preset_editor_error: None,
             confirm_preset_reset: false,
             preset_settings_collection: PresetCollection::Commands,
+            simulation_preset_name: String::new(),
+            simulation_prompt_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
@@ -1490,12 +1495,7 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             events_rx,
             #[cfg(target_arch = "wasm32")]
-            demo_lines: vec![
-                "ButtonsCLI browser sandbox".into(),
-                "Native speed. Familiar workflow. Zero access to your local machine.".into(),
-                "".into(),
-                "Type 'help' to explore the demo.".into(),
-            ],
+            browser_simulator: Default::default(),
             #[cfg(target_arch = "wasm32")]
             demo_input: String::new(),
             #[cfg(target_arch = "wasm32")]
@@ -2930,48 +2930,104 @@ impl ButtonsApp {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn run_demo_command(&mut self, command: &str) {
-        let command = command.trim();
-        if command.is_empty() {
-            return;
+    pub(crate) fn run_demo_command(&mut self, command: &str) {
+        self.browser_simulator
+            .run(&self.preferences.simulation, command);
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn open_browser_simulation_settings(&mut self) {
+        self.open_browser_settings();
+        self.settings_tab = SettingsTab::Simulation;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn configure_browser_backend(&mut self, available: bool, model: &str) {
+        self.browser_simulator.available = available;
+        self.browser_simulator.model = model.chars().take(256).collect();
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_ai_mode(&mut self, enabled: bool) -> Result<(), String> {
+        if enabled && !self.browser_simulator.available {
+            return Err("Start the local AI preview server first.".into());
         }
-        self.demo_lines
-            .push(format!("visitor@buttonscli:~$ {command}"));
-        match command {
-            "clear" => self.demo_lines.clear(),
-            "help" => self.demo_lines.extend([
-                "Try: ls, git status, uname -a, colors, clear".into(),
-                "This sandbox is local and deterministic; it never opens a real shell.".into(),
-            ]),
-            "ls" | "ls -la" => self.demo_lines.extend([
-                "drwxr-xr-x  src".into(),
-                "drwxr-xr-x  docs".into(),
-                "-rw-r--r--  Cargo.toml".into(),
-                "-rw-r--r--  README.md".into(),
-            ]),
-            "git status" => self.demo_lines.extend([
-                "On branch main".into(),
-                "nothing to commit, working tree clean".into(),
-            ]),
-            "pwd" => self.demo_lines.push("/home/visitor/buttonscli-demo".into()),
-            "df -h" => self.demo_lines.extend([
-                "Filesystem       Size  Used  Avail  Use%  Mounted on".into(),
-                "browser-demo      1G     0     1G    0%  / (simulated)".into(),
-            ]),
-            value if value.starts_with("echo ") => self
-                .demo_lines
-                .push(value[5..].trim_matches(['\"', '\'']).to_owned()),
-            "uname" | "uname -a" => self
-                .demo_lines
-                .push("ButtonsCLI wasm32 browser-demo #1 SMP".into()),
-            "colors" => self.demo_lines.extend([
-                "red  green  yellow  blue  magenta  cyan".into(),
-                "Browse the theme library in Settings, or load a theme JSON file.".into(),
-            ]),
-            other => self
-                .demo_lines
-                .push(format!("demo: {other}: command not found")),
+        self.browser_simulator.ai = enabled;
+        self.browser_simulator.reset(&self.preferences.simulation);
+        self.browser_ctx.request_repaint();
+        Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_status(&self) -> String {
+        serde_json::json!({"busy":self.browser_simulator.busy(),"ai":self.browser_simulator.ai,"available":self.browser_simulator.available,"model":self.browser_simulator.model,"cwd":self.browser_simulator.state.cwd,"error":self.browser_simulator.error,"pendingId":self.browser_simulator.pending_id()}).to_string()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_snapshot(&self) -> String {
+        serde_json::json!({"state":self.browser_simulator.state,"output":self.browser_simulator.lines,"config":self.preferences.simulation}).to_string()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_request(&mut self) -> Option<String> {
+        self.browser_simulator
+            .take_request()
+            .map(|request| serde_json::to_string(&request).unwrap())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn finish_browser_request(
+        &mut self,
+        id: u32,
+        reply: &str,
+        model: &str,
+    ) -> Result<bool, String> {
+        let result = self.browser_simulator.finish(id, reply, model);
+        self.browser_ctx.request_repaint();
+        result
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn fail_browser_request(&mut self, id: u32, error: &str) {
+        self.browser_simulator.fail(id, error);
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_cancel(&mut self) {
+        self.browser_simulator.cancel();
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_reset(&mut self) {
+        self.browser_simulator.reset(&self.preferences.simulation);
+        self.browser_ctx.request_repaint();
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn browser_undo(&mut self) -> bool {
+        let result = self.browser_simulator.undo();
+        self.browser_ctx.request_repaint();
+        result
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn import_browser_simulation(&mut self, json: &str) -> Result<(), String> {
+        if json.len() > 3 * 1024 * 1024 {
+            return Err("Prompt setup is too large.".into());
         }
+        let config: crate::settings::SimulationPreferences =
+            serde_json::from_str(json).map_err(|_| "Invalid prompt setup JSON.")?;
+        config.validate_prompts()?;
+        if config.saved_prompts.len() > 32 {
+            return Err("Too many saved prompt presets.".into());
+        }
+        self.preferences.simulation = config;
+        self.browser_ctx.request_repaint();
+        Ok(())
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -3016,55 +3072,131 @@ impl ButtonsApp {
     }
 
     #[cfg(target_arch = "wasm32")]
+    fn browser_sidebar(&mut self, ctx: &egui::Context) {
+        if !self.preferences.show_sidebar {
+            return;
+        }
+        let colors = self.colors();
+        egui::SidePanel::left("browser-left-commands")
+            .default_width(self.preferences.dock_width.clamp(124.0, 360.0))
+            .resizable(true)
+            .frame(
+                egui::Frame::new()
+                    .fill(colors.dock_background)
+                    .inner_margin(10.0),
+            )
+            .show(ctx, |ui| {
+                ui.spaced_label(RichText::new("Left commands").strong());
+                ui.separator();
+                let presets = self.preferences.ssh_presets.clone();
+                let mut action = None;
+                for (index, preset) in presets.iter().enumerate() {
+                    let response = ui
+                        .add_sized(
+                            [ui.available_width(), 30.0],
+                            crate::ui_text::button(ui, &preset.label),
+                        )
+                        .on_hover_text(preset_hover_text(&self.locale, preset));
+                    if response.clicked() {
+                        action = Some(PresetAction::Run(PresetCollection::Ssh, index));
+                    }
+                    preset_button_menu(
+                        ui,
+                        &response,
+                        &self.locale,
+                        PresetCollection::Ssh,
+                        index,
+                        self.preferences.show_action_buttons,
+                        &mut action,
+                    );
+                }
+                if ui.spaced_button("Add left command").clicked() {
+                    self.open_add_preset_editor(PresetCollection::Ssh);
+                }
+                if let Some(action) = action {
+                    self.perform_preset_action(action);
+                }
+            });
+    }
+
+    #[cfg(target_arch = "wasm32")]
     fn web_demo(&mut self, ui: &mut egui::Ui) {
         let colors = self.colors();
-        let terminal = &self
+        let terminal = self
             .themes
             .get(&self.preferences.terminal_theme_id)
-            .terminal_colors;
+            .terminal_colors
+            .clone();
         let foreground = crate::theme::parse_color(&terminal.foreground).unwrap_or(colors.text);
         let font = self
             .font_catalog
             .font_id(&self.preferences.typography.terminal, true);
-        ui.spaced_label(
-            RichText::new("SANDBOX TERMINAL")
+        let busy = self.browser_simulator.busy();
+        wrapping_row(ui, |ui| {
+            ui.spaced_label(
+                RichText::new(if self.browser_simulator.ai {
+                    "AI terminal"
+                } else {
+                    "Practice terminal"
+                })
                 .strong()
                 .color(colors.accent),
-        );
-        ui.spaced_label(
-            RichText::new("A safe in-browser preview — commands never leave this page")
-                .small()
-                .color(colors.muted),
-        );
+            );
+            if ui.spaced_button("Prompts & presets").clicked() {
+                self.open_browser_simulation_settings();
+            }
+            if ui.spaced_button("Reset").clicked() {
+                self.browser_reset();
+            }
+            if ui
+                .add_enabled(!busy, crate::ui_text::button(ui, "Undo"))
+                .clicked()
+            {
+                self.browser_undo();
+            }
+            if busy {
+                ui.spinner();
+                if ui.spaced_button("Cancel").clicked() {
+                    self.browser_cancel();
+                }
+            }
+        });
+        if self.preferences.simulation.show_notices {
+            ui.spaced_label(RichText::new(if self.browser_simulator.ai { "Fictional commands go to your configured AI model. No shell or tools are attached." } else { "Offline virtual files. Use AI simulator for custom prompts, tools and operating systems." }).small().color(colors.muted));
+        }
+        if let Some(error) = &self.browser_simulator.error {
+            ui.spaced_colored_label(colors.warning, error);
+        }
         ui.separator();
-        egui::ScrollArea::vertical()
+        egui::ScrollArea::both()
             .stick_to_bottom(true)
             .auto_shrink([false, false])
-            .max_height((ui.available_height() - 52.0).max(120.0))
+            .max_height((ui.available_height() - 56.0).max(80.0))
             .show(ui, |ui| {
-                for line in &self.demo_lines {
-                    ui.spaced_label(RichText::new(line).font(font.clone()).color(foreground));
+                for line in &self.browser_simulator.lines {
+                    ui.add(
+                        egui::Label::new(browser_ansi_line(line, &terminal, &font, foreground))
+                            .wrap_mode(egui::TextWrapMode::Extend),
+                    );
                 }
             });
         ui.separator();
         ui.horizontal(|ui| {
-            ui.spaced_label(RichText::new("$").monospace().color(colors.accent));
-            let response = ui.add(
+            ui.spaced_label(
+                RichText::new(format!("{} $", self.browser_simulator.state.cwd))
+                    .font(font.clone())
+                    .color(colors.accent),
+            );
+            let response = ui.add_enabled(
+                !busy,
                 egui::TextEdit::singleline(&mut self.demo_input)
-                    .font(
-                        self.font_catalog
-                            .font_id(&self.preferences.typography.terminal, true),
-                    )
-                    .hint_text(crate::i18n::literal(&self.locale, "type help"))
+                    .font(font)
+                    .hint_text("Type a command")
                     .desired_width((ui.available_width() - 64.0).max(40.0)),
             );
             let submit =
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-            if submit
-                || ui
-                    .spaced_button(crate::i18n::literal(&self.locale, "Run"))
-                    .clicked()
-            {
+            if !busy && (submit || ui.spaced_button("Run").clicked()) {
                 let command = std::mem::take(&mut self.demo_input);
                 self.run_demo_command(&command);
                 response.request_focus();
@@ -4227,7 +4359,10 @@ impl ButtonsApp {
                     self.dock_auto_hide_state.reveal();
                 }
             } else {
-                self.command_dock_contents(ui, controls_available);
+                egui::ScrollArea::vertical()
+                    .id_salt("left-command-scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| self.command_dock_contents(ui, controls_available));
             }
         });
         let rail_rect = panel_output.response.rect;
@@ -4342,7 +4477,7 @@ impl ButtonsApp {
         if !self.preferences.dock_compact {
             ui.add_space(4.0);
             ui.spaced_label(
-                RichText::new("Saved remote connections for the focused terminal")
+                RichText::new("Pre-typed commands for the focused terminal")
                     .small()
                     .color(colors.muted),
             );
@@ -4930,7 +5065,6 @@ impl ButtonsApp {
                     SettingsTab::Models,
                     "AI models",
                 );
-                #[cfg(not(target_arch = "wasm32"))]
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Simulation,
@@ -5014,7 +5148,6 @@ impl ButtonsApp {
                     self.task_model_settings(ui);
                     self.ensure_provider_catalogs(ctx);
                 }
-                #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Simulation => self.simulation_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Account if account_signin_available() => {
@@ -6163,7 +6296,6 @@ impl ButtonsApp {
         });
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn simulation_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Simulation setup"));
         ui.spaced_label(crate::i18n::literal(
@@ -6171,6 +6303,67 @@ impl ButtonsApp {
             "Open a simulated terminal from the + menu. This setup applies to new simulations.",
         ));
         let config = &mut self.preferences.simulation;
+        ui.spaced_label("Prompts below are the complete messages sent to the model. Output still has to match the fictional state JSON format; no tools or shell are attached.");
+        let mut load = None;
+        let mut delete = None;
+        wrapping_row(ui, |ui| {
+            ui.spaced_menu_button("Load practice preset", |ui| {
+                for preset in crate::settings::SimulationPreferences::practice_templates() {
+                    if ui.spaced_button(&preset.name).clicked() {
+                        load = Some(preset);
+                        ui.close_menu();
+                    }
+                }
+                if !config.saved_prompts.is_empty() {
+                    ui.separator();
+                }
+                for preset in &config.saved_prompts {
+                    if ui.spaced_button(&preset.name).clicked() {
+                        load = Some(preset.clone());
+                        ui.close_menu();
+                    }
+                }
+            });
+            ui.add(
+                egui::TextEdit::singleline(&mut self.simulation_preset_name)
+                    .hint_text("Name this prompt preset")
+                    .char_limit(80),
+            );
+            if ui
+                .spaced_button("Save prompt preset")
+                .on_hover_text(
+                    "Saves all three prompts and the persona. Using an existing name replaces it.",
+                )
+                .clicked()
+            {
+                self.simulation_prompt_message = Some(
+                    config
+                        .save_prompt(&self.simulation_preset_name)
+                        .map_or_else(
+                            |error| error,
+                            |_| "Prompt preset saved. Keep changes to save it.".into(),
+                        ),
+                );
+            }
+            ui.spaced_menu_button("Delete saved preset", |ui| {
+                for (index, preset) in config.saved_prompts.iter().enumerate() {
+                    if ui.spaced_button(&preset.name).clicked() {
+                        delete = Some(index);
+                        ui.close_menu();
+                    }
+                }
+            });
+        });
+        if let Some(preset) = load {
+            self.simulation_preset_name.clone_from(&preset.name);
+            config.load_prompt(&preset);
+        }
+        if let Some(index) = delete {
+            config.saved_prompts.remove(index);
+        }
+        if let Some(message) = &self.simulation_prompt_message {
+            ui.spaced_label(message);
+        }
         ui.spaced_checkbox(
             &mut config.show_notices,
             "Show simulation notices in terminal output",
@@ -6180,15 +6373,56 @@ impl ButtonsApp {
         let label = ui.spaced_label(crate::i18n::literal(&self.locale, "OS / shell persona"));
         ui.add(egui::TextEdit::singleline(&mut config.persona).char_limit(512))
             .labelled_by(label.id);
+        ui.separator();
+        ui.spaced_label("System prompt · complete instructions");
+        ui.add(
+            egui::TextEdit::multiline(&mut config.system_prompt)
+                .desired_rows(12)
+                .desired_width(f32::INFINITY)
+                .char_limit(32 * 1024),
+        );
+        ui.spaced_label("Scenario · fictional files, tools and environment");
         let label = ui.spaced_label(crate::i18n::literal(&self.locale, "Simulation prompt"));
         ui.add(
             egui::TextEdit::multiline(&mut config.prompt)
                 .desired_rows(10)
                 .desired_width(f32::INFINITY)
-                .char_limit(8192),
+                .char_limit(16 * 1024),
         )
         .labelled_by(label.id);
         ui.spaced_label(crate::i18n::literal(&self.locale, "Describe fictional files, commands, users, servers and tools. No real files or connections are used."));
+        ui.spaced_label("User prompt template · complete request");
+        ui.add(
+            egui::TextEdit::multiline(&mut config.user_prompt_template)
+                .code_editor()
+                .desired_rows(12)
+                .desired_width(f32::INFINITY)
+                .char_limit(32 * 1024),
+        );
+        ui.spaced_label("JSON-encoded placeholders: {{persona}}, {{scenario}}, {{command}}, {{state}}, {{recent_transcript}}, {{initializing}}, {{show_simulation_notices}}. Expansion adds no hidden instructions.");
+        egui::CollapsingHeader::new("Preview complete startup request").show(ui, |ui| {
+            match crate::assistant::simulation_protocol::build_prompts(
+                config,
+                "",
+                &Default::default(),
+                &[],
+                config.show_notices,
+            ) {
+                Ok((system, user)) => {
+                    let mut preview = format!("SYSTEM\n{system}\n\nUSER\n{user}");
+                    ui.add(
+                        egui::TextEdit::multiline(&mut preview)
+                            .code_editor()
+                            .desired_rows(15)
+                            .desired_width(f32::INFINITY)
+                            .interactive(false),
+                    );
+                }
+                Err(error) => {
+                    ui.spaced_colored_label(Color32::LIGHT_RED, error);
+                }
+            }
+        });
         if ui
             .spaced_button(crate::i18n::literal(
                 &self.locale,
@@ -6199,6 +6433,26 @@ impl ButtonsApp {
             let defaults = crate::settings::SimulationPreferences::default();
             config.persona = defaults.persona;
             config.prompt = defaults.prompt;
+            config.system_prompt = defaults.system_prompt;
+            config.user_prompt_template = defaults.user_prompt_template;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(tab) = self.tabs.get_mut(self.focused) {
+            if let Some(simulated) = &mut tab.simulated {
+                if ui
+                    .spaced_button("Restart focused simulator with these prompts")
+                    .clicked()
+                {
+                    simulated.apply_config(config, &mut tab.backend);
+                }
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        if ui
+            .spaced_button("Restart browser simulator with these prompts")
+            .clicked()
+        {
+            self.browser_simulator.reset(config);
         }
         let _ = ctx;
     }
@@ -11240,13 +11494,12 @@ impl ButtonsApp {
             {
                 self.open_add_preset_editor(collection);
             }
-            if collection == PresetCollection::Commands
-                && ui
-                    .spaced_button(crate::i18n::literal(
-                        &self.locale,
-                        "Restore starter presets",
-                    ))
-                    .clicked()
+            if ui
+                .spaced_button(crate::i18n::literal(
+                    &self.locale,
+                    "Restore starter presets",
+                ))
+                .clicked()
             {
                 self.confirm_preset_reset = true;
             }
@@ -11274,7 +11527,10 @@ impl ButtonsApp {
                             .spaced_button(crate::i18n::literal(&self.locale, "Confirm reset"))
                             .clicked()
                         {
-                            self.preferences.presets = default_presets();
+                            *self.presets_mut(collection) = match collection {
+                                PresetCollection::Commands => default_presets(),
+                                PresetCollection::Ssh => default_left_presets(),
+                            };
                             self.confirm_preset_reset = false;
                         }
                         if ui
@@ -13408,6 +13664,130 @@ fn tab_action_menu(
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn browser_ansi_line(
+    line: &str,
+    terminal: &crate::theme::TerminalColors,
+    font: &FontId,
+    default: Color32,
+) -> egui::text::LayoutJob {
+    let palette = [
+        &terminal.black,
+        &terminal.red,
+        &terminal.green,
+        &terminal.yellow,
+        &terminal.blue,
+        &terminal.magenta,
+        &terminal.cyan,
+        &terminal.white,
+        &terminal.bright_black,
+        &terminal.bright_red,
+        &terminal.bright_green,
+        &terminal.bright_yellow,
+        &terminal.bright_blue,
+        &terminal.bright_magenta,
+        &terminal.bright_cyan,
+        &terminal.bright_white,
+    ];
+    let mut job = egui::text::LayoutJob::default();
+    let mut color = default;
+    let mut background = Color32::TRANSPARENT;
+    let mut rest = line;
+    while !rest.is_empty() {
+        let end = rest.find('\x1b').unwrap_or(rest.len());
+        let text = rest[..end]
+            .chars()
+            .filter(|ch| !ch.is_control() || *ch == '\t')
+            .collect::<String>();
+        job.append(
+            &text,
+            0.0,
+            egui::TextFormat {
+                font_id: font.clone(),
+                color,
+                background,
+                ..Default::default()
+            },
+        );
+        if end == rest.len() {
+            break;
+        }
+        rest = &rest[end + 1..];
+        if let Some(csi) = rest.strip_prefix('[') {
+            if let Some(end) = csi.find(|ch: char| ('@'..='~').contains(&ch)) {
+                if &csi[end..end + 1] == "m" {
+                    let codes = csi[..end]
+                        .split(';')
+                        .map(|value| value.parse::<u16>().unwrap_or(0))
+                        .collect::<Vec<_>>();
+                    let mut i = 0;
+                    while i < codes.len() {
+                        let code = codes[i];
+                        match code {
+                            0 => {
+                                color = default;
+                                background = Color32::TRANSPARENT;
+                            }
+                            39 => color = default,
+                            49 => background = Color32::TRANSPARENT,
+                            30..=37 | 90..=97 => {
+                                let index = if code < 90 { code - 30 } else { code - 90 + 8 };
+                                color = crate::theme::parse_color(palette[index as usize])
+                                    .unwrap_or(default);
+                            }
+                            40..=47 | 100..=107 => {
+                                let index = if code < 100 {
+                                    code - 40
+                                } else {
+                                    code - 100 + 8
+                                };
+                                background = crate::theme::parse_color(palette[index as usize])
+                                    .unwrap_or(Color32::TRANSPARENT);
+                            }
+                            38 | 48
+                                if codes.get(i + 1) == Some(&2)
+                                    && i + 4 < codes.len()
+                                    && codes[i + 2..=i + 4].iter().all(|value| *value <= 255) =>
+                            {
+                                let value = Color32::from_rgb(
+                                    codes[i + 2] as u8,
+                                    codes[i + 3] as u8,
+                                    codes[i + 4] as u8,
+                                );
+                                if code == 38 {
+                                    color = value;
+                                } else {
+                                    background = value;
+                                }
+                                i += 4;
+                            }
+                            _ => {}
+                        }
+                        i += 1;
+                    }
+                }
+                rest = &csi[end + 1..];
+            } else {
+                break;
+            }
+        } else if rest.starts_with(']') {
+            let end = rest
+                .find('\x07')
+                .map(|end| (end, 1))
+                .or_else(|| rest.find("\x1b\\").map(|end| (end, 2)));
+            if let Some((end, width)) = end {
+                rest = &rest[end + width..];
+            } else {
+                break;
+            }
+        } else if !rest.is_empty() {
+            let width = rest.chars().next().unwrap().len_utf8();
+            rest = &rest[width..];
+        }
+    }
+    job
+}
+
 fn preset_hover_text(locale: &str, preset: &CommandPreset) -> String {
     if preset.send_enter {
         format!(
@@ -14046,6 +14426,8 @@ impl eframe::App for ButtonsApp {
         self.status_bar(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.sidebar(ctx);
+        #[cfg(target_arch = "wasm32")]
+        self.browser_sidebar(ctx);
 
         let colors = self.colors();
         #[cfg(not(target_arch = "wasm32"))]
@@ -18961,7 +19343,7 @@ Start-Sleep -Seconds 300
         assert_eq!(preferences.presets, default_presets());
         assert_eq!(preferences.default_shell_id, "system");
         assert!(preferences.custom_shell_profiles.is_empty());
-        assert!(preferences.ssh_presets.is_empty());
+        assert_eq!(preferences.ssh_presets, default_left_presets());
         assert!(preferences.pane_split_ratios.is_empty());
         assert!(preferences
             .presets
@@ -19006,7 +19388,10 @@ Start-Sleep -Seconds 300
 
     #[test]
     fn ssh_presets_are_edited_independently() {
-        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut app = ButtonsApp::empty(Preferences {
+            ssh_presets: Vec::new(),
+            ..Default::default()
+        });
         let command_presets = app.preferences.presets.clone();
 
         app.preset_editor_collection = PresetCollection::Ssh;

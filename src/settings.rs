@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct SimulationPreferences {
     pub persona: String,
     pub prompt: String,
+    pub system_prompt: String,
+    pub user_prompt_template: String,
+    pub saved_prompts: Vec<SimulationPromptPreset>,
     pub show_notices: bool,
     pub show_badges: bool,
 }
@@ -16,10 +19,96 @@ impl Default for SimulationPreferences {
     fn default() -> Self {
         Self {
             persona: "Linux / Bash".into(),
+            system_prompt: crate::assistant::simulation_protocol::DEFAULT_SYSTEM.into(),
+            user_prompt_template: crate::assistant::simulation_protocol::DEFAULT_USER_TEMPLATE.into(),
+            saved_prompts: Vec::new(),
             show_notices: true,
             show_badges: true,
             prompt: "A disposable Linux workstation for demos. Include a sample project in /home/student/demo with README.md, sample logs and a few example files. All users, accounts, network hosts and credentials are fictional. Simulate common shell commands, SSH sessions and tools without connecting to anything real.".into(),
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct SimulationPromptPreset {
+    pub name: String,
+    pub persona: String,
+    pub scenario: String,
+    pub system_prompt: String,
+    pub user_prompt_template: String,
+}
+
+impl Default for SimulationPromptPreset {
+    fn default() -> Self {
+        let config = SimulationPreferences::default();
+        Self {
+            name: "New practice terminal".into(),
+            persona: config.persona,
+            scenario: config.prompt,
+            system_prompt: config.system_prompt,
+            user_prompt_template: config.user_prompt_template,
+        }
+    }
+}
+
+impl SimulationPreferences {
+    pub(crate) fn validate_prompts(&self) -> Result<(), String> {
+        if self.system_prompt.trim().is_empty() || self.user_prompt_template.trim().is_empty() {
+            return Err("System and user prompts must not be empty.".into());
+        }
+        if self.system_prompt.len() > 32 * 1024
+            || self.user_prompt_template.len() > 32 * 1024
+            || self.prompt.len() > 16 * 1024
+            || self.persona.len() > 512
+        {
+            return Err("Prompts exceed their size limits (system/user: 32 KiB, scenario: 16 KiB, persona: 512 bytes).".into());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn save_prompt(&mut self, name: &str) -> Result<(), String> {
+        self.validate_prompts()?;
+        let name = name.trim();
+        if name.is_empty() || name.len() > 80 || name.chars().any(char::is_control) {
+            return Err("Enter a preset name up to 80 bytes.".into());
+        }
+        let preset = SimulationPromptPreset {
+            name: name.into(),
+            persona: self.persona.clone(),
+            scenario: self.prompt.clone(),
+            system_prompt: self.system_prompt.clone(),
+            user_prompt_template: self.user_prompt_template.clone(),
+        };
+        if let Some(existing) = self
+            .saved_prompts
+            .iter_mut()
+            .find(|saved| saved.name == name)
+        {
+            *existing = preset;
+        } else if self.saved_prompts.len() < 32 {
+            self.saved_prompts.push(preset);
+        } else {
+            return Err("At most 32 saved prompt presets are supported.".into());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn load_prompt(&mut self, preset: &SimulationPromptPreset) {
+        self.persona.clone_from(&preset.persona);
+        self.prompt.clone_from(&preset.scenario);
+        self.system_prompt.clone_from(&preset.system_prompt);
+        self.user_prompt_template
+            .clone_from(&preset.user_prompt_template);
+    }
+
+    pub(crate) fn practice_templates() -> Vec<SimulationPromptPreset> {
+        [
+            ("Linux workstation", "Linux / Bash", SimulationPreferences::default().prompt),
+            ("PowerShell practice", "Windows 11 / PowerShell", "A fictional Windows workstation. Home is C:/Users/Student. Seed Documents/demo with notes.txt and a pretend Git project. Simulate PowerShell, cmd, services and common Windows tools.".into()),
+            ("macOS practice", "macOS / zsh", "A fictional macOS laptop. Home is /Users/student. Seed a practice project with notes and pretend application files. Include zsh, Git and pretend Homebrew commands.".into()),
+            ("SSH server lab", "Ubuntu server / Bash", "A fictional SSH training lab with hosts web.example.test and db.example.test. Seed fake logs, a web project and a demo database. Simulate connections, users, updates and destructive commands entirely within the virtual world.".into()),
+        ].into_iter().map(|(name, persona, scenario)| SimulationPromptPreset { name: name.into(), persona: persona.into(), scenario, ..Default::default() }).collect()
     }
 }
 
@@ -72,25 +161,43 @@ impl CommandPreset {
 
 pub(crate) fn default_presets() -> Vec<CommandPreset> {
     #[cfg(windows)]
-    let (list_files, current_folder, disk_space) = (
-        "Get-ChildItem",
-        "Get-Location",
-        "Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize Name, Used, Free",
+    let (list_files, home, current_folder) =
+        ("Get-ChildItem", "Set-Location $HOME", "Get-Location");
+    #[cfg(not(windows))]
+    let (list_files, home, current_folder) = ("ls", "cd ~", "pwd");
+    vec![
+        CommandPreset::new("What are these buttons?", "echo \"Top and left buttons send commands to the focused terminal.\"; echo \"Right click a button to edit or delete it.\"; echo \"Some examples paste a command so you can review it before pressing Enter.\"", true),
+        CommandPreset::new("List files", list_files, true),
+        CommandPreset::new("Git Status", "git status", true),
+        CommandPreset::new("Go to home folder", home, true),
+        CommandPreset::new("Where am I?", current_folder, true),
+        CommandPreset::new("Update Ubuntu (review)", "sudo apt update && sudo apt upgrade", false),
+        CommandPreset::new("Show processes / htop", "htop", false),
+        CommandPreset::new("Docker containers", "docker ps", true),
+        CommandPreset::new("Nano editor", "nano", false),
+        CommandPreset::new("SSH Template", "ssh user@your-vps-or-vm", false),
+    ]
+}
+
+pub(crate) fn default_left_presets() -> Vec<CommandPreset> {
+    #[cfg(windows)]
+    let (all_files, disk_space, home) = (
+        "Get-ChildItem -Force",
+        "Get-PSDrive -PSProvider FileSystem",
+        "Set-Location $HOME",
     );
     #[cfg(not(windows))]
-    let (list_files, current_folder, disk_space) = ("ls -la", "pwd", "df -h");
-
+    let (all_files, disk_space, home) = ("ls -a", "df -h", "cd ~");
     vec![
-        CommandPreset::new(
-            "Preset Intro",
-            "echo \"ButtonsCLI preset buttons can run repeated commands or paste templates for you to edit.\"",
-            true,
-        ),
-        CommandPreset::new("List Files", list_files, true),
-        CommandPreset::new("Current Folder", current_folder, true),
-        CommandPreset::new("Disk Space", disk_space, true),
-        CommandPreset::new("Git Status", "git status", true),
-        CommandPreset::new("SSH Template", "ssh user@your-vps-or-vm", false),
+        CommandPreset::new("About left commands", "echo \"Save your commonly used commands here. These work like the top buttons.\"; echo \"Right click any example and choose Edit to change its label or command.\"; echo \"In a simulated terminal these commands affect fictional files only.\"", true),
+        CommandPreset::new("Include hidden files", all_files, true),
+        CommandPreset::new("Claude help", "claude -h", true),
+        CommandPreset::new("Codex help", "codex -h", true),
+        CommandPreset::new("Codex model (review)", "codex -m gpt-5.6-luna", false),
+        CommandPreset::new("Disk space", disk_space, true),
+        CommandPreset::new("Go to home folder", home, true),
+        CommandPreset::new("Update Codex (review)", "codex update", false),
+        CommandPreset::new("Update Claude (review)", "claude update", false),
     ]
 }
 
@@ -213,7 +320,7 @@ impl Default for Preferences {
             window_opacity: 1.0,
             dock_peek_radius: 10,
             presets: default_presets(),
-            ssh_presets: Vec::new(),
+            ssh_presets: default_left_presets(),
             pane_split_ratios: std::collections::BTreeMap::new(),
             pane_divider: PaneDividerAppearance::default(),
             provider_settings: ProviderSettings::default(),
@@ -503,6 +610,58 @@ mod tests {
             serde_json::from_str(r#"{"presets":[],"ssh_presets":[]}"#).unwrap();
         assert!(preferences.presets.is_empty());
         assert!(preferences.ssh_presets.is_empty());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn starter_echo_explanations_print_multiple_lines_in_platform_shell() {
+        for preset in [
+            default_presets().remove(0),
+            default_left_presets().remove(0),
+        ] {
+            #[cfg(windows)]
+            let output = std::process::Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-Command", &preset.command])
+                .output()
+                .unwrap();
+            #[cfg(not(windows))]
+            let output = std::process::Command::new("sh")
+                .args(["-c", &preset.command])
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            assert_eq!(String::from_utf8_lossy(&output.stdout).lines().count(), 3);
+            assert!(output.stderr.is_empty());
+        }
+    }
+
+    #[test]
+    fn prompt_presets_roundtrip_all_editable_messages_and_keep_display_options() {
+        let mut config: SimulationPreferences =
+            serde_json::from_str(r#"{"prompt":"my older scenario"}"#).unwrap();
+        assert_eq!(
+            config.system_prompt,
+            crate::assistant::simulation_protocol::DEFAULT_SYSTEM
+        );
+        config.system_prompt = "Custom instructions".into();
+        config.user_prompt_template = "Command {{command}}; state {{state}}".into();
+        config.save_prompt("My terminal").unwrap();
+        config.system_prompt = "Updated instructions".into();
+        config.save_prompt("My terminal").unwrap();
+        assert_eq!(config.saved_prompts.len(), 1);
+        let mut restored: SimulationPreferences =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        restored.show_notices = false;
+        restored.load_prompt(&restored.saved_prompts[0].clone());
+        assert_eq!(restored.system_prompt, "Updated instructions");
+        assert_eq!(restored.prompt, "my older scenario");
+        assert!(!restored.show_notices);
+        assert!(default_presets()
+            .iter()
+            .chain(default_left_presets().iter())
+            .filter(|preset| preset.command.contains("update")
+                || preset.command.starts_with("codex -m"))
+            .all(|preset| !preset.send_enter));
     }
 
     #[test]

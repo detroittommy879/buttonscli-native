@@ -21,6 +21,11 @@ name = "native-release"
 path = "src/bin/native-release.rs"
 required-features = ["release-tools"]
 
+[[bin]]
+name = "buttonscli-web"
+path = "src/bin/buttonscli-web.rs"
+required-features = ["desktop"]
+
 [features]
 default = ["desktop"]
 desktop = []

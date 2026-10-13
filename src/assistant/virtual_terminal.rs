@@ -60,6 +60,17 @@ impl VirtualTerminal {
         backend.clear_screen();
     }
 
+    pub(crate) fn apply_config(
+        &mut self,
+        config: &SimulationPreferences,
+        backend: &mut TerminalBackend,
+    ) {
+        self.engine.cancel();
+        self.engine = Simulation::configured(config);
+        self.show_notices = config.show_notices;
+        self.reset(backend);
+    }
+
     pub(crate) fn undo(&mut self, backend: &mut TerminalBackend, capture: &OutputCapture) {
         if self.engine.undo() {
             if self.show_notices {

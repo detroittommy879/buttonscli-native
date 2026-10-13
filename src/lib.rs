@@ -109,6 +109,99 @@ mod web {
                 .map_err(|error| JsValue::from_str(&error))
         }
 
+        pub fn open_simulator_settings(&self) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .open_browser_simulation_settings();
+            Ok(())
+        }
+        pub fn configure_simulator(&self, available: bool, model: &str) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .configure_browser_backend(available, model);
+            Ok(())
+        }
+        pub fn use_ai_simulator(&self, enabled: bool) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .browser_ai_mode(enabled)
+                .map_err(|error| JsValue::from_str(&error))
+        }
+        pub fn simulator_status(&self) -> Result<String, JsValue> {
+            Ok(self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .browser_status())
+        }
+        pub fn simulator_snapshot(&self) -> Result<String, JsValue> {
+            Ok(self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .browser_snapshot())
+        }
+        pub fn take_simulator_request(&self) -> Option<String> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()?
+                .browser_request()
+        }
+        pub fn finish_simulator_request(
+            &self,
+            id: u32,
+            reply: &str,
+            model: &str,
+        ) -> Result<bool, JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .finish_browser_request(id, reply, model)
+                .map_err(|error| JsValue::from_str(&error))
+        }
+        pub fn fail_simulator_request(&self, id: u32, error: &str) {
+            if let Some(mut app) = self.runner.app_mut::<crate::app::ButtonsApp>() {
+                app.fail_browser_request(id, error);
+            }
+        }
+        pub fn submit_simulator_command(&self, command: &str) -> Result<(), JsValue> {
+            let mut app = self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?;
+            if serde_json::from_str::<serde_json::Value>(&app.browser_status()).unwrap()["busy"]
+                == true
+            {
+                return Err(JsValue::from_str("Simulator is busy."));
+            }
+            app.run_demo_command(command);
+            Ok(())
+        }
+        pub fn cancel_simulator(&self) {
+            if let Some(mut app) = self.runner.app_mut::<crate::app::ButtonsApp>() {
+                app.browser_cancel();
+            }
+        }
+        pub fn reset_simulator(&self) {
+            if let Some(mut app) = self.runner.app_mut::<crate::app::ButtonsApp>() {
+                app.browser_reset();
+            }
+        }
+        pub fn undo_simulator(&self) -> bool {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .is_some_and(|mut app| app.browser_undo())
+        }
+        pub fn import_simulator_setup(&self, json: &str) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .import_browser_simulation(json)
+                .map_err(|error| JsValue::from_str(&error))
+        }
+
         pub fn destroy(&self) {
             self.runner.destroy();
         }
@@ -117,3 +210,6 @@ mod web {
 
 #[cfg(target_arch = "wasm32")]
 pub use web::WebHandle;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod web_preview;
