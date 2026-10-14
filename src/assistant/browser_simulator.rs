@@ -1,6 +1,16 @@
 //! Browser-owned virtual state. AI requests leave through the optional local bridge only.
 #![cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 use super::simulation_protocol::{build_prompts, parse_turn, Turn, VirtualState};
+
+/// The preview server forwards a parsed turn as JSON.
+#[derive(Deserialize)]
+struct BridgeTurn {
+    output: String,
+    #[serde(default)]
+    prompt: Option<String>,
+    #[serde(default)]
+    cwd: Option<String>,
+}
 use crate::settings::SimulationPreferences;
 use serde::{Deserialize, Serialize};
 
@@ -128,14 +138,10 @@ impl BrowserSimulator {
                 self.error = Some("Start the local AI preview server first.".into());
                 return;
             }
-            match build_prompts(
-                config,
-                command,
-                &self.state,
-                &self.transcript,
-                config.show_notices,
-            ) {
-                Ok((system, user)) => {
+            match build_prompts(config, command, &self.state.cwd, &self.transcript) {
+                Ok(prompts) => {
+                    let user = prompts.flattened_user();
+                    let system = prompts.system;
                     let id = self.next_id;
                     self.next_id = self.next_id.wrapping_add(1).max(1);
                     self.pending = Some(BrowserRequest { id, system, user });
@@ -150,11 +156,7 @@ impl BrowserSimulator {
             }
             let mut state = self.state.clone();
             let output = offline_commands(command, &mut state);
-            let raw = serde_json::json!({"output":output,"state":state}).to_string();
-            match parse_turn(&raw) {
-                Ok(turn) => self.commit(turn),
-                Err(error) => self.error = Some(error),
-            }
+            self.commit(output.clone(), output, state);
         }
     }
     pub fn finish(&mut self, id: u32, reply: &str, model: &str) -> Result<bool, String> {
@@ -163,10 +165,22 @@ impl BrowserSimulator {
         }
         self.pending = None;
         self.dispatched = false;
-        match parse_turn(reply) {
+        let parsed = serde_json::from_str::<BridgeTurn>(reply)
+            .map(|turn| Turn {
+                output: turn.output,
+                prompt: turn.prompt,
+                cwd: turn.cwd,
+                ..Default::default()
+            })
+            .or_else(|_| parse_turn(reply));
+        match parsed {
             Ok(turn) => {
                 self.model = model.chars().take(256).collect();
-                self.commit(turn);
+                let mut state = self.state.clone();
+                if let Some(cwd) = &turn.cwd {
+                    state.cwd.clone_from(cwd);
+                }
+                self.commit(turn.output.clone(), turn.history_text(), state);
                 Ok(true)
             }
             Err(error) => {
@@ -182,7 +196,7 @@ impl BrowserSimulator {
             self.error = Some(error.chars().take(512).collect());
         }
     }
-    fn commit(&mut self, turn: Turn) {
+    fn commit(&mut self, output: String, history: String, state: VirtualState) {
         self.undo.push((self.state.clone(), self.transcript.len()));
         if self.undo.len() > 16 {
             self.undo.remove(0);
@@ -193,10 +207,10 @@ impl BrowserSimulator {
                 *count = count.saturating_sub(1);
             }
         }
-        self.state = turn.state;
-        self.append(&turn.output);
+        self.state = state;
+        self.append(&output);
         self.transcript
-            .push((std::mem::take(&mut self.command), turn.output));
+            .push((std::mem::take(&mut self.command), history));
     }
     fn append(&mut self, text: &str) {
         self.lines

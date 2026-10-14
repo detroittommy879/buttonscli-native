@@ -3996,8 +3996,7 @@ impl ButtonsApp {
                         ui.add(
                             egui::TextEdit::multiline(&mut command_display)
                             .desired_rows(2)
-                            .code_editor()
-                            .interactive(false),
+                            .code_editor(),
                         );
                         ui.spaced_label(crate::i18n::literal(&locale, "Types for review"));
                         if let Some(reason) = &type_reason {
@@ -6311,7 +6310,7 @@ impl ButtonsApp {
         #[cfg(target_arch = "wasm32")]
         ui.spaced_label("Browser prompts apply to the next AI request. Restart below to begin a fresh fictional world.");
         let config = &mut self.preferences.simulation;
-        ui.spaced_label("Prompts below are the complete messages sent to the model. Output still has to match the fictional state JSON format; no tools or shell are attached.");
+        ui.spaced_label("Plain text in, plain text out. The model gets: the system prompt, then the persona and scenario in <machine> and <scenario> tags, then each earlier command and its output as normal chat turns, then the new command. It replies with terminal text and can end with <prompt>user@host:~$</prompt> to set the shell prompt. No tools or shell are attached.");
         let mut load = None;
         let mut delete = None;
         wrapping_row(ui, |ui| {
@@ -6389,7 +6388,7 @@ impl ButtonsApp {
                 .desired_width(f32::INFINITY)
                 .char_limit(32 * 1024),
         );
-        ui.spaced_label("Scenario · fictional files, tools and environment");
+        ui.spaced_label("Scenario · appended to the system prompt. Kept separate so the presets can swap machines without touching your instructions; leave it empty if your system prompt already covers it.");
         let label = ui.spaced_label(crate::i18n::literal(&self.locale, "Simulation prompt"));
         ui.add(
             egui::TextEdit::multiline(&mut config.prompt)
@@ -6399,7 +6398,7 @@ impl ButtonsApp {
         )
         .labelled_by(label.id);
         ui.spaced_label(crate::i18n::literal(&self.locale, "Describe fictional files, commands, users, servers and tools. No real files or connections are used."));
-        ui.spaced_label("User prompt template · complete request");
+        ui.spaced_label("User message template");
         ui.add(
             egui::TextEdit::multiline(&mut config.user_prompt_template)
                 .code_editor()
@@ -6407,23 +6406,23 @@ impl ButtonsApp {
                 .desired_width(f32::INFINITY)
                 .char_limit(32 * 1024),
         );
-        ui.spaced_label("JSON-encoded placeholders: {{persona}}, {{scenario}}, {{command}}, {{state}}, {{recent_transcript}}, {{initializing}}, {{show_simulation_notices}}. Expansion adds no hidden instructions.");
+        ui.spaced_label("Placeholders: {{command}}, {{cwd}}, {{persona}}, {{scenario}}, inserted as plain text. If {{command}} is missing, the command goes on the next line. The first message is <session_start/> (show a login banner).");
         egui::CollapsingHeader::new("Preview complete startup request").show(ui, |ui| {
             match crate::assistant::simulation_protocol::build_prompts(
                 config,
                 "",
-                &Default::default(),
+                "/home/student",
                 &[],
-                config.show_notices,
             ) {
-                Ok((system, user)) => {
-                    let mut preview = format!("SYSTEM\n{system}\n\nUSER\n{user}");
+                Ok(prompts) => {
+                    // Edits to this copy are discarded; it stays selectable for copying.
+                    let mut preview =
+                        format!("SYSTEM\n{}\n\nUSER\n{}", prompts.system, prompts.user);
                     ui.add(
                         egui::TextEdit::multiline(&mut preview)
                             .code_editor()
                             .desired_rows(15)
-                            .desired_width(f32::INFINITY)
-                            .interactive(false),
+                            .desired_width(f32::INFINITY),
                     );
                 }
                 Err(error) => {
@@ -11084,7 +11083,8 @@ impl ButtonsApp {
 
     fn keyboard_settings(&mut self, ui: &mut egui::Ui) {
         ui.spaced_heading("Keyboard & clipboard");
-        ui.spaced_label("Copy: Ctrl+Shift+C, or Cmd+C on macOS. Paste: Ctrl+Shift+V, or Cmd+V on macOS. Custom bindings are in Shortcuts.");
+        ui.spaced_label("Copy: select text, then Ctrl+C or Ctrl+Shift+C (Cmd+C on macOS). Paste: Ctrl+V or Ctrl+Shift+V (Cmd+V on macOS). Custom bindings are in Shortcuts.");
+        ui.spaced_label("Programs that capture the mouse (vim, htop, some AI CLIs) receive plain drags. Hold Shift while dragging to select text there.");
         ui.spaced_checkbox(
             &mut self.preferences.keyboard.ctrl_c_copies_selection,
             "Ctrl+C copies when terminal text is selected",
@@ -15098,6 +15098,149 @@ mod tests {
             app.open_tab(cc.egui_ctx.clone());
             Ok(Box::new(Probe { app, clipboard, saved_clipboard, started: Instant::now(), step_at: Instant::now(), step: 0,
                 pointer: egui::Pos2::ZERO, expected: String::new(), pending: Vec::new(), failure: report }))
+        })).unwrap();
+        assert!(
+            failure.lock().unwrap().is_none(),
+            "{}",
+            failure.lock().unwrap().as_deref().unwrap_or("")
+        );
+    }
+
+    /// Mirrors egui-winit: holding Ctrl updates `RawInput::modifiers`, then C
+    /// arrives only as `Event::Copy`. Drag-select first, like a user would.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "opens a test-owned native window and temporarily uses the OS text clipboard"]
+    fn native_ctrl_c_copies_mouse_selection_probe() {
+        use std::time::Instant;
+        struct Probe {
+            app: ButtonsApp,
+            clipboard: arboard::Clipboard,
+            saved_clipboard: Option<String>,
+            started: Instant,
+            step_at: Instant,
+            step: usize,
+            expected: String,
+            modifiers: egui::Modifiers,
+            pending: Vec<egui::Event>,
+            failure: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+        }
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                if let Some(text) = self.saved_clipboard.take() {
+                    let _ = self.clipboard.set_text(text);
+                }
+                while !self.app.tabs.is_empty() {
+                    self.app.close_tab(0);
+                }
+            }
+        }
+        impl eframe::App for Probe {
+            fn raw_input_hook(&mut self, _ctx: &egui::Context, input: &mut egui::RawInput) {
+                input.modifiers = self.modifiers;
+                input.events.append(&mut self.pending);
+            }
+            fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+                let ready = self.step_at.elapsed() >= Duration::from_millis(150);
+                let mut events = Vec::new();
+                let result = (|| -> Result<(), String> {
+                    if self.started.elapsed() > Duration::from_secs(60) {
+                        return Err(format!("probe timed out at step {}", self.step));
+                    }
+                    if !ready {
+                        return Ok(());
+                    }
+                    let rect = self.app.pane_rects.get(&self.app.tabs[0].id).copied();
+                    let Some(rect) = rect else { return Ok(()) };
+                    let start = rect.left_top() + egui::vec2(12.0, 30.0);
+                    let end = start + egui::vec2(140.0, 0.0);
+                    match self.step {
+                        0 => {
+                            if !self.app.tabs[0]
+                                .backend
+                                .plain_text_tail(2000)
+                                .contains("CTRLC-PROBE-050")
+                            {
+                                return Ok(());
+                            }
+                            self.clipboard
+                                .set_text("probe-sentinel")
+                                .map_err(|e| e.to_string())?;
+                            events.extend(pointer_events(
+                                start,
+                                egui::PointerButton::Primary,
+                                true,
+                            ));
+                        }
+                        1 => events.push(egui::Event::PointerMoved(start + egui::vec2(40.0, 0.0))),
+                        2 => events.push(egui::Event::PointerMoved(end)),
+                        3 => {
+                            events.extend(pointer_events(end, egui::PointerButton::Primary, false))
+                        }
+                        4 => {
+                            self.expected = self.app.tabs[0].backend.selectable_content();
+                            if self.expected.trim().is_empty() {
+                                return Err("mouse drag selected nothing".into());
+                            }
+                            self.modifiers = egui::Modifiers::CTRL;
+                        }
+                        5 => events.push(egui::Event::Copy),
+                        6 => self.modifiers = egui::Modifiers::NONE,
+                        7 => {
+                            let got = self.clipboard.get_text().ok();
+                            if got.as_deref() != Some(self.expected.as_str()) {
+                                return Err(format!(
+                                    "Ctrl+C did not copy the selection; clipboard: {got:?}"
+                                ));
+                            }
+                            println!("Ctrl+C after a mouse drag reached the OS clipboard.");
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                        _ => return Ok(()),
+                    }
+                    self.step += 1;
+                    self.step_at = Instant::now();
+                    Ok(())
+                })();
+                if let Err(error) = result {
+                    *self.failure.lock().unwrap() = Some(error);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                self.pending.extend(events);
+                self.app.update(ctx, frame);
+                ctx.request_repaint_after(Duration::from_millis(40));
+            }
+        }
+        let failure = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let report = failure.clone();
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_title("ButtonsCLI Ctrl+C probe")
+                .with_inner_size([1000.0, 700.0]),
+            persist_window: false,
+            event_loop_builder: Some(Box::new(|builder| {
+                winit::platform::windows::EventLoopBuilderExtWindows::with_any_thread(
+                    builder, true,
+                );
+            })),
+            ..Default::default()
+        };
+        eframe::run_native("ButtonsCLI Ctrl+C probe", options, Box::new(move |cc| {
+            let mut clipboard = arboard::Clipboard::new().unwrap();
+            let saved_clipboard = clipboard.get_text().ok();
+            let mut app = ButtonsApp::empty(Preferences {
+                default_shell_id: "probe".into(),
+                custom_shell_profiles: vec![ShellProfile { id: "probe".into(), label: "Probe".into(),
+                    command: "powershell.exe -NoLogo -NoProfile -Command \"1..50 | ForEach-Object { Write-Output ('CTRLC-PROBE-{0:D3}' -f $_) }; Start-Sleep -Seconds 30\"".into(),
+                    working_directory: String::new() }],
+                show_sidebar: false, show_presets: false, ..Default::default()
+            });
+            app.show_localization_onboarding = false;
+            fonts::install(&cc.egui_ctx, &app.font_catalog);
+            app.apply_style(&cc.egui_ctx);
+            app.open_tab(cc.egui_ctx.clone());
+            Ok(Box::new(Probe { app, clipboard, saved_clipboard, started: Instant::now(), step_at: Instant::now(), step: 0,
+                expected: String::new(), modifiers: egui::Modifiers::NONE, pending: Vec::new(), failure: report }))
         })).unwrap();
         assert!(
             failure.lock().unwrap().is_none(),

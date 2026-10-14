@@ -38,10 +38,10 @@ export function createFakeProvider({ delayMs = 25 } = {}) {
     if (body.model === 'fake-quota') return send(429, { error: { message: 'Fixture quota rejection' } });
     if (body.model === 'fake-error-once' && count === 1) return send(503, { error: { message: 'Fixture failure; retry succeeds' } });
     if (body.model === 'fake-simulation') {
-      const input = JSON.parse(body.messages.at(-1).content);
-      const state = structuredClone(input.state);
-      if (input.command.startsWith('rm ')) state.files = {};
-      const content = JSON.stringify({ output: `Simulated: ${input.command}`, state });
+      // Plain-text protocol: the last user message is the command; earlier turns are history.
+      const command = body.messages.at(-1).content;
+      const turns = body.messages.filter(message => message.role === 'user').length;
+      const content = `Simulated: ${command}\nturn ${turns}\n<prompt>student@fixture:~$</prompt>`;
       return send(200, { choices: [{ message: { content } }] });
     }
     const answer = `<answer>Local test response 🦇. This is a deterministic fixture, not an AI answer. Terminal context detected: ${context ? 'yes' : 'no'}. Review the harmless echo suggestion before inserting it.</answer><commands>${JSON.stringify([{ label: 'Local echo test', command: 'echo ButtonsCLI-local-test', description: 'Print a test marker in the reviewed target only.', sendEnter: false }])}</commands>`;

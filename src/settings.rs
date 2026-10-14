@@ -53,6 +53,29 @@ impl Default for SimulationPromptPreset {
 }
 
 impl SimulationPreferences {
+    /// The simulator used to exchange JSON state. Replace only the parts that
+    /// depended on it: JSON templates and the untouched old default system prompt.
+    pub(crate) fn migrate_legacy_prompts(&mut self) {
+        use crate::assistant::simulation_protocol::{
+            is_legacy_system, is_legacy_template, DEFAULT_SYSTEM, DEFAULT_USER_TEMPLATE,
+        };
+        let presets = self
+            .saved_prompts
+            .iter_mut()
+            .map(|preset| (&mut preset.system_prompt, &mut preset.user_prompt_template));
+        for (system, template) in
+            std::iter::once((&mut self.system_prompt, &mut self.user_prompt_template))
+                .chain(presets)
+        {
+            if is_legacy_template(template) {
+                *template = DEFAULT_USER_TEMPLATE.into();
+            }
+            if is_legacy_system(system) {
+                *system = DEFAULT_SYSTEM.into();
+            }
+        }
+    }
+
     pub(crate) fn validate_prompts(&self) -> Result<(), String> {
         if self.system_prompt.trim().is_empty() || self.user_prompt_template.trim().is_empty() {
             return Err("System and user prompts must not be empty.".into());
@@ -451,6 +474,7 @@ impl Preferences {
         self.favorite_theme_ids
             .retain(|id| !id.is_empty() && seen.insert(id.clone()));
         self.pane_hover_label.normalize();
+        self.simulation.migrate_legacy_prompts();
         self.scrollback_lines = self.scrollback_lines.min(100_000);
         self.terminal_history.retention_days = self.terminal_history.retention_days.clamp(1, 365);
         self.dock_title = self
@@ -662,6 +686,28 @@ mod tests {
             .filter(|preset| preset.command.contains("update")
                 || preset.command.starts_with("codex -m"))
             .all(|preset| !preset.send_enter));
+    }
+
+    #[test]
+    fn old_json_simulation_prompts_migrate_but_custom_text_is_kept() {
+        let legacy_template = "{\n  \"command\": {{command}},\n  \"state\": {{state}}\n}";
+        let mut prefs = Preferences::default();
+        prefs.simulation.user_prompt_template = legacy_template.into();
+        prefs.simulation.system_prompt = "Mine. Return only JSON: {\"output\":\"x\"}".into();
+        prefs.simulation.saved_prompts.push(SimulationPromptPreset {
+            system_prompt: "My own words".into(),
+            user_prompt_template: legacy_template.into(),
+            ..Default::default()
+        });
+        prefs.normalize_theme_sources();
+        let sim = &prefs.simulation;
+        assert_eq!(sim.user_prompt_template, "{{command}}");
+        assert_eq!(
+            sim.system_prompt,
+            crate::assistant::simulation_protocol::DEFAULT_SYSTEM
+        );
+        assert_eq!(sim.saved_prompts[0].user_prompt_template, "{{command}}");
+        assert_eq!(sim.saved_prompts[0].system_prompt, "My own words");
     }
 
     #[test]

@@ -165,7 +165,11 @@ async fn turn(State(state): State<ServerState>, Json(request): Json<TurnRequest>
                     .map(Some)
                     .map_err(|_| ClientError::Credential)
             },
-            (&request.system, &request.user),
+            &crate::assistant::simulation_protocol::Prompts {
+                system: request.system,
+                user: request.user,
+                history: Vec::new(),
+            },
             &cancel,
         )
     });
@@ -173,7 +177,7 @@ async fn turn(State(state): State<ServerState>, Json(request): Json<TurnRequest>
     drop(guard);
     match result {
         Ok(Ok(Ok(turn))) => {
-            Json(json!({"turn":{"output":turn.output,"state":turn.state},"model":turn.model}))
+            Json(json!({"turn":{"output":turn.output,"prompt":turn.prompt,"cwd":turn.cwd},"model":turn.model}))
                 .into_response()
         }
         Ok(Ok(Err(error))) => {
@@ -377,14 +381,14 @@ mod tests {
             .json()
             .unwrap();
         assert_eq!(session["model"], "OpenRouter · fake-simulation");
-        let (system, user) = crate::assistant::simulation_protocol::build_prompts(
+        let prompts = crate::assistant::simulation_protocol::build_prompts(
             &Default::default(),
             "rm -rf /",
-            &Default::default(),
+            "/home/student",
             &[],
-            false,
         )
         .unwrap();
+        let (user, system) = (prompts.flattened_user(), prompts.system);
         let body = json!({"client_id":"owned-client","id":1,"system":system,"user":user});
         assert_eq!(
             client
@@ -416,10 +420,12 @@ mod tests {
             .unwrap()
             .json()
             .unwrap();
-        assert!(reply["turn"]["state"]["files"]
-            .as_object()
-            .unwrap()
-            .is_empty());
+        assert_eq!(
+            reply["turn"]["output"],
+            "Simulated: rm -rf /
+turn 1"
+        );
+        assert_eq!(reply["turn"]["prompt"], "student@fixture:~$");
         assert_eq!(
             std::fs::read_to_string(owned.join("host-sentinel.txt")).unwrap(),
             "must survive"

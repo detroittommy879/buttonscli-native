@@ -48,7 +48,6 @@ impl VirtualTerminal {
 
     pub(crate) fn set_show_notices(&mut self, show: bool) {
         self.show_notices = show;
-        self.engine.set_show_notices(show);
     }
 
     pub(crate) fn reset(&mut self, backend: &mut TerminalBackend) {
@@ -197,6 +196,17 @@ impl VirtualTerminal {
 
     fn prompt(&self, columns: usize) -> String {
         let limit = (columns / 2).max(3);
+        if let Some(prompt) = self.engine.shell_prompt() {
+            // The model's own prompt, e.g. "student@lab:~$"; keep its tail if long.
+            let mut shown = String::new();
+            for character in prompt.chars().rev() {
+                if UnicodeWidthStr::width(shown.as_str()) + character.width().unwrap_or(0) > limit {
+                    break;
+                }
+                shown.insert(0, character);
+            }
+            return format!("{shown} ");
+        }
         let mut path = String::new();
         for character in self.engine.cwd().chars().rev() {
             if UnicodeWidthStr::width(path.as_str()) + character.width().unwrap_or(0) > limit {
@@ -547,13 +557,16 @@ mod tests {
             "{}",
             tab.backend.plain_text_tail(8192)
         );
-        assert_eq!(
-            tab.simulated.as_ref().unwrap().engine.virtual_file_count(),
-            0
+        assert!(
+            tab.backend
+                .plain_text_tail(8192)
+                .contains("student@fixture:~$"),
+            "the model's <prompt> tag becomes the shell prompt"
         );
+        assert_eq!(tab.simulated.as_ref().unwrap().engine.turn_count(), 2);
         let virtual_tab = tab.simulated.as_mut().unwrap();
         virtual_tab.undo(&mut tab.backend, &tab.output);
-        assert!(virtual_tab.engine.virtual_file_count() > 0);
+        assert_eq!(virtual_tab.engine.turn_count(), 1);
         assert!(tab.backend.is_virtual());
         #[cfg(windows)]
         assert!(tab.backend.child_process_id().is_none());
