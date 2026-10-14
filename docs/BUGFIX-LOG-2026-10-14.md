@@ -1,0 +1,14 @@
+# Work log — 2026-10-14
+
+Branch `claude/project-thread-b7w8o7`, from `codex/simulator-prompts-web-practice` at db2161c.
+
+- Simulator protocol is now plain text. The model gets the system prompt plus `<machine>`/`<scenario>`, earlier commands/outputs as real chat turns, and the new command through a `{{command}}` template (raw text; the command is appended if the template lacks it). Replies are terminal text with optional `<prompt>`/`<cwd>` tags; an untagged last line like `user@host:~$` or `PS C:\…>` becomes the prompt. Old JSON replies still parse. Old JSON templates and the untouched old default system prompt migrate in `normalize_theme_sources`. Undo drops the last turn from history. Browser bridge flattens history into one user message (`Prompts::flattened_user`).
+  - Cause of "Simulation returned invalid state JSON": the old protocol required the model to return the full virtual filesystem as JSON; a custom system prompt without those rules (and a template without `{{command}}`) could never satisfy it.
+- Terminal: egui-winit converts Ctrl+X (and Windows Shift+Delete) into `Event::Cut`; the terminal ignored it, so ^X never reached nano/readline. Now forwarded (Cmd+X copies on macOS).
+- Ctrl+C after a mouse drag: added `native_ctrl_c_copies_mouse_selection_probe` (real eframe window, Ctrl held in `RawInput::modifiers`, `Event::Copy` like egui-winit). It passes in a plain PowerShell pane, so the reported failure is not reproduced; likely inside mouse-capturing TUIs, where Shift+drag is needed. Keyboard settings text now says so.
+- Read-only TextEdits used `.interactive(false)`, which blocks selecting/copying. AI Help command display and simulator preview now use a discarded temp copy instead.
+- Settings: open Settings now writes changes within ~1 s (`autosave_open_settings`); Keep/Revert explain this on hover. Saves are skipped when nothing changed, so an idle second instance no longer bumps the revision every 30 s autosave and permanently blocks the other instance with StaleRevision (likely cause of "providers sometimes don't save" when two builds run).
+- Save copy no longer lights up for FPS, Calm, shader toggle, focused-pane-only, advanced effects or per-pane theme/font overrides, and only shows on Themes/Fonts tabs.
+- Trap: `Turn::model` is now present on all targets (dead-code allowed on WASM) so struct-update syntax stays valid for strict WASM Clippy.
+- Removed the OpenAI-det live test that depended on JSON file state; added `live_simulation_with_active_profile` (ignored, `BUTTONSCLI_TEST_LIVE_SIM=1`), which passed against the active profile's own prompts via mm/deepseek-flash: banner, `ls -a`, `cd /tmp`, `pwd` stayed consistent and the prompt came from the model.
+- Validation: fmt, 305 unit + 2 integration tests, egui_term 22 tests, native and WASM strict Clippy; Windows probes clipboard/detached Settings, new Ctrl+C probe and three-pane copy/scroll pass.

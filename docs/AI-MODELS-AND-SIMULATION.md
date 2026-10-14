@@ -82,18 +82,22 @@ token limit; official OpenAI Chat uses `max_completion_tokens`.
 Choose **+ → Simulated terminal** to open a normal workspace tab/pane backed by
 an LLM instead of a shell. It uses the same terminal grid, themes, fonts, effects,
 selection, search, scrollback, presets and pane layout. Each tab has independent
-virtual files, command history and worker state; changing themes does not reset it.
+conversation history and worker state; changing themes does not reset it.
 
 **Settings → Simulation setup** edits the saved OS/shell persona and scenario
-prompt. The complete **system prompt**, **scenario** and **user prompt template**
-are editable; no hidden simulator instructions are appended. Default user messages
-use JSON-encoded placeholders for persona, scenario, command, state, initialization,
-notice preference and recent transcript. Substitution is nonrecursive. Preview
-shows the exact startup messages; JSON reply/state size validation remains in code.
+prompt. Everything is plain text. The system message is the editable **system
+prompt**, then the persona in `<machine>` and the **scenario** in `<scenario>` tags.
+Earlier commands and outputs are sent as ordinary chat turns, so the fictional
+world lives in the conversation, not in a state file. The **user message template**
+defaults to `{{command}}` (also `{{cwd}}`, `{{persona}}`, `{{scenario}}`; the command
+is appended if the template omits it); the first message is `<session_start/>`.
+Replies are terminal text, optionally ending with `<prompt>user@host:~$</prompt>` or
+`<cwd>/path</cwd>`; an untagged final prompt line is also recognised. Old JSON
+templates migrate automatically. Preview shows the exact startup messages.
 
 Load Linux, PowerShell, macOS or SSH practice setups; save up to 32 named custom
 presets (system, user template, scenario and persona). Loading preserves display
-toggles. Reusing a name replaces that saved preset. Keep/Close saves native changes.
+toggles. Reusing a name replaces that saved preset. Changes save as you make them.
 New tabs snapshot this setup and ask the model to initialize the fictional world.
 **Restart focused simulator with these prompts** applies it immediately to a
 selected simulated pane without changing its theme/backend ID.

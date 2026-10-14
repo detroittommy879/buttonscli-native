@@ -1101,6 +1101,9 @@ impl ButtonsApp {
             app.native_store = native_store;
             app.native_revision = native_revision;
             app.native_save_blocked = storage_error.is_some();
+            // Matches the file just loaded, so an idle instance never rewrites it.
+            app.last_saved_preferences =
+                serde_json::to_vec(&app.preferences_to_save()).unwrap_or_default();
             app.restore_account_session(cc.egui_ctx.clone());
             app.import_offer = app.native_revision.is_none()
                 && production_roots().is_ok_and(|(_, legacy)| legacy.0.exists());
@@ -4847,11 +4850,16 @@ impl ButtonsApp {
         if !self.native_save_blocked {
             if let Some(store) = &self.native_store {
                 let preferences = self.preferences_to_save();
+                let bytes = serde_json::to_vec(&preferences).unwrap_or_default();
+                if self.native_revision.is_some() && bytes == self.last_saved_preferences {
+                    // Unchanged: skip the write. Otherwise an idle second window bumps
+                    // the revision every autosave and blocks the window being edited.
+                    return;
+                }
                 match store.save(self.native_revision, &preferences) {
                     Ok(revision) => {
                         self.native_revision = Some(revision);
-                        self.last_saved_preferences =
-                            serde_json::to_vec(&preferences).unwrap_or_default();
+                        self.last_saved_preferences = bytes;
                     }
                     Err(error) => {
                         tracing::error!("Native settings save failed: {error}");
