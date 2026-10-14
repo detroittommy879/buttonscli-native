@@ -463,6 +463,11 @@ pub struct ButtonsApp {
     native_revision: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     native_save_blocked: bool,
+    /// Serialized preferences last written, and when Settings last compared them.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    last_saved_preferences: Vec<u8>,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    settings_autosave_at: f64,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1328,6 +1333,8 @@ impl ButtonsApp {
             native_revision: None,
             #[cfg(not(target_arch = "wasm32"))]
             native_save_blocked: false,
+            last_saved_preferences: Vec::new(),
+            settings_autosave_at: 0.0,
             #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -4839,8 +4846,13 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if !self.native_save_blocked {
             if let Some(store) = &self.native_store {
-                match store.save(self.native_revision, &self.preferences_to_save()) {
-                    Ok(revision) => self.native_revision = Some(revision),
+                let preferences = self.preferences_to_save();
+                match store.save(self.native_revision, &preferences) {
+                    Ok(revision) => {
+                        self.native_revision = Some(revision);
+                        self.last_saved_preferences =
+                            serde_json::to_vec(&preferences).unwrap_or_default();
+                    }
                     Err(error) => {
                         tracing::error!("Native settings save failed: {error}");
                         self.notice = Some(format!("Native settings could not save: {error}"));
@@ -4851,6 +4863,25 @@ impl ButtonsApp {
                 }
             }
         }
+    }
+
+    /// Settings apply live; also write them to disk shortly after each change,
+    /// so nothing depends on how the window is closed.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn autosave_open_settings(&mut self, ctx: &egui::Context) {
+        let now = ctx.input(|input| input.time);
+        if !self.show_settings || now - self.settings_autosave_at < 0.75 {
+            return;
+        }
+        self.settings_autosave_at = now;
+        if ctx.wants_pointer_input() && ctx.input(|input| input.pointer.any_down()) {
+            return; // Wait until a slider or color drag ends.
+        }
+        let current = serde_json::to_vec(&self.preferences_to_save()).unwrap_or_default();
+        if current != self.last_saved_preferences {
+            self.persist_native_preferences();
+        }
+        ctx.request_repaint_after(std::time::Duration::from_millis(800));
     }
 
     fn open_settings(&mut self, ctx: &egui::Context) {
@@ -5182,6 +5213,7 @@ impl ButtonsApp {
                         crate::i18n::MessageKey::SettingsKeepClose,
                         &[],
                     ))
+                    .on_hover_text("Changes already apply and save as you make them. This just closes Settings.")
                     .clicked()
                 {
                     *close_action = Some(SettingsCloseAction::Keep);
@@ -5192,12 +5224,14 @@ impl ButtonsApp {
                         crate::i18n::MessageKey::SettingsRevertClose,
                         &[],
                     ))
+                    .on_hover_text("Undo every change made since Settings opened, then close.")
                     .clicked()
                 {
                     *close_action = Some(SettingsCloseAction::Revert);
                 }
+                // Forking a theme only makes sense next to the theme and font controls.
                 #[cfg(not(target_arch = "wasm32"))]
-                {
+                if matches!(self.settings_tab, SettingsTab::Themes | SettingsTab::Fonts) {
                     let dirty = self.appearance_is_dirty();
                     let color = if dirty { Color32::from_rgb(100, 245, 175) } else { ui.visuals().weak_text_color() };
                     let response = ui.add_enabled(dirty && self.native_store.is_some(), egui::Button::new(RichText::new("● Save copy").color(color)));
@@ -9781,13 +9815,24 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    /// What "Save copy" would change in a theme file. Live toggles (Calm, FPS,
+    /// shader on/off) and per-pane overrides are saved with a copy but do not,
+    /// on their own, mean the shared theme was edited.
     fn appearance_fingerprint(&self) -> Value {
-        let document = self.appearance_copy_document();
+        let mut document = self.appearance_copy_document();
+        if let Some(native) = document["nativeAppearance"].as_object_mut() {
+            for key in [
+                "animation_fps",
+                "calm_mode",
+                "shader_backgrounds_enabled",
+                "effects_focused_pane_only",
+                "advanced_effects",
+            ] {
+                native.remove(key);
+            }
+        }
         json!({"theme": document["theme"], "effects": document["effects"],
-            "nativeAppearance": document["nativeAppearance"],
-            "paneFonts": self.pane_fonts, "paneThemes": self.theme_overrides,
-            "shadersEnabled": self.preferences.shader_backgrounds_enabled,
-            "calm": self.preferences.calm_mode})
+            "nativeAppearance": document["nativeAppearance"]})
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -14495,6 +14540,8 @@ impl eframe::App for ButtonsApp {
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
+        self.autosave_open_settings(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         self.read_only_guides_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.feedback_window(ctx);
@@ -14564,7 +14611,14 @@ mod tests {
         app.ensure_appearance_baseline();
         assert!(!app.appearance_is_dirty());
         app.preferences.dock_title = "Unrelated workspace edit".into();
-        assert!(!app.appearance_is_dirty());
+        app.preferences.animation_fps = 7;
+        app.preferences.calm_mode = !app.preferences.calm_mode;
+        app.theme_overrides.insert(7, "aurora".into());
+        assert!(
+            !app.appearance_is_dirty(),
+            "workspace settings, live toggles and per-pane overrides do not light Save copy"
+        );
+        app.theme_overrides.clear();
         app.start_personal_theme_draft();
         assert!(
             !app.appearance_is_dirty(),

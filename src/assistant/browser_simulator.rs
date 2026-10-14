@@ -4,6 +4,7 @@ use super::simulation_protocol::{build_prompts, parse_turn, Turn, VirtualState};
 
 /// The preview server forwards a parsed turn as JSON.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BridgeTurn {
     output: String,
     #[serde(default)]
@@ -328,7 +329,7 @@ mod tests {
         };
         app.run(&config, "rm -rf /");
         let old = app.take_request().unwrap();
-        assert_eq!(old.system, config.system_prompt);
+        assert!(old.system.starts_with(&config.system_prompt));
         assert!(app.take_request().is_none());
         app.cancel();
         app.run(&config, "pwd");

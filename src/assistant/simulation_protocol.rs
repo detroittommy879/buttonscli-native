@@ -205,7 +205,8 @@ pub(crate) struct Turn {
     pub(crate) prompt: Option<String>,
     /// Working directory from `<cwd>`, when the model gave one.
     pub(crate) cwd: Option<String>,
-    #[cfg(not(target_arch = "wasm32"))]
+    /// "Provider · model" that answered (native only).
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(crate) model: String,
 }
 
