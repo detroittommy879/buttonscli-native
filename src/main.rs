@@ -52,14 +52,17 @@ fn main() -> eframe::Result {
 fn low_memory_wgpu() -> eframe::egui_wgpu::WgpuConfiguration {
     use eframe::egui_wgpu::{WgpuSetup, WgpuSetupCreateNew};
     use eframe::wgpu;
-    let mut setup = WgpuSetupCreateNew::default();
-    setup.power_preference =
-        wgpu::PowerPreference::from_env().unwrap_or(wgpu::PowerPreference::LowPower);
-    let base = setup.device_descriptor.clone();
-    setup.device_descriptor = std::sync::Arc::new(move |adapter| wgpu::DeviceDescriptor {
-        memory_hints: wgpu::MemoryHints::MemoryUsage,
-        ..base(adapter)
-    });
+    let defaults = WgpuSetupCreateNew::default();
+    let base = defaults.device_descriptor.clone();
+    let setup = WgpuSetupCreateNew {
+        power_preference: wgpu::PowerPreference::from_env()
+            .unwrap_or(wgpu::PowerPreference::LowPower),
+        device_descriptor: std::sync::Arc::new(move |adapter| wgpu::DeviceDescriptor {
+            memory_hints: wgpu::MemoryHints::MemoryUsage,
+            ..base(adapter)
+        }),
+        ..defaults
+    };
     eframe::egui_wgpu::WgpuConfiguration {
         wgpu_setup: WgpuSetup::CreateNew(setup),
         ..Default::default()
