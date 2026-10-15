@@ -91,12 +91,22 @@ figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px
 .code .d { color: var(--muted); }
 .code .o { color: #7ee2a8; }
 
+/* Claims: four short promises, big type */
+.claims { list-style: none; margin: 0; padding-block: 24px 64px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 56px; }
+.claims li { border-top: 2px solid var(--amber); padding-top: 18px; min-width: 0; }
+.claims h3 { font-size: clamp(34px, 4.4vw, 54px); font-weight: 900; text-transform: uppercase; margin-bottom: 12px; }
+.claims p { color: var(--muted); margin: 0; max-width: 44ch; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.glyph { display: inline-block; }
+.glyph.spin { color: var(--amber); }
+.win { will-change: transform; }
+
 /* Shader wall */
 .wall { padding-block: 56px; border-top: 1px solid var(--rule); }
 .wall header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 26px; }
 .wall h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
 .wall header p { color: var(--muted); max-width: 52ch; margin: 0; }
-.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .tiles figure { position: relative; }
 .tiles img { border-radius: 8px; aspect-ratio: 16 / 9; object-fit: cover; }
 .tiles figcaption { position: absolute; left: 8px; bottom: 6px; margin: 0; color: #fff; font-size: 11.5px; text-shadow: 0 1px 3px #000; }
@@ -110,6 +120,7 @@ figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px
 .spec dd { color: var(--text); font-variant-numeric: tabular-nums; }
 footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
 
+@media (max-width: 700px) { .claims { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
 @media (max-width: 900px) {
   .hero, section.row, section.row.flip, .spec { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   section.row.flip .copy { order: 0; }
@@ -140,16 +151,16 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   <section class="hero" aria-labelledby="hero-title">
     <div>
       <div class="eyebrow">Native terminal · Rust · Alacritty core</div>
-      <h1 id="hero-title">A terminal you can <span>click.</span></h1>
+      <h1 id="hero-title" data-scramble-hero>A terminal you can <span>click.</span></h1>
       <p class="lede">Put the commands you type every day on buttons, tile as many shells as your screen fits, and give each one its own theme. It opens fast and stays out of your way.</p>
       <div class="cta">
         <a class="btn primary" href="https://buttonscli.com">Get ButtonsCLI</a>
         <a class="btn" href="#buttons">See what it does</a>
       </div>
       <div class="facts" aria-label="Quick facts">
-        <div><strong>0.47 s</strong>window on screen</div>
-        <div><strong>555</strong>themes</div>
-        <div><strong>32</strong>GPU backgrounds</div>
+        <div><strong data-count="0.47" data-decimals="2" data-suffix=" s">0.47 s</strong>window on screen</div>
+        <div><strong data-count="550" data-suffix="+">550+</strong>themes</div>
+        <div><strong data-count="34">34</strong>GPU backgrounds</div>
       </div>
     </div>
 
@@ -178,6 +189,16 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
         <button type="button" id="s3" data-shader="3" aria-pressed="false">Off</button>
       </div>
     </div>
+  </section>
+
+  <section aria-labelledby="h-claims">
+    <h2 id="h-claims" class="sr-only">Why ButtonsCLI</h2>
+    <ul class="claims">
+      <li class="rv"><h3 data-scramble>No combos to memorize</h3><p>Every command you use is a button you can see. Hover to check it, click to type it. Keyboard shortcuts are there when you want them, never required.</p></li>
+      <li class="rv"><h3 data-scramble>No JSON to edit</h3><p>Change a theme by clicking one in the library, tweak colors with pickers, or describe a look and let AI build it. No config files, no restart.</p></li>
+      <li class="rv"><h3 data-scramble>The anti-minimal terminal</h3><p>Color, fonts, moving backgrounds and docks full of buttons. When you need quiet, Calm mode turns the motion off with one click.</p></li>
+      <li class="rv"><h3 data-scramble>Watch your agents work</h3><p>Claude Code, Codex or any MCP client can open tabs, type and run commands across every pane, and you see each keystroke land in real time.</p></li>
+    </ul>
   </section>
 
   <section class="row" id="buttons" aria-labelledby="h-buttons">
@@ -214,7 +235,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
     <header>
       <div>
         <div class="eyebrow">GPU shader backgrounds</div>
-        <h2 id="h-shaders">32 living backgrounds</h2>
+        <h2 id="h-shaders" data-scramble>34 living backgrounds</h2>
       </div>
       <p>Each pane can run its own animated background behind the text, rendered on the GPU. Calm mode freezes motion, strength stays capped so text stays readable, and you can write your own in a small built-in editor or ask AI to write one.</p>
     </header>
@@ -229,13 +250,15 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
       <figure><img src="img/shaders/26-fireice.jpg" alt="Fire and ice shader" loading="lazy" width="480" height="270"><figcaption>Fire and ice</figcaption></figure>
       <figure><img src="img/shaders/27-jellyfish.jpg" alt="Jellyfish shader" loading="lazy" width="480" height="270"><figcaption>Jellyfish</figcaption></figure>
       <figure><img src="img/shaders/31-cosmic.jpg" alt="Cosmic dust shader" loading="lazy" width="480" height="270"><figcaption>Cosmic dust</figcaption></figure>
+      <figure><img src="img/shaders/32-vhs.jpg" alt="VHS tape shader with tracking lines and snow" loading="lazy" width="480" height="270"><figcaption>VHS tape</figcaption></figure>
+      <figure><img src="img/shaders/33-crt.jpg" alt="CRT static shader with scanlines" loading="lazy" width="480" height="270"><figcaption>CRT static</figcaption></figure>
     </div>
   </section>
 
   <section class="row" aria-labelledby="h-themes">
     <div class="copy">
       <div class="eyebrow">Themes and fonts</div>
-      <h2 id="h-themes">555 themes, one per pane if you like</h2>
+      <h2 id="h-themes">550+ themes, one per pane if you like</h2>
       <p>Browse a searchable library, apply a theme to everything or to one terminal, or describe a look and let AI generate a palette that keeps text readable. Fonts, gradients and effects can each come from a different theme.</p>
       <p>26 font faces ship with the app and work offline.</p>
     </div>
@@ -298,8 +321,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
       <dt>UI</dt><dd>Rust, egui and wgpu. No browser runtime, no Electron</dd>
       <dt>Startup</dt><dd>Window on screen in 0.47 s (release build, Windows 11)</dd>
       <dt>Panes</dt><dd>Columns, rows or grid; panes reflow as you add them</dd>
-      <dt>Themes</dt><dd>555 built in, plus your own and AI-generated ones</dd>
-      <dt>Backgrounds</dt><dd>32 GPU shader presets and a custom expression editor</dd>
+      <dt>Themes</dt><dd>Over 550 built in, plus your own and AI-generated ones</dd>
+      <dt>Backgrounds</dt><dd>34 GPU shader presets, including VHS and CRT static, and a custom shader editor</dd>
       <dt>AI providers</dt><dd>OpenAI, Anthropic, OpenRouter, Mistral, Groq, NVIDIA NIM or any OpenAI-compatible endpoint; keys stay in your OS credential store</dd>
       <dt>Platforms</dt><dd>Windows today; Linux builds in CI</dd>
     </dl>
@@ -428,5 +451,177 @@ void main(){
     shaderButtons.forEach(o => o.setAttribute('aria-pressed', String(o === b)));
     if (reduce) requestAnimationFrame(frame);
   }));
+})();
+
+// ---- Motion: springs, easing and scrambled letters ----
+// Springs: a damped harmonic oscillator, x'' = -k(x - target) - c x', stepped
+// with semi-implicit Euler. Low damping overshoots a little and settles.
+(() => {
+  // Respect reduced motion; #motion forces it on for previews.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches && location.hash !== '#motion') return;
+
+  const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+  const easeInCubic = x => x * x * x;
+
+  function spring(values, { stiffness = 140, damping = 15, mass = 1 } = {}, apply, done) {
+    const state = values.map(v => ({ x: v, v: 0 }));
+    let last = performance.now();
+    function step(now) {
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      let moving = false;
+      for (const s of state) {
+        const force = -stiffness * s.x - damping * s.v;
+        s.v += (force / mass) * dt;
+        s.x += s.v * dt;
+        if (Math.abs(s.x) > 0.001 || Math.abs(s.v) > 0.001) moving = true;
+      }
+      if (finished) return;
+      apply(state.map(s => s.x));
+      if (moving) requestAnimationFrame(step);
+      else finish();
+    }
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      apply(state.map(() => 0));
+      done && done();
+    };
+    // Hidden tabs pause animation frames; never leave content offset.
+    setTimeout(finish, 3000);
+    requestAnimationFrame(step);
+  }
+
+  // Scramble: each letter spins through glyphs, fast at first, then slower
+  // (the delay grows with easeInCubic) until it lands, left to right.
+  const GLYPHS = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*+=<>/';
+  function scramble(el, { duration = 1100, stagger = 45 } = {}) {
+    const textNodes = [];
+    const walk = node => node.childNodes.forEach(child => {
+      if (child.nodeType === 3 && child.textContent.trim()) textNodes.push(child);
+      else if (child.nodeType === 1) walk(child);
+    });
+    walk(el);
+    el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
+    let index = 0;
+    const settle = [];
+    for (const node of textNodes) {
+      const frag = document.createDocumentFragment();
+      for (const ch of node.textContent) {
+        if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); continue; }
+        const span = document.createElement('span');
+        span.className = 'glyph spin';
+        span.setAttribute('aria-hidden', 'true');
+        span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        frag.appendChild(span);
+        const start = performance.now() + index * stagger;
+        const total = duration + index * stagger * 0.4;
+        let next = 0;
+        const tick = now => {
+          const p = Math.min(1, (now - start) / total);
+          if (p >= 1) { span.textContent = ch; span.classList.remove('spin'); return; }
+          if (now >= next) {
+            span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+            next = now + 16 + 140 * easeInCubic(Math.max(0, p));
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        settle.push(() => { span.textContent = ch; span.classList.remove('spin'); });
+        index++;
+      }
+      node.replaceWith(frag);
+    }
+    // If animation frames are paused (hidden tab), still land on the real text.
+    setTimeout(() => settle.forEach(f => f()), duration + index * stagger + 400);
+  }
+
+  // Count-up for the hero facts.
+  function countUp(el) {
+    const target = parseFloat(el.dataset.count);
+    const decimals = Number(el.dataset.decimals || 0);
+    const suffix = el.dataset.suffix || '';
+    const start = performance.now();
+    const tick = now => {
+      const p = Math.min(1, (now - start) / 1400);
+      el.textContent = (target * easeOutExpo(p)).toFixed(decimals) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // Hero on load.
+  const hero = document.querySelector('[data-scramble-hero]');
+  if (hero) scramble(hero, { duration: 900, stagger: 35 });
+  document.querySelectorAll('[data-count]').forEach(countUp);
+
+  // Hero window follows the pointer with a lerp-smoothed tilt.
+  const win = document.querySelector('.win');
+  let tx = 0, ty = 0, cx = 0, cy = 0;
+  addEventListener('pointermove', e => {
+    tx = (e.clientX / innerWidth - 0.5) * 6;
+    ty = (e.clientY / innerHeight - 0.5) * -6;
+  });
+  (function follow() {
+    cx += (tx - cx) * 0.08;
+    cy += (ty - cy) * 0.08;
+    if (win) win.style.transform = `perspective(1400px) rotateY(${cx.toFixed(3)}deg) rotateX(${cy.toFixed(3)}deg)`;
+    requestAnimationFrame(follow);
+  })();
+
+  // Scroll reveals. Everything stays readable without these: content only gets
+  // an offset once script runs, and only while it is below the fold.
+  const below = el => el.getBoundingClientRect().top > innerHeight * 0.9;
+  // Run fn once el scrolls into view. A plain rect check on scroll (plus a slow
+  // timer) instead of IntersectionObserver, which can stall in hidden previews.
+  const pending = [];
+  function whenVisible(el, fn, margin = 0.92) {
+    pending.push({ el, fn, margin });
+  }
+  function check() {
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const { el, fn, margin } = pending[i];
+      if (el.getBoundingClientRect().top < innerHeight * margin) {
+        pending.splice(i, 1);
+        fn();
+      }
+    }
+  }
+  addEventListener('scroll', check, { passive: true });
+  addEventListener('resize', check);
+  setInterval(check, 500);
+
+  function prime(el, from, delay = 0) {
+    if (!below(el)) return;
+    const [x0, y0, r0] = from;
+    el.style.transform = `translate(${x0}px, ${y0}px) rotate(${r0}deg)`;
+    whenVisible(el, () => setTimeout(() => {
+      spring([x0, y0, r0], { stiffness: 120, damping: 13 }, ([x, y, r]) => {
+        el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`;
+      });
+    }, delay));
+  }
+
+  document.querySelectorAll('.claims li').forEach((el, i) => prime(el, [0, 60, 0], i * 90));
+  document.querySelectorAll('section.row').forEach(row => {
+    const flip = row.classList.contains('flip');
+    const copy = row.querySelector('.copy');
+    const fig = row.querySelector('figure, .pair');
+    if (copy) prime(copy, [flip ? 70 : -70, 0, 0]);
+    if (fig) prime(fig, [flip ? -90 : 90, 20, flip ? -2 : 2], 80);
+  });
+  // Shader tiles fly in from scattered spots and assemble into the grid.
+  document.querySelectorAll('.tiles figure').forEach((el, i) => {
+    const angle = (i * 137.5) * Math.PI / 180;
+    prime(el, [Math.cos(angle) * 160, Math.sin(angle) * 110 + 40, (i % 2 ? 1 : -1) * (8 + (i % 5) * 4)], i * 55);
+  });
+  document.querySelectorAll('.spec dt, .spec dd').forEach((el, i) => prime(el, [i % 2 ? 60 : -60, 0, 0], Math.floor(i / 2) * 60));
+
+  // Headings scramble when they first scroll into view.
+  document.querySelectorAll('[data-scramble], section.row h2, .spec h2').forEach(el => {
+    if (below(el)) whenVisible(el, () => scramble(el, { duration: 700, stagger: 28 }), 0.8);
+  });
+  check();
 })();
 </script>
