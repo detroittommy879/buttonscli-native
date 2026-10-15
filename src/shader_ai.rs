@@ -179,7 +179,10 @@ mod tests {
     #[ignore = "sends real requests; set BUTTONSCLI_TEST_LIVE_SHADER_AI=1"]
     fn live_shader_ai_with_active_profile() {
         use crate::assistant::credentials::{CredentialStore, SystemCredentialStore};
-        assert_eq!(std::env::var("BUTTONSCLI_TEST_LIVE_SHADER_AI").as_deref(), Ok("1"));
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_LIVE_SHADER_AI").as_deref(),
+            Ok("1")
+        );
         let root = home::home_dir().unwrap().join(".buttonscli-native");
         let active: serde_json::Value =
             serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
@@ -198,7 +201,10 @@ mod tests {
             ..Default::default()
         };
         for (request, current) in [
-            ("slow purple and teal waves with a few sparkles", CustomShader::default()),
+            (
+                "slow purple and teal waves with a few sparkles",
+                CustomShader::default(),
+            ),
             ("", broken),
         ] {
             let error = crate::plugins::effects::shader_expression::function(&current).err();
@@ -206,7 +212,8 @@ mod tests {
                 &crate::assistant::transport::ReqwestTransport,
                 &chain,
                 &mut |provider| {
-                    let reference = crate::assistant::credentials::reference(&profile, &provider.id);
+                    let reference =
+                        crate::assistant::credentials::reference(&profile, &provider.id);
                     if provider.credential_ref.as_deref() != Some(reference.as_str()) {
                         return Ok(None);
                     }
