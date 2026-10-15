@@ -37,6 +37,13 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95;
 .top nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover { color: var(--text); }
+.top nav { align-items: center; }
+.motion-toggle { font: 600 12px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.motion-toggle[aria-pressed="true"] { color: var(--amber); border-color: var(--amber); }
+.shots { padding-block: 56px; border-top: 1px solid var(--rule); display: grid; gap: 14px; }
+.shots header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+.shots h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.shots header p { color: var(--muted); max-width: 52ch; margin: 0; }
 
 /* Hero */
 .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 40px 72px; }
@@ -141,10 +148,12 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
     <div class="brand"><b>B</b>BUTTONSCLI</div>
     <nav aria-label="Sections">
       <a href="#buttons">Buttons</a>
+      <a href="#real">Screenshots</a>
       <a href="#practice">AI practice</a>
       <a href="#shaders">Shaders</a>
       <a href="#agents">Agents</a>
       <a href="#specs">Specs</a>
+      <button type="button" id="motion-toggle" class="motion-toggle" aria-pressed="true">Motion on</button>
     </nav>
   </header>
 
@@ -228,6 +237,34 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
     <figure>
       <img src="img/ai-practice.jpg" width="1600" height="974" alt="An AI-simulated Linux terminal above a real PowerShell pane with a blue marbled shader background">
       <figcaption>Top: the AI-simulated workstation. Bottom: a real PowerShell session with a shader background.</figcaption>
+    </figure>
+  </section>
+
+  <section class="shots" id="real" aria-labelledby="h-real">
+    <header>
+      <div>
+        <div class="eyebrow">Real screenshots</div>
+        <h2 id="h-real" data-scramble>Seven shells, one window</h2>
+      </div>
+      <p>Every pane runs a real shell with its own theme and background: a galaxy here, stained glass there, a VHS tape in the corner. Right-click any pane to change its theme or font on the spot.</p>
+    </header>
+    <figure>
+      <img src="img/seven-panes.jpg" width="1600" height="1105" loading="lazy" alt="ButtonsCLI with seven tiled terminals, each with a different animated shader background, and a pane menu open for choosing a font">
+      <figcaption>Seven panes, seven backgrounds, and a pane menu for picking that terminal's font.</figcaption>
+    </figure>
+    <div class="pair">
+      <figure>
+        <img src="img/galaxy-disco.jpg" width="1600" height="979" loading="lazy" alt="A purple-themed ButtonsCLI window with a galaxy swirl background and a pane of glowing colored tiles">
+        <figcaption>Galaxy Brain and Disco Inferno, the theme with its own shader code.</figcaption>
+      </figure>
+      <figure>
+        <img src="img/stained-glass.jpg" width="1600" height="979" loading="lazy" alt="A ButtonsCLI pane with a stained-glass background below two terminals">
+        <figcaption>Stained Glass Chapel behind a PowerShell pane.</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <img src="img/memory.jpg" width="1800" height="927" loading="lazy" alt="ButtonsCLI with seven panes and the Settings theme library open, next to Task Manager showing buttonscli.exe using 118.7 MB of memory">
+      <figcaption>Seven shells, shaders running and Settings open: Task Manager shows 118.7 MB for ButtonsCLI.</figcaption>
     </figure>
   </section>
 
@@ -335,6 +372,10 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
 </div>
 
 <script>
+// Saved choice from the Motion toggle; default is motion on.
+try { window.__motionOff = localStorage.getItem("buttonscli-motion") === "off"; } catch (e) { window.__motionOff = false; }
+</script>
+<script>
 (() => {
   // ---- Terminal demo: buttons type canned output into the pane ----
   const term = document.getElementById('term');
@@ -349,7 +390,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   let html = 'Welcome to ButtonsCLI. Click a button above.\n' + prompt;
   let busy = false;
   term.innerHTML = html;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Motion is on unless the visitor turns it off with the toggle (remembered locally).
+  const reduce = window.__motionOff === true;
   function run(cmd) {
     if (busy) return;
     if (cmd === 'clear') { html = prompt; term.innerHTML = html; return; }
@@ -457,8 +499,9 @@ void main(){
 // Springs: a damped harmonic oscillator, x'' = -k(x - target) - c x', stepped
 // with semi-implicit Euler. Low damping overshoots a little and settles.
 (() => {
-  // Respect reduced motion; #motion forces it on for previews.
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches && location.hash !== '#motion') return;
+  if (window.__motionOff) return;
+  // The OS reduced-motion setting keeps motion but makes it calmer.
+  const gentle = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
   const easeInCubic = x => x * x * x;
@@ -559,7 +602,7 @@ void main(){
   // Hero window follows the pointer with a lerp-smoothed tilt.
   const win = document.querySelector('.win');
   let tx = 0, ty = 0, cx = 0, cy = 0;
-  addEventListener('pointermove', e => {
+  if (!gentle) addEventListener('pointermove', e => {
     tx = (e.clientX / innerWidth - 0.5) * 6;
     ty = (e.clientY / innerHeight - 0.5) * -6;
   });
@@ -594,7 +637,8 @@ void main(){
 
   function prime(el, from, delay = 0) {
     if (!below(el)) return;
-    const [x0, y0, r0] = from;
+    const k = gentle ? 0.35 : 1;
+    const [x0, y0, r0] = from.map(v => v * k);
     el.style.transform = `translate(${x0}px, ${y0}px) rotate(${r0}deg)`;
     whenVisible(el, () => setTimeout(() => {
       spring([x0, y0, r0], { stiffness: 120, damping: 13 }, ([x, y, r]) => {
@@ -623,5 +667,19 @@ void main(){
     if (below(el)) whenVisible(el, () => scramble(el, { duration: 700, stagger: 28 }), 0.8);
   });
   check();
+})();
+</script>
+<script>
+// Motion toggle: remember the choice and reload so every effect follows it.
+(() => {
+  const toggle = document.getElementById('motion-toggle');
+  if (!toggle) return;
+  const off = window.__motionOff === true;
+  toggle.setAttribute('aria-pressed', String(!off));
+  toggle.textContent = off ? 'Motion off' : 'Motion on';
+  toggle.addEventListener('click', () => {
+    try { localStorage.setItem('buttonscli-motion', off ? 'on' : 'off'); } catch (e) {}
+    location.reload();
+  });
 })();
 </script>
