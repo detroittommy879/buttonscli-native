@@ -438,6 +438,7 @@ mod tests {
     }
 
     /// Writes `<preset>.png` (480x270, max strength) for docs and the website.
+    #[cfg(target_os = "windows")]
     #[test]
     #[ignore = "requires a graphics adapter; set BUTTONSCLI_SHADER_GALLERY_DIR"]
     fn render_shader_gallery() {
