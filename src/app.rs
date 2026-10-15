@@ -16103,6 +16103,63 @@ Start-Sleep -Seconds 300
         println!("Native theme imports/captures passed: {}", expected.len());
     }
 
+    /// Prints this process's private memory after each startup phase.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "diagnostic: prints memory by startup phase"]
+    fn memory_by_startup_phase() {
+        fn private_mb() -> f64 {
+            let output = std::process::Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    &format!(
+                        "(Get-Process -Id {}).PrivateMemorySize64",
+                        std::process::id()
+                    ),
+                ])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<f64>()
+                .unwrap()
+                / 1_048_576.0
+        }
+        let mut last = private_mb();
+        let mut report = |label: &str| {
+            let now = private_mb();
+            println!("{label:<28} {now:8.1} MB  (+{:.1})", now - last);
+            last = now;
+        };
+        report("baseline");
+        let themes = ThemeCatalog::load();
+        report("theme catalog");
+        let catalog = fonts::FontCatalog::bundled();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &catalog);
+        report("fonts installed");
+        let mut app = ButtonsApp::empty(Preferences::default());
+        report("app state");
+        app.show_localization_onboarding = false;
+        for _ in 0..3 {
+            let _ = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 820.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            );
+        }
+        report("3 frames rendered (CPU)");
+        drop(themes);
+    }
+
     #[cfg(windows)]
     #[test]
     #[ignore = "opens a test-owned shader Settings window for visual verification"]

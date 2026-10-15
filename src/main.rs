@@ -31,6 +31,7 @@ fn main() -> eframe::Result {
             .with_title("ButtonsCLI")
             .with_inner_size([1280.0, 820.0])
             .with_min_inner_size([760.0, 480.0]),
+        wgpu_options: low_memory_wgpu(),
         ..Default::default()
     };
 
@@ -43,6 +44,26 @@ fn main() -> eframe::Result {
             )))
         }),
     )
+}
+
+/// A terminal draws little: prefer the power-saving GPU and small GPU memory
+/// blocks over egui's high-performance defaults. `WGPU_POWER_PREF` still wins.
+#[cfg(not(target_arch = "wasm32"))]
+fn low_memory_wgpu() -> eframe::egui_wgpu::WgpuConfiguration {
+    use eframe::egui_wgpu::{WgpuSetup, WgpuSetupCreateNew};
+    use eframe::wgpu;
+    let mut setup = WgpuSetupCreateNew::default();
+    setup.power_preference =
+        wgpu::PowerPreference::from_env().unwrap_or(wgpu::PowerPreference::LowPower);
+    let base = setup.device_descriptor.clone();
+    setup.device_descriptor = std::sync::Arc::new(move |adapter| wgpu::DeviceDescriptor {
+        memory_hints: wgpu::MemoryHints::MemoryUsage,
+        ..base(adapter)
+    });
+    eframe::egui_wgpu::WgpuConfiguration {
+        wgpu_setup: WgpuSetup::CreateNew(setup),
+        ..Default::default()
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
