@@ -62,18 +62,65 @@ pub(crate) fn program(custom: &CustomShader) -> Result<String, String> {
     Ok(combine(&function(custom)?))
 }
 
+/// Helpers (`hash`, `noise`, `cloud`, `stars`, `palette`, `hsv`) shared by the
+/// presets and callable from custom expressions.
+pub(crate) const HELPERS: &str = include_str!("shader_helpers.wgsl");
+/// The complete preset program.
+pub(crate) const SOURCE: &str = concat!(
+    include_str!("shader_helpers.wgsl"),
+    include_str!("shader_background.wgsl")
+);
+
 fn combine(source: &str) -> String {
-    let full = include_str!("shader_background.wgsl").replace(
+    let full = SOURCE.replace(
         "let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);",
-        "let color = clamp(custom_pattern(p, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;"
+        "let color = clamp(custom_pattern(p, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);"
     );
     format!("{full}\n{source}")
 }
 
+/// Line numbers in diagnostics refer to the user's expression, not the prelude.
+fn helper_lines() -> usize {
+    HELPERS.lines().count()
+}
+
+/// Rewrite `wgsl:LINE:COL` so it counts from the generated function's first line.
+fn shift_line_numbers(line: &str, offset: usize) -> String {
+    let Some(start) = line.find("wgsl:") else {
+        return line.to_owned();
+    };
+    let digits_at = start + "wgsl:".len();
+    let digits: String = line[digits_at..]
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    match digits.parse::<usize>() {
+        Ok(number) if number > offset => format!(
+            "{}expression:{}{}",
+            &line[..start],
+            number - offset,
+            &line[digits_at + digits.len()..]
+        ),
+        _ => line.to_owned(),
+    }
+}
+
 fn validate(source: &str) -> Result<(), String> {
-    let module =
-        naga::front::wgsl::parse_str(source).map_err(|error| error.emit_to_string(source))?;
-    if module.functions.len() != 1
+    // The helpers come first so the expression can call them; anything beyond
+    // them plus the one generated function is rejected below.
+    let helper_count = naga::front::wgsl::parse_str(HELPERS)
+        .map(|module| module.functions.len())
+        .unwrap_or(0);
+    let standalone = format!("{HELPERS}{source}");
+    let module = naga::front::wgsl::parse_str(&standalone).map_err(|error| {
+        error
+            .emit_to_string(&standalone)
+            .lines()
+            .map(|line| shift_line_numbers(line, helper_lines()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
+    if module.functions.len() != helper_count + 1
         || !module.entry_points.is_empty()
         || !module.global_variables.is_empty()
         || !module.constants.is_empty()
@@ -91,12 +138,22 @@ fn validate(source: &str) -> Result<(), String> {
     }) {
         return Err("Only scalar, vector and matrix math is supported; arrays, structures and resources are disabled.".into());
     }
-    let function = module.functions.iter().next().unwrap().1;
+    let Some((_, function)) = module
+        .functions
+        .iter()
+        .find(|(_, function)| function.name.as_deref() == Some("custom_pattern"))
+    else {
+        return Err("Enter one color expression, without declarations or resources.".into());
+    };
     if function.expressions.len() > 128
         || function.body.iter().any(|statement| {
             !matches!(
                 statement,
-                naga::Statement::Emit(_) | naga::Statement::Return { .. }
+                naga::Statement::Emit(_)
+                    | naga::Statement::Return { .. }
+                    // Calls can only reach the fixed, loop-free helpers: the
+                    // function count check above rejects any added function.
+                    | naga::Statement::Call { .. }
             )
         })
         || function
@@ -152,5 +209,40 @@ mod tests {
         custom = CustomShader::default();
         custom.variables[0].name = "p".into();
         assert!(function(&custom).is_err());
+        custom = CustomShader::default();
+        custom.variables[0].name = "noise".into();
+        assert!(function(&custom).is_err(), "helper names are reserved");
+    }
+
+    #[test]
+    fn expressions_can_call_helpers_but_not_add_functions() {
+        let mut custom = CustomShader {
+            expression:
+                "palette(cloud(p) + t) * hsv(hash(p), 0.5, 1.0) + vec3<f32>(stars(p, t) * noise(p))"
+                    .into(),
+            ..Default::default()
+        };
+        assert!(function(&custom).is_ok());
+        custom.expression =
+            "c1; } fn palette2(x: f32) -> vec3<f32> { return vec3<f32>(x); } fn z() -> vec3<f32> { return c1".into();
+        assert!(function(&custom).is_err());
+        custom.expression = "vec3<f32>(oops)".into();
+        let error = function(&custom).unwrap_err();
+        assert!(
+            !error.contains("wgsl:"),
+            "line numbers point at the expression: {error}"
+        );
+    }
+
+    #[test]
+    fn preset_program_validates_with_naga() {
+        let module = naga::front::wgsl::parse_str(SOURCE).unwrap();
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::empty(),
+        )
+        .validate(&module)
+        .unwrap();
+        assert!(program(&CustomShader::default()).is_ok());
     }
 }

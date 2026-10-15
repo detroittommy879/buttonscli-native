@@ -470,7 +470,26 @@ impl ShaderBackground {
         ("ocean", "Ocean currents"),
         ("hex", "Hex bloom"),
         ("silk", "Electric silk"),
+        // Full-spectrum presets choose their own colors (index 17 onward).
+        ("plasma", "Neon plasma"),
+        ("synthwave", "Synthwave"),
+        ("curtains", "Rainbow curtains"),
+        ("galaxy", "Galaxy swirl"),
+        ("candy", "Candy stripes"),
+        ("glass", "Stained glass"),
+        ("liquid", "Liquid rainbow"),
+        ("disco", "Disco dots"),
+        ("rings", "Rainbow rings"),
+        ("fireice", "Fire and ice"),
+        ("jellyfish", "Jellyfish"),
+        ("pixelrain", "Pixel rain"),
+        ("opal", "Opal"),
+        ("tropical", "Tropical"),
+        ("cosmic", "Cosmic dust"),
     ];
+
+    /// First preset that ignores c1–c3 and draws its own full-spectrum colors.
+    pub const FIRST_VIVID: usize = 17;
 
     pub fn preset_index(&self) -> Option<usize> {
         Self::PRESETS.iter().position(|(id, _)| *id == self.preset)
