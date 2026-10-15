@@ -41,5 +41,6 @@ jobs:
           name: buttonscli-web-preview
           path: |
             web/index.html
+            web/simulator.js
             web/pkg/buttonscli.js
             web/pkg/buttonscli_bg.wasm

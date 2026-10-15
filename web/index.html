@@ -28,6 +28,10 @@ canvas { width: 100%; height: 100%; display: block; }
 <strong>ButtonsCLI · browser preview</strong>
 <span id="build" title="Compiled source revision and build time"></span>
 <button id="settings" disabled>Themes &amp; Settings</button>
+<button id="prompt-settings" disabled>Simulator prompts</button>
+<button id="offline-mode" disabled>Offline practice</button>
+<button id="ai-mode" disabled>AI simulator</button>
+<button id="desktop-prompts" hidden>Load desktop prompts</button>
 <label class="file-button">Load theme JSON<input id="theme-file" type="file" accept=".json,application/json" disabled /></label>
 <span id="status" role="status">Loading app…</span>
 </header>
@@ -60,7 +64,8 @@ try {
   window.buttonscli = app;
   document.getElementById("loading").remove();
   settings.disabled = file.disabled = false;
-  status.textContent = "Fake shell · settings and themes stay in this browser";
+  const { connectSimulator } = await import(`./simulator.js${suffix}`);
+  await connectSimulator(app, status);
   settings.addEventListener("click", () => {
     try { app.open_settings(); } catch (error) { status.textContent = String(error); }
   });

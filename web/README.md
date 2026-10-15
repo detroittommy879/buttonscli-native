@@ -6,8 +6,9 @@ cache invalidation. Manual builds still work without it.
 
 The WASM build runs the shared egui app UI with a fake terminal. Visitors can
 browse/search/apply the 563 bundled themes, change fonts and Settings, and use
-command preset buttons (including adding/editing presets). Theme colors and
-bundled fonts update the fake terminal. No command reaches a shell or server.
+top/left command buttons (including adding/editing presets). Theme colors,
+bundled fonts and ANSI colors update the terminal. Offline practice supports
+virtual file creation/deletion, reset and undo; no command reaches a real shell.
 
 **Load theme JSON** reads a version 1 ButtonsCLI theme file locally, adds it to
 Library, and applies the checked theme scopes. Browser storage retains preferences
@@ -24,6 +25,26 @@ On Windows (Rust, Node/npm, and Python on PATH):
 ./scripts/build-web.ps1 -Serve
 ```
 
+This starts the loopback-only Rust preview server. **AI simulator** uses the
+simulated-terminal model/fallbacks already chosen in native Settings → AI models.
+Keys stay in OS credentials. The server reads native configuration once at startup
+and never writes it. **Load desktop prompts** imports that setup into the browser;
+subsequent browser edits remain local. Reopen/restart the server after changing
+native providers. Requests may use provider credits.
+
+**Simulator prompts** opens complete editable system instructions, scenario and
+user-message template, with preview and saved practice presets. Prompt presets
+and settings persist per browser origin; virtual files/transcript reset on reload.
+No model tools, host filesystem or real terminal-control routes are attached.
+Cancel/reset discard stale responses and keep virtual state consistent.
+
+Use `./scripts/build-web.ps1 -Serve -Offline` for a static offline-only preview.
+Without recompiling, start the local bridge with:
+
+```powershell
+cargo run --locked --bin buttonscli-web -- --port 8080 --web-root web
+```
+
 Or on any platform with wasm-pack installed:
 
 ```sh
@@ -37,13 +58,24 @@ skips its incompatible wasm-opt pass; Rust still produces an optimized release.
 
 ## Hosting
 
-Upload `index.html` and `pkg/buttonscli.js` plus `pkg/buttonscli_bg.wasm`, keeping
+Upload `index.html`, `simulator.js`, `pkg/buttonscli.js` and `pkg/buttonscli_bg.wasm`, keeping
 that folder structure, to any static HTTP(S) host. Relative asset paths support a
 subdirectory or an iframe. Serve `.wasm` as `application/wasm`; enable gzip/Brotli
 because bundled fonts make the uncompressed WASM about 38 MB. CI now builds the
 JS bindings and uploads a `buttonscli-web-preview` artifact; it does not deploy it.
 
+Static hosting provides offline practice; the AI bridge is an explicitly launched
+local utility, not a public API-key relay. It binds 127.0.0.1, requires an ephemeral
+session token, rejects other origins/rebound hosts, serves only preview assets and
+limits request sizes/concurrency. Runtime tests cover unauthorized/cross-origin
+requests and a destructive virtual command leaving a real sentinel intact.
+
 Desktop PTYs, multi-pane sessions, native theme editing/saving/generation, OS
 fonts, and GPU effects remain desktop-only. Effect scopes can be selected but the
 fake terminal does not render those effects. WebGL is required. Startup/loading
 failures show an error and retry button, including missing JS/WASM assets.
+
+New-install examples fill both command areas. Existing saved lists, including
+intentionally empty ones, are retained. Update/interactive examples paste for
+review; echo explanations use plain quoted text and three lines on PowerShell/POSIX
+shells. Tool availability and command syntax depend on the chosen shell.

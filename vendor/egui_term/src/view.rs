@@ -364,6 +364,7 @@ impl<'a> TerminalView<'a> {
                 egui::Event::Text(_)
                 | egui::Event::Key { .. }
                 | egui::Event::Copy
+                | egui::Event::Cut
                 | egui::Event::Paste(_)
                     if self.has_focus
                         && layout.has_focus()
@@ -1241,6 +1242,13 @@ fn process_keyboard_event(
             ctrl_c_copies_selection,
             cfg!(target_os = "macos"),
         ),
+        // egui-winit turns Ctrl+X (and Shift+Delete on Windows) into Cut, so
+        // without this the shell never sees ^X (nano exit, readline, etc.).
+        egui::Event::Cut => cut_action(
+            backend.selectable_content(),
+            modifiers,
+            cfg!(target_os = "macos"),
+        ),
         egui::Event::Key {
             key,
             pressed,
@@ -1284,6 +1292,26 @@ fn copy_action(
         InputAction::BackendCall(BackendCommand::Write(vec![0x3]))
     } else {
         InputAction::Ignore
+    }
+}
+
+fn cut_action(
+    content: String,
+    modifiers: Modifiers,
+    macos: bool,
+) -> InputAction {
+    if macos {
+        // Cmd+X cannot remove terminal text; treat it as copy.
+        if content.is_empty() {
+            InputAction::Ignore
+        } else {
+            InputAction::WriteToClipboard(content)
+        }
+    } else if modifiers.shift && !modifiers.ctrl {
+        // Windows Shift+Delete: forward the Delete key sequence.
+        InputAction::BackendCall(BackendCommand::Write(b"\x1b[3;2~".to_vec()))
+    } else {
+        InputAction::BackendCall(BackendCommand::Write(vec![0x18]))
     }
 }
 
@@ -1591,6 +1619,19 @@ mod background_gradient_tests {
             ),
             InputAction::Ignore
         ));
+    }
+
+    #[test]
+    fn cut_shortcut_reaches_the_shell_instead_of_being_dropped() {
+        assert!(
+            matches!(cut_action("sel".into(), Modifiers::CTRL, false), InputAction::BackendCall(BackendCommand::Write(bytes)) if bytes == [0x18])
+        );
+        assert!(
+            matches!(cut_action(String::new(), Modifiers::SHIFT, false), InputAction::BackendCall(BackendCommand::Write(bytes)) if bytes == b"\x1b[3;2~")
+        );
+        assert!(
+            matches!(cut_action("sel".into(), Modifiers::MAC_CMD, true), InputAction::WriteToClipboard(text) if text == "sel")
+        );
     }
 
     #[test]

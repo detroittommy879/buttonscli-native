@@ -13,3 +13,8 @@ pub(crate) mod simulation;
 pub(crate) mod transport;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod virtual_terminal;
+
+pub(crate) mod simulation_protocol;
+
+#[cfg(any(target_arch = "wasm32", test))]
+pub(crate) mod browser_simulator;
