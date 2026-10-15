@@ -10043,7 +10043,13 @@ impl ButtonsApp {
             } else {
                 &mut self.preferences.status_background_override
             };
-            if ui.color_edit_button_srgba(&mut color).changed() {
+            // Inline picker: a color button would open a second popup, and clicking in
+            // it counted as a click outside this menu, closing both unchanged.
+            if egui::color_picker::color_picker_color32(
+                ui,
+                &mut color,
+                egui::color_picker::Alpha::Opaque,
+            ) {
                 *target = Some(crate::theme::to_hex(color));
                 ui.ctx().request_repaint();
             }
@@ -15030,7 +15036,7 @@ mod tests {
             app.preferences.status_background_override = Some("#345678".into());
             let ctx = egui::Context::default();
             fonts::install(&ctx, &app.font_catalog);
-            let mut render = |events| {
+            let render = |app: &mut ButtonsApp, events| {
                 ctx.run(
                     egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(
@@ -15050,15 +15056,21 @@ mod tests {
                     },
                 )
             };
-            render(vec![]);
+            render(&mut app, vec![]);
             let pos = if dock {
                 egui::pos2(40.0, 650.0)
             } else {
                 egui::pos2(850.0, 680.0)
             };
-            render(pointer_events(pos, egui::PointerButton::Secondary, true));
-            render(pointer_events(pos, egui::PointerButton::Secondary, false));
-            let menu = render(vec![]);
+            render(
+                &mut app,
+                pointer_events(pos, egui::PointerButton::Secondary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(pos, egui::PointerButton::Secondary, false),
+            );
+            let menu = render(&mut app, vec![]);
             assert!(text_position(
                 &menu,
                 if dock {
@@ -15068,10 +15080,46 @@ mod tests {
                 }
             )
             .is_some());
+            // Picking a color inside the menu changes it and keeps the menu open.
+            let title = text_position(
+                &menu,
+                if dock {
+                    "Dock background"
+                } else {
+                    "Status bar background"
+                },
+            )
+            .unwrap();
+            let reset = text_position(&menu, "Use theme color").unwrap();
+            let swatch = egui::pos2(title.x + 25.0, title.y + (reset.y - title.y) * 0.45);
+            let before = (
+                app.preferences.dock_background_override.clone(),
+                app.preferences.status_background_override.clone(),
+            );
+            render(
+                &mut app,
+                pointer_events(swatch, egui::PointerButton::Primary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(swatch, egui::PointerButton::Primary, false),
+            );
+            let after = (
+                app.preferences.dock_background_override.clone(),
+                app.preferences.status_background_override.clone(),
+            );
+            assert_ne!(before, after, "clicking the picker changes the color");
+            let menu = render(&mut app, vec![]);
             let reset =
-                text_position(&menu, "Use theme color").expect("background reset menu item");
-            render(pointer_events(reset, egui::PointerButton::Primary, true));
-            render(pointer_events(reset, egui::PointerButton::Primary, false));
+                text_position(&menu, "Use theme color").expect("menu stays open after picking");
+            render(
+                &mut app,
+                pointer_events(reset, egui::PointerButton::Primary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(reset, egui::PointerButton::Primary, false),
+            );
             assert_eq!(app.preferences.dock_background_override.is_none(), dock);
             assert_eq!(app.preferences.status_background_override.is_none(), !dock);
         }
