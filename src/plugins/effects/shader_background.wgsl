@@ -195,7 +195,41 @@ fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
             vivid = mix(mix(vec3<f32>(0.1, 0.9, 0.5), vec3<f32>(1.0, 0.85, 0.1), a),
                 vec3<f32>(1.0, 0.3, 0.6), smoothstep(0.45, 0.7, b));
             glow = 0.4 + 0.6 * max(a, b);
-        } else { // Cosmic dust
+        } else if kind < 31.5 { // Cosmic dust
+            let drift = vec2<f32>(t * 0.03, -t * 0.02);
+            let neb = cloud(p * 2.2 + drift + cloud(p * 3.0 - drift));
+            vivid = palette(neb * 1.3 + 0.55) + stars(p * 16.0, t) * vec3<f32>(1.0);
+            glow = clamp(smoothstep(0.3, 0.75, neb) + stars(p * 16.0, t), 0.0, 1.0);
+        } else if kind < 32.5 { // VHS tape: snow, tracking band, ghosting, chroma bleed
+            let line = floor(uv.y * 240.0);
+            let frame = floor(t * 24.0);
+            let snow = hash(floor(position.xy * 0.5) + vec2<f32>(frame * 7.3, frame * 1.9));
+            let roll = fract(uv.y * 0.8 - t * 0.11);
+            let band = smoothstep(0.0, 0.02, roll) * (1.0 - smoothstep(0.02, 0.1, roll));
+            let jitter = (hash(vec2<f32>(line, frame)) - 0.5) * 0.02 * (1.0 + band * 6.0);
+            // A faint shifted copy of the stripes reads as RF ghosting.
+            let stripes = 0.5 + 0.5 * sin((uv.x + jitter) * 18.0 + sin(uv.y * 3.0 + t) * 2.0);
+            let ghost = 0.5 + 0.5 * sin((uv.x + jitter - 0.035) * 18.0 + sin(uv.y * 3.0 + t) * 2.0);
+            let chroma = vec3<f32>(
+                0.5 + 0.5 * sin((uv.x + jitter) * 9.0 + t * 0.5),
+                0.5 + 0.5 * sin((uv.x + jitter) * 9.0 + 2.1 + t * 0.5),
+                0.5 + 0.5 * sin((uv.x + jitter) * 9.0 + 4.2 + t * 0.5)
+            );
+            let scan = 0.75 + 0.25 * sin(uv.y * 754.0);
+            vivid = (chroma * (0.45 + 0.35 * stripes) + vec3<f32>(0.2, 0.25, 0.35) * ghost) * scan
+                + vec3<f32>(snow) * (0.18 + 0.7 * band);
+            glow = clamp(0.35 + 0.4 * stripes + band * 0.6 + snow * 0.15, 0.0, 1.0) * scan;
+        } else if kind < 33.5 { // CRT static: phosphor snow, scanlines, rolling bar, vignette
+            let frame = floor(t * 30.0);
+            let snow = hash(floor(position.xy * 0.75) + vec2<f32>(frame * 3.7, frame * 11.1));
+            let scan = 0.6 + 0.4 * sin(uv.y * 900.0);
+            let bar = 1.0 - smoothstep(0.0, 0.06, abs(fract(uv.y - t * 0.07) - 0.5));
+            let center = uv - 0.5;
+            let vignette = 1.0 - dot(center, center) * 1.6;
+            let tint = mix(vec3<f32>(0.25, 1.0, 0.55), vec3<f32>(0.55, 0.75, 1.0), 0.5 + 0.5 * sin(t * 0.2));
+            vivid = tint * (0.25 + 0.75 * snow) * scan * vignette + vec3<f32>(bar * 0.25);
+            glow = clamp((0.3 + 0.5 * snow + bar * 0.4) * vignette * scan, 0.0, 1.0);
+        } else { // Cosmic dust (fallback for unknown future indices)
             let drift = vec2<f32>(t * 0.03, -t * 0.02);
             let neb = cloud(p * 2.2 + drift + cloud(p * 3.0 - drift));
             vivid = palette(neb * 1.3 + 0.55) + stars(p * 16.0, t) * vec3<f32>(1.0);

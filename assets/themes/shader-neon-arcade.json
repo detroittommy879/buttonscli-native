@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-neon-arcade",
+    "name": "Neon Arcade",
+    "nativeThemeVersion": 1,
+    "description": "Hot pink, electric cyan and laser yellow over a moving neon plasma. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#140a2b",
+        "backgroundSecondary": "#1d0f3d",
+        "border": "#26f0ff",
+        "textMain": "#fdf6ff",
+        "textDim": "#b9a3e8",
+        "accent": "#ff3fd2",
+        "accentHover": "#fff15a",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#1d0f3d",
+        "idleBackground": "#2a1455",
+        "activeBackground": "#140a2b",
+        "hoverBackground": "#2a1455",
+        "activeBorder": "#ff3fd2",
+        "textActive": "#fdf6ff",
+        "textIdle": "#b9a3e8",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#1d0f3d",
+        "headerBackground": "#2a1455",
+        "buttonBackground": "#3a1a6e",
+        "buttonHover": "#26f0ff",
+        "widthAccent": "#fff15a"
+      },
+      "statusBar": {
+        "background": "#2b0f52",
+        "text": "#fdf6ff",
+        "accent": "#ff3fd2",
+        "border": "#26f0ff",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Fira Code Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#0b0618",
+      "foreground": "#f4f1ff",
+      "cursor": "#ff3fd2",
+      "selectionBackground": "#5a1f7a",
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#0b0618",
+        "#3b0d6b",
+        "#06405c"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#3d2a5c",
+        "red": "#ff4f8b",
+        "green": "#54ff9f",
+        "yellow": "#ffe45e",
+        "blue": "#4fa8ff",
+        "magenta": "#ff6bf0",
+        "cyan": "#3ff7ff",
+        "white": "#efe7ff",
+        "brightBlack": "#7b64a8",
+        "brightRed": "#ff86ad",
+        "brightGreen": "#8dffbf",
+        "brightYellow": "#fff08f",
+        "brightBlue": "#86c4ff",
+        "brightMagenta": "#ff9ff5",
+        "brightCyan": "#8cfbff",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "plasma",
+      "strength": 0.4,
+      "speed": 0.4,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

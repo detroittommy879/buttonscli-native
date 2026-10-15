@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-galaxy-brain",
+    "name": "Galaxy Brain",
+    "nativeThemeVersion": 1,
+    "description": "A spiral galaxy in violet and teal with twinkling stars. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#0b0b28",
+        "backgroundSecondary": "#121238",
+        "border": "#2de2e6",
+        "textMain": "#e8ecff",
+        "textDim": "#9aa5e6",
+        "accent": "#8f7dff",
+        "accentHover": "#ff7ad9",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#121238",
+        "idleBackground": "#1b1b52",
+        "activeBackground": "#0b0b28",
+        "hoverBackground": "#1b1b52",
+        "activeBorder": "#8f7dff",
+        "textActive": "#e8ecff",
+        "textIdle": "#9aa5e6",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#121238",
+        "headerBackground": "#1b1b52",
+        "buttonBackground": "#24246a",
+        "buttonHover": "#2de2e6",
+        "widthAccent": "#ff7ad9"
+      },
+      "statusBar": {
+        "background": "#3b2b9e",
+        "text": "#e8ecff",
+        "accent": "#8f7dff",
+        "border": "#2de2e6",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'JetBrains Mono Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#06061a",
+      "foreground": "#e8ecff",
+      "cursor": "#8f7dff",
+      "selectionBackground": "#2b2a7a",
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#06061a",
+        "#24125a",
+        "#063d4f"
+      ],
+      "gradientType": "radial",
+      "ansiColors": {
+        "black": "#2a2d55",
+        "red": "#ff6b9a",
+        "green": "#6ff2b0",
+        "yellow": "#ffe07a",
+        "blue": "#7c9cff",
+        "magenta": "#c88bff",
+        "cyan": "#5ee8f2",
+        "white": "#e6e9ff",
+        "brightBlack": "#5a5f95",
+        "brightRed": "#ff9bbb",
+        "brightGreen": "#9df7c9",
+        "brightYellow": "#ffeaa3",
+        "brightBlue": "#a8bcff",
+        "brightMagenta": "#dcb0ff",
+        "brightCyan": "#94f1f7",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "galaxy",
+      "strength": 0.45,
+      "speed": 0.3,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

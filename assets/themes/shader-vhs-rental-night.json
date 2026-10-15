@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-vhs-rental-night",
+    "name": "VHS Rental Night",
+    "nativeThemeVersion": 1,
+    "description": "Friday night at the video store: tracking lines, tape snow and chroma bleed. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#15121f",
+        "backgroundSecondary": "#1d1930",
+        "border": "#ff3864",
+        "textMain": "#f2efe6",
+        "textDim": "#c4b8a0",
+        "accent": "#ffd23f",
+        "accentHover": "#2de1fc",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#1d1930",
+        "idleBackground": "#2a2442",
+        "activeBackground": "#15121f",
+        "hoverBackground": "#2a2442",
+        "activeBorder": "#ffd23f",
+        "textActive": "#f2efe6",
+        "textIdle": "#c4b8a0",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#1d1930",
+        "headerBackground": "#2a2442",
+        "buttonBackground": "#3a3157",
+        "buttonHover": "#ff3864",
+        "widthAccent": "#2de1fc"
+      },
+      "statusBar": {
+        "background": "#1f4fb5",
+        "text": "#f2efe6",
+        "accent": "#ffd23f",
+        "border": "#ff3864",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Code New Roman Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#0d0b14",
+      "foreground": "#f2efe6",
+      "cursor": "#ffd23f",
+      "selectionBackground": "#3d3360",
+      "fontFamily": "Code New Roman Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#0d0b14",
+        "#2a1540",
+        "#0f3a4a"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#353047",
+        "red": "#ff4f6f",
+        "green": "#55f28a",
+        "yellow": "#ffd23f",
+        "blue": "#4c8dff",
+        "magenta": "#e46bff",
+        "cyan": "#2de1fc",
+        "white": "#eeeae0",
+        "brightBlack": "#6c6684",
+        "brightRed": "#ff8296",
+        "brightGreen": "#8af7ad",
+        "brightYellow": "#ffe27a",
+        "brightBlue": "#86b0ff",
+        "brightMagenta": "#ee9cff",
+        "brightCyan": "#7deefd",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "vhs",
+      "strength": 0.36,
+      "speed": 0.6,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

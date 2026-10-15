@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-phosphor-static",
+    "name": "Phosphor Static",
+    "nativeThemeVersion": 1,
+    "description": "A green phosphor tube between channels: snow, scanlines and a rolling bar. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#06120b",
+        "backgroundSecondary": "#0a1c11",
+        "border": "#2bd17a",
+        "textMain": "#b6ffcf",
+        "textDim": "#5fbf86",
+        "accent": "#5dff9a",
+        "accentHover": "#c6ff6b",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#0a1c11",
+        "idleBackground": "#0f2a19",
+        "activeBackground": "#06120b",
+        "hoverBackground": "#0f2a19",
+        "activeBorder": "#5dff9a",
+        "textActive": "#b6ffcf",
+        "textIdle": "#5fbf86",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#0a1c11",
+        "headerBackground": "#0f2a19",
+        "buttonBackground": "#143a23",
+        "buttonHover": "#2bd17a",
+        "widthAccent": "#c6ff6b"
+      },
+      "statusBar": {
+        "background": "#0f4d2b",
+        "text": "#b6ffcf",
+        "accent": "#5dff9a",
+        "border": "#2bd17a",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'saxmono Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#030a06",
+      "foreground": "#b6ffcf",
+      "cursor": "#5dff9a",
+      "selectionBackground": "#145232",
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#030a06",
+        "#0b2a17",
+        "#04140b"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#1d3a28",
+        "red": "#ff6a6a",
+        "green": "#5dff9a",
+        "yellow": "#e6ff6b",
+        "blue": "#5ac8ff",
+        "magenta": "#d48bff",
+        "cyan": "#5ff7e0",
+        "white": "#c8ffd9",
+        "brightBlack": "#3f6b52",
+        "brightRed": "#ff9a9a",
+        "brightGreen": "#93ffbd",
+        "brightYellow": "#efff9e",
+        "brightBlue": "#90dbff",
+        "brightMagenta": "#e2b3ff",
+        "brightCyan": "#94faea",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "crt",
+      "strength": 0.3,
+      "speed": 0.5,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

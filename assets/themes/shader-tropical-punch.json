@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-tropical-punch",
+    "name": "Tropical Punch",
+    "nativeThemeVersion": 1,
+    "description": "Lime, mango and flamingo pink drifting like a beach cocktail. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#0f2219",
+        "backgroundSecondary": "#143023",
+        "border": "#ff5c8d",
+        "textMain": "#f6fff4",
+        "textDim": "#a8e3b8",
+        "accent": "#ffb627",
+        "accentHover": "#3ef0a0",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#143023",
+        "idleBackground": "#1c4231",
+        "activeBackground": "#0f2219",
+        "hoverBackground": "#1c4231",
+        "activeBorder": "#ffb627",
+        "textActive": "#f6fff4",
+        "textIdle": "#a8e3b8",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#143023",
+        "headerBackground": "#1c4231",
+        "buttonBackground": "#235640",
+        "buttonHover": "#ff5c8d",
+        "widthAccent": "#3ef0a0"
+      },
+      "statusBar": {
+        "background": "#ff5c8d",
+        "text": "#f6fff4",
+        "accent": "#ffb627",
+        "border": "#ff5c8d",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Commit Mono Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#0b1712",
+      "foreground": "#f6fff4",
+      "cursor": "#ffb627",
+      "selectionBackground": "#1f5b3a",
+      "fontFamily": "Commit Mono Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#0b1712",
+        "#14503a",
+        "#5a1d3f"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#2c4a3b",
+        "red": "#ff6f91",
+        "green": "#7dff8a",
+        "yellow": "#ffd23f",
+        "blue": "#4fc3ff",
+        "magenta": "#ff8ad8",
+        "cyan": "#3ff2d0",
+        "white": "#effff0",
+        "brightBlack": "#5f8a74",
+        "brightRed": "#ff9db4",
+        "brightGreen": "#acffb5",
+        "brightYellow": "#ffe27a",
+        "brightBlue": "#8ad8ff",
+        "brightMagenta": "#ffb3e6",
+        "brightCyan": "#86f8e2",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "tropical",
+      "strength": 0.42,
+      "speed": 0.4,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}
