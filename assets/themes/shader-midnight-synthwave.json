@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-midnight-synthwave",
+    "name": "Midnight Synthwave",
+    "nativeThemeVersion": 1,
+    "description": "Sunset gradients, a striped sun and a magenta grid racing to the horizon. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#1a0a30",
+        "backgroundSecondary": "#26103f",
+        "border": "#ffb347",
+        "textMain": "#ffe9f7",
+        "textDim": "#e09ac7",
+        "accent": "#ff4d9d",
+        "accentHover": "#7d5cff",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#26103f",
+        "idleBackground": "#3a1557",
+        "activeBackground": "#1a0a30",
+        "hoverBackground": "#3a1557",
+        "activeBorder": "#ff4d9d",
+        "textActive": "#ffe9f7",
+        "textIdle": "#e09ac7",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#26103f",
+        "headerBackground": "#3a1557",
+        "buttonBackground": "#4c1b68",
+        "buttonHover": "#ffb347",
+        "widthAccent": "#7d5cff"
+      },
+      "statusBar": {
+        "background": "#ff4d9d",
+        "text": "#ffe9f7",
+        "accent": "#ff4d9d",
+        "border": "#ffb347",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Recursive Sans Lnr St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Lnr St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Lnr St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Monoisome Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#120724",
+      "foreground": "#ffe9f7",
+      "cursor": "#ff4d9d",
+      "selectionBackground": "#6b1a5e",
+      "fontFamily": "Monoisome Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#120724",
+        "#4a1460",
+        "#ff6a3d"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#3a2350",
+        "red": "#ff5c8a",
+        "green": "#6dfdbb",
+        "yellow": "#ffcf5c",
+        "blue": "#7aa2ff",
+        "magenta": "#ff6ed8",
+        "cyan": "#5ce1ff",
+        "white": "#fbe8ff",
+        "brightBlack": "#6e4f8c",
+        "brightRed": "#ff8fb0",
+        "brightGreen": "#a2ffd3",
+        "brightYellow": "#ffe08f",
+        "brightBlue": "#a9c1ff",
+        "brightMagenta": "#ff9ee6",
+        "brightCyan": "#93edff",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "synthwave",
+      "strength": 0.45,
+      "speed": 0.5,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

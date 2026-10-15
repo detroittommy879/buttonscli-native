@@ -13,7 +13,13 @@ use super::{
     transport::HttpTransport,
 };
 
-use super::simulation_protocol::{parse_turn, Prompts, Turn};
+use super::simulation_protocol::{parse_turn, Prompts, StreamFilter, Turn};
+
+/// Messages from the request thread: text as it streams, then the parsed turn.
+enum WorkerEvent {
+    Delta(String),
+    Done(Result<Turn, String>),
+}
 
 /// Restorable view state: working directory, prompt and history length.
 #[derive(Clone, Debug, PartialEq)]
@@ -34,7 +40,10 @@ pub(crate) struct Simulation {
     undo: Vec<Checkpoint>,
     pub(crate) error: Option<String>,
     cancel: Option<Arc<AtomicBool>>,
-    receiver: Option<mpsc::Receiver<Result<Turn, String>>>,
+    receiver: Option<mpsc::Receiver<WorkerEvent>>,
+    stream: StreamFilter,
+    /// Streamed lines not yet drawn by the terminal.
+    streamed: String,
     pending_command: String,
     model: String,
 }
@@ -54,6 +63,8 @@ impl Default for Simulation {
             error: None,
             cancel: None,
             receiver: None,
+            stream: StreamFilter::default(),
+            streamed: String::new(),
             pending_command: String::new(),
             model: String::new(),
         }
@@ -136,12 +147,24 @@ impl Simulation {
         }
     }
 
+    /// Lines that streamed in since the last call, safe to draw now.
+    pub(crate) fn take_streamed(&mut self) -> String {
+        std::mem::take(&mut self.streamed)
+    }
+
+    /// When the reply is complete, returns the output not yet streamed.
     pub(crate) fn poll(&mut self) -> Option<Result<String, String>> {
-        let result = match self.receiver.as_ref()?.try_recv() {
-            Ok(result) => result,
-            Err(mpsc::TryRecvError::Empty) => return None,
-            Err(mpsc::TryRecvError::Disconnected) => {
-                Err("Simulation worker stopped; session history was kept.".into())
+        let result = loop {
+            match self.receiver.as_ref()?.try_recv() {
+                Ok(WorkerEvent::Delta(text)) => {
+                    let shown = self.stream.push(&text);
+                    self.streamed.push_str(&shown);
+                }
+                Ok(WorkerEvent::Done(result)) => break result,
+                Err(mpsc::TryRecvError::Empty) => return None,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    break Err("Simulation worker stopped; session history was kept.".into())
+                }
             }
         };
         let cancelled = self
@@ -156,7 +179,11 @@ impl Simulation {
             ));
         }
         Some(result.map(|turn| {
-            let output = turn.output.clone();
+            let output = if self.stream.shown_anything() {
+                self.stream.remainder(&turn.output)
+            } else {
+                turn.output.clone()
+            };
             self.commit(turn);
             output
         }))
@@ -229,15 +256,23 @@ impl Simulation {
         self.cancel = Some(Arc::clone(&cancel));
         let (tx, rx) = mpsc::channel();
         self.receiver = Some(rx);
+        self.stream = StreamFilter::default();
+        self.streamed.clear();
         std::thread::spawn(move || {
+            let deltas = tx.clone();
+            let repaint = ctx.clone();
             let result = generate_turn(
                 &super::transport::ReqwestTransport,
                 &providers,
                 &mut load_key,
                 &prompts,
                 &cancel,
+                &mut |text| {
+                    let _ = deltas.send(WorkerEvent::Delta(text.to_owned()));
+                    repaint.request_repaint();
+                },
             );
-            let _ = tx.send(result);
+            let _ = tx.send(WorkerEvent::Done(result));
             ctx.request_repaint();
         });
     }
@@ -249,6 +284,7 @@ pub(crate) fn generate_turn(
     load_key: &mut super::client::KeyLoader<'_>,
     prompts: &Prompts,
     cancel: &AtomicBool,
+    on_delta: &mut dyn FnMut(&str),
 ) -> Result<Turn, String> {
     let mut model = String::new();
     let raw = complete_with_fallback(
@@ -261,7 +297,7 @@ pub(crate) fn generate_turn(
         (&prompts.system, &prompts.user),
         &prompts.history,
         cancel,
-        &mut |_| {},
+        on_delta,
     )
     .map_err(|error| error.to_string())?;
     if cancel.load(Ordering::Relaxed) {
@@ -314,9 +350,13 @@ mod tests {
             simulation.command = command.into();
             simulation.start(vec![provider.clone()], |_| Ok(None), ctx.clone());
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let mut shown = String::new();
             while simulation.receiver.is_some() && std::time::Instant::now() < deadline {
-                if let Some(result) = simulation.poll() {
-                    return result.unwrap();
+                let result = simulation.poll();
+                // Streamed lines plus the remainder make up the whole output.
+                shown.push_str(&simulation.take_streamed());
+                if let Some(result) = result {
+                    return shown + &result.unwrap();
                 }
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
@@ -368,6 +408,7 @@ mod tests {
             .chain(super::super::provider::AiTask::Simulation);
         let mut simulation = Simulation::configured(&preferences.simulation);
         for command in ["", "ls -a", "cd /tmp", "pwd"] {
+            let mut chunks = 0_usize;
             simulation.command = command.into();
             let prompts = simulation.prompts().unwrap();
             let turn = generate_turn(
@@ -385,10 +426,11 @@ mod tests {
                 },
                 &prompts,
                 &AtomicBool::new(false),
+                &mut |_| chunks += 1,
             )
             .unwrap_or_else(|error| panic!("{command:?}: {error}"));
             println!(
-                "--- {command:?} via {} · prompt {:?} · cwd {:?}\n{}",
+                "--- {command:?} via {} · {chunks} chunks · prompt {:?} · cwd {:?}\n{}",
                 turn.model, turn.prompt, turn.cwd, turn.output
             );
             simulation.pending_command = command.into();
@@ -431,7 +473,8 @@ mod tests {
             &[ProviderProfile::default()],
             &mut |_| Ok(None),
             &prompts,
-            &AtomicBool::new(true)
+            &AtomicBool::new(true),
+            &mut |_| {}
         )
         .is_err());
     }

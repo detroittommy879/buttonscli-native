@@ -1,0 +1,627 @@
+<title>ButtonsCLI</title>
+<meta name="description" content="ButtonsCLI is a native terminal with clickable command buttons, tiled panes, 555 themes and GPU shader backgrounds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one warm terminal-chrome world; the hero is a working mini ButtonsCLI window,
+   then alternating screenshot/explanation rows, a shader wall and a spec sheet. */
+:root {
+  --ink: #120d0a;        /* page ground, like the app's darkest chrome */
+  --panel: #1c1510;      /* window body */
+  --chrome: #2a1e15;     /* title/tab/button bars */
+  --rule: #3d2c20;       /* hairlines */
+  --text: #f3e7da;
+  --muted: #b8a08b;
+  --amber: #ff8a3d;      /* ButtonsCLI orange */
+  --amber-soft: #ffb37a;
+  --focus: #ffd166;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--ink); }
+body { background: var(--ink); color: var(--text); font: 16px/1.6 var(--body); margin: 0; padding-inline: 20px; }
+.wrap { max-width: 1180px; margin: 0 auto; }
+a { color: var(--amber-soft); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95; margin: 0; letter-spacing: 0.01em; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); }
+
+/* Top bar */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 800 22px/1 var(--display); letter-spacing: 0.06em; }
+.brand b { display: grid; place-items: center; width: 28px; height: 28px; background: var(--amber); color: var(--ink); border-radius: 6px; font-size: 18px; }
+.top nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+.top nav a { color: var(--muted); text-decoration: none; }
+.top nav a:hover { color: var(--text); }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 40px 72px; }
+.hero h1 { font-size: clamp(56px, 8vw, 104px); font-weight: 900; text-transform: uppercase; }
+.hero h1 span { color: var(--amber); }
+.hero p.lede { font-size: 19px; color: var(--muted); max-width: 34ch; margin: 22px 0 28px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { font: 600 15px/1 var(--body); padding: 14px 20px; border-radius: 8px; text-decoration: none; border: 1px solid var(--rule); color: var(--text); background: var(--chrome); }
+.btn.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+.facts { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; font: 13px/1.4 var(--mono); color: var(--muted); }
+.facts strong { display: block; font: 800 26px/1 var(--display); color: var(--text); letter-spacing: 0.02em; }
+
+/* The mini app window */
+.win { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(255, 138, 61, 0.35); min-width: 0; }
+.win-title { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--chrome); font: 600 12px/1 var(--mono); color: var(--muted); }
+.win-title i { width: 10px; height: 10px; border-radius: 50%; background: var(--rule); display: inline-block; }
+.win-title .tag { margin-left: auto; letter-spacing: 0.1em; }
+.tabs, .buttons { display: flex; gap: 6px; padding: 8px 10px; background: var(--chrome); border-top: 1px solid var(--rule); flex-wrap: wrap; }
+.tab { font: 13px/1 var(--mono); padding: 7px 14px; border: 1px solid var(--rule); border-radius: 6px; color: var(--muted); }
+.tab.on { color: var(--text); border-color: var(--amber); }
+.buttons button { font: 500 13px/1 var(--body); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--rule); background: #35261b; color: var(--text); cursor: pointer; }
+.buttons button:hover { border-color: var(--amber); }
+.buttons button:active { transform: translateY(1px); }
+.pane { position: relative; height: 330px; }
+.pane canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pane pre { position: relative; margin: 0; padding: 14px 16px; height: 100%; overflow: hidden; font: 13.5px/1.5 var(--mono); color: #f5ede4; white-space: pre-wrap; word-break: break-word; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.pane .p { color: #7ee2a8; }
+.pane .c { color: var(--amber-soft); }
+.status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 7px 10px; background: var(--chrome); border-top: 1px solid var(--rule); font: 12px/1 var(--mono); color: var(--muted); }
+.status .ready { color: var(--amber); font-weight: 600; }
+.status button { font: 12px/1 var(--mono); color: var(--text); background: transparent; border: 1px solid var(--rule); border-radius: 5px; padding: 5px 8px; cursor: pointer; }
+.status button[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); }
+.status .sp { margin-left: auto; }
+
+/* Sections */
+section.row { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 56px; border-top: 1px solid var(--rule); }
+section.row.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); }
+section.row.flip .copy { order: 2; }
+.copy h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin: 12px 0 16px; }
+.copy p { color: var(--muted); max-width: 46ch; margin: 0 0 12px; }
+.copy ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.copy li { margin-bottom: 6px; }
+.copy code, .spec code { font: 0.9em var(--mono); color: var(--amber-soft); }
+figure { margin: 0; min-width: 0; }
+figure img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--rule); }
+figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.code { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; }
+.code pre { margin: 0; padding: 20px 22px; font: 13.5px/1.75 var(--mono); color: var(--text); }
+.code .p { color: var(--amber); }
+.code .d { color: var(--muted); }
+.code .o { color: #7ee2a8; }
+
+/* Claims: four short promises, big type */
+.claims { list-style: none; margin: 0; padding-block: 24px 64px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 56px; }
+.claims li { border-top: 2px solid var(--amber); padding-top: 18px; min-width: 0; }
+.claims h3 { font-size: clamp(34px, 4.4vw, 54px); font-weight: 900; text-transform: uppercase; margin-bottom: 12px; }
+.claims p { color: var(--muted); margin: 0; max-width: 44ch; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.glyph { display: inline-block; }
+.glyph.spin { color: var(--amber); }
+.win { will-change: transform; }
+
+/* Shader wall */
+.wall { padding-block: 56px; border-top: 1px solid var(--rule); }
+.wall header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 26px; }
+.wall h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.wall header p { color: var(--muted); max-width: 52ch; margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.tiles figure { position: relative; }
+.tiles img { border-radius: 8px; aspect-ratio: 16 / 9; object-fit: cover; }
+.tiles figcaption { position: absolute; left: 8px; bottom: 6px; margin: 0; color: #fff; font-size: 11.5px; text-shadow: 0 1px 3px #000; }
+
+/* Spec sheet */
+.spec { padding-block: 56px 80px; border-top: 1px solid var(--rule); display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 48px; }
+.spec h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.spec dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); border-top: 1px solid var(--rule); }
+.spec dt, .spec dd { padding: 12px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+.spec dt { font: 600 12px/1.6 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); padding-right: 28px; }
+.spec dd { color: var(--text); font-variant-numeric: tabular-nums; }
+footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+
+@media (max-width: 700px) { .claims { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+@media (max-width: 900px) {
+  .hero, section.row, section.row.flip, .spec { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  section.row.flip .copy { order: 0; }
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pair { grid-template-columns: 1fr; }
+  .pane { height: 280px; }
+  .spec dl { grid-template-columns: minmax(0, 1fr); }
+  .spec dt { border-bottom: 0; padding-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .buttons button:active { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><b>B</b>BUTTONSCLI</div>
+    <nav aria-label="Sections">
+      <a href="#buttons">Buttons</a>
+      <a href="#practice">AI practice</a>
+      <a href="#shaders">Shaders</a>
+      <a href="#agents">Agents</a>
+      <a href="#specs">Specs</a>
+    </nav>
+  </header>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div>
+      <div class="eyebrow">Native terminal · Rust · Alacritty core</div>
+      <h1 id="hero-title" data-scramble-hero>A terminal you can <span>click.</span></h1>
+      <p class="lede">Put the commands you type every day on buttons, tile as many shells as your screen fits, and give each one its own theme. It opens fast and stays out of your way.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://buttonscli.com">Get ButtonsCLI</a>
+        <a class="btn" href="#buttons">See what it does</a>
+      </div>
+      <div class="facts" aria-label="Quick facts">
+        <div><strong data-count="0.47" data-decimals="2" data-suffix=" s">0.47 s</strong>window on screen</div>
+        <div><strong data-count="550" data-suffix="+">550+</strong>themes</div>
+        <div><strong data-count="34">34</strong>GPU backgrounds</div>
+      </div>
+    </div>
+
+    <div class="win" aria-label="Interactive ButtonsCLI demo">
+      <div class="win-title"><i></i><i></i><i></i>ButtonsCLI<span class="tag">NATIVE · RUST</span></div>
+      <div class="tabs" aria-hidden="true">
+        <span class="tab on">term1 · P1</span><span class="tab">server1 · P2</span><span class="tab">term3 · AI</span>
+      </div>
+      <div class="buttons" role="toolbar" aria-label="Command buttons">
+        <button type="button" id="b-git" data-cmd="git status">Git Status</button>
+        <button type="button" id="b-docker" data-cmd="docker ps">docker ps</button>
+        <button type="button" id="b-df" data-cmd="df -h">df -h</button>
+        <button type="button" id="b-update" data-cmd="sudo apt update">update ubuntu</button>
+        <button type="button" id="b-clear" data-cmd="clear">Clear</button>
+      </div>
+      <div class="pane">
+        <canvas id="shader" aria-hidden="true"></canvas>
+        <pre id="term" aria-live="polite"></pre>
+      </div>
+      <div class="status">
+        <span class="ready">SHELL READY</span><span>Alacritty engine</span>
+        <span class="sp">Background</span>
+        <button type="button" id="s0" data-shader="0" aria-pressed="true">Liquid</button>
+        <button type="button" id="s1" data-shader="1" aria-pressed="false">Synthwave</button>
+        <button type="button" id="s2" data-shader="2" aria-pressed="false">Cosmic</button>
+        <button type="button" id="s3" data-shader="3" aria-pressed="false">Off</button>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-claims">
+    <h2 id="h-claims" class="sr-only">Why ButtonsCLI</h2>
+    <ul class="claims">
+      <li class="rv"><h3 data-scramble>No combos to memorize</h3><p>Every command you use is a button you can see. Hover to check it, click to type it. Keyboard shortcuts are there when you want them, never required.</p></li>
+      <li class="rv"><h3 data-scramble>No JSON to edit</h3><p>Change a theme by clicking one in the library, tweak colors with pickers, or describe a look and let AI build it. No config files, no restart.</p></li>
+      <li class="rv"><h3 data-scramble>The anti-minimal terminal</h3><p>Color, fonts, moving backgrounds and docks full of buttons. When you need quiet, Calm mode turns the motion off with one click.</p></li>
+      <li class="rv"><h3 data-scramble>Watch your agents work</h3><p>Claude Code, Codex or any MCP client can open tabs, type and run commands across every pane, and you see each keystroke land in real time.</p></li>
+    </ul>
+  </section>
+
+  <section class="row" id="buttons" aria-labelledby="h-buttons">
+    <div class="copy">
+      <div class="eyebrow">Command buttons</div>
+      <h2 id="h-buttons">Stop retyping the same ten commands</h2>
+      <p>A top bar and a side dock hold your commands: SSH logins, <code>docker compose</code> shells, deploy steps, log tails. Click one and it types into the focused pane.</p>
+      <ul>
+        <li>Choose per button whether it presses Enter or waits for you to review.</li>
+        <li>Separate collections for everyday commands and SSH hosts.</li>
+        <li>Keyboard first when you want it: F6 moves between the dock and the terminal.</li>
+      </ul>
+    </div>
+    <figure>
+      <img src="img/six-panes.jpg" width="1600" height="974" alt="ButtonsCLI with a button bar, an SSH dock and five tiled terminals showing apt, PowerShell, htop and shader backgrounds">
+      <figcaption>Five shells in a grid, each with its own background. The SSH dock on the left is one click per host.</figcaption>
+    </figure>
+  </section>
+
+  <section class="row flip" id="practice" aria-labelledby="h-practice">
+    <div class="copy">
+      <div class="eyebrow">AI practice terminal</div>
+      <h2 id="h-practice">A safe Linux box that does not exist</h2>
+      <p>Open a simulated terminal and an AI model plays the machine. Type <code>ls -a</code>, <code>htop</code>, install packages, write a script in nano and run it. Nothing touches your computer.</p>
+      <p>It is a good way to learn the shell, demo a tool, or practice a risky command first. You write the system prompt in plain English and use any model you have a key for.</p>
+    </div>
+    <figure>
+      <img src="img/ai-practice.jpg" width="1600" height="974" alt="An AI-simulated Linux terminal above a real PowerShell pane with a blue marbled shader background">
+      <figcaption>Top: the AI-simulated workstation. Bottom: a real PowerShell session with a shader background.</figcaption>
+    </figure>
+  </section>
+
+  <section class="wall" id="shaders" aria-labelledby="h-shaders">
+    <header>
+      <div>
+        <div class="eyebrow">GPU shader backgrounds</div>
+        <h2 id="h-shaders" data-scramble>34 living backgrounds</h2>
+      </div>
+      <p>Each pane can run its own animated background behind the text, rendered on the GPU. Calm mode freezes motion, strength stays capped so text stays readable, and you can write your own in a small built-in editor or ask AI to write one.</p>
+    </header>
+    <div class="tiles">
+      <figure><img src="img/shaders/17-plasma.jpg" alt="Neon plasma shader" loading="lazy" width="480" height="270"><figcaption>Neon plasma</figcaption></figure>
+      <figure><img src="img/shaders/18-synthwave.jpg" alt="Synthwave shader" loading="lazy" width="480" height="270"><figcaption>Synthwave</figcaption></figure>
+      <figure><img src="img/shaders/20-galaxy.jpg" alt="Galaxy swirl shader" loading="lazy" width="480" height="270"><figcaption>Galaxy swirl</figcaption></figure>
+      <figure><img src="img/shaders/22-glass.jpg" alt="Stained glass shader" loading="lazy" width="480" height="270"><figcaption>Stained glass</figcaption></figure>
+      <figure><img src="img/shaders/23-liquid.jpg" alt="Liquid rainbow shader" loading="lazy" width="480" height="270"><figcaption>Liquid rainbow</figcaption></figure>
+      <figure><img src="img/shaders/24-disco.jpg" alt="Disco dots shader" loading="lazy" width="480" height="270"><figcaption>Disco dots</figcaption></figure>
+      <figure><img src="img/shaders/25-rings.jpg" alt="Rainbow rings shader" loading="lazy" width="480" height="270"><figcaption>Rainbow rings</figcaption></figure>
+      <figure><img src="img/shaders/26-fireice.jpg" alt="Fire and ice shader" loading="lazy" width="480" height="270"><figcaption>Fire and ice</figcaption></figure>
+      <figure><img src="img/shaders/27-jellyfish.jpg" alt="Jellyfish shader" loading="lazy" width="480" height="270"><figcaption>Jellyfish</figcaption></figure>
+      <figure><img src="img/shaders/31-cosmic.jpg" alt="Cosmic dust shader" loading="lazy" width="480" height="270"><figcaption>Cosmic dust</figcaption></figure>
+      <figure><img src="img/shaders/32-vhs.jpg" alt="VHS tape shader with tracking lines and snow" loading="lazy" width="480" height="270"><figcaption>VHS tape</figcaption></figure>
+      <figure><img src="img/shaders/33-crt.jpg" alt="CRT static shader with scanlines" loading="lazy" width="480" height="270"><figcaption>CRT static</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="row" aria-labelledby="h-themes">
+    <div class="copy">
+      <div class="eyebrow">Themes and fonts</div>
+      <h2 id="h-themes">550+ themes, one per pane if you like</h2>
+      <p>Browse a searchable library, apply a theme to everything or to one terminal, or describe a look and let AI generate a palette that keeps text readable. Fonts, gradients and effects can each come from a different theme.</p>
+      <p>26 font faces ship with the app and work offline.</p>
+    </div>
+    <div class="pair">
+      <figure>
+        <img src="img/halloween.jpg" width="1600" height="880" alt="A Halloween-styled ButtonsCLI window with htop, apt output and a directory listing">
+        <figcaption>Mixed themes per pane.</figcaption>
+      </figure>
+      <figure>
+        <img src="img/theme-library.jpg" width="900" height="975" alt="The theme library in Settings with theme cards and Apply buttons">
+        <figcaption>The theme library.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="row flip" id="agents" aria-labelledby="h-agents">
+    <div class="copy">
+      <div class="eyebrow">For AI coding agents</div>
+      <h2 id="h-agents">Let your agent drive a terminal you can watch</h2>
+      <p>ButtonsCLI runs a local, token-protected control service. Claude Code, Codex or any MCP client can open tabs, type, run commands, wait for output and read the screen, while you watch every pane live.</p>
+      <ul>
+        <li>CLI helper and an optional MCP server, copied with one click.</li>
+        <li>Listens on 127.0.0.1 only, with a fresh token each run.</li>
+        <li>Built-in AI Help explains output and suggests commands you review before they run.</li>
+      </ul>
+    </div>
+    <figure>
+      <div class="code" role="img" aria-label="Example agent session using the buttonsclictl helper">
+<pre><span class="d"># what an agent runs, while you watch the pane</span>
+<span class="p">$</span> buttonsclictl open-layout --layout vertical --name api --name web
+<span class="p">$</span> buttonsclictl run --tab api --wait-for-text "listening on" npm run dev
+<span class="p">$</span> buttonsclictl send --tab web --enter "npm test"
+<span class="p">$</span> buttonsclictl wait-for-quiet --tab web --quiet-ms 1500
+<span class="p">$</span> buttonsclictl read --tab web --lines 40
+<span class="o">  ✓ 128 tests passed</span></pre>
+      </div>
+      <figcaption>The same commands are available as MCP tools.</figcaption>
+    </figure>
+  </section>
+
+  <section class="row" aria-labelledby="h-editor">
+    <div class="copy">
+      <div class="eyebrow">Shader editor</div>
+      <h2 id="h-editor">Write your own background</h2>
+      <p>Type a one-line color expression, see it compile live, and drag sliders you attach to it. Stuck? Describe the look, or press Fix with AI, and the app asks your model for a version that compiles.</p>
+    </div>
+    <figure>
+      <img src="img/shader-editor.jpg" width="900" height="975" alt="The shader editor in Settings with a custom expression, color pickers and a live preview">
+      <figcaption>Live preview, color pickers and a custom expression.</figcaption>
+    </figure>
+  </section>
+
+  <section class="spec" id="specs" aria-labelledby="h-specs">
+    <div>
+      <div class="eyebrow">Spec sheet</div>
+      <h2 id="h-specs">Under the hood</h2>
+    </div>
+    <dl>
+      <dt>Terminal core</dt><dd>Alacritty's terminal engine with a real PTY per pane</dd>
+      <dt>UI</dt><dd>Rust, egui and wgpu. No browser runtime, no Electron</dd>
+      <dt>Startup</dt><dd>Window on screen in 0.47 s (release build, Windows 11)</dd>
+      <dt>Panes</dt><dd>Columns, rows or grid; panes reflow as you add them</dd>
+      <dt>Themes</dt><dd>Over 550 built in, plus your own and AI-generated ones</dd>
+      <dt>Backgrounds</dt><dd>34 GPU shader presets, including VHS and CRT static, and a custom shader editor</dd>
+      <dt>AI providers</dt><dd>OpenAI, Anthropic, OpenRouter, Mistral, Groq, NVIDIA NIM or any OpenAI-compatible endpoint; keys stay in your OS credential store</dd>
+      <dt>Platforms</dt><dd>Windows today; Linux builds in CI</dd>
+    </dl>
+  </section>
+
+  <footer>
+    <span>ButtonsCLI · native preview</span>
+    <span>Screenshots are from the current Windows build.</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  // ---- Terminal demo: buttons type canned output into the pane ----
+  const term = document.getElementById('term');
+  const prompt = '<span class="p">dev@buttons</span>:<span class="c">~/project</span>$ ';
+  const outputs = {
+    'git status': 'On branch main\nYour branch is up to date with \'origin/main\'.\n\nChanges not staged for commit:\n        modified:   src/app.rs\n        modified:   assets/themes/halloween.json\n',
+    'docker ps': 'CONTAINER ID   IMAGE          STATUS         PORTS                  NAMES\n3f2a9c1d8e44   nginx:1.27     Up 3 days      0.0.0.0:80->80/tcp     web\n9b7e0c55a1f2   postgres:16    Up 3 days      5432/tcp               db\n',
+    'df -h': 'Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        80G   31G   46G  41% /\ntmpfs           3.9G     0  3.9G   0% /dev/shm\n',
+    'sudo apt update': 'Hit:1 http://archive.ubuntu.com/ubuntu noble InRelease\nGet:2 http://security.ubuntu.com/ubuntu noble-security InRelease [126 kB]\nFetched 126 kB in 1s (210 kB/s)\nAll packages are up to date.\n'
+  };
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  let html = 'Welcome to ButtonsCLI. Click a button above.\n' + prompt;
+  let busy = false;
+  term.innerHTML = html;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function run(cmd) {
+    if (busy) return;
+    if (cmd === 'clear') { html = prompt; term.innerHTML = html; return; }
+    busy = true;
+    let i = 0;
+    const type = () => {
+      if (i <= cmd.length) {
+        term.innerHTML = html + esc(cmd.slice(0, i)) + '▌';
+        i++;
+        setTimeout(type, reduce ? 0 : 28);
+      } else {
+        html += esc(cmd) + '\n' + esc(outputs[cmd] || '') + prompt;
+        const lines = html.split('\n');
+        if (lines.length > 15) html = lines.slice(-15).join('\n');
+        term.innerHTML = html;
+        busy = false;
+      }
+    };
+    type();
+  }
+  document.querySelectorAll('.buttons button').forEach(b => b.addEventListener('click', () => run(b.dataset.cmd)));
+
+  // ---- WebGL background: ports of three ButtonsCLI presets ----
+  const canvas = document.getElementById('shader');
+  const gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
+  const shaderButtons = document.querySelectorAll('.status button');
+  let preset = 0;
+  if (!gl) { canvas.style.background = '#1c1510'; return; }
+  const vs = 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }';
+  const fs = `precision mediump float;
+uniform vec2 res; uniform float t; uniform float kind;
+float hash(vec2 p){ vec3 q = fract(vec3(p.x, p.y, p.x) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float noise(vec2 p){ vec2 c = floor(p), f = fract(p), b = f*f*(3.0-2.0*f);
+  return mix(mix(hash(c), hash(c+vec2(1.,0.)), b.x), mix(hash(c+vec2(0.,1.)), hash(c+vec2(1.)), b.x), b.y); }
+float cloud(vec2 p){ return noise(p)*0.57 + noise(p*2.03+7.1)*0.29 + noise(p*4.07+19.3)*0.14; }
+vec3 palette(float x){ return 0.5 + 0.5*cos(6.28318*(vec3(x) + vec3(0.0, 0.33, 0.67))); }
+float stars(vec2 p, float t){ vec2 c = floor(p); float s = hash(c); vec2 ctr = vec2(0.2+0.6*s, 0.2+0.6*hash(c+47.2));
+  float d = length(fract(p)-ctr); return ((1.0-smoothstep(0.01,0.03,d)) + exp(-d*19.0)*0.22) * smoothstep(0.48,0.95,s) * (0.75+0.25*sin(t*1.4+s*30.0)); }
+void main(){
+  vec2 uv = gl_FragCoord.xy / res; uv.y = 1.0 - uv.y;
+  vec2 p = (uv - 0.5) * vec2(res.x/res.y, 1.0);
+  vec3 base = vec3(0.07, 0.05, 0.04); vec3 col = base; float glow = 0.0;
+  if (kind < 0.5) {
+    vec2 w = vec2(cloud(p*2.0 + t*0.07), cloud(p*2.0 + 5.2 - t*0.05));
+    float f = cloud(p*3.0 + w*3.0); col = palette(f*1.6 + t*0.03); glow = 0.35 + 0.65*smoothstep(0.2, 0.8, f);
+  } else if (kind < 1.5) {
+    float horizon = 0.12; float h = clamp((horizon - p.y)/0.6, 0.0, 1.0);
+    vec3 sky = mix(vec3(1.0,0.35,0.35), vec3(0.25,0.05,0.45), h);
+    float sd = length(p - vec2(0.0, horizon - 0.2));
+    float slits = min(step(0.0, sin(p.y*70.0 - t*2.0)) + step(p.y, horizon - 0.25), 1.0);
+    float sun = (1.0 - smoothstep(0.26, 0.28, sd)) * slits;
+    float depth = 0.25 / max(p.y - horizon, 0.01);
+    float gx = abs(fract(p.x*depth*0.6)*2.0 - 1.0), gz = abs(fract(depth - t*0.8)*2.0 - 1.0);
+    float lines = smoothstep(0.85, 0.97, max(gx, gz)) * clamp((p.y - horizon)*4.0, 0.0, 1.0);
+    vec3 skyc = mix(sky, mix(vec3(1.0,0.85,0.2), vec3(1.0,0.3,0.55), clamp((p.y - horizon + 0.45)*2.0, 0.0, 1.0)), sun);
+    bool ground = p.y > horizon;
+    col = ground ? mix(vec3(0.12,0.0,0.2), vec3(1.0,0.2,0.9), lines) : skyc;
+    glow = ground ? 0.35 + 0.65*lines : 0.55 + 0.45*sun;
+  } else if (kind < 2.5) {
+    vec2 drift = vec2(t*0.03, -t*0.02);
+    float neb = cloud(p*2.2 + drift + cloud(p*3.0 - drift));
+    float st = stars(p*16.0, t);
+    col = palette(neb*1.3 + 0.55) + vec3(st); glow = clamp(smoothstep(0.3, 0.75, neb) + st, 0.0, 1.0);
+  }
+  gl_FragColor = vec4(mix(base, clamp(col, 0.0, 1.0), clamp(glow*0.5, 0.0, 0.5)), 1.0);
+}`;
+  function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { canvas.style.background = '#1c1510'; return; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const uRes = gl.getUniformLocation(prog, 'res'), uT = gl.getUniformLocation(prog, 't'), uK = gl.getUniformLocation(prog, 'kind');
+  function size() {
+    const r = Math.min(devicePixelRatio || 1, 1.5);
+    canvas.width = Math.max(1, Math.round(canvas.clientWidth * r));
+    canvas.height = Math.max(1, Math.round(canvas.clientHeight * r));
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  size(); addEventListener('resize', size);
+  const start = performance.now();
+  function frame(now) {
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uT, reduce ? 3.0 : (now - start) / 1000 * 0.6);
+    gl.uniform1f(uK, preset);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!reduce) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  shaderButtons.forEach(b => b.addEventListener('click', () => {
+    preset = Number(b.dataset.shader);
+    shaderButtons.forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+    if (reduce) requestAnimationFrame(frame);
+  }));
+})();
+
+// ---- Motion: springs, easing and scrambled letters ----
+// Springs: a damped harmonic oscillator, x'' = -k(x - target) - c x', stepped
+// with semi-implicit Euler. Low damping overshoots a little and settles.
+(() => {
+  // Respect reduced motion; #motion forces it on for previews.
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches && location.hash !== '#motion') return;
+
+  const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+  const easeInCubic = x => x * x * x;
+
+  function spring(values, { stiffness = 140, damping = 15, mass = 1 } = {}, apply, done) {
+    const state = values.map(v => ({ x: v, v: 0 }));
+    let last = performance.now();
+    function step(now) {
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      let moving = false;
+      for (const s of state) {
+        const force = -stiffness * s.x - damping * s.v;
+        s.v += (force / mass) * dt;
+        s.x += s.v * dt;
+        if (Math.abs(s.x) > 0.001 || Math.abs(s.v) > 0.001) moving = true;
+      }
+      if (finished) return;
+      apply(state.map(s => s.x));
+      if (moving) requestAnimationFrame(step);
+      else finish();
+    }
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      apply(state.map(() => 0));
+      done && done();
+    };
+    // Hidden tabs pause animation frames; never leave content offset.
+    setTimeout(finish, 3000);
+    requestAnimationFrame(step);
+  }
+
+  // Scramble: each letter spins through glyphs, fast at first, then slower
+  // (the delay grows with easeInCubic) until it lands, left to right.
+  const GLYPHS = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*+=<>/';
+  function scramble(el, { duration = 1100, stagger = 45 } = {}) {
+    const textNodes = [];
+    const walk = node => node.childNodes.forEach(child => {
+      if (child.nodeType === 3 && child.textContent.trim()) textNodes.push(child);
+      else if (child.nodeType === 1) walk(child);
+    });
+    walk(el);
+    el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
+    let index = 0;
+    const settle = [];
+    for (const node of textNodes) {
+      const frag = document.createDocumentFragment();
+      for (const ch of node.textContent) {
+        if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); continue; }
+        const span = document.createElement('span');
+        span.className = 'glyph spin';
+        span.setAttribute('aria-hidden', 'true');
+        span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        frag.appendChild(span);
+        const start = performance.now() + index * stagger;
+        const total = duration + index * stagger * 0.4;
+        let next = 0;
+        const tick = now => {
+          const p = Math.min(1, (now - start) / total);
+          if (p >= 1) { span.textContent = ch; span.classList.remove('spin'); return; }
+          if (now >= next) {
+            span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+            next = now + 16 + 140 * easeInCubic(Math.max(0, p));
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        settle.push(() => { span.textContent = ch; span.classList.remove('spin'); });
+        index++;
+      }
+      node.replaceWith(frag);
+    }
+    // If animation frames are paused (hidden tab), still land on the real text.
+    setTimeout(() => settle.forEach(f => f()), duration + index * stagger + 400);
+  }
+
+  // Count-up for the hero facts.
+  function countUp(el) {
+    const target = parseFloat(el.dataset.count);
+    const decimals = Number(el.dataset.decimals || 0);
+    const suffix = el.dataset.suffix || '';
+    const start = performance.now();
+    const tick = now => {
+      const p = Math.min(1, (now - start) / 1400);
+      el.textContent = (target * easeOutExpo(p)).toFixed(decimals) + suffix;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // Hero on load.
+  const hero = document.querySelector('[data-scramble-hero]');
+  if (hero) scramble(hero, { duration: 900, stagger: 35 });
+  document.querySelectorAll('[data-count]').forEach(countUp);
+
+  // Hero window follows the pointer with a lerp-smoothed tilt.
+  const win = document.querySelector('.win');
+  let tx = 0, ty = 0, cx = 0, cy = 0;
+  addEventListener('pointermove', e => {
+    tx = (e.clientX / innerWidth - 0.5) * 6;
+    ty = (e.clientY / innerHeight - 0.5) * -6;
+  });
+  (function follow() {
+    cx += (tx - cx) * 0.08;
+    cy += (ty - cy) * 0.08;
+    if (win) win.style.transform = `perspective(1400px) rotateY(${cx.toFixed(3)}deg) rotateX(${cy.toFixed(3)}deg)`;
+    requestAnimationFrame(follow);
+  })();
+
+  // Scroll reveals. Everything stays readable without these: content only gets
+  // an offset once script runs, and only while it is below the fold.
+  const below = el => el.getBoundingClientRect().top > innerHeight * 0.9;
+  // Run fn once el scrolls into view. A plain rect check on scroll (plus a slow
+  // timer) instead of IntersectionObserver, which can stall in hidden previews.
+  const pending = [];
+  function whenVisible(el, fn, margin = 0.92) {
+    pending.push({ el, fn, margin });
+  }
+  function check() {
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const { el, fn, margin } = pending[i];
+      if (el.getBoundingClientRect().top < innerHeight * margin) {
+        pending.splice(i, 1);
+        fn();
+      }
+    }
+  }
+  addEventListener('scroll', check, { passive: true });
+  addEventListener('resize', check);
+  setInterval(check, 500);
+
+  function prime(el, from, delay = 0) {
+    if (!below(el)) return;
+    const [x0, y0, r0] = from;
+    el.style.transform = `translate(${x0}px, ${y0}px) rotate(${r0}deg)`;
+    whenVisible(el, () => setTimeout(() => {
+      spring([x0, y0, r0], { stiffness: 120, damping: 13 }, ([x, y, r]) => {
+        el.style.transform = `translate(${x}px, ${y}px) rotate(${r}deg)`;
+      });
+    }, delay));
+  }
+
+  document.querySelectorAll('.claims li').forEach((el, i) => prime(el, [0, 60, 0], i * 90));
+  document.querySelectorAll('section.row').forEach(row => {
+    const flip = row.classList.contains('flip');
+    const copy = row.querySelector('.copy');
+    const fig = row.querySelector('figure, .pair');
+    if (copy) prime(copy, [flip ? 70 : -70, 0, 0]);
+    if (fig) prime(fig, [flip ? -90 : 90, 20, flip ? -2 : 2], 80);
+  });
+  // Shader tiles fly in from scattered spots and assemble into the grid.
+  document.querySelectorAll('.tiles figure').forEach((el, i) => {
+    const angle = (i * 137.5) * Math.PI / 180;
+    prime(el, [Math.cos(angle) * 160, Math.sin(angle) * 110 + 40, (i % 2 ? 1 : -1) * (8 + (i % 5) * 4)], i * 55);
+  });
+  document.querySelectorAll('.spec dt, .spec dd').forEach((el, i) => prime(el, [i % 2 ? 60 : -60, 0, 0], Math.floor(i / 2) * 60));
+
+  // Headings scramble when they first scroll into view.
+  document.querySelectorAll('[data-scramble], section.row h2, .spec h2').forEach(el => {
+    if (below(el)) whenVisible(el, () => scramble(el, { duration: 700, stagger: 28 }), 0.8);
+  });
+  check();
+})();
+</script>

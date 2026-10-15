@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-disco-inferno",
+    "name": "Disco Inferno",
+    "nativeThemeVersion": 1,
+    "description": "Its own shader code: a pulsing disco floor of colored tiles with a beat slider. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#1d0f08",
+        "backgroundSecondary": "#2a150b",
+        "border": "#ffd23f",
+        "textMain": "#fff3e6",
+        "textDim": "#e6b48f",
+        "accent": "#ff5f1f",
+        "accentHover": "#ff3fa4",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#2a150b",
+        "idleBackground": "#3d1e0f",
+        "activeBackground": "#1d0f08",
+        "hoverBackground": "#3d1e0f",
+        "activeBorder": "#ff5f1f",
+        "textActive": "#fff3e6",
+        "textIdle": "#e6b48f",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#2a150b",
+        "headerBackground": "#3d1e0f",
+        "buttonBackground": "#552a12",
+        "buttonHover": "#ffd23f",
+        "widthAccent": "#ff3fa4"
+      },
+      "statusBar": {
+        "background": "#ff5f1f",
+        "text": "#fff3e6",
+        "accent": "#ff5f1f",
+        "border": "#ffd23f",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#120a06",
+      "foreground": "#fff3e6",
+      "cursor": "#ff5f1f",
+      "selectionBackground": "#5c2a12",
+      "fontFamily": "Daddy Time Mono Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#120a06",
+        "#4a1608",
+        "#3a0b33"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#4a3022",
+        "red": "#ff5a5a",
+        "green": "#7cff6b",
+        "yellow": "#ffd23f",
+        "blue": "#5aa8ff",
+        "magenta": "#ff5fd2",
+        "cyan": "#4ff2e6",
+        "white": "#fff0e2",
+        "brightBlack": "#856049",
+        "brightRed": "#ff8f8f",
+        "brightGreen": "#a8ff9e",
+        "brightYellow": "#ffe27a",
+        "brightBlue": "#90c4ff",
+        "brightMagenta": "#ff94e3",
+        "brightCyan": "#88f7ef",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.4,
+      "speed": 0.6,
+      "scale": 1,
+      "animated": true,
+      "custom": {
+        "expression": "hsv(hash(floor(p * 5.0)) + t * 0.05, 0.85, 0.35 + 0.65 * (0.5 + 0.5 * sin(t * beat + hash(floor(p * 5.0)) * 6.28))) * smoothstep(0.02, 0.08, min(min(fract(p.x * 5.0), 1.0 - fract(p.x * 5.0)), min(fract(p.y * 5.0), 1.0 - fract(p.y * 5.0))))",
+        "variables": [
+          {
+            "name": "beat",
+            "min": 0.5,
+            "max": 8,
+            "value": 3
+          }
+        ]
+      }
+    }
+  }
+}

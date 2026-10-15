@@ -470,7 +470,28 @@ impl ShaderBackground {
         ("ocean", "Ocean currents"),
         ("hex", "Hex bloom"),
         ("silk", "Electric silk"),
+        // Full-spectrum presets choose their own colors (index 17 onward).
+        ("plasma", "Neon plasma"),
+        ("synthwave", "Synthwave"),
+        ("curtains", "Rainbow curtains"),
+        ("galaxy", "Galaxy swirl"),
+        ("candy", "Candy stripes"),
+        ("glass", "Stained glass"),
+        ("liquid", "Liquid rainbow"),
+        ("disco", "Disco dots"),
+        ("rings", "Rainbow rings"),
+        ("fireice", "Fire and ice"),
+        ("jellyfish", "Jellyfish"),
+        ("pixelrain", "Pixel rain"),
+        ("opal", "Opal"),
+        ("tropical", "Tropical"),
+        ("cosmic", "Cosmic dust"),
+        ("vhs", "VHS tape"),
+        ("crt", "CRT static"),
     ];
+
+    /// First preset that ignores c1–c3 and draws its own full-spectrum colors.
+    pub const FIRST_VIVID: usize = 17;
 
     pub fn preset_index(&self) -> Option<usize> {
         Self::PRESETS.iter().position(|(id, _)| *id == self.preset)
@@ -1152,6 +1173,36 @@ fn dim_hex(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn colorful_shader_themes_load_with_working_shaders() {
+        let catalog = super::ThemeCatalog::load();
+        for id in [
+            "shader-neon-arcade",
+            "shader-midnight-synthwave",
+            "shader-stained-glass",
+            "shader-tropical-punch",
+            "shader-galaxy-brain",
+            "shader-vhs-rental-night",
+            "shader-phosphor-static",
+            "shader-candy-shop",
+            "shader-northern-ribbons",
+            "shader-disco-inferno",
+        ] {
+            let theme = catalog.get(id);
+            assert_eq!(theme.id, id, "{id} is in the catalog");
+            let shader = theme
+                .effects
+                .shader_background
+                .as_ref()
+                .unwrap_or_else(|| panic!("{id} carries a shader"));
+            if let Some(custom) = &shader.custom {
+                crate::plugins::effects::shader_expression::function(custom)
+                    .unwrap_or_else(|error| panic!("{id}: {error}"));
+            }
+        }
+    }
+
     #[test]
     fn browser_import_preserves_identity_and_rejects_invalid_documents() {
         let mut catalog = super::ThemeCatalog::load();

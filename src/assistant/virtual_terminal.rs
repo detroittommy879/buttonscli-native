@@ -86,12 +86,23 @@ impl VirtualTerminal {
         capture: &OutputCapture,
         ctx: &egui::Context,
     ) -> bool {
-        if let Some(result) = self.engine.poll() {
+        let result = self.engine.poll();
+        // Draw lines as they stream in; poll() returns only what was not shown.
+        let streamed = self.engine.take_streamed();
+        if !streamed.is_empty() {
+            Self::emit(
+                backend,
+                capture,
+                &streamed.replace("\r\n", "\n").replace('\n', "\r\n"),
+            );
+            ctx.request_repaint();
+        }
+        if let Some(result) = result {
             match result {
                 Ok(output) => {
                     let output = output.replace("\r\n", "\n").replace('\n', "\r\n");
                     Self::emit(backend, capture, &output);
-                    if !output.ends_with('\n') {
+                    if !output.is_empty() && !output.ends_with('\n') {
                         Self::emit(backend, capture, "\r\n");
                     }
                 }

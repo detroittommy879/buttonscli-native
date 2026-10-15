@@ -171,6 +171,7 @@ async fn turn(State(state): State<ServerState>, Json(request): Json<TurnRequest>
                 history: Vec::new(),
             },
             &cancel,
+            &mut |_| {},
         )
     });
     let result = tokio::time::timeout(Duration::from_secs(185), worker).await;

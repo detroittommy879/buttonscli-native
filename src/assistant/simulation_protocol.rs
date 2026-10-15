@@ -220,6 +220,81 @@ impl Turn {
     }
 }
 
+/// Shows a reply line by line while it streams, without ever showing text that
+/// `parse_turn` will later remove. It lags one line (the last line may be an
+/// echoed prompt), hides fences, and stops at the first tag or a JSON reply.
+/// Lines shown are always a prefix of the parsed output's lines.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+#[derive(Debug, Default)]
+pub(crate) struct StreamFilter {
+    pending: String,
+    held: Option<String>,
+    emitted: usize,
+    started: bool,
+    stopped: bool,
+}
+
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+impl StreamFilter {
+    /// Feed a chunk; returns complete lines (each ending in `\n`) safe to show now.
+    pub(crate) fn push(&mut self, delta: &str) -> String {
+        let mut shown = String::new();
+        if self.stopped {
+            return shown;
+        }
+        self.pending.push_str(delta);
+        while let Some(index) = self.pending.find('\n') {
+            let line: String = self.pending.drain(..=index).collect();
+            let line = line.trim_end_matches(['\n', '\r']).to_owned();
+            if !self.started && line.trim().is_empty() {
+                continue;
+            }
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("```") {
+                // An opening fence is hidden; a later one ends the visible part.
+                if self.started {
+                    self.stopped = true;
+                    break;
+                }
+                continue;
+            }
+            if (!self.started && trimmed.starts_with('{'))
+                || line.contains("<prompt>")
+                || line.contains("<cwd>")
+            {
+                self.stopped = true;
+                break;
+            }
+            // parse_turn trims the whole reply, so the first line loses its indent.
+            let line = if self.started {
+                line
+            } else {
+                trimmed.to_owned()
+            };
+            self.started = true;
+            if let Some(previous) = self.held.replace(line) {
+                shown.push_str(&previous);
+                shown.push('\n');
+                self.emitted += 1;
+            }
+        }
+        shown
+    }
+
+    /// What is left to show once the full reply has been parsed.
+    pub(crate) fn remainder(&self, output: &str) -> String {
+        output
+            .split('\n')
+            .skip(self.emitted)
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub(crate) fn shown_anything(&self) -> bool {
+        self.emitted > 0
+    }
+}
+
 /// Parse a plain-text reply. Never fails on wording: only oversized replies are rejected.
 pub(crate) fn parse_turn(raw: &str) -> Result<Turn, String> {
     if raw.len() > MAX_REPLY {
@@ -228,9 +303,11 @@ pub(crate) fn parse_turn(raw: &str) -> Result<Turn, String> {
     if let Some(turn) = legacy_json_turn(raw) {
         return Ok(turn);
     }
-    let mut text = strip_fences(raw.trim()).to_owned();
+    let mut text = raw.trim().to_owned();
     let prompt = take_tag(&mut text, "prompt");
     let cwd = take_tag(&mut text, "cwd");
+    // Tags may follow a closing fence, so strip fences after removing them.
+    let text = strip_fences(text.trim()).to_owned();
     let mut output = text.trim_matches(['\r', '\n']).trim_end().to_owned();
     // Without the tag, most models end with the prompt line itself; use it.
     let prompt = prompt.or_else(|| {
@@ -434,6 +511,36 @@ mod tests {
         assert_eq!(plain.output, "anything at all, no tags");
         assert!(plain.prompt.is_none());
         assert!(parse_turn(&"x".repeat(MAX_REPLY + 1)).is_err());
+    }
+
+    #[test]
+    fn streamed_lines_plus_remainder_equal_the_parsed_output() {
+        for reply in [
+            "total 0\nnotes.txt\nREADME.md\n<prompt>a@b:~$</prompt>",
+            "\n\n  Welcome\nline two\nstudent@lab:~$\n",
+            "```text\nhello\nworld\n```\n<cwd>/tmp</cwd>",
+            "one<prompt>x@y:~$</prompt>",
+            r#"{"output":"json\nreply","state":{"cwd":"/","files":{},"environment":{}}}"#,
+            "single line no newline",
+        ] {
+            for chunk in [1, 3, 7, 1000] {
+                let mut filter = StreamFilter::default();
+                let mut shown = String::new();
+                let chars: Vec<char> = reply.chars().collect();
+                for piece in chars.chunks(chunk) {
+                    shown.push_str(&filter.push(&piece.iter().collect::<String>()));
+                }
+                let output = parse_turn(reply).unwrap().output;
+                let full = if filter.shown_anything() {
+                    format!("{shown}{}", filter.remainder(&output))
+                        .trim_end_matches('\n')
+                        .to_owned()
+                } else {
+                    output.clone()
+                };
+                assert_eq!(full, output, "{reply:?} in chunks of {chunk}");
+            }
+        }
     }
 
     #[test]

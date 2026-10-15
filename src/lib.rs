@@ -33,6 +33,8 @@ mod secret_vault;
 #[cfg(not(target_arch = "wasm32"))]
 mod session;
 mod settings;
+#[cfg(not(target_arch = "wasm32"))]
+mod shader_ai;
 mod shortcuts;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod startup;

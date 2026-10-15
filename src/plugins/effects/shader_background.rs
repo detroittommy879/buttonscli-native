@@ -109,12 +109,7 @@ impl Resources {
                 count: None,
             }],
         });
-        let pipeline = pipeline(
-            device,
-            format,
-            &layout,
-            include_str!("shader_background.wgsl"),
-        );
+        let pipeline = pipeline(device, format, &layout, super::shader_expression::SOURCE);
         Self {
             pipeline,
             layout,
@@ -440,6 +435,158 @@ mod tests {
         let output = readback.slice(..).get_mapped_range().to_vec();
         readback.unmap();
         output
+    }
+
+    /// Writes `<preset>.png` (480x270, max strength) for docs and the website.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires a graphics adapter; set BUTTONSCLI_SHADER_GALLERY_DIR"]
+    fn render_shader_gallery() {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("BUTTONSCLI_SHADER_GALLERY_DIR").expect("output directory"),
+        );
+        std::fs::create_dir_all(&directory).unwrap();
+        let (width, height) = (480_u32, 270_u32);
+        let row = (width * 4).div_ceil(256) * 256;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            use wgpu::util::DeviceExt;
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+                .expect("native graphics adapter");
+            let (device, queue) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+                .unwrap();
+            let resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
+            for (index, (id, _)) in ShaderBackground::PRESETS.iter().enumerate() {
+                // Dark terminal base with the editor's pink/cyan/gold colors.
+                let values: [f32; 28] = [
+                    0.0,
+                    0.0,
+                    width as f32,
+                    height as f32,
+                    3.0,
+                    0.65,
+                    1.0,
+                    index as f32,
+                    0.03,
+                    0.03,
+                    0.06,
+                    1.0,
+                    1.0,
+                    0.28,
+                    0.48,
+                    1.0,
+                    0.21,
+                    0.86,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.78,
+                    0.34,
+                    1.0,
+                    3.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                ];
+                let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
+                let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: &bytes,
+                    usage: wgpu::BufferUsages::UNIFORM,
+                });
+                let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &resources.layout,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: uniform.as_entire_binding(),
+                    }],
+                });
+                let size = wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                };
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    label: None,
+                    size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                    view_formats: &[],
+                });
+                let view = texture.create_view(&Default::default());
+                let readback = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: None,
+                    size: (row * height) as u64,
+                    usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                let mut encoder = device.create_command_encoder(&Default::default());
+                {
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    pass.set_pipeline(&resources.pipeline);
+                    pass.set_bind_group(0, &bindings, &[]);
+                    pass.draw(0..3, 0..1);
+                }
+                encoder.copy_texture_to_buffer(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    wgpu::TexelCopyBufferInfo {
+                        buffer: &readback,
+                        layout: wgpu::TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(row),
+                            rows_per_image: Some(height),
+                        },
+                    },
+                    size,
+                );
+                queue.submit([encoder.finish()]);
+                readback.slice(..).map_async(wgpu::MapMode::Read, |_| {});
+                device.poll(wgpu::Maintain::Wait);
+                let padded = readback.slice(..).get_mapped_range().to_vec();
+                let pixels: Vec<u8> = padded
+                    .chunks(row as usize)
+                    .flat_map(|line| line[..(width * 4) as usize].to_vec())
+                    .collect();
+                image::save_buffer(
+                    directory.join(format!("{index:02}-{id}.png")),
+                    &pixels,
+                    width,
+                    height,
+                    image::ColorType::Rgba8,
+                )
+                .unwrap();
+            }
+        });
     }
 
     #[test]

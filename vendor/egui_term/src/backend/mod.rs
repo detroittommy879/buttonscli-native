@@ -786,9 +786,13 @@ impl TerminalBackend {
                 }
             }
 
-            open::that(url).unwrap_or_else(|_| {
-                panic!("link opening is failed");
-            })
+            // Terminal output is untrusted. Only hand web/mail links to the OS:
+            // on Windows a file:// or custom-scheme link can launch programs.
+            if !is_safe_link(&url) {
+                return;
+            }
+            // A failed launch must not take every open terminal down with it.
+            let _ = open::that_detached(url);
         }
     }
 
@@ -1066,6 +1070,37 @@ fn scroll_to_search_match<T: EventListener>(
     let delta = target_offset - grid.display_offset() as i32;
     if delta != 0 {
         term.scroll_display(Scroll::Delta(delta));
+    }
+}
+
+/// Schemes a click may pass to the OS handler.
+fn is_safe_link(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    ["https://", "http://", "mailto:"]
+        .iter()
+        .any(|scheme| lower.starts_with(scheme))
+}
+
+#[cfg(test)]
+mod link_tests {
+    #[test]
+    fn only_web_and_mail_links_open() {
+        for safe in [
+            "https://example.com/a?b",
+            "HTTP://x.test",
+            "mailto:a@b.test",
+        ] {
+            assert!(super::is_safe_link(safe), "{safe}");
+        }
+        for unsafe_link in [
+            "file:///C:/Windows/System32/calc.exe",
+            "ssh:evil",
+            "ms-msdt:/id",
+            "git://x",
+            "magnet:?x",
+        ] {
+            assert!(!super::is_safe_link(unsafe_link), "{unsafe_link}");
+        }
     }
 }
 

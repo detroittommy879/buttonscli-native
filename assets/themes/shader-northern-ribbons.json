@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-northern-ribbons",
+    "name": "Northern Ribbons",
+    "nativeThemeVersion": 1,
+    "description": "Its own shader code: rainbow aurora ribbons with a brightness slider you can tune in Shaders. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#071825",
+        "backgroundSecondary": "#0b2233",
+        "border": "#8a7dff",
+        "textMain": "#e6fbff",
+        "textDim": "#8fc7d9",
+        "accent": "#5cffc8",
+        "accentHover": "#ff8ad8",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#0b2233",
+        "idleBackground": "#103047",
+        "activeBackground": "#071825",
+        "hoverBackground": "#103047",
+        "activeBorder": "#5cffc8",
+        "textActive": "#e6fbff",
+        "textIdle": "#8fc7d9",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#0b2233",
+        "headerBackground": "#103047",
+        "buttonBackground": "#164260",
+        "buttonHover": "#8a7dff",
+        "widthAccent": "#ff8ad8"
+      },
+      "statusBar": {
+        "background": "#1b6b7d",
+        "text": "#e6fbff",
+        "accent": "#5cffc8",
+        "border": "#8a7dff",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'JetBrains Mono Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#04101a",
+      "foreground": "#e6fbff",
+      "cursor": "#5cffc8",
+      "selectionBackground": "#13465c",
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#04101a",
+        "#0b3a3f",
+        "#25124a"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#24414f",
+        "red": "#ff6f8f",
+        "green": "#5cffc8",
+        "yellow": "#ffe27a",
+        "blue": "#62b6ff",
+        "magenta": "#c58bff",
+        "cyan": "#5ef0ff",
+        "white": "#e2f8ff",
+        "brightBlack": "#4f7385",
+        "brightRed": "#ff9cb2",
+        "brightGreen": "#93ffdb",
+        "brightYellow": "#ffeca8",
+        "brightBlue": "#95ceff",
+        "brightMagenta": "#dcb3ff",
+        "brightCyan": "#94f5ff",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.45,
+      "speed": 0.4,
+      "scale": 1,
+      "animated": true,
+      "custom": {
+        "expression": "palette(p.x * 0.25 + sin(p.y * 2.0 + t * 0.4) * 0.15 + t * 0.03) * (exp(-abs(p.y + sin(p.x * 2.5 + t * 0.6) * 0.25) * 3.5) * glow_amount + 0.12) + vec3<f32>(stars(p * 14.0, t) * 0.6)",
+        "variables": [
+          {
+            "name": "glow_amount",
+            "min": 0.2,
+            "max": 2,
+            "value": 1
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-stained-glass",
+    "name": "Stained Glass Chapel",
+    "nativeThemeVersion": 1,
+    "description": "Jewel-toned panes of ruby, emerald, sapphire and gold behind leaded lines. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#17110b",
+        "backgroundSecondary": "#22180f",
+        "border": "#e0344f",
+        "textMain": "#fbf3e4",
+        "textDim": "#d2b98a",
+        "accent": "#ffcc4d",
+        "accentHover": "#2fbf71",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#22180f",
+        "idleBackground": "#332312",
+        "activeBackground": "#17110b",
+        "hoverBackground": "#332312",
+        "activeBorder": "#ffcc4d",
+        "textActive": "#fbf3e4",
+        "textIdle": "#d2b98a",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#22180f",
+        "headerBackground": "#332312",
+        "buttonBackground": "#4a3115",
+        "buttonHover": "#e0344f",
+        "widthAccent": "#2fbf71"
+      },
+      "statusBar": {
+        "background": "#7a1a2a",
+        "text": "#fbf3e4",
+        "accent": "#ffcc4d",
+        "border": "#e0344f",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Roboto Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'iA Writer Mono S Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#0e0b08",
+      "foreground": "#fbf3e4",
+      "cursor": "#ffcc4d",
+      "selectionBackground": "#5a3b12",
+      "fontFamily": "iA Writer Mono S Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#0e0b08",
+        "#3a0d18",
+        "#0d2a3f"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#3b2f22",
+        "red": "#ff5a6e",
+        "green": "#4fe08f",
+        "yellow": "#ffd166",
+        "blue": "#5aa9ff",
+        "magenta": "#d77bff",
+        "cyan": "#4fe3d8",
+        "white": "#f6ead6",
+        "brightBlack": "#776650",
+        "brightRed": "#ff8c99",
+        "brightGreen": "#85f0b4",
+        "brightYellow": "#ffe199",
+        "brightBlue": "#8cc4ff",
+        "brightMagenta": "#e6a8ff",
+        "brightCyan": "#86f0e8",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "glass",
+      "strength": 0.32,
+      "speed": 0.25,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

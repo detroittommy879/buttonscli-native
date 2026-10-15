@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "shader-candy-shop",
+    "name": "Candy Shop",
+    "nativeThemeVersion": 1,
+    "description": "Diagonal rainbow candy stripes with bubblegum chrome. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "mood": "colorful"
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#220f22",
+        "backgroundSecondary": "#2f1530",
+        "border": "#7af0ff",
+        "textMain": "#fff3fb",
+        "textDim": "#f0b2da",
+        "accent": "#ff7ac8",
+        "accentHover": "#ffe066",
+        "shadowColor": "rgba(0, 0, 0, 0.45)"
+      },
+      "tabs": {
+        "background": "#2f1530",
+        "idleBackground": "#421c43",
+        "activeBackground": "#220f22",
+        "hoverBackground": "#421c43",
+        "activeBorder": "#ff7ac8",
+        "textActive": "#fff3fb",
+        "textIdle": "#f0b2da",
+        "radius": 8
+      },
+      "presetDock": {
+        "background": "#2f1530",
+        "headerBackground": "#421c43",
+        "buttonBackground": "#5a2560",
+        "buttonHover": "#7af0ff",
+        "widthAccent": "#ffe066"
+      },
+      "statusBar": {
+        "background": "#ff7ac8",
+        "text": "#fff3fb",
+        "accent": "#ff7ac8",
+        "border": "#7af0ff",
+        "height": 24
+      }
+    },
+    "typography": {
+      "shell": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 600,
+        "letterSpacing": 0.4
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Recursive Sans Lnr St Bundled', 'Roboto Bundled', 'Segoe UI', sans-serif",
+        "googleFont": "",
+        "fontWeight": 500
+      },
+      "statusBar": {
+        "fontFamily": "'Serious Shanns Bundled', 'JetBrains Mono Bundled', 'Cascadia Mono', 'Consolas', monospace",
+        "googleFont": "",
+        "fontWeight": 600
+      }
+    },
+    "terminal": {
+      "background": "#160a16",
+      "foreground": "#fff3fb",
+      "cursor": "#ff7ac8",
+      "selectionBackground": "#6a2460",
+      "fontFamily": "Serious Shanns Bundled",
+      "fontSize": 15,
+      "fontWeight": 400,
+      "useGradient": true,
+      "gradientColors": [
+        "#160a16",
+        "#4a1546",
+        "#123d4a"
+      ],
+      "gradientType": "linear",
+      "ansiColors": {
+        "black": "#43294a",
+        "red": "#ff6f9f",
+        "green": "#7cf7a3",
+        "yellow": "#ffe066",
+        "blue": "#7ab8ff",
+        "magenta": "#ff8ff0",
+        "cyan": "#7af0ff",
+        "white": "#fff0fa",
+        "brightBlack": "#7a5884",
+        "brightRed": "#ff9fc1",
+        "brightGreen": "#aefbc5",
+        "brightYellow": "#ffeb99",
+        "brightBlue": "#a9d0ff",
+        "brightMagenta": "#ffb8f5",
+        "brightCyan": "#a9f6ff",
+        "brightWhite": "#ffffff"
+      }
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "candy",
+      "strength": 0.28,
+      "speed": 0.35,
+      "scale": 1,
+      "animated": true
+    }
+  }
+}

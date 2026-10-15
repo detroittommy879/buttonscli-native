@@ -130,6 +130,52 @@ fn theme_generation_available() -> bool {
     access::resolve(FeatureKey::VibeCodeThemes, &runtime, &entitlement, now).available
 }
 
+/// "Write/fix with AI" in the custom shader editor (VibeCodeShaders).
+#[cfg(not(target_arch = "wasm32"))]
+fn shader_ai_available() -> bool {
+    use crate::features::{access, catalog::FeatureKey};
+    let mut runtime = crate::account::current_runtime_config().access();
+    if cfg!(debug_assertions)
+        && std::env::var("BUTTONSCLI_NATIVE_DEV_SHADER_AI").is_ok_and(|value| value == "1")
+    {
+        runtime
+            .development_overrides
+            .insert(FeatureKey::VibeCodeShaders);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    let entitlement = crate::account_api::current_entitlement();
+    access::resolve(FeatureKey::VibeCodeShaders, &runtime, &entitlement, now).available
+}
+
+/// Starting points for the custom shader editor; each must compile.
+#[cfg(not(target_arch = "wasm32"))]
+const SHADER_EXAMPLES: &[(&str, &str)] = &[
+    ("Rainbow waves", "palette(p.x * 0.4 + sin(p.y * 3.0 + t) * 0.2 + t * 0.05)"),
+    (
+        "Plasma",
+        "palette((sin(p.x * 4.0 + t) + sin(p.y * 5.0 - t) + sin(length(p) * 6.0 - t)) * 0.15)",
+    ),
+    (
+        "Theme colors flowing",
+        "mix(mix(c1, c2, cloud(p * 2.0 + t * 0.1)), c3, smoothstep(0.5, 0.8, noise(p * 4.0 - t * 0.2)))",
+    ),
+    (
+        "Neon rings",
+        "hsv(fract(length(p) * 0.5 - t * 0.1), 0.8, 0.5 + 0.5 * sin(length(p) * 20.0 - t * 2.0))",
+    ),
+    (
+        "Night sky",
+        "mix(vec3<f32>(0.02, 0.02, 0.1), palette(cloud(p * 2.0 + t * 0.02) + 0.6), cloud(p * 2.0) * 0.6) + vec3<f32>(stars(p * 15.0, t))",
+    ),
+    (
+        "Mosaic",
+        "hsv(hash(floor(p * 6.0)) + t * 0.03, 0.7, 0.4 + 0.6 * smoothstep(0.05, 0.15, min(fract(p.x * 6.0), fract(p.y * 6.0))))",
+    ),
+];
+
 #[cfg(not(target_arch = "wasm32"))]
 fn quick_secrets_available() -> bool {
     use crate::features::{access, catalog::FeatureKey};
@@ -349,6 +395,8 @@ pub struct ButtonsApp {
     theme_generation_candidate: Option<crate::theme_generation::ThemeCandidate>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_generation_message: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    shader_ai: ShaderAiState,
     #[cfg(not(target_arch = "wasm32"))]
     custom_font_import_path: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -819,6 +867,40 @@ enum AccountNotice {
     SignInFailed,
 }
 
+/// "Write/fix with AI" for custom shader expressions.
+#[cfg(not(target_arch = "wasm32"))]
+struct ShaderAiState {
+    prompt: String,
+    busy: bool,
+    message: Option<String>,
+    /// Expression before the last AI change, for one-step undo.
+    undo: Option<String>,
+    /// Accepted expression waiting to be written into the editor draft.
+    ready: Option<String>,
+    generation: u64,
+    cancel: Option<Arc<AtomicBool>>,
+    tx: Sender<(u64, Result<String, String>)>,
+    rx: Receiver<(u64, Result<String, String>)>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for ShaderAiState {
+    fn default() -> Self {
+        let (tx, rx) = mpsc::channel();
+        Self {
+            prompt: String::new(),
+            busy: false,
+            message: None,
+            undo: None,
+            ready: None,
+            generation: 0,
+            cancel: None,
+            tx,
+            rx,
+        }
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 struct ThemeGenerationEvent {
     generation: u64,
@@ -1213,6 +1295,8 @@ impl ButtonsApp {
             theme_generation_prompt: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_generation_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            shader_ai: ShaderAiState::default(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_generation_id: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -8687,7 +8771,10 @@ impl ButtonsApp {
                         ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
                     }
                 });
-            if shader.preset != old_preset && shader.preset_index().unwrap_or(0) >= 7 {
+            if shader.preset != old_preset
+                && shader.preset_index().unwrap_or(0) >= 7
+                && shader.preset_index().unwrap_or(0) < crate::theme::ShaderBackground::FIRST_VIVID
+            {
                 shader.colors = Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
             }
             ui.add(egui::Slider::new(&mut shader.strength, 0.0..=0.65).text("Strength"));
@@ -8727,14 +8814,95 @@ impl ButtonsApp {
                 shader.custom = custom.then(Default::default);
             }
             if let Some(custom) = &mut shader.custom {
-                ui.spaced_label("WGSL color expression returning vec3<f32>. p = coordinates, t = time, c1–c3 = colors. Use sin, cos, mix, length, etc. Loops and resources are disabled.");
+                if let Some(expression) = self.shader_ai.ready.take() {
+                    self.shader_ai.undo =
+                        Some(std::mem::replace(&mut custom.expression, expression));
+                }
+                ui.spaced_label("WGSL color expression returning vec3<f32>. p = coordinates, t = time, c1–c3 = colors. Helpers: palette(x) rainbow, hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). Plus sin, cos, mix, smoothstep, length… Loops and resources are disabled.");
+                wrapping_row(ui, |ui| {
+                    ui.spaced_menu_button("Load example", |ui| {
+                        for (label, example) in SHADER_EXAMPLES {
+                            if ui.spaced_button(*label).clicked() {
+                                custom.expression = (*example).into();
+                                ui.close_menu();
+                            }
+                        }
+                    });
+                    if self.shader_ai.undo.is_some()
+                        && !self.shader_ai.busy
+                        && ui.spaced_button("Undo AI change").clicked()
+                    {
+                        custom.expression = self.shader_ai.undo.take().unwrap_or_default();
+                        self.shader_ai.message = None;
+                    }
+                });
                 ui.add(
                     egui::TextEdit::multiline(&mut custom.expression)
                         .code_editor()
-                        .desired_rows(4)
+                        .desired_rows(8)
                         .desired_width(f32::INFINITY)
                         .char_limit(2048),
                 );
+                // Compile status is checked live (cached), so it doubles as the check button.
+                let compile = crate::plugins::effects::shader_expression::function(custom);
+                match &compile {
+                    Ok(_) => {
+                        ui.spaced_label(
+                            RichText::new("✓ Compiles. The preview below is live.")
+                                .color(Color32::from_rgb(100, 245, 175)),
+                        );
+                    }
+                    Err(error) => {
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!("Shader error:\n{error}"))
+                                    .monospace()
+                                    .color(Color32::LIGHT_RED),
+                            )
+                            .wrap(),
+                        );
+                        ui.spaced_label("The gradient shows until the expression compiles.");
+                    }
+                }
+                if shader_ai_available() {
+                    ui.add_space(4.0);
+                    ui.spaced_label(
+                        "Ask AI: describe a look, or leave empty to just fix the error.",
+                    );
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.shader_ai.prompt)
+                            .hint_text("e.g. slow purple and teal waves with sparkles")
+                            .desired_width(f32::INFINITY)
+                            .char_limit(2_000),
+                    );
+                    wrapping_row(ui, |ui| {
+                        if self.shader_ai.busy {
+                            ui.spinner();
+                            if ui.spaced_button("Cancel").clicked() {
+                                if let Some(cancel) = &self.shader_ai.cancel {
+                                    cancel.store(true, Ordering::Relaxed);
+                                }
+                            }
+                        } else {
+                            let label =
+                                if compile.is_err() && self.shader_ai.prompt.trim().is_empty() {
+                                    "Fix with AI"
+                                } else {
+                                    "Write with AI"
+                                };
+                            if ui.spaced_button(label).clicked() {
+                                self.start_shader_ai(
+                                    ui.ctx(),
+                                    custom.clone(),
+                                    compile.as_ref().err().cloned(),
+                                );
+                            }
+                        }
+                    });
+                    if let Some(message) = &self.shader_ai.message {
+                        ui.spaced_label(message);
+                    }
+                }
                 ui.spaced_label("Attach up to four named sliders; use their names in the expression. Speed, scale and colors above also apply.");
                 let mut remove = None;
                 for (index, variable) in custom.variables.iter_mut().enumerate() {
@@ -8783,14 +8951,6 @@ impl ButtonsApp {
                         name: format!("param{suffix}"),
                         ..Default::default()
                     });
-                }
-                if let Err(error) = crate::plugins::effects::shader_expression::function(custom) {
-                    ui.spaced_label(
-                        RichText::new(format!("Shader error: {error}")).color(Color32::LIGHT_RED),
-                    );
-                    ui.spaced_label(
-                        "Fix the expression to resume preview. The gradient remains available.",
-                    );
                 }
             }
         }
@@ -9655,6 +9815,82 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn start_shader_ai(
+        &mut self,
+        ctx: &egui::Context,
+        current: crate::theme::CustomShader,
+        error: Option<String>,
+    ) {
+        if self.shader_ai.busy {
+            return;
+        }
+        let providers = self.preferences.provider_settings.chain(AiTask::Shader);
+        if providers.is_empty() {
+            self.shader_ai.message =
+                Some("Choose a shader model in Settings → AI models first.".into());
+            return;
+        }
+        let profile = self
+            .native_store
+            .as_ref()
+            .map_or("default", NativeStore::profile_name)
+            .to_owned();
+        self.shader_ai.generation = self.shader_ai.generation.wrapping_add(1);
+        let generation = self.shader_ai.generation;
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.shader_ai.cancel = Some(Arc::clone(&cancel));
+        self.shader_ai.busy = true;
+        self.shader_ai.message = Some(format!(
+            "Asking {} · {}…",
+            providers[0].name, providers[0].model
+        ));
+        let request = self.shader_ai.prompt.clone();
+        let session = Arc::clone(&self.credential_session);
+        let sender = self.shader_ai.tx.clone();
+        let context = ctx.clone();
+        std::thread::spawn(move || {
+            let result = crate::shader_ai::generate(
+                &crate::assistant::transport::ReqwestTransport,
+                &providers,
+                &mut |provider| {
+                    let reference = credentials::reference(&profile, &provider.id);
+                    provider_key(&session, &reference, provider.credential_ref.as_deref())
+                        .map_err(|_| crate::assistant::client::ClientError::Credential)
+                },
+                &request,
+                &current,
+                error.as_deref(),
+                &cancel,
+            );
+            let _ = sender.send((generation, result));
+            context.request_repaint();
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn process_shader_ai_events(&mut self) {
+        while let Ok((generation, result)) = self.shader_ai.rx.try_recv() {
+            if generation != self.shader_ai.generation {
+                continue;
+            }
+            let cancelled = self
+                .shader_ai
+                .cancel
+                .take()
+                .is_some_and(|cancel| cancel.load(Ordering::Relaxed));
+            self.shader_ai.busy = false;
+            self.shader_ai.message = Some(match (cancelled, result) {
+                (true, _) => "Cancelled.".into(),
+                (false, Ok(expression)) => {
+                    self.shader_ai.ready = Some(expression);
+                    "Applied to the preview. Save the theme to keep it, or Undo AI change.".into()
+                }
+                (false, Err(error)) => format!("AI could not write a working shader: {error}"),
+            });
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn cancel_theme_generation(&mut self) {
         if let Some(cancel) = &self.theme_generation_cancel {
             cancel.store(true, Ordering::Relaxed);
@@ -9807,7 +10043,13 @@ impl ButtonsApp {
             } else {
                 &mut self.preferences.status_background_override
             };
-            if ui.color_edit_button_srgba(&mut color).changed() {
+            // Inline picker: a color button would open a second popup, and clicking in
+            // it counted as a click outside this menu, closing both unchanged.
+            if egui::color_picker::color_picker_color32(
+                ui,
+                &mut color,
+                egui::color_picker::Alpha::Opaque,
+            ) {
                 *target = Some(crate::theme::to_hex(color));
                 ui.ctx().request_repaint();
             }
@@ -14456,6 +14698,8 @@ impl eframe::App for ButtonsApp {
         self.sync_control_server(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_generation_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_shader_ai_events();
 
         #[cfg(not(target_arch = "wasm32"))]
         self.process_quick_secrets_events();
@@ -14600,6 +14844,22 @@ impl eframe::App for ButtonsApp {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn every_shader_editor_example_compiles() {
+        for (label, expression) in SHADER_EXAMPLES {
+            let custom = crate::theme::CustomShader {
+                expression: (*expression).into(),
+                variables: Vec::new(),
+            };
+            assert!(
+                crate::plugins::effects::shader_expression::function(&custom).is_ok(),
+                "{label}: {:?}",
+                crate::plugins::effects::shader_expression::function(&custom)
+            );
+        }
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn appearance_copy_versions_merge_edits_rename_and_reload_without_losing_overrides() {
@@ -14776,7 +15036,7 @@ mod tests {
             app.preferences.status_background_override = Some("#345678".into());
             let ctx = egui::Context::default();
             fonts::install(&ctx, &app.font_catalog);
-            let mut render = |events| {
+            let render = |app: &mut ButtonsApp, events| {
                 ctx.run(
                     egui::RawInput {
                         screen_rect: Some(egui::Rect::from_min_size(
@@ -14796,15 +15056,21 @@ mod tests {
                     },
                 )
             };
-            render(vec![]);
+            render(&mut app, vec![]);
             let pos = if dock {
                 egui::pos2(40.0, 650.0)
             } else {
                 egui::pos2(850.0, 680.0)
             };
-            render(pointer_events(pos, egui::PointerButton::Secondary, true));
-            render(pointer_events(pos, egui::PointerButton::Secondary, false));
-            let menu = render(vec![]);
+            render(
+                &mut app,
+                pointer_events(pos, egui::PointerButton::Secondary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(pos, egui::PointerButton::Secondary, false),
+            );
+            let menu = render(&mut app, vec![]);
             assert!(text_position(
                 &menu,
                 if dock {
@@ -14814,10 +15080,46 @@ mod tests {
                 }
             )
             .is_some());
+            // Picking a color inside the menu changes it and keeps the menu open.
+            let title = text_position(
+                &menu,
+                if dock {
+                    "Dock background"
+                } else {
+                    "Status bar background"
+                },
+            )
+            .unwrap();
+            let reset = text_position(&menu, "Use theme color").unwrap();
+            let swatch = egui::pos2(title.x + 25.0, title.y + (reset.y - title.y) * 0.45);
+            let before = (
+                app.preferences.dock_background_override.clone(),
+                app.preferences.status_background_override.clone(),
+            );
+            render(
+                &mut app,
+                pointer_events(swatch, egui::PointerButton::Primary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(swatch, egui::PointerButton::Primary, false),
+            );
+            let after = (
+                app.preferences.dock_background_override.clone(),
+                app.preferences.status_background_override.clone(),
+            );
+            assert_ne!(before, after, "clicking the picker changes the color");
+            let menu = render(&mut app, vec![]);
             let reset =
-                text_position(&menu, "Use theme color").expect("background reset menu item");
-            render(pointer_events(reset, egui::PointerButton::Primary, true));
-            render(pointer_events(reset, egui::PointerButton::Primary, false));
+                text_position(&menu, "Use theme color").expect("menu stays open after picking");
+            render(
+                &mut app,
+                pointer_events(reset, egui::PointerButton::Primary, true),
+            );
+            render(
+                &mut app,
+                pointer_events(reset, egui::PointerButton::Primary, false),
+            );
             assert_eq!(app.preferences.dock_background_override.is_none(), dock);
             assert_eq!(app.preferences.status_background_override.is_none(), !dock);
         }
@@ -15847,6 +16149,63 @@ Start-Sleep -Seconds 300
             .starts_with(std::env::temp_dir().canonicalize().unwrap()));
         std::fs::remove_dir_all(&owned_root).unwrap();
         println!("Native theme imports/captures passed: {}", expected.len());
+    }
+
+    /// Prints this process's private memory after each startup phase.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "diagnostic: prints memory by startup phase"]
+    fn memory_by_startup_phase() {
+        fn private_mb() -> f64 {
+            let output = std::process::Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    &format!(
+                        "(Get-Process -Id {}).PrivateMemorySize64",
+                        std::process::id()
+                    ),
+                ])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<f64>()
+                .unwrap()
+                / 1_048_576.0
+        }
+        let mut last = private_mb();
+        let mut report = |label: &str| {
+            let now = private_mb();
+            println!("{label:<28} {now:8.1} MB  (+{:.1})", now - last);
+            last = now;
+        };
+        report("baseline");
+        let themes = ThemeCatalog::load();
+        report("theme catalog");
+        let catalog = fonts::FontCatalog::bundled();
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &catalog);
+        report("fonts installed");
+        let mut app = ButtonsApp::empty(Preferences::default());
+        report("app state");
+        app.show_localization_onboarding = false;
+        for _ in 0..3 {
+            let _ = ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280.0, 820.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| app.terminal_workspace(ui, ctx));
+                },
+            );
+        }
+        report("3 frames rendered (CPU)");
+        drop(themes);
     }
 
     #[cfg(windows)]
