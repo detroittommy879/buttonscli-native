@@ -3124,6 +3124,14 @@ impl ButtonsApp {
         Ok(())
     }
 
+    /// Demo pages start in the visitor's browser language without asking.
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn skip_browser_onboarding(&mut self) {
+        self.show_localization_onboarding = false;
+        self.preferences.localization.first_run_language_confirmed = true;
+        self.browser_ctx.request_repaint();
+    }
+
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn open_browser_settings(&mut self) {
         self.show_localization_onboarding = false;
@@ -3173,6 +3181,8 @@ impl ButtonsApp {
         let colors = self.colors();
         egui::SidePanel::left("browser-left-commands")
             .default_width(self.preferences.dock_width.clamp(124.0, 360.0))
+            // A remembered narrow width wrapped labels one word per line.
+            .min_width(150.0)
             .resizable(true)
             .frame(
                 egui::Frame::new()

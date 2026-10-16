@@ -93,6 +93,14 @@ mod web {
                 .await
         }
 
+        pub fn skip_onboarding(&self) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("The preview is still starting."))?
+                .skip_browser_onboarding();
+            Ok(())
+        }
+
         pub fn open_settings(&self) -> Result<(), JsValue> {
             let mut app = self
                 .runner

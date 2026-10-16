@@ -31,3 +31,20 @@ fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'index.html'), page);
 fs.cpSync(path.join(here, 'img'), path.join(out, 'img'), { recursive: true });
 console.log(`wrote ${path.join(out, 'index.html')} and img/`);
+
+// The live demo: copy the browser build (run scripts/build-web.ps1 first).
+const web = path.join(here, '..', 'web');
+if (fs.existsSync(path.join(web, 'pkg', 'buttonscli_bg.wasm'))) {
+  const tryDir = path.join(out, 'try');
+  fs.mkdirSync(tryDir, { recursive: true });
+  for (const file of ['index.html', 'simulator.js', 'build-info.json']) {
+    fs.copyFileSync(path.join(web, file), path.join(tryDir, file));
+  }
+  fs.cpSync(path.join(web, 'pkg'), path.join(tryDir, 'pkg'), {
+    recursive: true,
+    filter: source => !source.endsWith('.gitignore'),
+  });
+  console.log(`copied the live demo to ${tryDir}`);
+} else {
+  console.log('web/pkg not built; the live demo button will say it is unavailable');
+}

@@ -40,6 +40,17 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95;
 .top nav { align-items: center; }
 .motion-toggle { font: 600 12px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
 .motion-toggle[aria-pressed="true"] { color: var(--amber); border-color: var(--amber); }
+.live { padding-block: 56px; border-top: 1px solid var(--rule); }
+.live header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 22px; }
+.live h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.live header p { color: var(--muted); max-width: 56ch; margin: 0; }
+.live header code { font: 0.9em var(--mono); color: var(--amber-soft); }
+.live-box { position: relative; height: min(640px, 78vh); min-height: 420px; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.live-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+.live-cover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: radial-gradient(circle at 50% 40%, rgba(255, 138, 61, 0.18), transparent 60%), var(--panel); text-align: center; padding: 24px; }
+.live-note { font: 13px/1.5 var(--mono); color: var(--muted); max-width: 46ch; }
+.live-expand { position: absolute; top: 8px; right: 10px; z-index: 2; font: 600 12px/1 var(--mono); color: var(--text); background: var(--chrome); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.live-box.full { position: fixed; inset: 0; height: auto; min-height: 0; z-index: 50; border-radius: 0; }
 .shots { padding-block: 56px; border-top: 1px solid var(--rule); display: grid; gap: 14px; }
 .shots header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 12px; }
 .shots h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
@@ -48,7 +59,7 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95;
 /* Hero */
 .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 40px 72px; }
 .hero h1 { font-size: clamp(56px, 8vw, 104px); font-weight: 900; text-transform: uppercase; }
-.hero h1 span { color: var(--amber); }
+.hero h1 .accent { color: var(--amber); }
 .hero p.lede { font-size: 19px; color: var(--muted); max-width: 34ch; margin: 22px 0 28px; }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; }
 .btn { font: 600 15px/1 var(--body); padding: 14px 20px; border-radius: 8px; text-decoration: none; border: 1px solid var(--rule); color: var(--text); background: var(--chrome); }
@@ -105,6 +116,7 @@ figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px
 .claims p { color: var(--muted); margin: 0; max-width: 44ch; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .glyph { display: inline-block; }
+.word { display: inline-block; white-space: nowrap; }
 .glyph.spin { color: var(--amber); }
 .win { will-change: transform; }
 
@@ -147,6 +159,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   <header class="top">
     <div class="brand"><b>B</b>BUTTONSCLI</div>
     <nav aria-label="Sections">
+      <a href="#try">Try it</a>
       <a href="#buttons">Buttons</a>
       <a href="#real">Screenshots</a>
       <a href="#practice">AI practice</a>
@@ -160,7 +173,7 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   <section class="hero" aria-labelledby="hero-title">
     <div>
       <div class="eyebrow">Native terminal · Rust · Alacritty core</div>
-      <h1 id="hero-title" data-scramble-hero>A terminal you can <span>click.</span></h1>
+      <h1 id="hero-title" data-scramble-hero>A terminal you can <span class="accent">click.</span></h1>
       <p class="lede">Put the commands you type every day on buttons, tile as many shells as your screen fits, and give each one its own theme. It opens fast and stays out of your way.</p>
       <div class="cta">
         <a class="btn primary" href="https://buttonscli.com">Get ButtonsCLI</a>
@@ -238,6 +251,23 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
       <img src="img/ai-practice.jpg" width="1600" height="974" alt="An AI-simulated Linux terminal above a real PowerShell pane with a blue marbled shader background">
       <figcaption>Top: the AI-simulated workstation. Bottom: a real PowerShell session with a shader background.</figcaption>
     </figure>
+  </section>
+
+  <section class="live" id="try" aria-labelledby="h-try">
+    <header>
+      <div>
+        <div class="eyebrow">Live demo</div>
+        <h2 id="h-try" data-scramble>Try it right here</h2>
+      </div>
+      <p>The real ButtonsCLI interface, compiled to run in your browser. Click the buttons, type <code>ls -la</code>, <code>cd projects</code> or <code>htop</code>, and open Settings to try themes. It is a practice terminal with pretend files; nothing runs on your computer.</p>
+    </header>
+    <div class="live-box" id="live-box">
+      <div class="live-cover" id="live-cover">
+        <button type="button" class="btn primary" id="live-start">Start the live demo</button>
+        <span class="live-note" id="live-note">About a 38 MB download, once.</span>
+      </div>
+      <button type="button" class="live-expand" id="live-expand" hidden aria-pressed="false">Full window</button>
+    </div>
   </section>
 
   <section class="shots" id="real" aria-labelledby="h-real">
@@ -551,13 +581,21 @@ void main(){
     const settle = [];
     for (const node of textNodes) {
       const frag = document.createDocumentFragment();
+      // Letters sit inside a no-wrap span per word, so lines only break
+      // between words, never inside one.
+      let word = null;
       for (const ch of node.textContent) {
-        if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); continue; }
+        if (/\s/.test(ch)) { frag.appendChild(document.createTextNode(' ')); word = null; continue; }
+        if (!word) {
+          word = document.createElement('span');
+          word.className = 'word';
+          frag.appendChild(word);
+        }
         const span = document.createElement('span');
         span.className = 'glyph spin';
         span.setAttribute('aria-hidden', 'true');
         span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-        frag.appendChild(span);
+        word.appendChild(span);
         const start = performance.now() + index * stagger;
         const total = duration + index * stagger * 0.4;
         let next = 0;
@@ -681,5 +719,40 @@ void main(){
     try { localStorage.setItem('buttonscli-motion', off ? 'on' : 'off'); } catch (e) {}
     location.reload();
   });
+})();
+</script>
+<script>
+// Live demo: load the WASM build (in ./try/) only when asked, inside the box.
+(() => {
+  const box = document.getElementById('live-box');
+  const cover = document.getElementById('live-cover');
+  const start = document.getElementById('live-start');
+  const note = document.getElementById('live-note');
+  const expand = document.getElementById('live-expand');
+  if (!box || !start) return;
+  start.addEventListener('click', async () => {
+    start.disabled = true;
+    note.textContent = 'Loading…';
+    let available = false;
+    try { available = (await fetch('try/build-info.json', { cache: 'no-store' })).ok; } catch (e) { available = false; }
+    if (!available) {
+      start.disabled = false;
+      note.textContent = 'The live demo is not hosted on this preview. It runs on buttonscli.com/native/.';
+      return;
+    }
+    const frame = document.createElement('iframe');
+    frame.src = 'try/index.html?embed';
+    frame.title = 'ButtonsCLI live demo';
+    frame.allow = 'clipboard-write';
+    box.appendChild(frame);
+    frame.addEventListener('load', () => { cover.remove(); expand.hidden = false; frame.focus(); });
+  });
+  const setFull = full => {
+    box.classList.toggle('full', full);
+    expand.setAttribute('aria-pressed', String(full));
+    expand.textContent = full ? 'Exit full window (Esc)' : 'Full window';
+  };
+  expand.addEventListener('click', () => setFull(!box.classList.contains('full')));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && box.classList.contains('full')) setFull(false); });
 })();
 </script>
