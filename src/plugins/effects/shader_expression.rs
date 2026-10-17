@@ -1,10 +1,19 @@
-//! A color expression only: no statements, loops, helper functions or resources.
+//! A color expression, or a short body of `let` lines ending in `return`.
+//! No loops, branches, `var`, helper functions or resources.
 use crate::theme::CustomShader;
 use eframe::wgpu::naga;
 
+pub(crate) const MAX_SOURCE_BYTES: usize = crate::theme::MAX_CUSTOM_SHADER_BYTES;
+
+fn is_body(source: &str) -> bool {
+    source
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .any(|word| word == "return")
+}
+
 pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
-    if custom.expression.len() > 2048 || custom.variables.len() > 4 {
-        return Err("Use at most 2048 source bytes and four variables.".into());
+    if custom.expression.len() > MAX_SOURCE_BYTES || custom.variables.len() > 4 {
+        return Err("Use at most 4096 source bytes and four variables.".into());
     }
     if custom
         .expression
@@ -40,7 +49,17 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
         }
         source.push_str(&format!("let {name} = knobs[{index}];\n"));
     }
-    source.push_str(&format!("return {};\n}}", custom.expression));
+    // A body with its own `return` (and `let` lines) is used as is; a bare
+    // expression is wrapped. Bodies are far easier for models to get right.
+    if is_body(&custom.expression) {
+        source.push_str(custom.expression.trim());
+        source.push_str("\n}");
+    } else {
+        source.push_str(&format!(
+            "return {};\n}}",
+            custom.expression.trim().trim_end_matches(';')
+        ));
+    }
     static CACHE: std::sync::OnceLock<
         std::sync::Mutex<std::collections::HashMap<String, Result<(), String>>>,
     > = std::sync::OnceLock::new();
@@ -145,7 +164,7 @@ fn validate(source: &str) -> Result<(), String> {
     else {
         return Err("Enter one color expression, without declarations or resources.".into());
     };
-    if function.expressions.len() > 128
+    if function.expressions.len() > 256
         || function.body.iter().any(|statement| {
             !matches!(
                 statement,
@@ -231,6 +250,29 @@ mod tests {
         assert!(
             !error.contains("wgsl:"),
             "line numbers point at the expression: {error}"
+        );
+    }
+
+    #[test]
+    fn short_bodies_with_let_lines_work_but_loops_and_vars_do_not() {
+        let mut custom = CustomShader {
+            expression: "let r = length(p);\nlet glow = smoothstep(0.6, 0.0, r);\nreturn mix(c1, palette(r - t * 0.1), glow);".into(),
+            ..Default::default()
+        };
+        assert!(function(&custom).is_ok(), "{:?}", function(&custom));
+        for invalid in [
+            "var x = 1.0;\nx = x + 1.0;\nreturn c1 * x;",
+            "for (var i = 0; i < 3; i++) {}\nreturn c1;",
+            "if (p.x > 0.0) { return c1; }\nreturn c2;",
+            "let a = c1;",
+        ] {
+            custom.expression = invalid.into();
+            assert!(function(&custom).is_err(), "{invalid}");
+        }
+        custom.expression = "c1 * 0.5;".into();
+        assert!(
+            function(&custom).is_ok(),
+            "a stray semicolon on an expression is fine"
         );
     }
 
