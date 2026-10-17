@@ -21,6 +21,10 @@ canvas { width: 100%; height: 100%; display: block; }
 #status { font-size: 12px; }
 #fallback { display: none; padding: 2rem; max-width: 600px; }
 #loading { position: absolute; inset: 0; display: grid; place-items: center; background: #090c16; }
+/* ?embed: compact header for use inside another page */
+body.embed header { gap: 6px; padding: 4px 8px; font-size: 12px; }
+body.embed header strong, body.embed #build, body.embed #desktop-prompts, body.embed .file-button { display: none; }
+body.embed button { padding: 3px 8px; }
 </style>
 </head>
 <body>
@@ -41,6 +45,7 @@ canvas { width: 100%; height: 100%; display: block; }
 <div id="fallback" role="alert"><strong>The preview could not start.</strong><p id="failure-detail"></p><p>Serve the complete web folder over HTTP(S), with WebGL enabled in your browser.</p><button id="retry">Try again</button></div>
 </main>
 <script type="module">
+if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
 const status = document.getElementById("status");
 const file = document.getElementById("theme-file");
 const settings = document.getElementById("settings");
@@ -62,6 +67,8 @@ try {
   const app = new WebHandle();
   await app.start(document.getElementById("buttonscli_canvas"));
   window.buttonscli = app;
+  // Demo visitors get their browser language without a first-run dialog.
+  try { app.skip_onboarding(); } catch { /* still starting */ }
   document.getElementById("loading").remove();
   settings.disabled = file.disabled = false;
   const { connectSimulator } = await import(`./simulator.js${suffix}`);

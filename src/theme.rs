@@ -450,6 +450,9 @@ impl Default for ShaderBackground {
     }
 }
 
+/// Largest custom shader body a theme may carry (bytes).
+pub const MAX_CUSTOM_SHADER_BYTES: usize = 4096;
+
 impl ShaderBackground {
     // Order is the GPU preset index; keep existing entries stable.
     pub const PRESETS: &'static [(&'static str, &'static str)] = &[
@@ -518,7 +521,7 @@ impl ShaderBackground {
             return None;
         }
         if let Some(custom) = &mut shader.custom {
-            if custom.expression.len() > 2048 || custom.variables.len() > 4 {
+            if custom.expression.len() > MAX_CUSTOM_SHADER_BYTES || custom.variables.len() > 4 {
                 return None;
             }
             for variable in &mut custom.variables {

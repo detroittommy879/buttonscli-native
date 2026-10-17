@@ -1,5 +1,5 @@
 <title>ButtonsCLI</title>
-<meta name="description" content="ButtonsCLI is a native terminal with clickable command buttons, tiled panes, 555 themes and GPU shader backgrounds.">
+<meta name="description" content="ButtonsCLI Native: a Rust terminal with clickable command buttons, tiled panes, 550+ themes and GPU shader backgrounds. No webview.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -22,8 +22,9 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html { background: var(--ink); }
-body { background: var(--ink); color: var(--text); font: 16px/1.6 var(--body); margin: 0; padding-inline: 20px; }
+html { background: var(--ink); overflow-x: clip; }
+/* Reveal offsets are transforms; clip them so they never add a sideways scroll. */
+body { background: var(--ink); color: var(--text); font: 16px/1.6 var(--body); margin: 0; padding-inline: 20px; overflow-x: clip; }
 .wrap { max-width: 1180px; margin: 0 auto; }
 a { color: var(--amber-soft); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -37,17 +38,43 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95;
 .top nav { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover { color: var(--text); }
+.top nav { align-items: center; }
+.motion-toggle { font: 600 12px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.motion-toggle[aria-pressed="true"] { color: var(--amber); border-color: var(--amber); }
+.live { padding-block: 56px; border-top: 1px solid var(--rule); }
+.live header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 22px; }
+.live h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.live header p { color: var(--muted); max-width: 56ch; margin: 0; }
+.live header code { font: 0.9em var(--mono); color: var(--amber-soft); }
+.live-box { position: relative; height: min(640px, 78vh); min-height: 420px; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.live-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+.live-cover { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; background: radial-gradient(circle at 50% 40%, rgba(255, 138, 61, 0.18), transparent 60%), var(--panel); text-align: center; padding: 24px; }
+.live-note { font: 13px/1.5 var(--mono); color: var(--muted); max-width: 46ch; }
+.live-expand { position: absolute; top: 8px; right: 10px; z-index: 2; font: 600 12px/1 var(--mono); color: var(--text); background: var(--chrome); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.live-box.full { position: fixed; inset: 0; height: auto; min-height: 0; z-index: 50; border-radius: 0; }
+.shots { padding-block: 56px; border-top: 1px solid var(--rule); display: grid; gap: 14px; }
+.shots header { display: flex; flex-wrap: wrap; gap: 12px 40px; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+.shots h2 { font-size: clamp(40px, 5vw, 60px); font-weight: 800; text-transform: uppercase; margin-top: 12px; }
+.shots header p { color: var(--muted); max-width: 52ch; margin: 0; }
 
 /* Hero */
 .hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: center; padding-block: 40px 72px; }
 .hero h1 { font-size: clamp(56px, 8vw, 104px); font-weight: 900; text-transform: uppercase; }
-.hero h1 span { color: var(--amber); }
+.hero h1 .accent { color: var(--amber); }
 .hero p.lede { font-size: 19px; color: var(--muted); max-width: 34ch; margin: 22px 0 28px; }
 .cta { display: flex; gap: 12px; flex-wrap: wrap; }
 .btn { font: 600 15px/1 var(--body); padding: 14px 20px; border-radius: 8px; text-decoration: none; border: 1px solid var(--rule); color: var(--text); background: var(--chrome); }
 .btn.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
 .facts { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; font: 13px/1.4 var(--mono); color: var(--muted); }
-.facts strong { display: block; font: 800 26px/1 var(--display); color: var(--text); letter-spacing: 0.02em; }
+.facts strong { display: block; font: 800 26px/1 var(--display); color: var(--text); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; min-width: 4ch; }
+.install { background: #000; color: #f3e7da; border-radius: 16px; padding: 22px 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 8px; }
+.install > * { min-width: 0; }
+.install h2 { font-size: clamp(24px, 3vw, 32px); font-weight: 800; text-transform: uppercase; color: var(--amber); }
+.install .cmd { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.install pre { flex: 1 1 420px; min-width: 0; margin: 0; padding: 14px 16px; background: #121212; border: 1px solid #2a2a2a; border-radius: 10px; overflow-x: auto; font: 14px/1.6 var(--mono); }
+.install pre .p { color: var(--amber); user-select: none; }
+.install button { font: 600 13px/1 var(--mono); color: #000; background: var(--amber); border: 0; border-radius: 10px; padding: 0 16px; cursor: pointer; min-height: 44px; }
+.install p { margin: 0; color: #c9b7a5; font-size: 14px; max-width: 80ch; }
 
 /* The mini app window */
 .win { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(255, 138, 61, 0.35); min-width: 0; }
@@ -98,7 +125,8 @@ figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px
 .claims p { color: var(--muted); margin: 0; max-width: 44ch; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .glyph { display: inline-block; }
-.glyph.spin { color: var(--amber); }
+.word { display: inline-block; white-space: nowrap; }
+.glyph { will-change: transform; }
 .win { will-change: transform; }
 
 /* Shader wall */
@@ -140,18 +168,21 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   <header class="top">
     <div class="brand"><b>B</b>BUTTONSCLI</div>
     <nav aria-label="Sections">
+      <a href="#try">Try it</a>
       <a href="#buttons">Buttons</a>
+      <a href="#real">Screenshots</a>
       <a href="#practice">AI practice</a>
       <a href="#shaders">Shaders</a>
       <a href="#agents">Agents</a>
       <a href="#specs">Specs</a>
+      <button type="button" id="motion-toggle" class="motion-toggle" aria-pressed="true">Motion on</button>
     </nav>
   </header>
 
   <section class="hero" aria-labelledby="hero-title">
     <div>
       <div class="eyebrow">Native terminal · Rust · Alacritty core</div>
-      <h1 id="hero-title" data-scramble-hero>A terminal you can <span>click.</span></h1>
+      <h1 id="hero-title" data-scramble-hero>A terminal you can <span class="accent">click.</span></h1>
       <p class="lede">Put the commands you type every day on buttons, tile as many shells as your screen fits, and give each one its own theme. It opens fast and stays out of your way.</p>
       <div class="cta">
         <a class="btn primary" href="https://buttonscli.com">Get ButtonsCLI</a>
@@ -191,6 +222,15 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
     </div>
   </section>
 
+  <section class="install" aria-labelledby="h-install">
+    <h2 id="h-install">Install with Cargo</h2>
+    <div class="cmd">
+      <pre id="install-cmd"><span class="p">$ </span>cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli</pre>
+      <button type="button" id="copy-install">Copy</button>
+    </div>
+    <p>Needs current stable Rust, Git and your platform's build tools; themes and fonts are built in. Run <code>buttonscli</code> afterwards, and repeat the command to update. Most testing so far has been on Windows, and it builds and runs in a Linux desktop VM. It has not been compiled or tested on a Mac yet; help and test reports are very welcome, and Mac support is coming soon.</p>
+  </section>
+
   <section aria-labelledby="h-claims">
     <h2 id="h-claims" class="sr-only">Why ButtonsCLI</h2>
     <ul class="claims">
@@ -228,6 +268,51 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
     <figure>
       <img src="img/ai-practice.jpg" width="1600" height="974" alt="An AI-simulated Linux terminal above a real PowerShell pane with a blue marbled shader background">
       <figcaption>Top: the AI-simulated workstation. Bottom: a real PowerShell session with a shader background.</figcaption>
+    </figure>
+  </section>
+
+  <section class="live" id="try" aria-labelledby="h-try">
+    <header>
+      <div>
+        <div class="eyebrow">Live demo</div>
+        <h2 id="h-try" data-scramble>Try it right here</h2>
+      </div>
+      <p>The real ButtonsCLI interface, compiled to run in your browser. Click the buttons, type <code>ls -la</code>, <code>cd projects</code> or <code>htop</code>, and open Settings to try themes. It is a practice terminal with pretend files; nothing runs on your computer.</p>
+    </header>
+    <div class="live-box" id="live-box">
+      <div class="live-cover" id="live-cover">
+        <button type="button" class="btn primary" id="live-start">Start the live demo</button>
+        <span class="live-note" id="live-note">About a 38 MB download, once.</span>
+      </div>
+      <button type="button" class="live-expand" id="live-expand" hidden aria-pressed="false">Full window</button>
+    </div>
+  </section>
+
+  <section class="shots" id="real" aria-labelledby="h-real">
+    <header>
+      <div>
+        <div class="eyebrow">Real screenshots</div>
+        <h2 id="h-real" data-scramble>Seven shells, one window</h2>
+      </div>
+      <p>Every pane runs a real shell with its own theme and background: a galaxy here, stained glass there, a VHS tape in the corner. Right-click any pane to change its theme or font on the spot.</p>
+    </header>
+    <figure>
+      <img src="img/seven-panes.jpg" width="1600" height="1105" loading="lazy" alt="ButtonsCLI with seven tiled terminals, each with a different animated shader background, and a pane menu open for choosing a font">
+      <figcaption>Seven panes, seven backgrounds, and a pane menu for picking that terminal's font.</figcaption>
+    </figure>
+    <div class="pair">
+      <figure>
+        <img src="img/galaxy-disco.jpg" width="1600" height="979" loading="lazy" alt="A purple-themed ButtonsCLI window with a galaxy swirl background and a pane of glowing colored tiles">
+        <figcaption>Galaxy Brain and Disco Inferno, the theme with its own shader code.</figcaption>
+      </figure>
+      <figure>
+        <img src="img/stained-glass.jpg" width="1600" height="979" loading="lazy" alt="A ButtonsCLI pane with a stained-glass background below two terminals">
+        <figcaption>Stained Glass Chapel behind a PowerShell pane.</figcaption>
+      </figure>
+    </div>
+    <figure>
+      <img src="img/memory.jpg" width="1800" height="927" loading="lazy" alt="ButtonsCLI with seven panes and the Settings theme library open, next to Task Manager showing buttonscli.exe using 118.7 MB of memory">
+      <figcaption>Seven shells, shaders running and Settings open: Task Manager shows 118.7 MB for ButtonsCLI.</figcaption>
     </figure>
   </section>
 
@@ -335,6 +420,10 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
 </div>
 
 <script>
+// Saved choice from the Motion toggle; default is motion on.
+try { window.__motionOff = localStorage.getItem("buttonscli-motion") === "off"; } catch (e) { window.__motionOff = false; }
+</script>
+<script>
 (() => {
   // ---- Terminal demo: buttons type canned output into the pane ----
   const term = document.getElementById('term');
@@ -349,7 +438,8 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
   let html = 'Welcome to ButtonsCLI. Click a button above.\n' + prompt;
   let busy = false;
   term.innerHTML = html;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Motion is on unless the visitor turns it off with the toggle (remembered locally).
+  const reduce = window.__motionOff === true;
   function run(cmd) {
     if (busy) return;
     if (cmd === 'clear') { html = prompt; term.innerHTML = html; return; }
@@ -457,11 +547,11 @@ void main(){
 // Springs: a damped harmonic oscillator, x'' = -k(x - target) - c x', stepped
 // with semi-implicit Euler. Low damping overshoots a little and settles.
 (() => {
-  // Respect reduced motion; #motion forces it on for previews.
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches && location.hash !== '#motion') return;
+  if (window.__motionOff) return;
+  // The OS reduced-motion setting keeps motion but makes it calmer.
+  const gentle = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
-  const easeInCubic = x => x * x * x;
 
   function spring(values, { stiffness = 140, damping = 15, mass = 1 } = {}, apply, done) {
     const state = values.map(v => ({ x: v, v: 0 }));
@@ -493,9 +583,10 @@ void main(){
     requestAnimationFrame(step);
   }
 
-  // Scramble: each letter spins through glyphs, fast at first, then slower
-  // (the delay grows with easeInCubic) until it lands, left to right.
-  const GLYPHS = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*+=<>/';
+  // Spin: each letter turns around its vertical axis, fast at first and then
+  // easing to a stop (easeOutCubic). Only transforms change, never the text,
+  // so nothing reflows and images below do not flicker.
+  const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
   function scramble(el, { duration = 1100, stagger = 45 } = {}) {
     const textNodes = [];
     const walk = node => node.childNodes.forEach(child => {
@@ -504,37 +595,44 @@ void main(){
     });
     walk(el);
     el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
-    let index = 0;
-    const settle = [];
+    const glyphs = [];
     for (const node of textNodes) {
       const frag = document.createDocumentFragment();
+      // Letters sit inside a no-wrap span per word, so lines only break
+      // between words, never inside one.
+      let word = null;
       for (const ch of node.textContent) {
-        if (ch === ' ') { frag.appendChild(document.createTextNode(' ')); continue; }
+        if (/\s/.test(ch)) { frag.appendChild(document.createTextNode(' ')); word = null; continue; }
+        if (!word) {
+          word = document.createElement('span');
+          word.className = 'word';
+          frag.appendChild(word);
+        }
         const span = document.createElement('span');
-        span.className = 'glyph spin';
+        span.className = 'glyph';
         span.setAttribute('aria-hidden', 'true');
-        span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-        frag.appendChild(span);
-        const start = performance.now() + index * stagger;
-        const total = duration + index * stagger * 0.4;
-        let next = 0;
-        const tick = now => {
-          const p = Math.min(1, (now - start) / total);
-          if (p >= 1) { span.textContent = ch; span.classList.remove('spin'); return; }
-          if (now >= next) {
-            span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-            next = now + 16 + 140 * easeInCubic(Math.max(0, p));
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-        settle.push(() => { span.textContent = ch; span.classList.remove('spin'); });
-        index++;
+        span.textContent = ch;
+        word.appendChild(span);
+        glyphs.push(span);
       }
       node.replaceWith(frag);
     }
-    // If animation frames are paused (hidden tab), still land on the real text.
-    setTimeout(() => settle.forEach(f => f()), duration + index * stagger + 400);
+    const t0 = performance.now();
+    const turns = 2;
+    const finish = () => glyphs.forEach(g => { g.style.transform = ''; });
+    const tick = now => {
+      let running = false;
+      glyphs.forEach((g, i) => {
+        const p = Math.min(1, Math.max(0, (now - t0 - i * stagger) / duration));
+        if (p < 1) running = true;
+        const angle = 360 * turns * (1 - easeOutCubic(p));
+        g.style.transform = angle > 0.5 ? `perspective(400px) rotateY(${angle.toFixed(1)}deg)` : '';
+      });
+      if (running) requestAnimationFrame(tick); else finish();
+    };
+    requestAnimationFrame(tick);
+    // If animation frames are paused (hidden tab), still end upright.
+    setTimeout(finish, duration + glyphs.length * stagger + 400);
   }
 
   // Count-up for the hero facts.
@@ -559,7 +657,7 @@ void main(){
   // Hero window follows the pointer with a lerp-smoothed tilt.
   const win = document.querySelector('.win');
   let tx = 0, ty = 0, cx = 0, cy = 0;
-  addEventListener('pointermove', e => {
+  if (!gentle) addEventListener('pointermove', e => {
     tx = (e.clientX / innerWidth - 0.5) * 6;
     ty = (e.clientY / innerHeight - 0.5) * -6;
   });
@@ -594,7 +692,8 @@ void main(){
 
   function prime(el, from, delay = 0) {
     if (!below(el)) return;
-    const [x0, y0, r0] = from;
+    const k = gentle ? 0.35 : 1;
+    const [x0, y0, r0] = from.map(v => v * k);
     el.style.transform = `translate(${x0}px, ${y0}px) rotate(${r0}deg)`;
     whenVisible(el, () => setTimeout(() => {
       spring([x0, y0, r0], { stiffness: 120, damping: 13 }, ([x, y, r]) => {
@@ -623,5 +722,77 @@ void main(){
     if (below(el)) whenVisible(el, () => scramble(el, { duration: 700, stagger: 28 }), 0.8);
   });
   check();
+})();
+</script>
+<script>
+// Motion toggle: remember the choice and reload so every effect follows it.
+(() => {
+  const toggle = document.getElementById('motion-toggle');
+  if (!toggle) return;
+  const off = window.__motionOff === true;
+  toggle.setAttribute('aria-pressed', String(!off));
+  toggle.textContent = off ? 'Motion off' : 'Motion on';
+  toggle.addEventListener('click', () => {
+    try { localStorage.setItem('buttonscli-motion', off ? 'on' : 'off'); } catch (e) {}
+    location.reload();
+  });
+})();
+</script>
+<script>
+// Live demo: load the WASM build (in ./try/) only when asked, inside the box.
+(() => {
+  const box = document.getElementById('live-box');
+  const cover = document.getElementById('live-cover');
+  const start = document.getElementById('live-start');
+  const note = document.getElementById('live-note');
+  const expand = document.getElementById('live-expand');
+  if (!box || !start) return;
+  start.addEventListener('click', async () => {
+    start.disabled = true;
+    note.textContent = 'Loading…';
+    let available = false;
+    try { available = (await fetch('try/build-info.json', { cache: 'no-store' })).ok; } catch (e) { available = false; }
+    if (!available) {
+      start.disabled = false;
+      note.textContent = 'The live demo is not hosted on this preview. It runs on buttonscli.com/native/.';
+      return;
+    }
+    const frame = document.createElement('iframe');
+    frame.src = 'try/index.html?embed';
+    frame.title = 'ButtonsCLI live demo';
+    frame.allow = 'clipboard-write';
+    box.appendChild(frame);
+    frame.addEventListener('load', () => { cover.remove(); expand.hidden = false; frame.focus(); });
+  });
+  const setFull = full => {
+    box.classList.toggle('full', full);
+    expand.setAttribute('aria-pressed', String(full));
+    expand.textContent = full ? 'Exit full window (Esc)' : 'Full window';
+  };
+  expand.addEventListener('click', () => setFull(!box.classList.contains('full')));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && box.classList.contains('full')) setFull(false); });
+})();
+</script>
+<script>
+// Copy the cargo command; fall back to selecting it if the clipboard is refused.
+(() => {
+  const button = document.getElementById('copy-install');
+  const pre = document.getElementById('install-cmd');
+  if (!button || !pre) return;
+  const command = pre.textContent.replace(/^\$\s*/, '');
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      button.textContent = 'Copied';
+    } catch (e) {
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = 'Press Ctrl+C';
+    }
+    setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+  });
 })();
 </script>

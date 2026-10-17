@@ -102,12 +102,20 @@ pub(crate) enum AiTask {
     Help,
     Theme,
     Shader,
+    /// Reviews and repairs generated shaders; works best as a different model.
+    ShaderJudge,
     Simulation,
 }
 
 impl AiTask {
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) const ALL: [Self; 4] = [Self::Help, Self::Theme, Self::Shader, Self::Simulation];
+    pub(crate) const ALL: [Self; 5] = [
+        Self::Help,
+        Self::Theme,
+        Self::Shader,
+        Self::ShaderJudge,
+        Self::Simulation,
+    ];
 
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn label(self) -> &'static str {
@@ -115,6 +123,7 @@ impl AiTask {
             Self::Help => "AI Help model",
             Self::Theme => "Theme generation model",
             Self::Shader => "Shader generation model",
+            Self::ShaderJudge => "Shader judge model (checks and fixes; pick a different model)",
             Self::Simulation => "Simulated terminal model",
         }
     }
