@@ -22,8 +22,9 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html { background: var(--ink); }
-body { background: var(--ink); color: var(--text); font: 16px/1.6 var(--body); margin: 0; padding-inline: 20px; }
+html { background: var(--ink); overflow-x: clip; }
+/* Reveal offsets are transforms; clip them so they never add a sideways scroll. */
+body { background: var(--ink); color: var(--text); font: 16px/1.6 var(--body); margin: 0; padding-inline: 20px; overflow-x: clip; }
 .wrap { max-width: 1180px; margin: 0 auto; }
 a { color: var(--amber-soft); }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -65,7 +66,15 @@ h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 0.95;
 .btn { font: 600 15px/1 var(--body); padding: 14px 20px; border-radius: 8px; text-decoration: none; border: 1px solid var(--rule); color: var(--text); background: var(--chrome); }
 .btn.primary { background: var(--amber); color: var(--ink); border-color: var(--amber); }
 .facts { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; font: 13px/1.4 var(--mono); color: var(--muted); }
-.facts strong { display: block; font: 800 26px/1 var(--display); color: var(--text); letter-spacing: 0.02em; }
+.facts strong { display: block; font: 800 26px/1 var(--display); color: var(--text); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; min-width: 4ch; }
+.install { background: #000; color: #f3e7da; border-radius: 16px; padding: 22px 24px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 8px; }
+.install > * { min-width: 0; }
+.install h2 { font-size: clamp(24px, 3vw, 32px); font-weight: 800; text-transform: uppercase; color: var(--amber); }
+.install .cmd { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.install pre { flex: 1 1 420px; min-width: 0; margin: 0; padding: 14px 16px; background: #121212; border: 1px solid #2a2a2a; border-radius: 10px; overflow-x: auto; font: 14px/1.6 var(--mono); }
+.install pre .p { color: var(--amber); user-select: none; }
+.install button { font: 600 13px/1 var(--mono); color: #000; background: var(--amber); border: 0; border-radius: 10px; padding: 0 16px; cursor: pointer; min-height: 44px; }
+.install p { margin: 0; color: #c9b7a5; font-size: 14px; max-width: 80ch; }
 
 /* The mini app window */
 .win { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; box-shadow: 0 30px 80px -30px rgba(255, 138, 61, 0.35); min-width: 0; }
@@ -117,7 +126,7 @@ figcaption { font: 12.5px/1.5 var(--mono); color: var(--muted); margin-top: 10px
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .glyph { display: inline-block; }
 .word { display: inline-block; white-space: nowrap; }
-.glyph.spin { color: var(--amber); }
+.glyph { will-change: transform; }
 .win { will-change: transform; }
 
 /* Shader wall */
@@ -211,6 +220,15 @@ footer { padding-block: 28px 48px; border-top: 1px solid var(--rule); color: var
         <button type="button" id="s3" data-shader="3" aria-pressed="false">Off</button>
       </div>
     </div>
+  </section>
+
+  <section class="install" aria-labelledby="h-install">
+    <h2 id="h-install">Install with Cargo</h2>
+    <div class="cmd">
+      <pre id="install-cmd"><span class="p">$ </span>cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli</pre>
+      <button type="button" id="copy-install">Copy</button>
+    </div>
+    <p>Needs current stable Rust, Git and your platform's build tools; themes and fonts are built in. Run <code>buttonscli</code> afterwards, and repeat the command to update. Most testing so far has been on Windows, and it builds and runs in a Linux desktop VM. It has not been compiled or tested on a Mac yet; help and test reports are very welcome, and Mac support is coming soon.</p>
   </section>
 
   <section aria-labelledby="h-claims">
@@ -534,7 +552,6 @@ void main(){
   const gentle = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const easeOutExpo = x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
-  const easeInCubic = x => x * x * x;
 
   function spring(values, { stiffness = 140, damping = 15, mass = 1 } = {}, apply, done) {
     const state = values.map(v => ({ x: v, v: 0 }));
@@ -566,9 +583,10 @@ void main(){
     requestAnimationFrame(step);
   }
 
-  // Scramble: each letter spins through glyphs, fast at first, then slower
-  // (the delay grows with easeInCubic) until it lands, left to right.
-  const GLYPHS = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&*+=<>/';
+  // Spin: each letter turns around its vertical axis, fast at first and then
+  // easing to a stop (easeOutCubic). Only transforms change, never the text,
+  // so nothing reflows and images below do not flicker.
+  const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
   function scramble(el, { duration = 1100, stagger = 45 } = {}) {
     const textNodes = [];
     const walk = node => node.childNodes.forEach(child => {
@@ -577,8 +595,7 @@ void main(){
     });
     walk(el);
     el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
-    let index = 0;
-    const settle = [];
+    const glyphs = [];
     for (const node of textNodes) {
       const frag = document.createDocumentFragment();
       // Letters sit inside a no-wrap span per word, so lines only break
@@ -592,30 +609,30 @@ void main(){
           frag.appendChild(word);
         }
         const span = document.createElement('span');
-        span.className = 'glyph spin';
+        span.className = 'glyph';
         span.setAttribute('aria-hidden', 'true');
-        span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        span.textContent = ch;
         word.appendChild(span);
-        const start = performance.now() + index * stagger;
-        const total = duration + index * stagger * 0.4;
-        let next = 0;
-        const tick = now => {
-          const p = Math.min(1, (now - start) / total);
-          if (p >= 1) { span.textContent = ch; span.classList.remove('spin'); return; }
-          if (now >= next) {
-            span.textContent = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-            next = now + 16 + 140 * easeInCubic(Math.max(0, p));
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-        settle.push(() => { span.textContent = ch; span.classList.remove('spin'); });
-        index++;
+        glyphs.push(span);
       }
       node.replaceWith(frag);
     }
-    // If animation frames are paused (hidden tab), still land on the real text.
-    setTimeout(() => settle.forEach(f => f()), duration + index * stagger + 400);
+    const t0 = performance.now();
+    const turns = 2;
+    const finish = () => glyphs.forEach(g => { g.style.transform = ''; });
+    const tick = now => {
+      let running = false;
+      glyphs.forEach((g, i) => {
+        const p = Math.min(1, Math.max(0, (now - t0 - i * stagger) / duration));
+        if (p < 1) running = true;
+        const angle = 360 * turns * (1 - easeOutCubic(p));
+        g.style.transform = angle > 0.5 ? `perspective(400px) rotateY(${angle.toFixed(1)}deg)` : '';
+      });
+      if (running) requestAnimationFrame(tick); else finish();
+    };
+    requestAnimationFrame(tick);
+    // If animation frames are paused (hidden tab), still end upright.
+    setTimeout(finish, duration + glyphs.length * stagger + 400);
   }
 
   // Count-up for the hero facts.
@@ -754,5 +771,28 @@ void main(){
   };
   expand.addEventListener('click', () => setFull(!box.classList.contains('full')));
   addEventListener('keydown', e => { if (e.key === 'Escape' && box.classList.contains('full')) setFull(false); });
+})();
+</script>
+<script>
+// Copy the cargo command; fall back to selecting it if the clipboard is refused.
+(() => {
+  const button = document.getElementById('copy-install');
+  const pre = document.getElementById('install-cmd');
+  if (!button || !pre) return;
+  const command = pre.textContent.replace(/^\$\s*/, '');
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      button.textContent = 'Copied';
+    } catch (e) {
+      const range = document.createRange();
+      range.selectNodeContents(pre);
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = 'Press Ctrl+C';
+    }
+    setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+  });
 })();
 </script>
