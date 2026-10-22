@@ -7,6 +7,14 @@ use std::time::Duration;
 use zeroize::Zeroizing;
 
 const MAX_REPLY: u64 = 1024 * 1024;
+// SSE wraps every token in a JSON envelope (and reasoning models stream their
+// thinking too), so wire bytes run ~100x the answer. Decoded text is bounded
+// separately by the SSE decoder and answer buffer; this only stops a runaway.
+const MAX_STREAM: u64 = 64 * 1024 * 1024;
+// A stream may run this long in total, as long as no single read stalls past
+// STREAM_IDLE.
+const STREAM_TOTAL: Duration = Duration::from_secs(300);
+const STREAM_IDLE: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Copy)]
 pub(crate) enum Method {
@@ -51,7 +59,7 @@ impl std::fmt::Display for TransportError {
                 "API key contains invalid characters; paste only the key and save it again"
             }
             Self::Network => "provider connection failed or timed out",
-            Self::ResponseTooLarge => "provider response exceeded 1 MiB",
+            Self::ResponseTooLarge => "provider response was too large",
             Self::Cancelled => "provider request was cancelled",
         })
     }
@@ -210,7 +218,7 @@ impl HttpTransport for ReqwestTransport {
         let _runtime_context = runtime.enter();
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(60))
+            .read_timeout(STREAM_IDLE)
             .connect_timeout(Duration::from_secs(5))
             .build()
             .map_err(|_| TransportError::Network)?;
@@ -224,11 +232,11 @@ impl HttpTransport for ReqwestTransport {
         if let Some(body) = request.body {
             builder = builder.json(&body);
         }
-        let deadline = std::time::Instant::now() + Duration::from_secs(60);
+        let deadline = std::time::Instant::now() + STREAM_TOTAL;
         let mut response = cancellable(&runtime, cancelled, deadline, builder.send())?;
         if response
             .content_length()
-            .is_some_and(|length| length > MAX_REPLY)
+            .is_some_and(|length| length > MAX_STREAM)
         {
             return Err(TransportError::ResponseTooLarge);
         }
@@ -255,7 +263,7 @@ impl HttpTransport for ReqwestTransport {
                 break;
             };
             total += chunk.len() as u64;
-            if total > MAX_REPLY {
+            if total > MAX_STREAM {
                 return Err(TransportError::ResponseTooLarge);
             }
             on_chunk(&chunk)?;
@@ -352,5 +360,50 @@ mod tests {
                 TransportError::InvalidCredential
             );
         }
+    }
+
+    #[test]
+    fn sse_streams_may_exceed_one_mib_on_the_wire() {
+        use std::io::Write;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut head = [0_u8; 4096];
+            let _ = socket.read(&mut head).unwrap();
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n",
+                )
+                .unwrap();
+            let event = format!(
+                "data: {{\"choices\":[{{\"index\":0,\"delta\":{{\"reasoning_content\":\"{}\"}}}}]}}\n\n",
+                "x".repeat(200)
+            );
+            for _ in 0..8000 {
+                socket.write_all(event.as_bytes()).unwrap();
+            }
+            socket.write_all(b"data: [DONE]\n\n").unwrap();
+        });
+        let mut total = 0_usize;
+        ReqwestTransport
+            .execute_stream(
+                Request {
+                    method: Method::Post,
+                    url: format!("http://127.0.0.1:{port}/v1/chat/completions"),
+                    body: Some(serde_json::json!({})),
+                    key: None,
+                    anthropic: false,
+                },
+                &AtomicBool::new(false),
+                &mut |head| assert_eq!(head.status, 200),
+                &mut |chunk| {
+                    total += chunk.len();
+                    Ok(())
+                },
+            )
+            .unwrap();
+        server.join().unwrap();
+        assert!(total as u64 > MAX_REPLY);
     }
 }
