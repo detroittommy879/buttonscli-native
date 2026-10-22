@@ -513,6 +513,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     native_revision: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
+    native_profiles: Option<Vec<crate::storage::store::ProfileSummary>>,
+    #[cfg(not(target_arch = "wasm32"))]
     native_save_blocked: bool,
     /// Serialized preferences last written, and when Settings last compared them.
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -1471,6 +1473,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             native_revision: None,
             #[cfg(not(target_arch = "wasm32"))]
+            native_profiles: None,
+            #[cfg(not(target_arch = "wasm32"))]
             native_save_blocked: false,
             last_saved_preferences: Vec::new(),
             settings_autosave_at: 0.0,
@@ -1883,6 +1887,136 @@ impl ButtonsApp {
             .filter(|theme| theme.id != current)
             .collect();
         (!candidates.is_empty()).then(|| candidates[fastrand::usize(..candidates.len())].id.clone())
+    }
+
+    /// Make `store` the active profile in this window: its settings, themes and favorites.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn adopt_native_profile(
+        &mut self,
+        store: NativeStore,
+        mut preferences: Preferences,
+        revision: Option<u64>,
+        ctx: &egui::Context,
+    ) {
+        self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
+        self.quick_secrets_busy = false;
+        self.quick_secrets_open = false;
+        self.quick_secrets_vault_exists = false;
+        self.lock_quick_secrets();
+        preferences.normalize_theme_sources();
+        self.themes = ThemeCatalog::load();
+        self.theme_load_warnings = self
+            .themes
+            .load_personal(store.profile_name(), &store.profile_dir());
+        for warning in &self.theme_load_warnings {
+            log::warn!("personal theme: {warning}");
+        }
+        self.preferences = preferences;
+        self.refresh_locale();
+        self.theme_overrides.clear();
+        self.history_writer.take();
+        self.history_last_tick = None;
+        self.native_store = Some(store);
+        self.native_revision = revision;
+        self.native_save_blocked = false;
+        self.native_profiles = None;
+        self.last_saved_preferences =
+            serde_json::to_vec(&self.preferences_to_save()).unwrap_or_default();
+        self.import_offer = false;
+        self.apply_style(ctx);
+        if self.settings_snapshot.is_some() {
+            self.settings_snapshot = Some(self.capture_settings_snapshot());
+        }
+    }
+
+    /// Save the current profile, then switch this window to another existing one.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn switch_native_profile(&mut self, name: &str, ctx: &egui::Context) {
+        let Some(store) = self.native_store.clone() else {
+            return;
+        };
+        if store.profile_name() == name {
+            return;
+        }
+        self.persist_native_preferences();
+        let result = store.switch_profile(name).and_then(|next| {
+            let loaded = next.load()?;
+            Ok((next, loaded))
+        });
+        match result {
+            Ok((next, loaded)) => {
+                let (preferences, revision) = match loaded {
+                    Some(loaded) => (loaded.preferences, Some(loaded.revision)),
+                    None => (Preferences::default(), None),
+                };
+                self.adopt_native_profile(next, preferences, revision, ctx);
+                self.notice = Some(format!("Switched to profile {name}."));
+            }
+            Err(error) => {
+                // Stay on the profile we had; put its name back if the switch got that far.
+                let _ = store.switch_profile(store.profile_name());
+                self.notice = Some(format!("Could not switch profile: {error}"));
+            }
+        }
+    }
+
+    /// Status-bar menu that shows the active profile and lists every profile found on disk.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn profile_menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let Some(store) = self.native_store.clone() else {
+            return;
+        };
+        let mut chosen = None;
+        let mut open_import = false;
+        let label = format!(
+            "{} {}",
+            crate::i18n::literal(&self.locale, "Profile:"),
+            store.profile_name()
+        );
+        let response = ui.spaced_menu_button(label, |ui| {
+            let profiles = self
+                .native_profiles
+                .get_or_insert_with(|| store.list_profiles());
+            ui.spaced_label(
+                RichText::new(crate::i18n::literal(
+                    &self.locale,
+                    "Each profile has its own settings, saved themes and favorites.",
+                ))
+                .small(),
+            );
+            ui.separator();
+            for profile in profiles.iter() {
+                let text = format!(
+                    "{}{}  ·  {} themes",
+                    if profile.active { "✓ " } else { "" },
+                    profile.name,
+                    profile.themes
+                );
+                if ui.spaced_selectable_label(profile.active, text).clicked() && !profile.active {
+                    chosen = Some(profile.name.clone());
+                    ui.close_menu();
+                }
+            }
+            ui.separator();
+            if ui
+                .spaced_button(crate::i18n::literal(&self.locale, "Import from original…"))
+                .clicked()
+            {
+                open_import = true;
+                ui.close_menu();
+            }
+        });
+        if response.response.clicked() {
+            // Re-read on every open so new or imported profiles show up.
+            self.native_profiles = None;
+        }
+        if let Some(name) = chosen {
+            self.switch_native_profile(&name, ctx);
+        }
+        if open_import {
+            self.show_settings = true;
+            self.settings_tab = SettingsTab::Import;
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -4804,6 +4938,8 @@ impl ButtonsApp {
                             }
                         });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
+                        ui.separator();
+                        self.profile_menu(ui, ctx);
                         ui.separator();
                         ui.spaced_label("Row banding");
                         ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
@@ -11747,39 +11883,11 @@ impl ButtonsApp {
                             )
                         }
                         Ok(ImportCommit::Imported { store, preferences }) => {
-                            self.quick_secrets_generation =
-                                self.quick_secrets_generation.wrapping_add(1);
-                            self.quick_secrets_busy = false;
-                            self.quick_secrets_open = false;
-                            self.quick_secrets_vault_exists = false;
-                            self.lock_quick_secrets();
-                            let mut preferences = *preferences;
-                            preferences.normalize_theme_sources();
-                            self.themes = ThemeCatalog::load();
-                            for warning in self
-                                .themes
-                                .load_personal(store.profile_name(), &store.profile_dir())
-                            {
-                                log::warn!("personal theme: {warning}");
-                            }
-                            self.preferences = preferences;
-                            self.refresh_locale();
-                            self.theme_overrides.clear();
-                            self.history_writer.take();
-                            self.history_last_tick = None;
-                            self.native_store = Some(store);
-                            self.native_revision = Some(
-                                transfer
-                                    .as_ref()
-                                    .and_then(|result| result.as_ref().ok())
-                                    .map_or(1, |result| result.revision),
-                            );
-                            self.native_save_blocked = false;
-                            self.import_offer = false;
-                            self.apply_style(ctx);
-                            if self.settings_snapshot.is_some() {
-                                self.settings_snapshot = Some(self.capture_settings_snapshot());
-                            }
+                            let revision = transfer
+                                .as_ref()
+                                .and_then(|result| result.as_ref().ok())
+                                .map_or(1, |result| result.revision);
+                            self.adopt_native_profile(store, *preferences, Some(revision), ctx);
                             self.import_message = Some(match transfer {
                                 Some(Ok(result)) => crate::i18n::text(&self.locale, crate::i18n::MessageKey::ImportKeysResult, &[("saved", &result.imported.to_string()), ("failed", &result.failed.to_string())]),
                                 Some(Err(error)) => crate::i18n::text(&self.locale, crate::i18n::MessageKey::ImportKeysFailed, &[("reason", &error)]),

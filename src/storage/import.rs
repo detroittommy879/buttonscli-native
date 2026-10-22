@@ -70,6 +70,10 @@ struct ImportManifest {
     command_presets: usize,
     ssh_presets: usize,
     themes: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    carried_from_profile: Option<String>,
+    #[serde(skip_serializing_if = "is_zero")]
+    carried_themes: usize,
     exclusions: Vec<&'static str>,
 }
 
@@ -249,7 +253,10 @@ pub(crate) fn commit(
     if already_imported {
         return Ok(ImportCommit::AlreadyImported);
     }
-    let prepared = preview.prepared;
+    let mut prepared = preview.prepared;
+    // A re-import starts a new profile; bring the active one's saved themes and
+    // favorites along so switching to it never makes them look deleted.
+    let carried = carry_over_active_profile(store, &destination_now, &mut prepared);
     let config = serde_json::to_vec_pretty(&prepared.compatible_config)
         .map_err(|_| ImportError::InvalidConfig)?;
     let source_profile = prepared.source_profile.clone();
@@ -261,7 +268,9 @@ pub(crate) fn commit(
         fingerprint_sha256: prepared.fingerprint.clone(),
         command_presets: prepared.preferences.presets.len(),
         ssh_presets: prepared.preferences.ssh_presets.len(),
-        themes: prepared.themes.len(),
+        themes: prepared.themes.len() - carried.themes,
+        carried_themes: carried.themes,
+        carried_from_profile: carried.from_profile,
         exclusions: vec![
             "API keys",
             "runtime/auth files",
@@ -455,6 +464,117 @@ fn provider_summary(config: &Value) -> Vec<String> {
     names
 }
 
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
+#[derive(Default)]
+struct CarriedOver {
+    from_profile: Option<String>,
+    themes: usize,
+}
+
+/// Copy the active native profile's personal themes and favorites into a fresh
+/// import. Same-named themes keep the imported copy; a differing native copy is
+/// kept beside it as `<stem>-previous.json`. Nothing in the old profile changes.
+fn carry_over_active_profile(
+    store: &NativeStore,
+    destination: &str,
+    prepared: &mut Prepared,
+) -> CarriedOver {
+    let previous = store.profile_name().to_owned();
+    if previous == destination {
+        return CarriedOver::default();
+    }
+    let mut renamed = std::collections::HashMap::new();
+    let mut carried = 0;
+    let themes_dir = store.profile_dir().join("themes");
+    let root = store.native_root().canonicalize().ok();
+    let mut paths: Vec<PathBuf> = fs::read_dir(&themes_dir)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .collect()
+        })
+        .unwrap_or_default();
+    paths.sort();
+    for path in paths {
+        let (Some(file_name), Some(stem)) = (
+            path.file_name().and_then(|name| name.to_str()),
+            path.file_stem().and_then(|name| name.to_str()),
+        ) else {
+            continue;
+        };
+        let is_json = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+        let inside = root.as_ref().is_some_and(|root| {
+            path.canonicalize()
+                .is_ok_and(|resolved| resolved.starts_with(root))
+        });
+        if !is_json || !inside || !path.is_file() {
+            continue;
+        }
+        let Ok(bytes) = fs::read(&path) else { continue };
+        if bytes.len() as u64 > MAX_THEME {
+            continue;
+        }
+        let taken = |name: &str| {
+            prepared
+                .themes
+                .iter()
+                .find(|(existing, _)| existing.eq_ignore_ascii_case(name))
+                .map(|(_, existing)| existing.clone())
+        };
+        let new_stem = match taken(file_name) {
+            None => stem.to_owned(),
+            Some(existing) if existing == bytes => {
+                renamed.insert(stem.to_owned(), stem.to_owned());
+                continue;
+            }
+            Some(_) => {
+                let mut candidate = format!("{stem}-previous");
+                let mut suffix = 2;
+                while taken(&format!("{candidate}.json")).is_some() {
+                    candidate = format!("{stem}-previous-{suffix}");
+                    suffix += 1;
+                }
+                candidate
+            }
+        };
+        prepared.themes.push((format!("{new_stem}.json"), bytes));
+        renamed.insert(stem.to_owned(), new_stem);
+        carried += 1;
+    }
+    let old_favorites = store
+        .load()
+        .ok()
+        .flatten()
+        .map(|loaded| loaded.preferences.favorite_theme_ids)
+        .unwrap_or_default();
+    let prefix = format!("personal:{previous}:");
+    for id in old_favorites {
+        let id = match id.strip_prefix(&prefix) {
+            Some(stem) => match renamed.get(stem) {
+                Some(new_stem) => format!("personal:{destination}:{new_stem}"),
+                None => continue,
+            },
+            // Unsaved previews never outlive their profile.
+            None if id.starts_with("preview:") => continue,
+            None => id,
+        };
+        if !prepared.preferences.favorite_theme_ids.contains(&id) {
+            prepared.preferences.favorite_theme_ids.push(id);
+        }
+    }
+    CarriedOver {
+        from_profile: (carried > 0 || !renamed.is_empty()).then_some(previous),
+        themes: carried,
+    }
+}
+
 fn destination(store: &NativeStore, prepared: &Prepared) -> Result<(String, bool), ImportError> {
     let prefix: String = prepared.source_profile.chars().take(24).collect();
     let base = format!("imported-{prefix}-{}", &prepared.fingerprint[..12]);
@@ -591,6 +711,96 @@ mod tests {
         fn delete(&self, _: &str) -> Result<(), CredentialError> {
             Err(CredentialError::Unavailable)
         }
+    }
+
+    #[test]
+    fn reimport_carries_saved_themes_and_favorites_from_the_active_profile() {
+        let (base, source, store) = fixture();
+        let ImportCommit::Imported { store: first, .. } =
+            commit(&source, &store, preview(&source, &store, None).unwrap()).unwrap()
+        else {
+            panic!("fresh import skipped");
+        };
+        let old = first.profile_name().to_owned();
+        let themes = first.profile_dir().join("themes");
+        let imported_a = fs::read(themes.join("duplicate-a.json")).unwrap();
+        fs::write(themes.join("mine.json"), b"{\"saved\":true}").unwrap();
+        fs::write(themes.join("duplicate-a.json"), b"{\"edited\":true}").unwrap();
+        let loaded = first.load().unwrap().unwrap();
+        let mut preferences = loaded.preferences;
+        preferences.favorite_theme_ids = vec![
+            format!("personal:{old}:mine"),
+            format!("personal:{old}:duplicate-a"),
+            format!("personal:{old}:duplicate-b"),
+            format!("preview:{old}:draft"),
+            "basic2".into(),
+        ];
+        first.save(Some(loaded.revision), &preferences).unwrap();
+        let source_themes = source.0.join("profiles/Work_Space/themes");
+        fs::copy(
+            source_themes.join("duplicate-b.json"),
+            source_themes.join("added-later.json"),
+        )
+        .unwrap();
+
+        let ImportCommit::Imported {
+            store: second,
+            preferences,
+        } = commit(&source, &first, preview(&source, &first, None).unwrap()).unwrap()
+        else {
+            panic!("changed source skipped");
+        };
+        let new = second.profile_name().to_owned();
+        assert_ne!(new, old);
+        let carried = second.profile_dir().join("themes");
+        assert_eq!(
+            fs::read(carried.join("mine.json")).unwrap(),
+            b"{\"saved\":true}"
+        );
+        assert_eq!(
+            fs::read(carried.join("duplicate-a.json")).unwrap(),
+            imported_a
+        );
+        assert_eq!(
+            fs::read(carried.join("duplicate-a-previous.json")).unwrap(),
+            b"{\"edited\":true}"
+        );
+        assert!(!carried.join("duplicate-b-previous.json").exists());
+        for expected in [
+            format!("personal:{new}:mine"),
+            format!("personal:{new}:duplicate-a-previous"),
+            format!("personal:{new}:duplicate-b"),
+            "basic2".into(),
+        ] {
+            assert!(
+                preferences.favorite_theme_ids.contains(&expected),
+                "{expected}"
+            );
+            assert!(second
+                .load()
+                .unwrap()
+                .unwrap()
+                .preferences
+                .favorite_theme_ids
+                .contains(&expected));
+        }
+        assert!(!preferences
+            .favorite_theme_ids
+            .iter()
+            .any(|id| id.starts_with("preview:") || id.contains(&old)));
+        // The previous profile is left exactly as it was.
+        assert!(themes.join("mine.json").is_file());
+        let profiles = second.list_profiles();
+        assert_eq!(profiles.len(), 2);
+        assert!(profiles.iter().any(|p| p.name == new && p.active));
+        let back = second.switch_profile(&old).unwrap();
+        assert_eq!(back.profile_name(), old);
+        let reopened =
+            NativeStore::open(NativeDataRoot(base.join("native")), source.0.clone()).unwrap();
+        assert_eq!(reopened.profile_name(), old);
+        assert!(second.switch_profile("../escape").is_err());
+        assert!(second.switch_profile("missing").is_err());
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
