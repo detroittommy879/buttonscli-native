@@ -656,6 +656,15 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     show_tab_rename: bool,
     #[cfg(not(target_arch = "wasm32"))]
+    show_group_save: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    group_name_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    group_save_error: Option<String>,
+    /// Last Left command each terminal ran, saved as its startup command in a tab group.
+    #[cfg(not(target_arch = "wasm32"))]
+    tab_launch_commands: std::collections::BTreeMap<u64, String>,
+    #[cfg(not(target_arch = "wasm32"))]
     renaming_tab: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     tab_title_draft: String,
@@ -704,6 +713,8 @@ enum SettingsTab {
     Fonts,
     Commands,
     Workspace,
+    #[cfg(not(target_arch = "wasm32"))]
+    TabGroups,
     Language,
     Shortcuts,
     Keyboard,
@@ -1613,6 +1624,14 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             show_tab_rename: false,
             #[cfg(not(target_arch = "wasm32"))]
+            show_group_save: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            group_name_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            group_save_error: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            tab_launch_commands: std::collections::BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             renaming_tab: None,
             #[cfg(not(target_arch = "wasm32"))]
             tab_title_draft: String::new(),
@@ -2358,6 +2377,15 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn open_startup_tabs(&mut self, ctx: &egui::Context, startup: crate::startup::StartupOptions) {
+        // Explicit command-line options win over the saved launch group.
+        if startup == crate::startup::StartupOptions::default()
+            && self.preferences.tab_groups.restore_on_launch
+        {
+            let name = self.preferences.tab_groups.launch_group.clone();
+            if self.open_tab_group(ctx, &name) {
+                return;
+            }
+        }
         for number in 1..=startup.tabs {
             let result = self.dispatch_ui_action(
                 None,
@@ -2435,12 +2463,28 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn open_tab_with_profile(&mut self, context: egui::Context, profile_id: &str) {
+        self.open_tab_in(context, profile_id, None);
+    }
+
+    /// Opens a terminal, optionally in `working_directory` instead of the profile's folder.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn open_tab_in(
+        &mut self,
+        context: egui::Context,
+        profile_id: &str,
+        working_directory: Option<std::path::PathBuf>,
+    ) {
         let simulated = profile_id == crate::assistant::virtual_terminal::PROFILE_ID;
         let launch = if simulated {
             None
         } else {
             Some(match self.shell_launch(profile_id) {
-                Ok(launch) => launch,
+                Ok(mut launch) => {
+                    if working_directory.is_some() {
+                        launch.working_directory = working_directory;
+                    }
+                    launch
+                }
                 Err(error) => {
                     self.notice = Some(format!("Could not use shell profile: {error}"));
                     return;
@@ -2669,6 +2713,7 @@ impl ButtonsApp {
         }
         self.save_terminal_history(Some(index));
         let mut tab = self.tabs.remove(index);
+        self.tab_launch_commands.remove(&tab.id);
         let closed = ClosedTab {
             title: tab.title.clone(),
             had_custom_title: tab.custom_title.is_some(),
@@ -2851,6 +2896,10 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(tab) = self.tabs.get_mut(self.focused) {
             tab.write(preset.terminal_payload());
+            if collection == PresetCollection::Ssh && preset.send_enter {
+                self.tab_launch_commands
+                    .insert(tab.id, preset.command.clone());
+            }
         }
         #[cfg(target_arch = "wasm32")]
         if preset.send_enter {
@@ -3096,6 +3145,7 @@ impl ButtonsApp {
             || self.show_about
             || self.show_preset_editor
             || self.show_tab_rename
+            || self.show_group_save
             || self.show_localization_onboarding;
         let mut clicked = None;
         let mut pane_action = None;
@@ -3901,6 +3951,8 @@ impl ButtonsApp {
                             self.dispatch_ui_or_notice(None, Action::Reopen, ctx);
                             ui.close_menu();
                         }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        self.tab_group_menu(ui, ctx);
                         ui.separator();
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
@@ -5363,6 +5415,12 @@ impl ButtonsApp {
                     SettingsTab::Workspace,
                     crate::i18n::literal(&self.locale, "Workspace"),
                 );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::TabGroups,
+                    crate::i18n::literal(&self.locale, "Tab groups"),
+                );
                 if localization_settings_available() {
                     ui.spaced_selectable_value(
                         &mut self.settings_tab,
@@ -5462,6 +5520,8 @@ impl ButtonsApp {
                 SettingsTab::Fonts => self.font_settings(ui, ctx),
                 SettingsTab::Commands => self.command_settings(ui),
                 SettingsTab::Workspace => self.workspace_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::TabGroups => self.tab_group_settings(ui),
                 SettingsTab::Language if localization_settings_available() => {
                     self.language_settings(ui)
                 }
@@ -13132,7 +13192,7 @@ impl ButtonsApp {
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if self.show_tab_rename {
+        if self.show_tab_rename || self.show_group_save {
             return;
         }
         let matched = pressed.and_then(|(key, modifiers)| {
@@ -15408,6 +15468,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod tab_groups;
 
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
@@ -15550,6 +15612,8 @@ impl eframe::App for ButtonsApp {
         self.preset_editor_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.tab_rename_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.group_save_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.terminal_reader_window(ctx);
         self.about_window(ctx);
