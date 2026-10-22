@@ -83,6 +83,14 @@ pub struct LoadedNative {
     pub revision: u64,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct ProfileSummary {
+    pub name: String,
+    pub active: bool,
+    pub themes: usize,
+    pub modified: Option<std::time::SystemTime>,
+}
+
 #[derive(Clone)]
 pub struct NativeStore {
     root: NativeDataRoot,
@@ -439,6 +447,80 @@ impl NativeStore {
             root: self.root.clone(),
             legacy_root: self.legacy_root.clone(),
             profile: profile.to_owned(),
+        })
+    }
+
+    /// Every native profile on disk, so the app can show and switch between them.
+    pub(crate) fn list_profiles(&self) -> Vec<ProfileSummary> {
+        let profiles = self.root.0.join("profiles");
+        let Ok(entries) = fs::read_dir(&profiles) else {
+            return Vec::new();
+        };
+        let mut list: Vec<ProfileSummary> = entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                // Hidden staging folders and unsafe names are never profiles.
+                if name.starts_with('.') || sanitize_profile_name(&name).ok()? != name {
+                    return None;
+                }
+                let path = entry.path();
+                if ensure_native_path(&self.root.0, &path).is_err() {
+                    return None;
+                }
+                let themes = fs::read_dir(path.join("themes"))
+                    .map(|themes| {
+                        themes
+                            .filter_map(Result::ok)
+                            .filter(|theme| {
+                                theme
+                                    .path()
+                                    .extension()
+                                    .is_some_and(|ext| ext.eq_ignore_ascii_case("json"))
+                            })
+                            .count()
+                    })
+                    .unwrap_or(0);
+                let modified = fs::metadata(path.join("native.json"))
+                    .and_then(|metadata| metadata.modified())
+                    .ok();
+                Some(ProfileSummary {
+                    active: name == self.profile,
+                    name,
+                    themes,
+                    modified,
+                })
+            })
+            .collect();
+        list.sort_by(|a, b| b.modified.cmp(&a.modified).then(a.name.cmp(&b.name)));
+        list
+    }
+
+    /// Make another existing native profile the active one. Nothing is copied or removed.
+    pub(crate) fn switch_profile(&self, name: &str) -> Result<Self, StoreError> {
+        let profile = sanitize_profile_name(name).map_err(|_| StoreError::InvalidProfile)?;
+        if profile != name {
+            return Err(StoreError::InvalidProfile);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let directory = self.root.0.join("profiles").join(&profile);
+        ensure_native_path(&self.root.0, &directory)?;
+        if !directory.is_dir() {
+            return Err(StoreError::InvalidProfile);
+        }
+        let metadata_path = self.root.0.join("active-profile.json");
+        ensure_native_path(&self.root.0, &metadata_path)?;
+        atomic_replace(
+            &metadata_path,
+            serde_json::json!({ "name": profile })
+                .to_string()
+                .as_bytes(),
+        )?;
+        Ok(Self {
+            root: self.root.clone(),
+            legacy_root: self.legacy_root.clone(),
+            profile,
         })
     }
 
