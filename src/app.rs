@@ -1889,7 +1889,6 @@ impl ButtonsApp {
         (!candidates.is_empty()).then(|| candidates[fastrand::usize(..candidates.len())].id.clone())
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     /// Make `store` the active profile in this window: its settings, themes and favorites.
     #[cfg(not(target_arch = "wasm32"))]
     fn adopt_native_profile(
@@ -2020,6 +2019,7 @@ impl ButtonsApp {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn perform_global_theme_action(&mut self, action: PaneAction) {
         let id = match action {
             PaneAction::Theme(id) => Some(id),
