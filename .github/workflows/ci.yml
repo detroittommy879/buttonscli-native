@@ -31,7 +31,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Headless terminal pipeline benchmark
-        run: cargo run --release --locked -p egui_term --example term_bench -- --quick --json bench.json
+        # `cargo run -p` needs a workspace member; build then run the example.
+        run: |
+          cargo build --release --locked -p egui_term --example term_bench
+          ./target/release/examples/term_bench --quick --json bench.json
       - uses: actions/upload-artifact@v4
         with:
           name: term-bench

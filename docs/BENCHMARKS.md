@@ -6,8 +6,9 @@ Two tools, one workload set (vtebench-style: `dense_cells`, `scrolling`,
 ## 1. Headless pipeline benchmark (any OS, CI)
 
 ```text
-cargo run --release --locked -p egui_term --example term_bench
-cargo run --release --locked -p egui_term --example term_bench -- --quick --json target/bench.json
+cargo build --release --locked -p egui_term --example term_bench
+./target/release/examples/term_bench
+./target/release/examples/term_bench --quick --json target/bench.json
 ```
 
 No window, GPU or shell. It measures the parts ButtonsCLI owns:

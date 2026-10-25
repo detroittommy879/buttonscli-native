@@ -2,8 +2,9 @@
 //! build and tessellation. Needs no GPU, window or shell, so it runs in CI.
 //!
 //! ```text
-//! cargo run --release --locked -p egui_term --example term_bench
-//! cargo run --release --locked -p egui_term --example term_bench -- --quick --json out.json
+//! cargo build --release --locked -p egui_term --example term_bench
+//! ./target/release/examples/term_bench
+//! ./target/release/examples/term_bench --quick --json out.json
 //! ```
 //!
 //! Workloads mirror vtebench's categories so numbers can be read next to
