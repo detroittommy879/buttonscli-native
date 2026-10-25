@@ -1,7 +1,7 @@
 use alacritty_terminal::index::Point as TerminalGridPoint;
 use alacritty_terminal::term::cell;
 use alacritty_terminal::term::TermMode;
-use alacritty_terminal::vte::ansi::{Color, NamedColor};
+use alacritty_terminal::vte::ansi::{Color, CursorShape, NamedColor};
 use egui::epaint::RectShape;
 use egui::Modifiers;
 use egui::MouseWheelUnit;
@@ -526,7 +526,7 @@ impl<'a> TerminalView<'a> {
             && layout.has_focus()
             && !layout.ctx.memory(|memory| memory.any_popup_open())
         {
-            let cursor = content.grid.cursor.point;
+            let cursor = content.cursor_point;
             let origin = layout_min
                 + egui::vec2(
                     cursor.column.0 as f32 * cell_width,
@@ -574,7 +574,12 @@ impl<'a> TerminalView<'a> {
             ));
         }
 
-        for indexed in content.grid.display_iter() {
+        // TUIs hide the cursor (DECTCEM) while they draw their own.
+        let cursor_visible =
+            content.terminal_mode.contains(TermMode::SHOW_CURSOR)
+                && content.cursor_style.shape != CursorShape::Hidden;
+        let fonts = painter.fonts(|fonts| fonts.clone());
+        for indexed in &content.cells {
             let flags = indexed.cell.flags;
             let is_wide_char_spacer =
                 flags.contains(cell::Flags::WIDE_CHAR_SPACER);
@@ -582,14 +587,13 @@ impl<'a> TerminalView<'a> {
                 continue;
             }
 
-            let is_app_cursor_mode =
-                content.terminal_mode.contains(TermMode::APP_CURSOR);
             let is_wide_char = flags.contains(cell::Flags::WIDE_CHAR);
             let is_inverse = flags.contains(cell::Flags::INVERSE);
             let is_bold =
                 flags.intersects(cell::Flags::BOLD | cell::Flags::DIM_BOLD);
             let is_dim =
                 flags.intersects(cell::Flags::DIM | cell::Flags::DIM_BOLD);
+            let is_hidden = flags.contains(cell::Flags::HIDDEN);
             let is_selected = content
                 .selectable_range
                 .is_some_and(|r| r.contains(indexed.point));
@@ -605,8 +609,7 @@ impl<'a> TerminalView<'a> {
                 });
 
             let x = layout_min.x + (cell_width * indexed.point.column.0 as f32);
-            let line_num =
-                indexed.point.line.0 + content.grid.display_offset() as i32;
+            let line_num = indexed.point.line.0 + content.display_offset as i32;
             let y = layout_min.y + (cell_height * line_num as f32);
 
             let mut fg = self.theme.get_color(indexed.fg);
@@ -670,35 +673,45 @@ impl<'a> TerminalView<'a> {
                 });
             }
 
-            // Handle cursor rendering
-            if content.grid.cursor.point == indexed.point {
+            let is_cursor =
+                cursor_visible && content.cursor_point == indexed.point;
+            let cursor_shape = if self.has_focus {
+                content.cursor_style.shape
+            } else {
+                CursorShape::HollowBlock
+            };
+            if is_cursor {
                 let cursor_color = self.theme.get_color(content.cursor.fg);
-                shapes.push(Shape::Rect(RectShape::filled(
+                shapes.push(cursor_shape_at(
+                    cursor_shape,
                     Rect::from_min_size(
                         Pos2::new(x, y),
                         Vec2::new(cell_width, cell_height),
                     ),
-                    CornerRadius::default(),
                     cursor_color,
-                )));
+                ));
+                // Keep the character readable on a filled block cursor.
+                if cursor_shape == CursorShape::Block {
+                    fg = bg;
+                }
             }
 
-            // Draw text content
-            if indexed.c != ' ' && indexed.c != '\t' {
-                if content.grid.cursor.point == indexed.point
-                    && is_app_cursor_mode
-                {
-                    std::mem::swap(&mut fg, &mut bg);
-                }
+            if is_hidden {
+                continue;
+            }
 
+            // Draw text content, including combining marks stored as zero-width.
+            if indexed.c != ' ' && indexed.c != '\t' {
+                let mut text = String::from(indexed.c);
+                text.extend(indexed.zerowidth().into_iter().flatten());
                 shapes.push(Shape::text(
-                    &painter.fonts(|c| c.clone()),
+                    &fonts,
                     Pos2 {
                         x: x + (cell_width / 2.0),
                         y,
                     },
                     Align2::CENTER_TOP,
-                    indexed.c,
+                    text,
                     if is_bold {
                         self.font.bold_font_type()
                     } else {
@@ -707,6 +720,33 @@ impl<'a> TerminalView<'a> {
                     fg,
                 ));
             }
+
+            if flags.intersects(cell::Flags::ALL_UNDERLINES) {
+                let color = indexed
+                    .underline_color()
+                    .map(|color| self.theme.get_color(color))
+                    .unwrap_or(fg);
+                underline_shapes(
+                    &mut shapes,
+                    flags,
+                    Rect::from_min_size(
+                        Pos2::new(x, y),
+                        Vec2::new(cell_width, cell_height),
+                    ),
+                    color,
+                );
+            }
+            if flags.contains(cell::Flags::STRIKEOUT) {
+                let thickness = line_thickness(cell_height);
+                let middle = y + cell_height * 0.5;
+                shapes.push(Shape::LineSegment {
+                    points: [
+                        Pos2::new(x, middle),
+                        Pos2::new(x + cell_width, middle),
+                    ],
+                    stroke: Stroke::new(thickness, fg).into(),
+                });
+            }
         }
 
         if let Some(color) = self.row_banding_color {
@@ -714,6 +754,84 @@ impl<'a> TerminalView<'a> {
         }
 
         painter.extend(shapes);
+    }
+}
+
+fn line_thickness(cell_height: f32) -> f32 {
+    (cell_height * 0.07).max(1.0)
+}
+
+fn cursor_shape_at(shape: CursorShape, cell: Rect, color: Color32) -> Shape {
+    let thickness = line_thickness(cell.height());
+    match shape {
+        CursorShape::Beam => Shape::rect_filled(
+            Rect::from_min_size(
+                cell.min,
+                Vec2::new((cell.width() * 0.15).max(1.0), cell.height()),
+            ),
+            CornerRadius::ZERO,
+            color,
+        ),
+        CursorShape::Underline => Shape::rect_filled(
+            Rect::from_min_max(
+                Pos2::new(cell.min.x, cell.max.y - thickness * 1.5),
+                cell.max,
+            ),
+            CornerRadius::ZERO,
+            color,
+        ),
+        CursorShape::HollowBlock => Shape::rect_stroke(
+            cell.shrink(thickness * 0.5),
+            CornerRadius::ZERO,
+            Stroke::new(thickness, color),
+            egui::StrokeKind::Inside,
+        ),
+        CursorShape::Block | CursorShape::Hidden => {
+            Shape::rect_filled(cell, CornerRadius::ZERO, color)
+        },
+    }
+}
+
+/// SGR 4 variants: single, double (4:2/21), curly (4:3), dotted and dashed.
+fn underline_shapes(
+    shapes: &mut Vec<Shape>,
+    flags: cell::Flags,
+    cell: Rect,
+    color: Color32,
+) {
+    let thickness = line_thickness(cell.height());
+    let y = cell.max.y - thickness * 1.5;
+    let stroke = Stroke::new(thickness, color);
+    let line = |y: f32| [Pos2::new(cell.min.x, y), Pos2::new(cell.max.x, y)];
+    if flags.contains(cell::Flags::DOUBLE_UNDERLINE) {
+        shapes.push(Shape::line_segment(line(y), stroke));
+        shapes.push(Shape::line_segment(line(y - thickness * 2.0), stroke));
+    } else if flags.contains(cell::Flags::UNDERCURL) {
+        let steps = 4;
+        let points = (0..=steps)
+            .map(|step| {
+                let x = cell.min.x + cell.width() * step as f32 / steps as f32;
+                let offset = if step % 2 == 0 { 0.0 } else { -thickness * 1.5 };
+                Pos2::new(x, y + offset)
+            })
+            .collect();
+        shapes.push(Shape::line(points, stroke));
+    } else if flags.contains(cell::Flags::DOTTED_UNDERLINE) {
+        shapes.extend(Shape::dashed_line(
+            &line(y),
+            stroke,
+            thickness,
+            thickness,
+        ));
+    } else if flags.contains(cell::Flags::DASHED_UNDERLINE) {
+        shapes.extend(Shape::dashed_line(
+            &line(y),
+            stroke,
+            thickness * 3.0,
+            thickness * 2.0,
+        ));
+    } else {
+        shapes.push(Shape::line_segment(line(y), stroke));
     }
 }
 
@@ -1545,7 +1663,7 @@ fn process_mouse_move(
         cursor_x,
         cursor_y,
         &terminal_content.terminal_size,
-        terminal_content.grid.display_offset(),
+        terminal_content.display_offset,
     );
 
     let mut actions = vec![];
@@ -1772,5 +1890,189 @@ mod background_gradient_tests {
         assert!(row_banding_shapes(rect, 10.0, Color32::TRANSPARENT).is_empty());
         assert!(row_banding_shapes(rect, 0.0, Color32::WHITE).is_empty());
         assert!(row_banding_shapes(rect, f32::NAN, Color32::WHITE).is_empty());
+    }
+}
+
+/// Headless rendering checks: feed escape sequences through the real parser,
+/// paint one egui frame and inspect the shapes. No window or GPU is needed.
+#[cfg(test)]
+mod render_parity_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    const SCREEN: Vec2 = Vec2::new(400.0, 160.0);
+
+    fn render(bytes: &[u8], focused: bool) -> (Vec<Shape>, Vec2) {
+        let ctx = egui::Context::default();
+        let mut backend = TerminalBackend::new_virtual(1, Arc::new(|_| {}));
+        let paint = |backend: &mut TerminalBackend| {
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, SCREEN)),
+                ..Default::default()
+            };
+            ctx.run(input, |ctx| {
+                egui::CentralPanel::default().frame(egui::Frame::NONE).show(
+                    ctx,
+                    |ui| {
+                        let view = TerminalView::new(ui, backend)
+                            .set_size(SCREEN)
+                            .set_focus(focused);
+                        ui.add(view);
+                    },
+                );
+            })
+        };
+        // The first frame sizes the grid, like the app's first paint.
+        paint(&mut backend);
+        backend.feed_virtual_output(bytes);
+        let output = paint(&mut backend);
+        let size = backend.last_content().terminal_size;
+        let cell = Vec2::new(size.cell_width as f32, size.cell_height as f32);
+        (
+            output
+                .shapes
+                .into_iter()
+                .map(|clipped| clipped.shape)
+                .collect(),
+            cell,
+        )
+    }
+
+    fn texts(shapes: &[Shape]) -> Vec<(String, Pos2, Color32)> {
+        shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                Shape::Text(text) => Some((
+                    text.galley.text().to_owned(),
+                    text.pos,
+                    text.fallback_color,
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn horizontal_lines(shapes: &[Shape]) -> Vec<f32> {
+        shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                Shape::LineSegment { points, .. }
+                    if points[0].y == points[1].y =>
+                {
+                    Some(points[0].y)
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn cursor_rects(shapes: &[Shape], cell: Vec2) -> Vec<Rect> {
+        // The cursor sits at column 1 after printing one character.
+        let cursor_cell = Rect::from_min_size(Pos2::new(cell.x, 0.0), cell);
+        shapes
+            .iter()
+            .filter_map(|shape| match shape {
+                Shape::Rect(rect)
+                    if cursor_cell.expand(0.5).contains_rect(rect.rect) =>
+                {
+                    Some(rect.rect)
+                },
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn underline_variants_and_strikeout_are_drawn() {
+        let (plain, cell) = render(b"a", true);
+        assert!(horizontal_lines(&plain).is_empty());
+
+        let (underline, _) = render(b"\x1b[4ma", true);
+        let lines = horizontal_lines(&underline);
+        assert_eq!(lines.len(), 1, "single underline");
+        assert!(lines[0] > cell.y * 0.75 && lines[0] <= cell.y);
+
+        let (double, _) = render(b"\x1b[4:2ma", true);
+        assert_eq!(horizontal_lines(&double).len(), 2, "double underline");
+
+        let (curly, _) = render(b"\x1b[4:3ma", true);
+        assert!(curly.iter().any(|shape| matches!(shape, Shape::Path(_))));
+
+        let (strike, _) = render(b"\x1b[9ma", true);
+        let lines = horizontal_lines(&strike);
+        assert_eq!(lines.len(), 1);
+        assert!((lines[0] - cell.y * 0.5).abs() < 1.0, "strikeout mid-cell");
+    }
+
+    #[test]
+    fn hidden_text_is_not_painted_and_combining_marks_are() {
+        let (hidden, _) = render(b"\x1b[8msecret", true);
+        assert!(texts(&hidden).is_empty());
+
+        let (combined, _) = render("e\u{301}".as_bytes(), true);
+        assert!(texts(&combined).iter().any(|(text, ..)| text == "e\u{301}"));
+    }
+
+    #[test]
+    fn cursor_respects_visibility_shape_and_focus() {
+        let (shown, cell) = render(b"a", true);
+        let block = cursor_rects(&shown, cell);
+        assert_eq!(block.len(), 1, "one block cursor");
+        assert!((block[0].width() - cell.x).abs() < 0.01);
+
+        // DECTCEM hide: TUIs hide the cursor while drawing their own UI.
+        let (hidden, _) = render(b"a\x1b[?25l", true);
+        assert!(cursor_rects(&hidden, cell).is_empty());
+
+        // DECSCUSR 6 = steady beam.
+        let (beam, _) = render(b"a\x1b[6 q", true);
+        let beam = cursor_rects(&beam, cell);
+        assert_eq!(beam.len(), 1);
+        assert!(beam[0].width() < cell.x * 0.5);
+
+        // DECSCUSR 4 = steady underline.
+        let (underline, _) = render(b"a\x1b[4 q", true);
+        let underline = cursor_rects(&underline, cell);
+        assert_eq!(underline.len(), 1);
+        assert!(underline[0].height() < cell.y * 0.5);
+
+        // Unfocused panes show a hollow outline, not a filled block.
+        let (unfocused, _) = render(b"a", false);
+        let outlines: Vec<_> = cursor_rects(&unfocused, cell)
+            .into_iter()
+            .zip(unfocused.iter().filter_map(|shape| match shape {
+                Shape::Rect(rect)
+                    if rect.stroke.width > 0.0
+                        && rect.fill == Color32::TRANSPARENT =>
+                {
+                    Some(rect.rect)
+                },
+                _ => None,
+            }))
+            .collect();
+        assert_eq!(outlines.len(), 1, "hollow cursor when unfocused");
+    }
+
+    #[test]
+    fn character_under_block_cursor_stays_readable() {
+        // Move the cursor back over "b": its glyph must not use the cursor color.
+        let (shapes, cell) = render(b"ab\x1b[D", true);
+        let cursor = shapes
+            .iter()
+            .find_map(|shape| match shape {
+                Shape::Rect(rect)
+                    if (rect.rect.min.x - cell.x).abs() < 0.01
+                        && rect.fill != Color32::TRANSPARENT =>
+                {
+                    Some(rect.fill)
+                },
+                _ => None,
+            })
+            .expect("block cursor over b");
+        let (_, _, color) = texts(&shapes)
+            .into_iter()
+            .find(|(text, ..)| text == "b")
+            .expect("b is painted");
+        assert_ne!(color, cursor);
     }
 }

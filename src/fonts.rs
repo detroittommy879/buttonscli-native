@@ -205,6 +205,20 @@ pub static FONT_FACES: &[FontFace] = &[
     face!("saxmono", "saxmono Bundled", "saxmono.ttf", 400, Mono),
 ];
 
+/// Fonts tried, in order, when the selected face lacks a glyph. egui draws a
+/// replacement square for a glyph that no font in the chain has. Many
+/// programming fonts omit box drawing/block elements (TUI borders, htop bars)
+/// and none include emoji, so a full mono face and egui's built-in emoji
+/// fonts come before the broad Noto coverage.
+const GLYPH_FALLBACKS: &[&str] = &[
+    "jetbrains-mono-400",
+    "symbols-nerd",
+    "go-noto-current",
+    "noto-sans-kr",
+    "NotoEmoji-Regular",
+    "emoji-icon-font",
+];
+
 #[derive(Clone, Debug)]
 struct LoadedFace {
     id: String,
@@ -437,11 +451,13 @@ impl FontCatalog {
             definitions
                 .font_data
                 .insert(face.id.clone(), face.data.clone());
+        }
+        for face in &self.faces {
             families.entry(face.family.clone()).or_default().push(face);
             let mut fallback = vec![face.id.clone()];
-            for id in ["symbols-nerd", "go-noto-current", "noto-sans-kr"] {
-                if id != face.id {
-                    fallback.push(id.into());
+            for id in GLYPH_FALLBACKS {
+                if *id != face.id && definitions.font_data.contains_key(*id) {
+                    fallback.push((*id).into());
                 }
             }
             definitions.families.insert(
@@ -452,9 +468,11 @@ impl FontCatalog {
         for (family, mut faces) in families {
             faces.sort_by_key(|face| face.weight.abs_diff(400));
             let mut fallback = faces.iter().map(|face| face.id.clone()).collect::<Vec<_>>();
-            for id in ["symbols-nerd", "go-noto-current", "noto-sans-kr"] {
-                if !fallback.iter().any(|value| value == id) {
-                    fallback.push(id.into());
+            for id in GLYPH_FALLBACKS {
+                if !fallback.iter().any(|value| value == id)
+                    && definitions.font_data.contains_key(*id)
+                {
+                    fallback.push((*id).into());
                 }
             }
             definitions
@@ -1119,5 +1137,65 @@ mod tests {
         assert!(regular_width > 0.0);
         assert!(bold_width > 0.0);
         assert!(korean_width > 0.0);
+    }
+
+    /// Characters real shells, prompts and TUIs print. A missing glyph is drawn
+    /// as egui's replacement square, which is what users report as "boxes".
+    const TERMINAL_GLYPHS: &[(&str, &str)] = &[
+        ("box drawing", "─│┌┐└┘├┤┬┴┼═║╔╗╚╝╭╮╯╰╱╲╳"),
+        ("block elements", "▀▄█▌▐░▒▓▁▂▃▄▅▆▇"),
+        ("braille (btop, spinners)", "⠁⠂⠄⡀⣀⣤⣶⣿"),
+        ("arrows and math", "←↑→↓↔⇒⇐≠≤≥±×÷√∞λπ"),
+        ("prompt symbols", "✓✔✗✘❯❮➜•…§¶"),
+        ("powerline", "\u{e0b0}\u{e0b1}\u{e0b2}\u{e0b3}\u{e0a0}"),
+        ("nerd font icons", "\u{f115}\u{f121}\u{e7a8}\u{f07b}"),
+        ("emoji", "😀👍🚀🔥✨❌⚠"),
+        ("cjk", "한국어日本語中文"),
+    ];
+
+    fn missing_terminal_glyphs(context: &egui::Context, font: &FontId) -> Vec<String> {
+        let mut missing = Vec::new();
+        let _ = context.run(egui::RawInput::default(), |ctx| {
+            ctx.fonts(|fonts| {
+                for (group, glyphs) in TERMINAL_GLYPHS {
+                    let absent: String = glyphs
+                        .chars()
+                        .filter(|c| !fonts.has_glyph(font, *c))
+                        .collect();
+                    if !absent.is_empty() {
+                        missing.push(format!("{group}: {absent}"));
+                    }
+                }
+            })
+        });
+        missing
+    }
+
+    #[test]
+    fn every_bundled_terminal_font_draws_common_terminal_glyphs() {
+        let context = egui::Context::default();
+        let catalog = FontCatalog::bundled();
+        catalog.install(&context);
+        let mut failures = Vec::new();
+        for family in catalog.family_names(true) {
+            let font = catalog.font_id(
+                &FontZone {
+                    family: family.clone(),
+                    weight: 400,
+                    size: 14.0,
+                    letter_spacing: 0.0,
+                },
+                true,
+            );
+            let missing = missing_terminal_glyphs(&context, &font);
+            if !missing.is_empty() {
+                failures.push(format!("{family}: {}", missing.join("; ")));
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "glyphs fall back to squares:\n{}",
+            failures.join("\n")
+        );
     }
 }
