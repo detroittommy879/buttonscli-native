@@ -7,7 +7,7 @@ use alacritty_terminal::event::{
 use alacritty_terminal::event_loop::{
     EventLoop, Msg, Notifier, SensitiveInput,
 };
-use alacritty_terminal::grid::{Dimensions, Scroll};
+use alacritty_terminal::grid::{Dimensions, Indexed, Scroll};
 use alacritty_terminal::index::{Column, Direction, Line, Point, Side};
 use alacritty_terminal::selection::{
     Selection, SelectionRange, SelectionType as AlacrittySelectionType,
@@ -20,7 +20,7 @@ use alacritty_terminal::term::{
     test::TermSize,
     viewport_to_point, Term, TermMode,
 };
-use alacritty_terminal::vte::ansi::Color;
+use alacritty_terminal::vte::ansi::{Color, CursorStyle};
 use alacritty_terminal::{tty, Grid};
 use egui::Modifiers;
 use settings::BackendSettings;
@@ -51,9 +51,9 @@ pub struct ScrollbackState {
 impl ScrollbackState {
     fn from_content(content: &RenderableContent) -> Self {
         Self {
-            history_lines: content.grid.history_size(),
-            viewport_lines: content.grid.screen_lines(),
-            display_offset: content.grid.display_offset(),
+            history_lines: content.history_size,
+            viewport_lines: content.screen_lines,
+            display_offset: content.display_offset,
             mouse_reporting: content
                 .terminal_mode
                 .intersects(TermMode::MOUSE_MODE),
@@ -256,16 +256,13 @@ impl TerminalBackend {
         let content_dirty = Arc::new(AtomicBool::new(true));
         let event_proxy = EventProxy(event_sender, content_dirty.clone());
         let mut term = Term::new(config, &terminal_size, event_proxy.clone());
-        let initial_content = RenderableContent {
-            grid: term.grid().clone(),
-            selectable_range: None,
+        let mut initial_content = RenderableContent {
             terminal_mode: *term.mode(),
             terminal_size,
             cursor: term.grid_mut().cursor_cell().clone(),
-            hovered_hyperlink: None,
-            search_highlights: HashSet::new(),
-            current_search_highlights: HashSet::new(),
+            ..Default::default()
         };
+        initial_content.snapshot_viewport(term.grid());
         let term = Arc::new(FairMutex::new(term));
         let pty_event_loop = EventLoop::new_with_output_observer(
             term.clone(),
@@ -332,16 +329,13 @@ impl TerminalBackend {
         let (sender, _receiver) = mpsc::channel();
         let proxy = EventProxy(sender, content_dirty.clone());
         let mut terminal = Term::new(term::Config::default(), &size, proxy);
-        let content = RenderableContent {
-            grid: terminal.grid().clone(),
-            selectable_range: None,
+        let mut content = RenderableContent {
             terminal_mode: *terminal.mode(),
             terminal_size: size,
             cursor: terminal.grid_mut().cursor_cell().clone(),
-            hovered_hyperlink: None,
-            search_highlights: HashSet::new(),
-            current_search_highlights: HashSet::new(),
+            ..Default::default()
         };
+        content.snapshot_viewport(terminal.grid());
         Self {
             id,
             url_regex: RegexSearch::new(r#"https?://[^\s<>\"\x00-\x1f]+"#)
@@ -640,7 +634,11 @@ impl TerminalBackend {
         };
 
         let cursor = terminal.grid_mut().cursor_cell().clone();
-        self.last_content.grid = terminal.grid().clone();
+        // Copy only the visible cells. Cloning the whole grid copied every
+        // retained scrollback row on each output frame while holding the
+        // parser lock (about 27 ms at the default 10k lines, 200 columns).
+        self.last_content.snapshot_viewport(terminal.grid());
+        self.last_content.cursor_style = terminal.cursor_style();
         self.last_content.selectable_range = selectable_range;
         self.last_content.cursor = cursor.clone();
         self.last_content.terminal_mode = *terminal.mode();
@@ -679,37 +677,35 @@ impl TerminalBackend {
 
     /// Accessible text for the currently displayed viewport, including scrolling.
     pub fn visible_text(&self) -> String {
-        let grid = &self.last_content.grid;
-        let first = -(grid.display_offset() as i32);
+        let content = &self.last_content;
         let mut output = String::new();
-        for row in first..first + grid.screen_lines() as i32 {
-            let mut line = String::new();
-            for column in 0..grid.columns() {
-                let cell = &grid[Line(row)][Column(column)];
-                if !cell.flags.intersects(
-                    Flags::WIDE_CHAR_SPACER | Flags::LEADING_WIDE_CHAR_SPACER,
-                ) && cell.c != '\0'
-                {
-                    line.push(cell.c);
-                    for ch in cell.zerowidth().into_iter().flatten() {
-                        line.push(*ch);
-                    }
-                }
+        let mut line = String::new();
+        let mut current = None;
+        for indexed in &content.cells {
+            if current.is_some_and(|row| row != indexed.point.line) {
+                output.push_str(line.trim_end());
+                output.push('\n');
+                line.clear();
             }
+            current = Some(indexed.point.line);
+            push_cell_text(&mut line, &indexed.cell);
+        }
+        if current.is_some() {
             output.push_str(line.trim_end());
             output.push('\n');
         }
         output
     }
 
-    /// Copy a bounded plain-text tail from the grid snapshot already owned by the UI.
-    /// This does not read the PTY or acquire the terminal grid lock.
+    /// Copy a bounded plain-text tail of the retained grid. This reads only
+    /// the requested rows under the parser lock; it never reads the PTY.
     pub fn plain_text_tail(&self, max_chars: usize) -> String {
         let limit = max_chars.min(200_000);
         if limit == 0 {
             return String::new();
         }
-        let grid = &self.last_content.grid;
+        let term = self.term.lock();
+        let grid = term.grid();
         let columns = grid.columns();
         if columns == 0 {
             return String::new();
@@ -728,16 +724,10 @@ impl TerminalBackend {
         for row in first..screen as i32 {
             let mut line = String::with_capacity(columns);
             for column in 0..columns {
-                let cell = grid.index(Point::new(Line(row), Column(column)));
-                if !cell.flags.intersects(
-                    Flags::WIDE_CHAR_SPACER | Flags::LEADING_WIDE_CHAR_SPACER,
-                ) && cell.c != '\0'
-                {
-                    line.push(cell.c);
-                    for ch in cell.zerowidth().into_iter().flatten() {
-                        line.push(*ch);
-                    }
-                }
+                push_cell_text(
+                    &mut line,
+                    grid.index(Point::new(Line(row), Column(column))),
+                );
             }
             output.push_str(line.trim_end());
             output.push('\n');
@@ -765,12 +755,12 @@ impl TerminalBackend {
                 self.last_content.hovered_hyperlink = None;
             },
             LinkAction::Open => {
-                self.open_link();
+                self.open_link(terminal);
             },
         };
     }
 
-    fn open_link(&self) {
+    fn open_link(&self, terminal: &Term<EventProxy>) {
         if self.is_virtual() {
             return;
         }
@@ -778,8 +768,9 @@ impl TerminalBackend {
             let start = range.start();
             let end = range.end();
 
-            let mut url = String::from(self.last_content.grid.index(*start).c);
-            for indexed in self.last_content.grid.iter_from(*start) {
+            let grid = terminal.grid();
+            let mut url = String::from(grid.index(*start).c);
+            for indexed in grid.iter_from(*start) {
                 url.push(indexed.c);
                 if indexed.point == *end {
                     break;
@@ -1171,7 +1162,15 @@ fn visible_search_highlights<T>(
 }
 
 pub struct RenderableContent {
-    pub grid: Grid<Cell>,
+    /// Visible cells in display order (top-left to bottom-right). Points use
+    /// grid coordinates, so scrolled-back rows have negative lines.
+    pub cells: Vec<Indexed<Cell>>,
+    pub cursor_point: Point,
+    pub cursor_style: CursorStyle,
+    pub display_offset: usize,
+    pub history_size: usize,
+    pub screen_lines: usize,
+    pub columns: usize,
     pub hovered_hyperlink: Option<RangeInclusive<Point>>,
     pub selectable_range: Option<SelectionRange>,
     pub cursor: Cell,
@@ -1184,7 +1183,13 @@ pub struct RenderableContent {
 impl Default for RenderableContent {
     fn default() -> Self {
         Self {
-            grid: Grid::new(0, 0, 0),
+            cells: Vec::new(),
+            cursor_point: Point::default(),
+            cursor_style: CursorStyle::default(),
+            display_offset: 0,
+            history_size: 0,
+            screen_lines: 0,
+            columns: 0,
             hovered_hyperlink: None,
             selectable_range: None,
             cursor: Cell::default(),
@@ -1192,6 +1197,37 @@ impl Default for RenderableContent {
             terminal_size: TerminalSize::default(),
             search_highlights: HashSet::new(),
             current_search_highlights: HashSet::new(),
+        }
+    }
+}
+
+impl RenderableContent {
+    /// Refresh the viewport fields from `grid`. Cost scales with the visible
+    /// screen, not with retained scrollback.
+    fn snapshot_viewport(&mut self, grid: &Grid<Cell>) {
+        self.cells.clear();
+        self.cells
+            .extend(grid.display_iter().map(|indexed| Indexed {
+                point: indexed.point,
+                cell: indexed.cell.clone(),
+            }));
+        self.cursor_point = grid.cursor.point;
+        self.display_offset = grid.display_offset();
+        self.history_size = grid.history_size();
+        self.screen_lines = grid.screen_lines();
+        self.columns = grid.columns();
+    }
+}
+
+fn push_cell_text(line: &mut String, cell: &Cell) {
+    if !cell
+        .flags
+        .intersects(Flags::WIDE_CHAR_SPACER | Flags::LEADING_WIDE_CHAR_SPACER)
+        && cell.c != '\0'
+    {
+        line.push(cell.c);
+        for ch in cell.zerowidth().into_iter().flatten() {
+            line.push(*ch);
         }
     }
 }
@@ -1273,27 +1309,52 @@ mod scrollback_tests {
 
     #[test]
     fn snapshot_tracks_retained_grid_offset_and_mode() {
-        let mut content = RenderableContent {
-            grid: Grid::new(24, 80, 100),
-            ..Default::default()
-        };
+        let mut grid = Grid::<Cell>::new(24, 80, 100);
+        let mut content = RenderableContent::default();
+        content.snapshot_viewport(&grid);
         assert!(!ScrollbackState::from_content(&content).available());
-        content.grid.scroll_up::<Color>(&(Line(0)..Line(24)), 60);
+        assert_eq!(content.cells.len(), 24 * 80);
+        grid.scroll_up::<Color>(&(Line(0)..Line(24)), 60);
+        content.snapshot_viewport(&grid);
         let state = ScrollbackState::from_content(&content);
         assert_eq!(state.viewport_lines, 24);
         assert_eq!(state.history_lines, 60);
         assert_eq!(state.display_offset, 0);
-        content.grid.scroll_display(Scroll::Top);
+        grid.scroll_display(Scroll::Top);
+        content.snapshot_viewport(&grid);
         assert_eq!(ScrollbackState::from_content(&content).display_offset, 60);
-        content.grid.update_history(10);
+        // Scrolled-back cells keep grid coordinates for selection/search.
+        assert_eq!(content.cells[0].point, Point::new(Line(-60), Column(0)));
+        assert_eq!(content.cells.len(), 24 * 80);
+        grid.update_history(10);
+        content.snapshot_viewport(&grid);
         let truncated = ScrollbackState::from_content(&content);
         assert_eq!(truncated.history_lines, 10);
         assert_eq!(truncated.display_offset, 10);
         content.terminal_mode =
             TermMode::ALT_SCREEN | TermMode::MOUSE_REPORT_CLICK;
         assert!(!ScrollbackState::from_content(&content).available());
-        content.grid.clear_history();
+        grid.clear_history();
+        content.snapshot_viewport(&grid);
         assert_eq!(ScrollbackState::from_content(&content).history_lines, 0);
+    }
+
+    #[test]
+    fn snapshot_copies_only_the_viewport_and_text_tail_reads_history() {
+        let mut backend = TerminalBackend::new_virtual(7, Arc::new(|_| {}));
+        backend.set_scrollback_lines(1_000);
+        for line in 0..500 {
+            backend
+                .feed_virtual_output(format!("history-{line}\r\n").as_bytes());
+        }
+        let content = backend.sync();
+        assert!(content.history_size > 400);
+        assert_eq!(content.cells.len(), content.screen_lines * content.columns);
+        assert!(backend.visible_text().contains("history-499"));
+        assert!(!backend.visible_text().contains("history-0\n"));
+        let tail = backend.plain_text_tail(200_000);
+        assert!(tail.contains("history-0\n"), "tail must include scrollback");
+        assert!(tail.trim_end().ends_with("history-499"));
     }
 
     #[test]

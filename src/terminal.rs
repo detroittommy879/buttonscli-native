@@ -652,8 +652,8 @@ Start-Sleep -Seconds 30
             let cell = tab
                 .backend
                 .last_content()
-                .grid
-                .display_iter()
+                .cells
+                .iter()
                 .find(|cell| cell.c == marker)
                 .unwrap();
             theme.get_color(cell.fg)

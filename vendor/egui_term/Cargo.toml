@@ -41,3 +41,7 @@ version = "0.31.0"
 
 [dependencies.open]
 version = "5.3.2"
+
+[[example]]
+name = "term_bench"
+path = "examples/term_bench.rs"
