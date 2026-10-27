@@ -298,6 +298,7 @@ pub(crate) struct Preferences {
     pub(crate) default_working_directory: String,
     pub(crate) custom_shell_profiles: Vec<ShellProfile>,
     pub(crate) quick_secrets_auto_lock_minutes: u32,
+    pub(crate) tab_groups: TabGroupPreferences,
 }
 
 impl Default for Preferences {
@@ -354,6 +355,59 @@ impl Default for Preferences {
             default_working_directory: String::new(),
             custom_shell_profiles: Vec::new(),
             quick_secrets_auto_lock_minutes: 15,
+            tab_groups: TabGroupPreferences::default(),
+        }
+    }
+}
+
+/// Named sets of open terminals that can be reopened later.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct TabGroupPreferences {
+    pub(crate) groups: Vec<TabGroup>,
+    /// Open `launch_group` instead of a single blank terminal when the app starts.
+    pub(crate) restore_on_launch: bool,
+    pub(crate) launch_group: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct TabGroup {
+    pub(crate) name: String,
+    /// "single", "columns", "rows" or "grid".
+    pub(crate) layout: String,
+    pub(crate) visible_panes: usize,
+    pub(crate) focused: usize,
+    pub(crate) tabs: Vec<SavedTab>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct SavedTab {
+    pub(crate) title: String,
+    pub(crate) custom_title: bool,
+    pub(crate) profile_id: String,
+    pub(crate) working_directory: String,
+    pub(crate) theme_id: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) font: Option<crate::fonts::PaneFont>,
+    pub(crate) auto_tile: bool,
+    /// Typed into the terminal once its shell settles, e.g. `ssh root@vps1`.
+    pub(crate) startup_command: String,
+}
+
+impl Default for SavedTab {
+    fn default() -> Self {
+        Self {
+            title: String::new(),
+            custom_title: false,
+            profile_id: "system".into(),
+            working_directory: String::new(),
+            theme_id: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            font: None,
+            auto_tile: true,
+            startup_command: String::new(),
         }
     }
 }
