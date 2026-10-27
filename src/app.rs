@@ -371,6 +371,9 @@ pub struct ButtonsApp {
     theme_editor_file_name: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_file_exists: bool,
+    /// Digest of the file bytes this window last loaded or saved; guards overwrites.
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_file_digest: Option<[u8; 32]>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_import_path: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1343,6 +1346,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_file_exists: false,
             #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_file_digest: None,
+            #[cfg(not(target_arch = "wasm32"))]
             theme_editor_import_path: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_export_path: String::new(),
@@ -1903,7 +1908,7 @@ impl ButtonsApp {
             .themes
             .all()
             .iter()
-            .filter(|theme| theme.id != current)
+            .filter(|theme| theme.id != current && !theme.id.starts_with("preview:"))
             .collect();
         (!candidates.is_empty()).then(|| candidates[fastrand::usize(..candidates.len())].id.clone())
     }
@@ -1922,6 +1927,9 @@ impl ButtonsApp {
         self.quick_secrets_open = false;
         self.quick_secrets_vault_exists = false;
         self.lock_quick_secrets();
+        // Resolve the old profile's preview and draft before its files stop being the target.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.discard_theme_editor_session();
         preferences.normalize_theme_sources();
         self.themes = ThemeCatalog::load();
         self.theme_load_warnings = self
@@ -2055,7 +2063,8 @@ impl ButtonsApp {
             _ => None,
         };
         if let Some(id) = id {
-            if !self.themes.all().iter().any(|theme| theme.id == id) {
+            // A preview id is removed by set_theme_all, so it must never reach the app slot.
+            if id.starts_with("preview:") || !self.themes.all().iter().any(|theme| theme.id == id) {
                 return;
             }
             self.set_theme_all(&id);
@@ -10854,11 +10863,17 @@ impl ButtonsApp {
         }
         document["metadata"]["name"] = json!(name);
         let file = format!("{}.json", id.rsplit(':').next().unwrap());
+        let expected = (self.theme_editor_file_name.as_deref() == Some(file.as_str()))
+            .then_some(self.theme_editor_file_digest)
+            .flatten();
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
-            crate::theme_files::save_theme_file(store, &file, name, &bytes, true)
+            crate::theme_files::replace_theme_file(store, &file, &bytes, expected)
         });
         match result {
             Ok(_) => {
+                if expected.is_some() {
+                    self.theme_editor_file_digest = store.theme_file_digest(&file).ok();
+                }
                 // Rename only metadata, without discarding a pending editor draft.
                 if self.theme_editor_source_id.as_deref() == Some(&id) {
                     for value in [
@@ -10961,8 +10976,33 @@ impl ButtonsApp {
         self.theme_editor_original_document = Some(document);
         self.theme_editor_file_name = Some(format!("{stem}.json"));
         self.theme_editor_file_exists = true;
+        self.refresh_theme_file_digest();
         self.theme_editor_confirm_delete = false;
         self.theme_editor_status = None;
+    }
+
+    /// Ends the editor's ownership of a draft: restores any preview and forgets the file.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn discard_theme_editor_session(&mut self) {
+        self.restore_personal_theme_preview();
+        self.theme_editor_source_id = None;
+        self.theme_editor_document = None;
+        self.theme_editor_original_document = None;
+        self.theme_editor_file_name = None;
+        self.theme_editor_file_exists = false;
+        self.theme_editor_file_digest = None;
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = None;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn refresh_theme_file_digest(&mut self) {
+        self.theme_editor_file_digest = match (&self.native_store, &self.theme_editor_file_name) {
+            (Some(store), Some(file_name)) if self.theme_editor_file_exists => {
+                store.theme_file_digest(file_name).ok()
+            }
+            _ => None,
+        };
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -11003,6 +11043,7 @@ impl ButtonsApp {
                 self.theme_editor_original_document = Some(document);
                 self.theme_editor_file_name = Some(file_name);
                 self.theme_editor_file_exists = true;
+                self.refresh_theme_file_digest();
                 self.theme_editor_confirm_delete = false;
                 self.theme_editor_status = Some(crate::i18n::literal(
                     &self.locale,
@@ -11153,11 +11194,17 @@ impl ButtonsApp {
             file_name =
                 crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
         }
+        let expected = replace.then_some(self.theme_editor_file_digest).flatten();
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
-            crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, replace)
+            if replace {
+                crate::theme_files::replace_theme_file(store, &file_name, &bytes, expected)
+            } else {
+                crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, false)
+            }
         });
         match result {
             Ok(saved_file_name) => {
+                self.theme_editor_file_digest = store.theme_file_digest(&saved_file_name).ok();
                 let saved_id = format!(
                     "personal:{profile_name}:{}",
                     saved_file_name.trim_end_matches(".json")
@@ -11246,6 +11293,7 @@ impl ButtonsApp {
             self.theme_editor_file_name = None;
             self.theme_editor_file_exists = false;
         }
+        self.refresh_theme_file_digest();
         self.theme_editor_confirm_delete = false;
         self.theme_editor_status = Some(crate::i18n::literal(
             &self.locale,
@@ -12075,7 +12123,10 @@ impl ButtonsApp {
             return;
         }
         let id = self.preferences.theme_id.clone();
-        if self.theme_editor_source_id.as_deref() == Some(&id) {
+        // A discarded new draft clears its document but keeps the source; recreate it here.
+        if self.theme_editor_source_id.as_deref() == Some(&id)
+            && self.theme_editor_document.is_some()
+        {
             return;
         }
         if self.themes.personal_document(&id).is_some() {
@@ -20591,6 +20642,137 @@ Start-Sleep -Seconds 300
         let expected_id = format!("personal:default:{}", saved.trim_end_matches(".json"));
         assert_eq!(app.preferences.theme_id, expected_id);
         assert!(app.themes.all().iter().any(|theme| theme.id == expected_id));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn profile_switch_discards_preview_so_other_profile_file_is_untouched() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-profile-switch-preview-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        fs::create_dir_all(base.join("native").join("profiles").join("other")).unwrap();
+        let other = store.switch_profile("other").unwrap();
+        let other_bytes = br#"{"version":1,"metadata":{"name":"Other"}}"#;
+        other
+            .write_theme_file("shared.json", other_bytes, false)
+            .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        app.theme_editor_document.as_mut().unwrap()["metadata"]["name"] = json!("Shared");
+        app.theme_editor_file_name = Some("shared.json".into());
+        app.save_personal_theme_draft();
+        assert_eq!(app.theme_editor_file_name.as_deref(), Some("shared.json"));
+        app.reload_personal_themes();
+        app.load_personal_theme_draft("personal:default:shared");
+        let mut document = app.theme_editor_document.clone().unwrap();
+        document["metadata"]["name"] = json!("Edited");
+        app.theme_editor_document = Some(document);
+        app.preview_personal_theme_draft();
+        assert!(app.theme_editor_preview_snapshot.is_some());
+
+        app.adopt_native_profile(
+            other.clone(),
+            Preferences::default(),
+            None,
+            &egui::Context::default(),
+        );
+        app.save_personal_theme_draft();
+
+        assert_eq!(
+            fs::read(other.profile_dir().join("themes").join("shared.json")).unwrap(),
+            other_bytes
+        );
+        assert!(app.theme_editor_preview_snapshot.is_none());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn preview_ids_never_become_favorites_or_app_theme_references() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-preview-reference-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        let preview_id = format!(
+            "preview:default:{}",
+            app.theme_editor_file_name
+                .as_deref()
+                .unwrap()
+                .trim_end_matches(".json")
+        );
+        app.preview_personal_theme_draft();
+
+        app.perform_global_theme_action(PaneAction::ToggleFavorite(preview_id.clone()));
+        app.perform_global_theme_action(PaneAction::Theme(preview_id.clone()));
+
+        assert!(!app.preferences.favorite_theme_ids.contains(&preview_id));
+        // The preview is still open, so its app slot must still resolve to a catalog entry.
+        assert!(app
+            .themes
+            .all()
+            .iter()
+            .any(|theme| theme.id == app.preferences.app_theme_id));
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn canceling_a_new_draft_lets_the_editor_recreate_it() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-cancel-new-draft-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.sync_theme_editor_to_current();
+        assert!(app.theme_editor_document.is_some());
+
+        app.cancel_personal_theme_draft();
+        app.sync_theme_editor_to_current();
+
+        assert!(app.theme_editor_document.is_some());
         fs::remove_dir_all(base).unwrap();
     }
 

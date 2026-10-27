@@ -31,6 +31,7 @@ pub enum StoreError {
     FontCollision,
     InstallerCollision,
     SourceChanged,
+    ThemeChanged,
     Io(io::Error),
 }
 
@@ -59,6 +60,10 @@ impl std::fmt::Display for StoreError {
                 write!(f, "a different bundled installer file already exists")
             }
             Self::SourceChanged => write!(f, "original settings changed; refresh the preview"),
+            Self::ThemeChanged => write!(
+                f,
+                "this theme changed in another window; reload it before saving"
+            ),
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
     }
@@ -558,6 +563,40 @@ impl NativeStore {
         }
     }
 
+    /// Digest of a theme file's current bytes, used to detect edits made by another window.
+    pub(crate) fn theme_file_digest(&self, file_name: &str) -> Result<[u8; 32], StoreError> {
+        validate_theme_file_name(file_name)?;
+        let path = self.profile_dir().join("themes").join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        let bytes = fs::read(&path)?;
+        Ok(Sha256::digest(&bytes).into())
+    }
+
+    /// Replaces an existing theme file only if it still matches `expected`, under the write lock.
+    pub(crate) fn replace_theme_file_if_unchanged(
+        &self,
+        file_name: &str,
+        bytes: &[u8],
+        expected: [u8; 32],
+    ) -> Result<(), StoreError> {
+        validate_theme_file_name(file_name)?;
+        if bytes.len() as u64 > 2 * 1024 * 1024 {
+            return Err(StoreError::TooLarge);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let themes = self.ensure_profile_themes_dir()?;
+        let path = themes.join(file_name);
+        ensure_native_path(&self.root.0, &path)?;
+        if !path.is_file() {
+            return Err(StoreError::InvalidDocument);
+        }
+        let current: [u8; 32] = Sha256::digest(fs::read(&path)?).into();
+        if current != expected {
+            return Err(StoreError::ThemeChanged);
+        }
+        atomic_replace(&path, bytes)
+    }
+
     pub(crate) fn delete_theme_file(&self, file_name: &str) -> Result<(), StoreError> {
         validate_theme_file_name(file_name)?;
         let _lock = self.acquire_root_lock()?;
@@ -932,6 +971,34 @@ mod tests {
         ));
         store.delete_theme_file("night.json").unwrap();
         assert!(!store.profile_dir().join("themes/night.json").exists());
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn stale_theme_writer_cannot_overwrite_a_newer_theme_file() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        let path = store.profile_dir().join("themes/night.json");
+        store
+            .write_theme_file("night.json", b"loaded", false)
+            .unwrap();
+        let loaded = store.theme_file_digest("night.json").unwrap();
+        // Another window saves its edit to the same file first.
+        store
+            .replace_theme_file_if_unchanged("night.json", b"other window", loaded)
+            .unwrap();
+        // This window still holds the older digest and must be refused.
+        assert!(matches!(
+            store.replace_theme_file_if_unchanged("night.json", b"stale", loaded),
+            Err(StoreError::ThemeChanged)
+        ));
+        assert_eq!(fs::read(&path).unwrap(), b"other window");
+        // Reloading the newer digest allows the save again.
+        let current = store.theme_file_digest("night.json").unwrap();
+        store
+            .replace_theme_file_if_unchanged("night.json", b"reloaded save", current)
+            .unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"reloaded save");
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

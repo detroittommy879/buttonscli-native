@@ -489,6 +489,10 @@ pub(crate) struct PaneDividerAppearance {
 
 impl Preferences {
     pub(crate) fn toggle_favorite_theme(&mut self, id: &str) {
+        // Preview ids exist only while a draft is open; they must not persist as favorites.
+        if id.starts_with("preview:") {
+            return;
+        }
         if self
             .favorite_theme_ids
             .iter()

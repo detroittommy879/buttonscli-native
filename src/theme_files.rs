@@ -110,6 +110,22 @@ pub(crate) fn save_theme_file(
     Err("theme filename kept colliding; choose another name and retry".into())
 }
 
+/// Overwrites a theme file only when it still holds the bytes this window last loaded.
+pub(crate) fn replace_theme_file(
+    store: &NativeStore,
+    file_name: &str,
+    bytes: &[u8],
+    expected: Option<[u8; 32]>,
+) -> Result<String, String> {
+    let result = match expected {
+        Some(digest) => store.replace_theme_file_if_unchanged(file_name, bytes, digest),
+        None => store.write_theme_file(file_name, bytes, true),
+    };
+    result
+        .map(|()| file_name.to_owned())
+        .map_err(|error| error.to_string())
+}
+
 pub(crate) fn export_theme_file(
     destination: &Path,
     document: &mut Value,
