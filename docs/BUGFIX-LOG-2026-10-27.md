@@ -50,8 +50,13 @@ otherwise). Tests that switch profiles must create `native/profiles/<name>` firs
   `preview_ids_never_become_favorites_or_app_theme_references`.
 - Not run: ConPTY/Windows probes, a live app run, and the release build. Right-click copy,
   multi-window and draft-replacement behaviour in the real app is still "needs repro".
-- Not fixed yet: A4 (complete theme skips saved native controls), A6 (raw JSON editor
-  ownership), and the A2 rename-from-stale-catalog gap.
+- **A4 complete theme:** the status "complete theme" action now goes through
+  `apply_theme_sources` with all scopes on (scopes restored after), so saved window,
+  shader and chrome settings apply and old dock/divider overrides clear.
+- **A6 raw JSON editor:** the text editor records the draft source and file it was copied
+  from. "Apply to draft" refuses when the open draft differs, and closing the session
+  closes the editor window.
+- Still open: the A2 rename-from-stale-catalog gap.
 
 ## Independent ASTRA review (later validation; no fixes)
 

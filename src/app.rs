@@ -894,6 +894,15 @@ struct TextEditorWindow {
     text: String,
     kind: TextEditorKind,
     error: Option<String>,
+    /// The draft this text was copied from; "Apply" only writes back into that same draft.
+    draft_source: Option<String>,
+    draft_file: Option<String>,
+}
+
+/// True when the draft the text came from is still the open draft.
+#[cfg(not(target_arch = "wasm32"))]
+fn raw_editor_targets(editor: &TextEditorWindow, source: Option<&str>, file: Option<&str>) -> bool {
+    editor.draft_source.as_deref() == source && editor.draft_file.as_deref() == file
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2067,12 +2076,16 @@ impl ButtonsApp {
             if id.starts_with("preview:") || !self.themes.all().iter().any(|theme| theme.id == id) {
                 return;
             }
-            self.set_theme_all(&id);
-            self.preferences.app_theme_id = id.clone();
             // Status controls always apply the complete theme, regardless of editor scopes.
-            if let Some(typography) = self.themes.get(&id).typography.clone() {
-                self.preferences.typography = typography;
-            }
+            // Use the same appearance path as Library apply, so saved window, shader and
+            // chrome settings come with it and old chrome overrides are cleared.
+            let theme = self.themes.get(&id).clone();
+            // take() leaves the default scopes (all on) in place for the duration of the apply.
+            let scopes = std::mem::take(&mut self.preferences.theme_apply);
+            self.set_theme_all(&id);
+            let calm = self.preferences.calm_mode;
+            self.apply_theme_sources(theme, calm);
+            self.preferences.theme_apply = scopes;
         }
     }
 
@@ -10512,6 +10525,8 @@ impl ButtonsApp {
             text: serde_json::to_string_pretty(document).unwrap_or_default(),
             kind: TextEditorKind::ThemeJson,
             error: None,
+            draft_source: self.theme_editor_source_id.clone(),
+            draft_file: self.theme_editor_file_name.clone(),
         });
     }
 
@@ -10566,7 +10581,18 @@ impl ButtonsApp {
                         );
                     });
             });
-        if apply {
+        if apply
+            && !raw_editor_targets(
+                editor,
+                self.theme_editor_source_id.as_deref(),
+                self.theme_editor_file_name.as_deref(),
+            )
+        {
+            editor.error = Some(
+                "The draft changed after this editor opened, so nothing was applied. Copy the text and reopen the editor."
+                    .into(),
+            );
+        } else if apply {
             let parsed = serde_json::from_str::<Value>(&editor.text)
                 .map_err(|error| format!("Not valid JSON: {error}"))
                 .and_then(|value| {
@@ -10985,6 +11011,7 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn discard_theme_editor_session(&mut self) {
         self.restore_personal_theme_preview();
+        self.text_editor = None;
         self.theme_editor_source_id = None;
         self.theme_editor_document = None;
         self.theme_editor_original_document = None;
@@ -20698,6 +20725,71 @@ Start-Sleep -Seconds 300
             other_bytes
         );
         assert!(app.theme_editor_preview_snapshot.is_none());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn raw_editor_text_only_applies_to_the_draft_it_was_copied_from() {
+        let editor = TextEditorWindow {
+            title: "Theme file".into(),
+            text: "{}".into(),
+            kind: TextEditorKind::ThemeJson,
+            error: None,
+            draft_source: Some("personal:default:a".into()),
+            draft_file: Some("a.json".into()),
+        };
+        assert!(raw_editor_targets(
+            &editor,
+            Some("personal:default:a"),
+            Some("a.json")
+        ));
+        assert!(!raw_editor_targets(
+            &editor,
+            Some("personal:default:b"),
+            Some("b.json")
+        ));
+        assert!(!raw_editor_targets(&editor, None, None));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn complete_theme_action_applies_saved_native_appearance_and_clears_chrome_overrides() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-complete-theme-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        app.theme_editor_file_name = Some("saved-look.json".into());
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["nativeAppearance"] =
+            json!({"window_opacity": 0.4, "shader_backgrounds_enabled": false});
+        app.theme_editor_document = Some(draft);
+        app.save_personal_theme_draft();
+
+        app.preferences.window_opacity = 1.0;
+        app.preferences.shader_backgrounds_enabled = true;
+        app.preferences.dock_background_override = Some("#123456".into());
+        app.perform_global_theme_action(PaneAction::Theme("personal:default:saved-look".into()));
+
+        assert!((app.preferences.window_opacity - 0.4).abs() < 1e-6);
+        assert!(!app.preferences.shader_backgrounds_enabled);
+        assert_eq!(app.preferences.dock_background_override, None);
+        assert!(app.preferences.theme_apply.app && app.preferences.theme_apply.effects);
         fs::remove_dir_all(base).unwrap();
     }
 
