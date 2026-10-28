@@ -2,10 +2,31 @@
 
 # ButtonsCLI Native
 
-**Your shells, your shortcuts, your workspace.**
+A fast terminal app for people who prefer using a mouse, clicking buttons instead of memorizing key combos, who want a more normal way to customize the appearance without editing json files. I hurt the nerve in one of my arms and can't type fast right now so this lets me click to paste common commands (VPS server related, etc) and generate them.
 
-A native terminal workspace built in Rust, with tiled shells, command buttons,
-and hundreds of themes.
+## Several AI features and other things to save time like:
+
+The Buttons, obviously. All they do is paste long commands. You create a button and set it to some text, with optional press enter for you.
+
+Auto organizing panes, auto arrange in grid, row, etc
+
+Theme/shader gen from prompt - (with auto self healing) so you can tell it "make the app look like halloween" and it does it.
+
+AI Agent Control of app - ability to control all tabs (via MCP or CLI tool, you click "Agent Inst" which copies instructions for agent to clipboard, paste into Claude, Codex, etc), they can then open new panes, work on all at the same time etc - I wanted this so i can better see what they're doing
+
+## Very fine grained control over a lot of the app
+
+Choose different fonts for each terminal pane, each part of the UI, set them all to different themes, shaders, etc. I went out of my way to make it anti-minimal with the user interface.
+
+Right click menus all over the app 
+
+**Alacritty Engine used for xxxxx. Low ram even with tons of visuals and UI, many panes/tabs open**
+
+I made a Tauri/Rust version of this the first time but i cannot stand a terminal inside the Webview! Too laggy... feels bad. This one is fast. A native terminal workspace built in Rust, with tiled shells, command buttons, borderline ridiculous level of control over the apperance. Analog TV style noise for when you get bored with "normal colors"
+
+I'll work on getting the releases working but for now if you have rust/cargo installed just 
+
+ai update or check to see what info is out of date:
 
 [![CI](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml/badge.svg)](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/built_with-Rust-e06c75?style=flat-square)
@@ -16,7 +37,7 @@ and hundreds of themes.
 
 </div>
 
-![ButtonsCLI Native with six numbered panes, command and SSH docks, and individually themed live terminals](docs/images/workspace-grid-2026-10-07.png)
+![ButtonsCLI Native with six numbered panes, command and SSH docks, and individually themed live terminals](docs/images/main.png)
 
 ButtonsCLI Native brings your terminal sessions and frequently used commands
 into one configurable desktop workspace. Keep a local shell, remote SSH
