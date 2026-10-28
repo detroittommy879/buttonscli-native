@@ -87,6 +87,8 @@ impl Stage {
 pub(crate) struct Candidate {
     pub(crate) name: String,
     pub(crate) code: String,
+    /// The slider variables `code` was checked against; it may use them.
+    pub(crate) variables: Vec<crate::theme::ShaderVariable>,
     pub(crate) writer: String,
     pub(crate) judge: Option<String>,
     pub(crate) note: String,
@@ -227,6 +229,7 @@ pub(crate) fn generate(
     Ok(Candidate {
         name,
         code,
+        variables,
         writer,
         judge: judge_name,
         note,

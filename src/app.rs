@@ -9314,7 +9314,18 @@ impl ButtonsApp {
             self.preferences.theme_apply.effects = true;
             let previous = shader.custom.take();
             self.shader_ai.undo = previous.as_ref().map(|c| c.expression.clone());
-            let variables = previous.map(|c| c.variables).unwrap_or_default();
+            // Keep slider values the user moved, but only for the variables the
+            // candidate was checked with, so its code always compiles.
+            let mut variables = candidate.variables.clone();
+            for variable in &mut variables {
+                if let Some(old) = previous
+                    .iter()
+                    .flat_map(|c| &c.variables)
+                    .find(|old| old.name == variable.name)
+                {
+                    *variable = old.clone();
+                }
+            }
             shader.custom = Some(crate::theme::CustomShader {
                 expression: candidate.code,
                 variables,
@@ -9386,8 +9397,10 @@ impl ButtonsApp {
         ui.painter()
             .rect_filled(rect, 6.0, shader_palette(theme)[0]);
         let Some(shader) = shader else { return };
+        // The theme's legacy `masterDisabled` covers gradient, noise and scanlines,
+        // not shaders: many imported themes carry it, and it hid chosen shaders.
         let switched_on = is_candidate || self.preferences.shader_backgrounds_enabled;
-        if !switched_on || theme.effects.master_disabled {
+        if !switched_on {
             return;
         }
         let mut shader = shader.clone();
@@ -9455,13 +9468,11 @@ impl ButtonsApp {
                         let (rect, response) =
                             ui.allocate_exact_size(egui::vec2(width, 96.0), egui::Sense::click());
                         let mut preview = shader.clone();
+                        // Use the sliders the code was checked with: it may
+                        // reference them, and the draft may have none yet.
                         preview.custom = Some(crate::theme::CustomShader {
                             expression: candidate.code.clone(),
-                            variables: shader
-                                .custom
-                                .as_ref()
-                                .map(|c| c.variables.clone())
-                                .unwrap_or_default(),
+                            variables: candidate.variables.clone(),
                         });
                         if preview.strength < 0.3 {
                             preview.strength = 0.45;
@@ -13827,7 +13838,6 @@ fn terminal_surface(
     let shader = theme.effects.shader_background.as_ref().filter(|shader| {
         interaction.shader_backgrounds_enabled
             && local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds)
-            && !theme.effects.master_disabled
             && shader.strength > 0.0
     });
     let background_callback = shader.and_then(|shader| {
@@ -20122,6 +20132,75 @@ Start-Sleep -Seconds 300
             app.tabs.is_empty(),
             "synthetic preview must not spawn a shell"
         );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn shaders_draw_in_legacy_effects_off_themes_and_candidates_keep_their_sliders() {
+        // Many imported themes store `effects.masterDisabled`; it hid every shader.
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let mut document = app.shared_appearance_document();
+        document["effects"]["masterDisabled"] = json!(true);
+        document["effects"]["shaderBackground"] = json!(crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            ..Default::default()
+        });
+        app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
+        app.theme_editor_document = Some(document.clone());
+        app.theme_editor_original_document = Some(document.clone());
+        app.preferences.shader_backgrounds_enabled = true;
+        // A result checked against the default `amount` slider, while the draft
+        // has no custom code (so no sliders) yet.
+        app.shader_ai.lanes.push(ShaderLane {
+            direction: "Balanced",
+            stage: crate::shader_ai::Stage::Ready,
+            chars: 0,
+            result: Some(Ok(crate::shader_ai::Candidate {
+                name: "Uses a slider".into(),
+                code: "return mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t));".into(),
+                variables: crate::theme::CustomShader::default().variables,
+                writer: "test".into(),
+                judge: None,
+                note: String::new(),
+            })),
+        });
+        let theme = ThemeDefinition::editor_document(&document).unwrap();
+        assert!(theme.effects.master_disabled);
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        crate::plugins::effects::shader_background::register(
+            &ctx,
+            eframe::wgpu::TextureFormat::Bgra8Unorm,
+        );
+        let callbacks = |output: &egui::FullOutput| {
+            output
+                .shapes
+                .iter()
+                .filter(|shape| matches!(shape.shape, egui::Shape::Callback(_)))
+                .count()
+        };
+        let input = || egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1000.0, 900.0),
+            )),
+            ..Default::default()
+        };
+        let output = ctx.run(input(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| app.shader_settings(ui));
+        });
+        assert!(callbacks(&output) >= 1, "live preview draws the shader");
+        let output = ctx.run(input(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.shader_lane_results(
+                    ui,
+                    &theme,
+                    &crate::theme::ShaderBackground::default(),
+                    0.0,
+                );
+            });
+        });
+        assert_eq!(callbacks(&output), 1, "the candidate thumbnail draws");
     }
 
     #[test]

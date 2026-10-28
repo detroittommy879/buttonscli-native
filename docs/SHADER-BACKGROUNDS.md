@@ -12,8 +12,9 @@ preview; saving keeps the configuration in the theme JSON.
 A shader replaces the visible gradient behind terminal cells. The gradient or
 solid fill stays underneath as a fallback when GPU backgrounds are disabled,
 unavailable, or strength is zero. Explicit cell backgrounds, selection and the
-cursor paint above it; a full-screen program can cover the shader. Effects master
-off disables it. Calm and Animate off produce a still pattern. Settings and pane
+cursor paint above it; a full-screen program can cover the shader. A theme's
+`effects.masterDisabled` (gradient, noise and scanlines) does not hide its shader.
+Calm and Animate off produce a still pattern. Settings and pane
 input coordinates remain outside the effect.
 
 The current extension is **app-owned presets**, separate from the proposed
