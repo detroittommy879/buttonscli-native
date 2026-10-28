@@ -9047,7 +9047,7 @@ impl ButtonsApp {
             if !self.preferences.shader_backgrounds_enabled {
                 ui.spaced_colored_label(
                     self.colors().warning,
-                    "Shader backgrounds are off, so terminals show the gradient. Picking or generating a shader turns them on.",
+                    "Shader backgrounds are off, so terminals show the gradient. Turn on \"Use a shader in this theme\" or choose a generated version to turn them on.",
                 );
             }
             if let Ok(theme) = ThemeDefinition::editor_document(&document) {
@@ -9062,6 +9062,7 @@ impl ButtonsApp {
                     enabled.then_some(&shader),
                     u64::MAX,
                     time,
+                    false,
                 );
                 ui.painter().text(
                     rect.min + egui::vec2(14.0, 16.0),
@@ -9370,6 +9371,7 @@ impl ButtonsApp {
 
     /// Draws the theme background with an optional shader on top.
     #[cfg(not(target_arch = "wasm32"))]
+    #[allow(clippy::too_many_arguments)]
     fn paint_shader_preview(
         &self,
         ui: &mut egui::Ui,
@@ -9378,11 +9380,14 @@ impl ButtonsApp {
         shader: Option<&crate::theme::ShaderBackground>,
         id: u64,
         time: f32,
+        // Generated candidates are previews, so they show even while the global switch is off.
+        is_candidate: bool,
     ) {
         ui.painter()
             .rect_filled(rect, 6.0, shader_palette(theme)[0]);
         let Some(shader) = shader else { return };
-        if !self.preferences.shader_backgrounds_enabled || theme.effects.master_disabled {
+        let switched_on = is_candidate || self.preferences.shader_backgrounds_enabled;
+        if !switched_on || theme.effects.master_disabled {
             return;
         }
         let mut shader = shader.clone();
@@ -9468,6 +9473,7 @@ impl ButtonsApp {
                             Some(&preview),
                             u64::MAX - 1 - *index as u64,
                             time,
+                            true,
                         );
                         if response.hovered() {
                             ui.painter().rect_stroke(
@@ -11220,6 +11226,12 @@ impl ButtonsApp {
         if self.theme_editor_file_exists && keep_existing {
             file_name =
                 crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        }
+        // The saved theme records the shader on/off state the editor shows. Without this,
+        // an older copy's stored "off" flag would turn the chosen shader off on apply.
+        if document["effects"]["shaderBackground"].is_object() {
+            document["nativeAppearance"]["shader_backgrounds_enabled"] =
+                json!(self.preferences.shader_backgrounds_enabled);
         }
         let expected = replace.then_some(self.theme_editor_file_digest).flatten();
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
@@ -20865,6 +20877,54 @@ Start-Sleep -Seconds 300
         app.sync_theme_editor_to_current();
 
         assert!(app.theme_editor_document.is_some());
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn chosen_shader_stays_on_after_saving_a_theme_that_stored_shader_off() {
+        use std::fs;
+
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-shader-choice-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).unwrap();
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("original"),
+        )
+        .unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.start_personal_theme_draft();
+        app.theme_editor_file_name = Some("ai-look.json".into());
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["nativeAppearance"] = json!({"shader_backgrounds_enabled": false});
+        app.theme_editor_document = Some(draft);
+        app.save_personal_theme_draft();
+
+        // Open the saved theme and choose a generated shader, as the shader editor does.
+        app.load_personal_theme_draft("personal:default:ai-look");
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        let shader = crate::theme::ShaderBackground {
+            custom: Some(Default::default()),
+            ..Default::default()
+        };
+        draft["effects"]["shaderBackground"] = json!(shader);
+        app.theme_editor_document = Some(draft);
+        app.preferences.shader_backgrounds_enabled = true;
+        app.preferences.theme_apply.effects = true;
+        app.save_personal_theme_draft();
+
+        assert!(
+            app.preferences.shader_backgrounds_enabled,
+            "saving must not let the theme's stored shader-off flag undo the choice"
+        );
         fs::remove_dir_all(base).unwrap();
     }
 

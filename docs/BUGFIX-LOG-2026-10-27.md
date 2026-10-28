@@ -58,6 +58,25 @@ otherwise). Tests that switch profiles must create `native/profiles/<name>` firs
   closes the editor window.
 - Still open: the A2 rename-from-stale-catalog gap.
 
+## AI shader "can't activate" (2026-10-27)
+
+- **Saved shader-off flag overrode a chosen shader.** Apply overlays
+  `nativeAppearance.shader_backgrounds_enabled` from the theme file. A copy saved while
+  shaders were off kept that flag, so choosing a generated shader and saving turned it off
+  again on apply. Save now writes the editor's on/off state into the document when the theme
+  has a shader (`app.rs` save path). Reproduced first with
+  `chosen_shader_stays_on_after_saving_a_theme_that_stored_shader_off`.
+- **Generated thumbnails blank while the global switch is off.** `paint_shader_preview`
+  hid every shader while "Shader backgrounds on" was off, which is the default. Candidate
+  thumbnails now show regardless; choosing one still turns the switch on.
+- **Checked:** five generated-style bodies render real pixels on the native adapter
+  (`generated_style_bodies_render_real_pixels_on_the_native_adapter`, ignored GPU test,
+  passes here). The rendering path is not the cause.
+- Trap: `combine()` splices by exact string match against `shader_background.wgsl`; if that
+  line changes, custom shaders silently render nothing. Keep the splice target in sync.
+- Not checked: how a shader looks on a real terminal pane with the app running; this needs a
+  live run.
+
 ## Independent ASTRA review (later validation; no fixes)
 
 - Added [THEME-STATE-AUDIT-2026-10-27-ASTRA.md](THEME-STATE-AUDIT-2026-10-27-ASTRA.md), correcting overstated findings and documenting six additional gaps.

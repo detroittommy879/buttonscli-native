@@ -591,6 +591,59 @@ mod tests {
 
     #[test]
     #[ignore = "requires a graphics adapter"]
+    fn generated_style_bodies_render_real_pixels_on_the_native_adapter() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        // Bodies in the style the shader writer is asked for.
+        let bodies = [
+            "let s = stars(p * 12.0, t); return mix(c1, c2, 0.5 + 0.5 * sin(p.y * 6.0 + t)) + vec3<f32>(s);",
+            "let n = cloud(p * 2.5 + vec2<f32>(t * 0.1, 0.0)); return palette(n + t * 0.05) * smoothstep(0.2, 0.8, n);",
+            "let g = fract(p * 4.0) - 0.5; let d = length(g); return mix(c3, c1, step(d, 0.25 + 0.05 * sin(t)));",
+            "return hsv(fract(atan2(p.y, p.x) / 6.28318 + t * 0.05), 0.6, 0.5);",
+            "let w = noise(p * 3.0 + t * 0.2); return mix(c1, c2, w) * 0.8 + c3 * pow(w, 3.0);",
+        ];
+        runtime.block_on(async {
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+                .expect("native graphics adapter");
+            let (device, queue) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+                .unwrap();
+            device.push_error_scope(wgpu::ErrorFilter::Validation);
+            for body in bodies {
+                let custom = crate::theme::CustomShader {
+                    expression: body.into(),
+                    variables: crate::theme::CustomShader::default().variables,
+                };
+                let source =
+                    custom_source(&custom).unwrap_or_else(|error| panic!("{body}: {error}"));
+                let mut resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
+                resources.pipeline = pipeline(
+                    &device,
+                    wgpu::TextureFormat::Rgba8Unorm,
+                    &resources.layout,
+                    &source,
+                );
+                let still = render_sample_with_knob(&device, &queue, &resources, 0.0, 0.0, 3.0);
+                assert!(
+                    still.chunks_exact(4).any(|pixel| pixel != &still[..4]),
+                    "{body} renders a flat color"
+                );
+            }
+            assert!(
+                device.pop_error_scope().await.is_none(),
+                "generated-style shaders failed GPU validation"
+            );
+        });
+    }
+
+    #[test]
+    #[ignore = "requires a graphics adapter"]
     fn background_shader_pipeline_validates_on_the_native_adapter() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
