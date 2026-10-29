@@ -676,6 +676,12 @@ pub struct ButtonsApp {
     group_name_draft: String,
     #[cfg(not(target_arch = "wasm32"))]
     group_save_error: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pending_pane_looks: Option<theme_bundles::PendingPaneLooks>,
+    #[cfg(not(target_arch = "wasm32"))]
+    bundle_name_draft: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    bundle_message: Option<String>,
     /// Last Left command each terminal ran, saved as its startup command in a tab group.
     #[cfg(not(target_arch = "wasm32"))]
     tab_launch_commands: std::collections::BTreeMap<u64, String>,
@@ -1286,6 +1292,17 @@ impl ButtonsApp {
             app.last_saved_preferences =
                 serde_json::to_vec(&app.preferences_to_save()).unwrap_or_default();
             app.restore_account_session(cc.egui_ctx.clone());
+            // Earlier builds dropped the ChatGPT marker on load; the tokens
+            // are still saved, so reconnect without a new sign-in.
+            if let Some(store) = &app.native_store {
+                if crate::assistant::chatgpt::reconnect_saved(
+                    &SystemCredentialStore,
+                    store.profile_name(),
+                    &mut app.preferences.provider_settings,
+                ) {
+                    log::info!("reconnected a saved ChatGPT sign-in");
+                }
+            }
             app.import_offer = app.native_revision.is_none()
                 && production_roots().is_ok_and(|(_, legacy)| legacy.0.exists());
             if let Some(store) = &app.native_store {
@@ -1676,6 +1693,12 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             group_save_error: None,
             #[cfg(not(target_arch = "wasm32"))]
+            pending_pane_looks: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            bundle_name_draft: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            bundle_message: None,
+            #[cfg(not(target_arch = "wasm32"))]
             tab_launch_commands: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
             renaming_tab: None,
@@ -1936,6 +1959,10 @@ impl ButtonsApp {
         self.preferences.effects_theme_id = theme_id.to_owned();
         self.theme_overrides.clear();
         self.pane_fonts.clear();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.pending_pane_looks = None;
+        }
         if self.preferences.theme_apply.fonts {
             if let Some(typography) = self.themes.get(theme_id).typography.clone() {
                 self.preferences.typography = typography;
@@ -1982,6 +2009,7 @@ impl ButtonsApp {
         self.preferences = preferences;
         self.refresh_locale();
         self.theme_overrides.clear();
+        self.pending_pane_looks = None;
         self.history_writer.take();
         self.history_last_tick = None;
         self.native_store = Some(store);
@@ -2469,6 +2497,7 @@ impl ButtonsApp {
         if !self.tabs.is_empty() {
             self.dispatch_ui_or_notice(Some(Target::Id(self.tabs[0].id)), Action::Focus, ctx);
         }
+        self.restore_pane_looks();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -4008,6 +4037,8 @@ impl ButtonsApp {
                         }
                         #[cfg(not(target_arch = "wasm32"))]
                         self.tab_group_menu(ui, ctx);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        self.theme_bundle_menu(ui, ctx);
                         ui.separator();
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
@@ -8789,6 +8820,8 @@ impl ButtonsApp {
             self.theme_settings_tab = ThemeSettingsTab::Edit;
         }
         #[cfg(not(target_arch = "wasm32"))]
+        self.theme_bundle_settings(ui);
+        #[cfg(not(target_arch = "wasm32"))]
         {
             use crate::i18n::{text, MessageKey};
             let current_id = self.theme_for_tab(self.focused).to_owned();
@@ -11466,6 +11499,10 @@ impl ButtonsApp {
         let mut preferences = self.preferences.clone();
         if let Some(snapshot) = &self.theme_editor_preview_snapshot {
             restore_preview_preferences(&mut preferences, snapshot);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            preferences.pane_looks = self.current_pane_looks();
         }
         preferences
     }
@@ -16062,6 +16099,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
+#[cfg(not(target_arch = "wasm32"))]
+mod theme_bundles;
 
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
@@ -16115,6 +16154,8 @@ impl eframe::App for ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.apply_pending_pane_looks();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
         #[cfg(not(target_arch = "wasm32"))]

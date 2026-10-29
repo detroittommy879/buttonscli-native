@@ -28,9 +28,13 @@
 - ChatGPT connections store `chatgpt:<reference>` in `credential_ref`; `provider_key`
   turns it into a fresh token. Never save those tokens as a plain API key.
   `chatgpt_plan` providers hide URL/format/key fields; that endpoint rejects
-  non-streaming requests, so probes must stream.
+  non-streaming requests, so probes must stream. `ProviderSettings::normalize`
+  must keep `chatgpt:native:v1:<hex>`; use `chatgpt::saved_key` in key loaders.
 - The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
   preview/save touch only that pane's `theme_overrides`, never shared sources.
+- Theme bundles and `pane_looks` are keyed by slot (`slot_order`: displayed
+  panes, then other tabs), never by PTY ID. `preferences_to_save` fills
+  `pane_looks`; unused slots wait in `pending_pane_looks` for new tabs.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover

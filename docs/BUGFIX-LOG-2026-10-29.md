@@ -31,3 +31,35 @@ Validation: fmt check, `cargo test --locked` (340 passed), native and wasm
 clippy clean. New tests: `pane_editor_previews_and_saves_only_on_its_pane`,
 `test_connection_streams_when_the_provider_requires_it`. Not checked by eye:
 the new provider screen and the pane row (no ChatGPT account here).
+
+## ChatGPT sign-in stopped working after a restart (second test)
+
+- Cause: `ProviderSettings::normalize` (runs on every load and on provider
+  removal) cleared any `credential_ref` not starting with `native:v1:`. That
+  dropped the `chatgpt:` marker, so every request went out without a token:
+  "HTTP 401: Missing bearer or basic authentication in header" in shaders,
+  themes, AI Help and simulated terminals. Tokens stayed in the OS store.
+- Fix: normalize keeps `chatgpt:native:v1:<hex>` and pins those connections to
+  `api.openai.com/v1` + Responses. On startup `chatgpt::reconnect_saved`
+  restores the marker for OpenAI-endpoint connections whose tokens are still
+  saved, so no new sign-in is needed. `chatgpt_plan` is now accepted in
+  provider JSON (it was exported but rejected on import).
+- `chatgpt::saved_key` is the one key loader for the web preview and the live
+  probes (they compared `credential_ref` to the plain ref and skipped ChatGPT).
+- Live check with the user's permission, on their active profile (read-only;
+  only the normal token refresh may write to the OS store):
+  `BUTTONSCLI_TEST_LIVE_CHATGPT=1 cargo test --locked --lib live_chatgpt -- --ignored --nocapture`.
+  Help, Theme, Shader, ShaderJudge and Simulation each got a streamed reply;
+  Test connection passed; model discovery returned 8 models.
+
+## Per-pane looks across restarts, theme bundles
+
+- `Preferences::pane_looks` (by slot, up to 8) is filled in
+  `preferences_to_save` and reapplied after startup tabs open (not when a
+  launch tab group opens, which sets its own themes). Slots without a terminal
+  wait and go to the next terminals opened, and are kept in the saved copy.
+- Theme bundles: shared theme sources, per-slot theme + font, and the layout.
+  Applying never opens/closes terminals; missing themes are skipped with a
+  count; the layout is applied only with 2+ tabs.
+- Plan doc for panel/button shaders and par-term ideas:
+  `docs/PLANS-2026-10-29-PANEL-SHADERS.md`.

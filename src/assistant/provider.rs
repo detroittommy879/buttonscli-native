@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+/// Prefix of a ChatGPT sign-in's `credential_ref` (then the native ref).
+pub(crate) const CHATGPT_MARKER: &str = "chatgpt:";
+/// The only endpoint a ChatGPT sign-in can call.
+pub(crate) const CHATGPT_RESOURCE: &str = "https://api.openai.com/v1";
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct ProviderProfile {
@@ -218,6 +223,7 @@ impl ProviderSettings {
                     "default_model",
                     "model",
                     "models_endpoint",
+                    "chatgpt_plan",
                 ]
                 .contains(&key.as_str())
             }) {
@@ -369,12 +375,29 @@ impl ProviderSettings {
                 ));
             }
             // Native configuration never trusts a credential ref from imported JSON.
+            // A ChatGPT sign-in keeps its marker in front of the native ref.
+            let chatgpt = provider
+                .credential_ref
+                .as_ref()
+                .is_some_and(|reference| reference.starts_with(CHATGPT_MARKER));
             if provider.credential_ref.as_ref().is_some_and(|reference| {
-                reference.strip_prefix("native:v1:").is_none_or(|hex| {
-                    hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit())
-                })
+                reference
+                    .strip_prefix(CHATGPT_MARKER)
+                    .unwrap_or(reference)
+                    .strip_prefix("native:v1:")
+                    .is_none_or(|hex| {
+                        hex.len() != 64 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    })
             }) {
                 provider.credential_ref = None;
+            } else if chatgpt {
+                provider.chatgpt_plan = true;
+            }
+            // That endpoint takes Responses requests only, at a fixed URL.
+            if provider.chatgpt_plan {
+                provider.endpoint = CHATGPT_RESOURCE.into();
+                provider.api = ProviderApi::Responses;
+                provider.models_endpoint = None;
             }
             if let Some(safe) = sanitize_endpoint(&provider.endpoint) {
                 if safe != provider.endpoint {

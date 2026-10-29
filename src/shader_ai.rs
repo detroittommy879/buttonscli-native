@@ -506,7 +506,7 @@ mod tests {
     #[test]
     #[ignore = "sends real requests; set BUTTONSCLI_TEST_LIVE_SHADER_AI=1"]
     fn live_shader_ai_with_active_profile() {
-        use crate::assistant::credentials::{CredentialStore, SystemCredentialStore};
+        use crate::assistant::credentials::SystemCredentialStore;
         assert_eq!(
             std::env::var("BUTTONSCLI_TEST_LIVE_SHADER_AI").as_deref(),
             Ok("1")
@@ -535,15 +535,12 @@ mod tests {
                         writers,
                         judges,
                         &mut |provider| {
-                            let reference =
-                                crate::assistant::credentials::reference(profile, &provider.id);
-                            if provider.credential_ref.as_deref() != Some(reference.as_str()) {
-                                return Ok(None);
-                            }
-                            SystemCredentialStore
-                                .get(&reference)
-                                .map(Some)
-                                .map_err(|_| crate::assistant::client::ClientError::Credential)
+                            crate::assistant::chatgpt::saved_key(
+                                &SystemCredentialStore,
+                                profile,
+                                provider,
+                            )
+                            .map_err(|_| crate::assistant::client::ClientError::Credential)
                         },
                         &Request {
                             brief: "bouncing fireballs with gravity",
