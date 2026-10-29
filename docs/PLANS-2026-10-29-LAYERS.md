@@ -1,6 +1,8 @@
 # Plan: shader layers and saved scenes (Oct 29)
 
-Nothing here is built yet. Approve, cut or reorder before I start.
+Layers are on hold. Saved scenes shipped as **theme bundles** (see the end).
+Panel and button shaders and the par-term review moved to
+[PLANS-2026-10-29-PANEL-SHADERS.md](PLANS-2026-10-29-PANEL-SHADERS.md).
 
 ## What other terminals do
 
@@ -54,7 +56,12 @@ shaders. Heavy AI shaders are where it would show; the FPS cap and a per-layer
    egui render pass into a texture per pane. Worth it only if phase 1 leaves people
    wanting glow and blur.
 
-## Saved scenes (name ideas: Scenes, Looks, Setups)
+## Saved scenes → built as theme bundles
+
+Built: Settings → Themes → Library → Theme bundles, and File → Apply theme
+bundle. Per-pane looks are also saved and restored across restarts
+(`pane_looks`). The layout is saved but applied loosely. Original notes:
+
 
 "Scene" = per-slot looks for up to 8 panes, plus the shared theme.
 
@@ -69,6 +76,4 @@ shaders. Heavy AI shaders are where it would show; the FPS cap and a per-layer
 
 ## Questions for you
 
-- Overlay first, or go straight to true post effects (glow/blur)?
-- Scene name preference?
-- Should a scene also save the layout (columns/rows, pane count), or only looks?
+- Overlay first, or go straight to true post effects (glow/blur)? (on hold)
