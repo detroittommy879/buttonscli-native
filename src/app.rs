@@ -3282,6 +3282,7 @@ impl ButtonsApp {
             pane_rects: &mut self.pane_rects,
             hovered_tab: self.hovered_tab,
             indicator_colors,
+            distinct_pane_colors: self.preferences.pane_colors_distinct,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
@@ -4477,6 +4478,12 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.tabs);
+                let window_focused = ui.input(|input| input.viewport().focused.unwrap_or(true));
+                let button_font = egui::TextStyle::Button.resolve(ui.style());
+                let focus_mark = ['⌨', '▶']
+                    .into_iter()
+                    .find(|mark| ui.fonts(|fonts| fonts.has_glyph(&button_font, *mark)))
+                    .unwrap_or('*');
                 let mut action = None;
                 let mut add = None;
                 let mut reopen = false;
@@ -4503,35 +4510,45 @@ impl ButtonsApp {
                             ));
                         }
                         let highlighted = hovered_pane == Some(tab.id);
-                        let indicator =
-                            pane_indicator_color(&colors, pane_number.unwrap_or(focused_pane));
-                        let mut text =
-                            RichText::new(label).color(if active || pane_number.is_some() {
-                                colors.text
-                            } else {
-                                colors.muted
-                            });
+                        let indicator = pane_indicator_color(
+                            &colors,
+                            pane_number.unwrap_or(focused_pane),
+                            self.preferences.pane_colors_distinct,
+                        );
+                        // Keyboard focus: a solid tab in its pane's color with a
+                        // keyboard mark. Dimmed while another window is in front.
+                        let focus_fill = if window_focused {
+                            indicator
+                        } else {
+                            mix_effect_color(colors.tabs_idle, indicator, 0.55)
+                        };
+                        if active {
+                            label = format!("{focus_mark} {label}");
+                        }
+                        let mut text = RichText::new(label).color(if active {
+                            contrasting_text(focus_fill)
+                        } else if pane_number.is_some() {
+                            colors.text
+                        } else {
+                            colors.muted
+                        });
                         if active {
                             text = text.strong();
                         }
                         let button = crate::ui_text::button(ui, text)
                             .fill(if active {
-                                colors.tabs_active
+                                focus_fill
                             } else if pane_number.is_some() {
                                 mix_effect_color(
                                     colors.tabs_idle,
                                     indicator,
-                                    if highlighted { 0.25 } else { 0.12 },
+                                    if highlighted { 0.3 } else { 0.16 },
                                 )
                             } else {
                                 colors.tabs_idle
                             })
                             .stroke(Stroke::new(
-                                if active || highlighted {
-                                    2.0_f32
-                                } else {
-                                    1.0_f32
-                                },
+                                1.0_f32,
                                 if pane_number.is_some() {
                                     indicator
                                 } else {
@@ -12445,6 +12462,11 @@ impl ButtonsApp {
                 &mut self.preferences.show_action_buttons,
                 crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
             );
+            ui.spaced_checkbox(
+                &mut self.preferences.pane_colors_distinct,
+                "Give each pane its own color",
+            )
+            .on_hover_text("Tabs and pane borders share one color per pane. The tab with keyboard focus is filled with its color. Off uses the theme's two accent colors.");
             ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Right-click a tab or preset for its menu. Menu buttons are optional.",
@@ -14443,6 +14465,7 @@ struct PaneRenderState<'a> {
     pane_rects: &'a mut std::collections::BTreeMap<u64, egui::Rect>,
     hovered_tab: Option<u64>,
     indicator_colors: crate::theme::AppColors,
+    distinct_pane_colors: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -14500,15 +14523,24 @@ fn render_pane_tree(
                 .position(|pane| pane == index)
                 .unwrap_or(0)
                 + 1;
-            let indicator = pane_indicator_color(&state.indicator_colors, number);
+            let indicator =
+                pane_indicator_color(&state.indicator_colors, number, state.distinct_pane_colors);
             let hovered = response.hovered() || state.hovered_tab == Some(tab.id);
-            if hovered || state.focused == *index {
-                pane.painter().rect_stroke(
-                    rect.shrink(1.0),
-                    2.0,
-                    Stroke::new(if hovered { 2.0_f32 } else { 1.0_f32 }, indicator),
-                    egui::StrokeKind::Inside,
-                );
+            let focused = state.focused == *index;
+            // Focus is the strongest border; with several panes each keeps a
+            // faint border in its own color so it matches its tab.
+            let border = if focused {
+                Some(Stroke::new(2.0_f32, indicator))
+            } else if hovered {
+                Some(Stroke::new(1.0_f32, indicator))
+            } else if state.distinct_pane_colors && state.pane_indices.len() > 1 {
+                Some(Stroke::new(1.0_f32, indicator.gamma_multiply(0.45)))
+            } else {
+                None
+            };
+            if let Some(border) = border {
+                pane.painter()
+                    .rect_stroke(rect.shrink(1.0), 2.0, border, egui::StrokeKind::Inside);
             }
             if !state.modal_open
                 && local_feature_available(
@@ -14842,11 +14874,43 @@ fn pane_state_after_close(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn pane_indicator_color(colors: &crate::theme::AppColors, number: usize) -> Color32 {
-    if number % 2 == 1 {
+/// Pane slot colors: distinct hues that stay readable on dark and light tabs.
+const PANE_COLORS: [Color32; 10] = [
+    Color32::from_rgb(76, 154, 255),  // blue
+    Color32::from_rgb(255, 159, 67),  // orange
+    Color32::from_rgb(46, 204, 113),  // green
+    Color32::from_rgb(255, 92, 168),  // pink
+    Color32::from_rgb(250, 204, 21),  // yellow
+    Color32::from_rgb(34, 211, 238),  // cyan
+    Color32::from_rgb(167, 139, 250), // violet
+    Color32::from_rgb(248, 113, 113), // red
+    Color32::from_rgb(163, 230, 53),  // lime
+    Color32::from_rgb(214, 167, 120), // tan
+];
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_indicator_color(
+    colors: &crate::theme::AppColors,
+    number: usize,
+    distinct: bool,
+) -> Color32 {
+    if distinct {
+        PANE_COLORS[number.max(1).saturating_sub(1) % PANE_COLORS.len()]
+    } else if number % 2 == 1 {
         colors.accent
     } else {
         colors.accent_alt
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+/// Black or white, whichever reads better on `fill`.
+fn contrasting_text(fill: Color32) -> Color32 {
+    let luminance = 0.2126 * fill.r() as f32 + 0.7152 * fill.g() as f32 + 0.0722 * fill.b() as f32;
+    if luminance > 140.0 {
+        Color32::from_rgb(16, 16, 20)
+    } else {
+        Color32::WHITE
     }
 }
 
