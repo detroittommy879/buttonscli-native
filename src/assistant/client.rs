@@ -112,8 +112,17 @@ pub(crate) fn collect_models(body: &[u8]) -> Result<Vec<String>, ClientError> {
     for list in ["data", "models"] {
         if let Some(entries) = value.get(list).and_then(Value::as_array) {
             for entry in entries {
+                // The ChatGPT plan catalog lists `slug`s and marks hidden ones.
+                if entry
+                    .get("visibility")
+                    .and_then(Value::as_str)
+                    .is_some_and(|visibility| visibility != "list")
+                {
+                    continue;
+                }
                 let id = entry
                     .as_str()
+                    .or_else(|| entry.get("slug").and_then(Value::as_str))
                     .or_else(|| entry.get("id").and_then(Value::as_str))
                     .or_else(|| entry.get("name").and_then(Value::as_str));
                 if let Some(id) = id.map(str::trim).filter(|id| {
@@ -667,6 +676,15 @@ fn completion_content(body: &[u8], responses: bool) -> Result<String, ClientErro
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn chatgpt_plan_catalog_lists_visible_slugs() {
+        let body = br#"{"models":[
+            {"slug":"gpt-plan","display_name":"GPT","visibility":"list"},
+            {"slug":"internal","display_name":"Hidden","visibility":"hide"}
+        ]}"#;
+        assert_eq!(super::collect_models(body).unwrap(), vec!["gpt-plan"]);
+    }
+
     #[test]
     fn responses_routes_and_bodies_preserve_history_without_chat_only_fields() {
         use super::super::provider::ProviderApi;

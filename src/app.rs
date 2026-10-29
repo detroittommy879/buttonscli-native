@@ -550,6 +550,12 @@ pub struct ButtonsApp {
     credential_session_only: bool,
     #[cfg(not(target_arch = "wasm32"))]
     credential_busy: bool,
+    /// Stops a ChatGPT sign-in that is waiting for the browser.
+    #[cfg(not(target_arch = "wasm32"))]
+    chatgpt_cancel: Option<Arc<AtomicBool>>,
+    /// Signed-in ChatGPT email by provider ID, for this session's display.
+    #[cfg(not(target_arch = "wasm32"))]
+    chatgpt_accounts: std::collections::BTreeMap<String, Option<String>>,
     #[cfg(not(target_arch = "wasm32"))]
     credential_message: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -852,6 +858,16 @@ enum CredentialEvent {
         provider_id: String,
         session_only: bool,
         result: Result<(), credentials::CredentialError>,
+    },
+    /// Email and whether plan usage was allowed.
+    ChatGptSignedIn {
+        provider_id: String,
+        reference: String,
+        result: Result<(Option<String>, bool), String>,
+    },
+    ChatGptSignedOut {
+        provider_id: String,
+        result: Result<(), String>,
     },
 }
 
@@ -1529,6 +1545,10 @@ impl ButtonsApp {
             credential_session_only: false,
             #[cfg(not(target_arch = "wasm32"))]
             credential_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            chatgpt_cancel: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            chatgpt_accounts: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             credential_message: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -6152,6 +6172,11 @@ impl ButtonsApp {
                     ProviderApi::Responses,
                 ),
                 (
+                    "ChatGPT plan (sign in)",
+                    crate::assistant::chatgpt::RESOURCE,
+                    ProviderApi::Responses,
+                ),
+                (
                     "Anthropic",
                     "https://api.anthropic.com/v1",
                     ProviderApi::Anthropic,
@@ -6186,7 +6211,7 @@ impl ButtonsApp {
         if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
                 id: format!("provider-{:032x}", fastrand::u128(..)),
-                name: name.into(),
+                name: name.trim_end_matches(" (sign in)").into(),
                 endpoint: endpoint.into(),
                 model: String::new(),
                 api,
@@ -6291,6 +6316,65 @@ impl ButtonsApp {
         let reference = credentials::reference(profile_name, &provider.id);
         let has_session_key = self.credential_session.get(&reference).is_ok();
         let has_saved_key = provider.credential_ref.as_deref() == Some(reference.as_str());
+        let chatgpt_connected = provider
+            .credential_ref
+            .as_deref()
+            .and_then(crate::assistant::chatgpt::marked)
+            == Some(reference.as_str());
+        let openai_endpoint = url::Url::parse(&provider.endpoint)
+            .is_ok_and(|url| url.host_str() == Some("api.openai.com"));
+        let (mut chatgpt_sign_in, mut chatgpt_sign_out) = (false, false);
+        if chatgpt_connected || (openai_endpoint && !has_session_key && !has_saved_key) {
+            ui.spaced_label(RichText::new("ChatGPT plan").strong());
+            if chatgpt_connected {
+                let who = self
+                    .chatgpt_accounts
+                    .get(&provider.id)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| "your ChatGPT account".into());
+                ui.spaced_label(format!(
+                    "Connected as {who}. Requests use your ChatGPT plan instead of an API key."
+                ));
+            } else {
+                ui.spaced_label("Use your ChatGPT Plus or Pro plan instead of an API key. Your browser opens to sign in, and you choose whether ButtonsCLI may use your plan.");
+            }
+            wrapping_row(ui, |ui| {
+                chatgpt_sign_in = ui
+                    .add_enabled(
+                        !self.credential_busy,
+                        crate::ui_text::button(
+                            ui,
+                            if chatgpt_connected {
+                                "Sign in again"
+                            } else {
+                                "Continue with ChatGPT"
+                            },
+                        ),
+                    )
+                    .clicked();
+                if chatgpt_connected {
+                    if ui.spaced_button("Manage usage").clicked() {
+                        ctx.open_url(egui::OpenUrl::new_tab(crate::assistant::chatgpt::USAGE_URL));
+                    }
+                    chatgpt_sign_out = ui
+                        .add_enabled(
+                            !self.credential_busy,
+                            crate::ui_text::button(ui, "Sign out"),
+                        )
+                        .clicked();
+                }
+                if let Some(cancel) = &self.chatgpt_cancel {
+                    ui.spinner();
+                    if ui.spaced_button("Cancel sign-in").clicked() {
+                        cancel.store(true, Ordering::Relaxed);
+                    }
+                }
+            });
+        }
+        if chatgpt_connected {
+            ui.add_space(4.0);
+        }
         let key_status = text(
             &self.locale,
             if has_session_key {
@@ -6302,19 +6386,21 @@ impl ButtonsApp {
             },
             &[],
         );
-        ui.spaced_label(text(
-            &self.locale,
-            M::ProviderKeyStatus,
-            &[("status", &key_status)],
-        ));
-        ui.horizontal(|ui| {
-            ui.spaced_label(text(&self.locale, M::ApiKey, &[]));
-            ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
-        });
-        ui.spaced_checkbox(
-            &mut self.credential_session_only,
-            text(&self.locale, M::SessionOnlyKey, &[]),
-        );
+        if !chatgpt_connected {
+            ui.spaced_label(text(
+                &self.locale,
+                M::ProviderKeyStatus,
+                &[("status", &key_status)],
+            ));
+            ui.horizontal(|ui| {
+                ui.spaced_label(text(&self.locale, M::ApiKey, &[]));
+                ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
+            });
+            ui.spaced_checkbox(
+                &mut self.credential_session_only,
+                text(&self.locale, M::SessionOnlyKey, &[]),
+            );
+        }
         let provider_id = provider.id.clone();
         let (mut save, mut delete, mut remove) = (false, false, false);
         wrapping_row(ui, |ui| {
@@ -6332,7 +6418,10 @@ impl ButtonsApp {
                 .clicked();
             remove = ui
                 .add_enabled(
-                    !self.credential_busy && !has_session_key && !has_saved_key,
+                    !self.credential_busy
+                        && !has_session_key
+                        && !has_saved_key
+                        && !chatgpt_connected,
                     crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
                 )
                 .clicked();
@@ -6416,6 +6505,49 @@ impl ButtonsApp {
                     }
                     Err(error) => {
                         ProviderEvent::Models(provider, generation, Err(error.to_string()))
+                    }
+                };
+                let _ = tx.send(event);
+                ctx.request_repaint();
+            });
+        }
+        if chatgpt_sign_in || chatgpt_sign_out {
+            let profile_name = profile_name.to_owned();
+            let reference = reference.clone();
+            let provider_id = provider_id.clone();
+            let tx = self.credential_tx.clone();
+            let ctx = ctx.clone();
+            let cancel = Arc::new(AtomicBool::new(false));
+            if chatgpt_sign_in {
+                self.chatgpt_cancel = Some(Arc::clone(&cancel));
+            }
+            self.credential_busy = true;
+            self.credential_message =
+                chatgpt_sign_in.then(|| "Finish signing in to ChatGPT in your browser.".to_owned());
+            std::thread::spawn(move || {
+                let event = if chatgpt_sign_in {
+                    let result = crate::assistant::chatgpt::sign_in(
+                        &SystemCredentialStore,
+                        &profile_name,
+                        &reference,
+                        &cancel,
+                        &open_in_browser,
+                    );
+                    CredentialEvent::ChatGptSignedIn {
+                        provider_id,
+                        reference,
+                        result: result.map(|connection| {
+                            let sharing = connection.sharing();
+                            (connection.email.clone(), sharing)
+                        }),
+                    }
+                } else {
+                    CredentialEvent::ChatGptSignedOut {
+                        provider_id,
+                        result: crate::assistant::chatgpt::sign_out(
+                            &SystemCredentialStore,
+                            &reference,
+                        ),
                     }
                 };
                 let _ = tx.send(event);
@@ -6966,6 +7098,56 @@ impl ButtonsApp {
                         ));
                     }
                 },
+                CredentialEvent::ChatGptSignedIn {
+                    provider_id,
+                    reference,
+                    result,
+                } => {
+                    self.chatgpt_cancel = None;
+                    match result {
+                        Ok((email, sharing)) => {
+                            if let Some(provider) = self
+                                .preferences
+                                .provider_settings
+                                .providers
+                                .iter_mut()
+                                .find(|p| p.id == provider_id)
+                            {
+                                provider.credential_ref =
+                                    Some(crate::assistant::chatgpt::marker(&reference));
+                            }
+                            self.credential_message = Some(if sharing {
+                                "Connected to ChatGPT. Click Discover models, then pick a model."
+                                    .into()
+                            } else {
+                                "Signed in, but ChatGPT plan usage was not allowed. Click Sign in again and allow it."
+                                    .into()
+                            });
+                            self.chatgpt_accounts.insert(provider_id, email);
+                            self.persist_native_preferences();
+                        }
+                        Err(error) => self.credential_message = Some(error),
+                    }
+                }
+                CredentialEvent::ChatGptSignedOut {
+                    provider_id,
+                    result,
+                } => {
+                    if let Some(provider) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|p| p.id == provider_id)
+                    {
+                        provider.credential_ref = None;
+                    }
+                    self.chatgpt_accounts.remove(&provider_id);
+                    self.credential_message = Some(
+                        result.map_or_else(|error| error, |()| "Signed out of ChatGPT.".into()),
+                    );
+                    self.persist_native_preferences();
+                }
                 CredentialEvent::Deleted {
                     provider_id,
                     session_only,
@@ -15131,12 +15313,34 @@ fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[Strin
     });
 }
 
+/// Opens an https sign-in page in the default browser from a worker thread.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_in_browser(url: &str) {
+    if !url.starts_with("https://") {
+        return;
+    }
+    #[cfg(windows)]
+    let command = std::process::Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let command = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(not(any(windows, target_os = "macos")))]
+    let command = std::process::Command::new("xdg-open").arg(url).spawn();
+    let _ = command;
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn provider_key(
     session: &SessionCredentialStore,
     expected_reference: &str,
     stored_reference: Option<&str>,
 ) -> Result<Option<Zeroizing<String>>, credentials::CredentialError> {
+    // A ChatGPT sign-in supplies a fresh access token instead of a saved key.
+    if stored_reference.and_then(crate::assistant::chatgpt::marked) == Some(expected_reference) {
+        return crate::assistant::chatgpt::access_token(&SystemCredentialStore, expected_reference)
+            .map(Some);
+    }
     match session.get(expected_reference) {
         Ok(key) => return Ok(Some(key)),
         Err(credentials::CredentialError::Missing) => {}
