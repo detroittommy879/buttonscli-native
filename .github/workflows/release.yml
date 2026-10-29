@@ -4,6 +4,9 @@ name: Release builds
 # `gh workflow run release.yml`. Tick "publish" to put the files on a draft
 # GitHub release for `v<Cargo.toml version>`; you publish the draft yourself.
 on:
+  # TEMP: test from this branch; remove before merging.
+  push:
+    branches: [claude/overnight-release-tabs]
   workflow_dispatch:
     inputs:
       publish:
