@@ -29,6 +29,8 @@ A fast terminal app for people who'd rather use a mouse: click buttons instead o
   clipboard, and paste them into Claude, Codex, etc. It can then open new panes
   and work in all of them at the same time. I wanted this so I can better see
   what they're doing.
+- **Bring your own AI**: any OpenAI-compatible or Anthropic API key, or just
+  sign in with ChatGPT and use your Plus/Pro plan, no API key needed.
 
 ## Very fine-grained control over a lot of the app
 
@@ -61,7 +63,7 @@ install from. The AI and agent features still count as previews. See
 | **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. Save a set of open terminals as a named tab group and reopen it later. |
 | **Put commands on buttons** | Separate command and SSH docks with editable presets. Choose whether a button types the command or also sends Enter. Docks resize, collapse, and auto-hide. |
 | **Use the terminal normally** | Scrollback and scrollbars, selection, copy/paste, hyperlinks, regex search, select-all, clear-screen, and live PTY resizing. |
-| **Make every pane recognizable** | 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
+| **Make every pane recognizable** | Each pane and its tab share their own color, and the tab that gets your typing is filled in. 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
 | **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. 34 built-in GPU shader backgrounds (including VHS and CRT static), your own WGSL shader code with sliders, or AI-written shaders. Calm effects pauses motion; window opacity works on Windows. |
 | **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Import from the original app into a separate native profile and switch profiles from the status bar. Re-importing keeps your saved themes and favorites. Provider keys transfer only when selected explicitly. |
 | **Launch a workspace** | Start multiple tabs with a chosen shell/directory and optional commands for specific tabs. Startup options are available without AI or agent-control access. |

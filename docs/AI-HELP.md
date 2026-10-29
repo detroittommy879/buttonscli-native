@@ -22,6 +22,30 @@ server, without interacting with personal terminals or sending external requests
 
 Open **Settings → AI providers** to add a provider, choose the active provider, and edit its chat completions endpoint and model ID. The endpoint must be an HTTP or HTTPS URL. You can save an API key in your operating system's credential store or keep it in memory for this app session. The key field is cleared after a save attempt; the key is never placed in native settings files.
 
+## Use your ChatGPT plan (Sign in with ChatGPT)
+
+**Add connection → ChatGPT plan (sign in)**, then **Continue with ChatGPT**. Your
+browser opens OpenAI's sign-in page; pick the account and allow ButtonsCLI to use
+your plan. Back in the app the connection shows "Connected as …", and **Discover
+models** lists the models your plan allows. Every AI feature (Help, themes,
+shaders, the judge model, simulated terminals) can then use it like any other
+connection. **Manage usage** opens chatgpt.com/settings/usage; **Sign out**
+forgets the tokens here and asks OpenAI to end the connection.
+
+How it works: OAuth with PKCE through a one-time listener on `127.0.0.1`, with
+OpenAI registering the app on first sign-in (no client secret). Requests go to
+the Responses API at `api.openai.com/v1` with the access token. Tokens are kept
+in the OS credential store, split into pieces because Windows limits one entry
+to 1,280 characters, and refreshed one at a time so parallel shader versions
+never reuse a spent refresh token. Code: `src/assistant/chatgpt.rs`.
+
+Limits: needs an eligible ChatGPT plan (Plus or Pro at launch). OpenAI offers
+plan usage to open-source and locally run apps; a paid or hosted version of the
+app would need to join their waitlist first. Signing in was checked up to
+OpenAI's login page; a full sign-in and request still needs a real account.
+
+## Base URLs
+
 You can enter a compatible provider's origin or `/v1` base URL; the app appends
 `/v1/chat/completions` or `/chat/completions`, respectively. Explicit custom
 completion paths are preserved. Model discovery uses the same normalized base.
