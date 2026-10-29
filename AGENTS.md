@@ -23,7 +23,14 @@
   Clicking an offscreen tab replaces the focused displayed slot (swap if already in
   the requested group). Clicking a displayed tab only focuses it. Counts preserve order.
 - Pane numbers describe displayed slots, not `termN` identities. Tab/pane indicators
-  share app-theme accents; the hover label uses that terminal's theme and font preference.
+  use one `PANE_COLORS` entry per slot (theme accents when `pane_colors_distinct` is off);
+  the hover label uses that terminal's theme and font preference.
+- ChatGPT connections store `chatgpt:<reference>` in `credential_ref`; `provider_key`
+  turns it into a fresh token. Never save those tokens as a plain API key.
+  `chatgpt_plan` providers hide URL/format/key fields; that endpoint rejects
+  non-streaming requests, so probes must stream.
+- The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
+  preview/save touch only that pane's `theme_overrides`, never shared sources.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover

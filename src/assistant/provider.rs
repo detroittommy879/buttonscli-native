@@ -18,6 +18,10 @@ pub(crate) struct ProviderProfile {
     #[serde(alias = "format")]
     pub api: ProviderApi,
     pub models_endpoint: Option<String>,
+    /// Signs in with a ChatGPT plan instead of an API key; the editor hides the
+    /// URL, format and key fields for these.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub chatgpt_plan: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -84,6 +88,7 @@ impl Default for ProviderProfile {
             credential_ref: None,
             api: ProviderApi::Auto,
             models_endpoint: None,
+            chatgpt_plan: false,
         }
     }
 }
@@ -315,6 +320,7 @@ impl ProviderSettings {
                     credential_ref: None,
                     api: ProviderApi::Auto,
                     models_endpoint: None,
+                    chatgpt_plan: false,
                 });
             }
         } else if let Some(endpoint) = assistant["endpoint"].as_str().and_then(sanitize_endpoint) {
@@ -329,6 +335,7 @@ impl ProviderSettings {
                 credential_ref: None,
                 api: ProviderApi::Auto,
                 models_endpoint: None,
+                chatgpt_plan: false,
             });
         }
         let mut settings = Self {

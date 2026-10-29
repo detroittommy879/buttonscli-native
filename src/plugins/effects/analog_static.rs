@@ -35,7 +35,6 @@ pub(crate) fn paint(
                 rect,
                 format,
                 terminal,
-                frame: ui.ctx().cumulative_pass_nr(),
                 values: [
                     time,
                     0.35 + effects.static_density * 1.4,
@@ -54,20 +53,21 @@ struct AnalogStatic {
     rect: Rect,
     format: wgpu::TextureFormat,
     terminal: u64,
-    frame: u64,
     values: [f32; 6],
 }
 
 struct PaneUniform {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    last_frame: u64,
+    last_used: u64,
 }
 
 struct Resources {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     panes: HashMap<u64, PaneUniform>,
+    /// One use counter for every window; see [`super::make_room`].
+    uses: u64,
 }
 
 impl Resources {
@@ -136,6 +136,7 @@ impl Resources {
             pipeline,
             layout,
             panes: HashMap::new(),
+            uses: 0,
         }
     }
 }
@@ -155,19 +156,12 @@ impl egui_wgpu::CallbackTrait for AnalogStatic {
         let resources = resources
             .get_mut::<Resources>()
             .expect("initialized analog static resources");
+        resources.uses += 1;
+        let now = resources.uses;
         if !resources.panes.contains_key(&self.terminal) {
             // Only tiny uniform buffers are cached, with a hard bound even
             // after many tab-close/reopen cycles. No pane image is retained.
-            if resources.panes.len() >= MAX_BUFFERS {
-                if let Some(oldest) = resources
-                    .panes
-                    .iter()
-                    .min_by_key(|(_, pane)| pane.last_frame)
-                    .map(|(id, _)| *id)
-                {
-                    resources.panes.remove(&oldest);
-                }
-            }
+            super::make_room(&mut resources.panes, MAX_BUFFERS, |pane| pane.last_used);
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("analog static pane"),
                 size: 48,
@@ -187,7 +181,7 @@ impl egui_wgpu::CallbackTrait for AnalogStatic {
                 PaneUniform {
                     buffer,
                     bind_group,
-                    last_frame: self.frame,
+                    last_used: now,
                 },
             );
         }
@@ -195,7 +189,7 @@ impl egui_wgpu::CallbackTrait for AnalogStatic {
             .panes
             .get_mut(&self.terminal)
             .expect("initialized pane uniforms");
-        pane.last_frame = self.frame;
+        pane.last_used = now;
         let scale = screen.pixels_per_point;
         let values = [
             self.rect.left() * scale,

@@ -415,6 +415,12 @@ pub struct ButtonsApp {
     theme_settings_tab: ThemeSettingsTab,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_source_id: Option<String>,
+    /// "Edit for: Pane N" mode: the editor follows the focused pane.
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_pane_mode: bool,
+    /// Terminal ID whose own theme the draft edits; `None` edits the shared theme.
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_editor_pane: Option<u64>,
     settings_snapshot: Option<SettingsSnapshot>,
     #[cfg(not(target_arch = "wasm32"))]
     appearance_baseline: Option<Value>,
@@ -550,6 +556,12 @@ pub struct ButtonsApp {
     credential_session_only: bool,
     #[cfg(not(target_arch = "wasm32"))]
     credential_busy: bool,
+    /// Stops a ChatGPT sign-in that is waiting for the browser.
+    #[cfg(not(target_arch = "wasm32"))]
+    chatgpt_cancel: Option<Arc<AtomicBool>>,
+    /// Signed-in ChatGPT email by provider ID, for this session's display.
+    #[cfg(not(target_arch = "wasm32"))]
+    chatgpt_accounts: std::collections::BTreeMap<String, Option<String>>,
     #[cfg(not(target_arch = "wasm32"))]
     credential_message: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -763,6 +775,8 @@ struct SettingsSnapshot {
 struct ThemePreviewSnapshot {
     preferences: Preferences,
     applied_preferences: Preferences,
+    /// A pane preview: that terminal and the theme it had before.
+    pane: Option<(u64, Option<String>)>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -852,6 +866,16 @@ enum CredentialEvent {
         provider_id: String,
         session_only: bool,
         result: Result<(), credentials::CredentialError>,
+    },
+    /// Email and whether plan usage was allowed.
+    ChatGptSignedIn {
+        provider_id: String,
+        reference: String,
+        result: Result<(Option<String>, bool), String>,
+    },
+    ChatGptSignedOut {
+        provider_id: String,
+        result: Result<(), String>,
     },
 }
 
@@ -1396,6 +1420,10 @@ impl ButtonsApp {
             theme_settings_tab: ThemeSettingsTab::Library,
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_source_id: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_pane_mode: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_editor_pane: None,
             settings_snapshot: None,
             #[cfg(not(target_arch = "wasm32"))]
             appearance_baseline: None,
@@ -1529,6 +1557,10 @@ impl ButtonsApp {
             credential_session_only: false,
             #[cfg(not(target_arch = "wasm32"))]
             credential_busy: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            chatgpt_cancel: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            chatgpt_accounts: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             credential_message: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -3262,6 +3294,7 @@ impl ButtonsApp {
             pane_rects: &mut self.pane_rects,
             hovered_tab: self.hovered_tab,
             indicator_colors,
+            distinct_pane_colors: self.preferences.pane_colors_distinct,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
@@ -4457,6 +4490,12 @@ impl ButtonsApp {
             )
             .show(ctx, |ui| {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.tabs);
+                let window_focused = ui.input(|input| input.viewport().focused.unwrap_or(true));
+                let button_font = egui::TextStyle::Button.resolve(ui.style());
+                let focus_mark = ['⌨', '▶']
+                    .into_iter()
+                    .find(|mark| ui.fonts(|fonts| fonts.has_glyph(&button_font, *mark)))
+                    .unwrap_or('*');
                 let mut action = None;
                 let mut add = None;
                 let mut reopen = false;
@@ -4483,35 +4522,45 @@ impl ButtonsApp {
                             ));
                         }
                         let highlighted = hovered_pane == Some(tab.id);
-                        let indicator =
-                            pane_indicator_color(&colors, pane_number.unwrap_or(focused_pane));
-                        let mut text =
-                            RichText::new(label).color(if active || pane_number.is_some() {
-                                colors.text
-                            } else {
-                                colors.muted
-                            });
+                        let indicator = pane_indicator_color(
+                            &colors,
+                            pane_number.unwrap_or(focused_pane),
+                            self.preferences.pane_colors_distinct,
+                        );
+                        // Keyboard focus: a solid tab in its pane's color with a
+                        // keyboard mark. Dimmed while another window is in front.
+                        let focus_fill = if window_focused {
+                            indicator
+                        } else {
+                            mix_effect_color(colors.tabs_idle, indicator, 0.55)
+                        };
+                        if active {
+                            label = format!("{focus_mark} {label}");
+                        }
+                        let mut text = RichText::new(label).color(if active {
+                            contrasting_text(focus_fill)
+                        } else if pane_number.is_some() {
+                            colors.text
+                        } else {
+                            colors.muted
+                        });
                         if active {
                             text = text.strong();
                         }
                         let button = crate::ui_text::button(ui, text)
                             .fill(if active {
-                                colors.tabs_active
+                                focus_fill
                             } else if pane_number.is_some() {
                                 mix_effect_color(
                                     colors.tabs_idle,
                                     indicator,
-                                    if highlighted { 0.25 } else { 0.12 },
+                                    if highlighted { 0.3 } else { 0.16 },
                                 )
                             } else {
                                 colors.tabs_idle
                             })
                             .stroke(Stroke::new(
-                                if active || highlighted {
-                                    2.0_f32
-                                } else {
-                                    1.0_f32
-                                },
+                                1.0_f32,
                                 if pane_number.is_some() {
                                     indicator
                                 } else {
@@ -6152,6 +6201,11 @@ impl ButtonsApp {
                     ProviderApi::Responses,
                 ),
                 (
+                    "ChatGPT plan (sign in)",
+                    crate::assistant::chatgpt::RESOURCE,
+                    ProviderApi::Responses,
+                ),
+                (
                     "Anthropic",
                     "https://api.anthropic.com/v1",
                     ProviderApi::Anthropic,
@@ -6186,10 +6240,11 @@ impl ButtonsApp {
         if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
                 id: format!("provider-{:032x}", fastrand::u128(..)),
-                name: name.into(),
+                name: name.trim_end_matches(" (sign in)").into(),
                 endpoint: endpoint.into(),
                 model: String::new(),
                 api,
+                chatgpt_plan: name.ends_with(" (sign in)"),
                 ..Default::default()
             };
             if settings.providers.is_empty() {
@@ -6210,80 +6265,6 @@ impl ButtonsApp {
             return;
         };
         let provider = &mut settings.providers[index];
-        ui.horizontal(|ui| {
-            let label = ui.spaced_label(text(&self.locale, M::ProviderName, &[]));
-            ui.text_edit_singleline(&mut provider.name)
-                .labelled_by(label.id);
-        });
-        ui.horizontal(|ui| {
-            let label = ui.spaced_label("Base URL");
-            ui.add(
-                egui::TextEdit::singleline(&mut provider.endpoint)
-                    .desired_width(650.0_f32.min(ui.available_width())),
-            )
-            .labelled_by(label.id);
-        });
-        egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "API format"))
-            .selected_text(match provider.api {
-                ProviderApi::Auto => crate::i18n::literal(&self.locale, "Automatic"),
-                ProviderApi::ChatCompletions => "Chat Completions".into(),
-                ProviderApi::Responses => "Responses API".into(),
-                ProviderApi::Anthropic => "Anthropic Messages".into(),
-            })
-            .show_ui(ui, |ui| {
-                ui.spaced_selectable_value(
-                    &mut provider.api,
-                    ProviderApi::Auto,
-                    crate::i18n::literal(&self.locale, "Automatic"),
-                );
-                ui.spaced_selectable_value(
-                    &mut provider.api,
-                    ProviderApi::ChatCompletions,
-                    "Chat Completions",
-                );
-                ui.spaced_selectable_value(
-                    &mut provider.api,
-                    ProviderApi::Responses,
-                    "Responses API",
-                );
-                ui.spaced_selectable_value(
-                    &mut provider.api,
-                    ProviderApi::Anthropic,
-                    "Anthropic Messages",
-                );
-            });
-        if validate_endpoint(&provider.endpoint).is_err() {
-            ui.spaced_colored_label(
-                warning_color,
-                text(&self.locale, M::ProviderEndpointInvalid, &[]),
-            );
-        }
-        ui.spaced_label("Default model for this connection");
-        let models = catalog_models(&self.provider_catalogs, provider);
-        model_picker(ui, "provider-default-model", &mut provider.model, models);
-        if let Some(catalog) = self
-            .provider_catalogs
-            .get(&provider.id)
-            .filter(|c| c.fingerprint == provider_fingerprint(provider))
-        {
-            if let Some(error) = &catalog.error {
-                ui.spaced_label(format!(
-                    "Model list unavailable: {error}. You can type a model ID."
-                ));
-            }
-        }
-        ui.spaced_label(format!(
-            "Requests use {}",
-            api_label(provider.resolved_api())
-        ));
-        egui::CollapsingHeader::new("Advanced connection options").show(ui, |ui| {
-            let mut models_url = provider.models_endpoint.clone().unwrap_or_default();
-            ui.label("Models URL override (optional)");
-            if ui.text_edit_singleline(&mut models_url).changed() {
-                provider.models_endpoint =
-                    (!models_url.trim().is_empty()).then(|| models_url.trim().into());
-            }
-        });
         let profile_name = self
             .native_store
             .as_ref()
@@ -6291,72 +6272,234 @@ impl ButtonsApp {
         let reference = credentials::reference(profile_name, &provider.id);
         let has_session_key = self.credential_session.get(&reference).is_ok();
         let has_saved_key = provider.credential_ref.as_deref() == Some(reference.as_str());
-        let key_status = text(
-            &self.locale,
-            if has_session_key {
-                M::ProviderSessionStatus
-            } else if has_saved_key {
-                M::ProviderOsStatus
-            } else {
-                M::ProviderNoneStatus
-            },
-            &[],
-        );
-        ui.spaced_label(text(
-            &self.locale,
-            M::ProviderKeyStatus,
-            &[("status", &key_status)],
-        ));
+        let chatgpt_connected = provider
+            .credential_ref
+            .as_deref()
+            .and_then(crate::assistant::chatgpt::marked)
+            == Some(reference.as_str());
+        // ChatGPT connections have one fixed endpoint and no key, so the URL,
+        // format and key fields would only confuse.
+        let chatgpt = provider.chatgpt_plan || chatgpt_connected;
+        if chatgpt {
+            provider.chatgpt_plan = true;
+            provider.endpoint = crate::assistant::chatgpt::RESOURCE.into();
+            provider.api = ProviderApi::Responses;
+            provider.models_endpoint = None;
+        }
         ui.horizontal(|ui| {
-            ui.spaced_label(text(&self.locale, M::ApiKey, &[]));
-            ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
+            let label = ui.spaced_label(text(&self.locale, M::ProviderName, &[]));
+            ui.text_edit_singleline(&mut provider.name)
+                .labelled_by(label.id);
         });
-        ui.spaced_checkbox(
-            &mut self.credential_session_only,
-            text(&self.locale, M::SessionOnlyKey, &[]),
-        );
+        if !chatgpt {
+            ui.horizontal(|ui| {
+                let label = ui.spaced_label("Base URL");
+                ui.add(
+                    egui::TextEdit::singleline(&mut provider.endpoint)
+                        .desired_width(650.0_f32.min(ui.available_width())),
+                )
+                .labelled_by(label.id);
+            });
+            egui::ComboBox::from_label(crate::i18n::literal(&self.locale, "API format"))
+                .selected_text(match provider.api {
+                    ProviderApi::Auto => crate::i18n::literal(&self.locale, "Automatic"),
+                    ProviderApi::ChatCompletions => "Chat Completions".into(),
+                    ProviderApi::Responses => "Responses API".into(),
+                    ProviderApi::Anthropic => "Anthropic Messages".into(),
+                })
+                .show_ui(ui, |ui| {
+                    ui.spaced_selectable_value(
+                        &mut provider.api,
+                        ProviderApi::Auto,
+                        crate::i18n::literal(&self.locale, "Automatic"),
+                    );
+                    ui.spaced_selectable_value(
+                        &mut provider.api,
+                        ProviderApi::ChatCompletions,
+                        "Chat Completions",
+                    );
+                    ui.spaced_selectable_value(
+                        &mut provider.api,
+                        ProviderApi::Responses,
+                        "Responses API",
+                    );
+                    ui.spaced_selectable_value(
+                        &mut provider.api,
+                        ProviderApi::Anthropic,
+                        "Anthropic Messages",
+                    );
+                });
+            if validate_endpoint(&provider.endpoint).is_err() {
+                ui.spaced_colored_label(
+                    warning_color,
+                    text(&self.locale, M::ProviderEndpointInvalid, &[]),
+                );
+            }
+        }
+        let (mut chatgpt_sign_in, mut chatgpt_sign_out) = (false, false);
+        if chatgpt {
+            if chatgpt_connected {
+                let who = self
+                    .chatgpt_accounts
+                    .get(&provider.id)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| "your ChatGPT account".into());
+                ui.spaced_label(format!(
+                    "Connected as {who}. Requests use your ChatGPT plan instead of an API key."
+                ));
+            } else {
+                ui.spaced_label("Use your ChatGPT Plus or Pro plan instead of an API key. Your browser opens to sign in, and you choose whether ButtonsCLI may use your plan.");
+            }
+            wrapping_row(ui, |ui| {
+                chatgpt_sign_in = ui
+                    .add_enabled(
+                        !self.credential_busy,
+                        crate::ui_text::button(
+                            ui,
+                            if chatgpt_connected {
+                                "Sign in again"
+                            } else {
+                                "Continue with ChatGPT"
+                            },
+                        ),
+                    )
+                    .clicked();
+                if chatgpt_connected {
+                    if ui.spaced_button("Manage usage").clicked() {
+                        ctx.open_url(egui::OpenUrl::new_tab(crate::assistant::chatgpt::USAGE_URL));
+                    }
+                    chatgpt_sign_out = ui
+                        .add_enabled(
+                            !self.credential_busy,
+                            crate::ui_text::button(ui, "Sign out"),
+                        )
+                        .clicked();
+                }
+                if let Some(cancel) = &self.chatgpt_cancel {
+                    ui.spinner();
+                    if ui.spaced_button("Cancel sign-in").clicked() {
+                        cancel.store(true, Ordering::Relaxed);
+                    }
+                }
+            });
+        }
+        if !chatgpt || chatgpt_connected {
+            ui.spaced_label("Default model for this connection");
+            let models = catalog_models(&self.provider_catalogs, provider);
+            model_picker(ui, "provider-default-model", &mut provider.model, models);
+            match self
+                .provider_catalogs
+                .get(&provider.id)
+                .filter(|c| c.fingerprint == provider_fingerprint(provider))
+            {
+                Some(ProviderCatalog {
+                    error: Some(error), ..
+                }) => {
+                    ui.spaced_label(format!(
+                        "Model list unavailable: {error}. You can type a model ID."
+                    ));
+                }
+                Some(catalog) if catalog.models.is_empty() && self.provider_busy => {
+                    ui.spaced_label("Loading the model list…");
+                }
+                _ => {}
+            }
+        }
+        if !chatgpt {
+            ui.spaced_label(format!(
+                "Requests use {}",
+                api_label(provider.resolved_api())
+            ));
+            egui::CollapsingHeader::new("Advanced connection options").show(ui, |ui| {
+                let mut models_url = provider.models_endpoint.clone().unwrap_or_default();
+                ui.label("Models URL override (optional)");
+                if ui.text_edit_singleline(&mut models_url).changed() {
+                    provider.models_endpoint =
+                        (!models_url.trim().is_empty()).then(|| models_url.trim().into());
+                }
+            });
+            let key_status = text(
+                &self.locale,
+                if has_session_key {
+                    M::ProviderSessionStatus
+                } else if has_saved_key {
+                    M::ProviderOsStatus
+                } else {
+                    M::ProviderNoneStatus
+                },
+                &[],
+            );
+            ui.spaced_label(text(
+                &self.locale,
+                M::ProviderKeyStatus,
+                &[("status", &key_status)],
+            ));
+            ui.horizontal(|ui| {
+                ui.spaced_label(text(&self.locale, M::ApiKey, &[]));
+                ui.add(egui::TextEdit::singleline(&mut self.credential_draft).password(true));
+            });
+            ui.spaced_checkbox(
+                &mut self.credential_session_only,
+                text(&self.locale, M::SessionOnlyKey, &[]),
+            );
+        }
         let provider_id = provider.id.clone();
         let (mut save, mut delete, mut remove) = (false, false, false);
-        wrapping_row(ui, |ui| {
-            save = ui
-                .add_enabled(
-                    !self.credential_busy && !self.credential_draft.trim().is_empty(),
-                    crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
-                )
-                .clicked();
-            delete = ui
-                .add_enabled(
-                    !self.credential_busy && (has_session_key || has_saved_key),
-                    crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
-                )
-                .clicked();
-            remove = ui
-                .add_enabled(
-                    !self.credential_busy && !has_session_key && !has_saved_key,
-                    crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
-                )
-                .clicked();
-        });
         let mut test_connection = false;
         let mut discover_models = false;
         let mut detect_format = false;
         wrapping_row(ui, |ui| {
-            test_connection = ui
+            if !chatgpt {
+                save = ui
+                    .add_enabled(
+                        !self.credential_busy && !self.credential_draft.trim().is_empty(),
+                        crate::ui_text::button(ui, text(&self.locale, M::SaveKey, &[])),
+                    )
+                    .clicked();
+                delete = ui
+                    .add_enabled(
+                        !self.credential_busy && (has_session_key || has_saved_key),
+                        crate::ui_text::button(ui, text(&self.locale, M::RemoveKey, &[])),
+                    )
+                    .clicked();
+            }
+            remove = ui
                 .add_enabled(
-                    !self.provider_busy
-                        && validate_endpoint(&provider.endpoint).is_ok()
-                        && !provider.model.trim().is_empty(),
-                    crate::ui_text::button(ui, text(&self.locale, M::TestConnection, &[])),
+                    !self.credential_busy
+                        && !has_session_key
+                        && !has_saved_key
+                        && !chatgpt_connected,
+                    crate::ui_text::button(ui, text(&self.locale, M::RemoveProvider, &[])),
                 )
+                .on_disabled_hover_text(if chatgpt_connected {
+                    "Sign out first."
+                } else {
+                    "Remove the saved key first."
+                })
                 .clicked();
-            discover_models = ui
-                .add_enabled(
-                    !self.provider_busy && validate_endpoint(&provider.endpoint).is_ok(),
-                    crate::ui_text::button(ui, text(&self.locale, M::DiscoverModels, &[])),
-                )
-                .clicked();
-            detect_format |= ui.add_enabled(!self.provider_busy && validate_endpoint(&provider.endpoint).is_ok() && !provider.model.trim().is_empty(), crate::ui_text::button(ui, "Detect API format")).on_hover_text("Tests up to three formats with a short model request at this base URL. May use provider credits.").clicked();
         });
+        if !chatgpt || chatgpt_connected {
+            wrapping_row(ui, |ui| {
+                test_connection = ui
+                    .add_enabled(
+                        !self.provider_busy
+                            && validate_endpoint(&provider.endpoint).is_ok()
+                            && !provider.model.trim().is_empty(),
+                        crate::ui_text::button(ui, text(&self.locale, M::TestConnection, &[])),
+                    )
+                    .clicked();
+                discover_models = ui
+                    .add_enabled(
+                        !self.provider_busy && validate_endpoint(&provider.endpoint).is_ok(),
+                        crate::ui_text::button(ui, text(&self.locale, M::DiscoverModels, &[])),
+                    )
+                    .clicked();
+                if !chatgpt {
+                    detect_format |= ui.add_enabled(!self.provider_busy && validate_endpoint(&provider.endpoint).is_ok() && !provider.model.trim().is_empty(), crate::ui_text::button(ui, "Detect API format")).on_hover_text("Tests up to three formats with a short model request at this base URL. May use provider credits.").clicked();
+                }
+            });
+        }
         if self.provider_busy {
             ui.spinner();
         }
@@ -6416,6 +6559,49 @@ impl ButtonsApp {
                     }
                     Err(error) => {
                         ProviderEvent::Models(provider, generation, Err(error.to_string()))
+                    }
+                };
+                let _ = tx.send(event);
+                ctx.request_repaint();
+            });
+        }
+        if chatgpt_sign_in || chatgpt_sign_out {
+            let profile_name = profile_name.to_owned();
+            let reference = reference.clone();
+            let provider_id = provider_id.clone();
+            let tx = self.credential_tx.clone();
+            let ctx = ctx.clone();
+            let cancel = Arc::new(AtomicBool::new(false));
+            if chatgpt_sign_in {
+                self.chatgpt_cancel = Some(Arc::clone(&cancel));
+            }
+            self.credential_busy = true;
+            self.credential_message =
+                chatgpt_sign_in.then(|| "Finish signing in to ChatGPT in your browser.".to_owned());
+            std::thread::spawn(move || {
+                let event = if chatgpt_sign_in {
+                    let result = crate::assistant::chatgpt::sign_in(
+                        &SystemCredentialStore,
+                        &profile_name,
+                        &reference,
+                        &cancel,
+                        &open_in_browser,
+                    );
+                    CredentialEvent::ChatGptSignedIn {
+                        provider_id,
+                        reference,
+                        result: result.map(|connection| {
+                            let sharing = connection.sharing();
+                            (connection.email.clone(), sharing)
+                        }),
+                    }
+                } else {
+                    CredentialEvent::ChatGptSignedOut {
+                        provider_id,
+                        result: crate::assistant::chatgpt::sign_out(
+                            &SystemCredentialStore,
+                            &reference,
+                        ),
                     }
                 };
                 let _ = tx.send(event);
@@ -6966,6 +7152,57 @@ impl ButtonsApp {
                         ));
                     }
                 },
+                CredentialEvent::ChatGptSignedIn {
+                    provider_id,
+                    reference,
+                    result,
+                } => {
+                    self.chatgpt_cancel = None;
+                    match result {
+                        Ok((email, sharing)) => {
+                            if let Some(provider) = self
+                                .preferences
+                                .provider_settings
+                                .providers
+                                .iter_mut()
+                                .find(|p| p.id == provider_id)
+                            {
+                                provider.credential_ref =
+                                    Some(crate::assistant::chatgpt::marker(&reference));
+                                provider.chatgpt_plan = true;
+                            }
+                            self.credential_message = Some(if sharing {
+                                "Connected to ChatGPT. Pick a model above once the list loads."
+                                    .into()
+                            } else {
+                                "Signed in, but ChatGPT plan usage was not allowed. Click Sign in again and allow it."
+                                    .into()
+                            });
+                            self.chatgpt_accounts.insert(provider_id, email);
+                            self.persist_native_preferences();
+                        }
+                        Err(error) => self.credential_message = Some(error),
+                    }
+                }
+                CredentialEvent::ChatGptSignedOut {
+                    provider_id,
+                    result,
+                } => {
+                    if let Some(provider) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|p| p.id == provider_id)
+                    {
+                        provider.credential_ref = None;
+                    }
+                    self.chatgpt_accounts.remove(&provider_id);
+                    self.credential_message = Some(
+                        result.map_or_else(|error| error, |()| "Signed out of ChatGPT.".into()),
+                    );
+                    self.persist_native_preferences();
+                }
                 CredentialEvent::Deleted {
                     provider_id,
                     session_only,
@@ -7084,6 +7321,18 @@ impl ButtonsApp {
                             Err(error) => format!("Format detection failed: {error}"),
                         });
                     }
+                }
+                // A dropped (stale) result must not leave its empty in-flight
+                // placeholder behind, or that model list never loads again.
+                ProviderEvent::Models(provider, ..)
+                    if self
+                        .provider_catalogs
+                        .get(&provider.id)
+                        .is_some_and(|catalog| {
+                            catalog.models.is_empty() && catalog.error.is_none()
+                        }) =>
+                {
+                    self.provider_catalogs.remove(&provider.id);
                 }
                 _ => {}
             }
@@ -9000,6 +9249,7 @@ impl ButtonsApp {
         if !local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds) {
             return;
         }
+        self.theme_editor_target_row(ui);
         self.sync_theme_editor_to_current();
         let base = self.colors().settings_background;
         ui.spaced_heading("Shader backgrounds");
@@ -9106,12 +9356,23 @@ impl ButtonsApp {
                     shader.colors = Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
                 }
             }
-            ui.add(egui::Slider::new(&mut shader.strength, 0.0..=0.65).text("Strength"));
-            ui.add(egui::Slider::new(&mut shader.scale, 0.25..=4.0).text("Scale"));
+            ui.add(
+                egui::Slider::new(
+                    &mut shader.strength,
+                    crate::theme::ShaderBackground::STRENGTH,
+                )
+                .text("Strength"),
+            );
+            ui.add(
+                egui::Slider::new(&mut shader.scale, crate::theme::ShaderBackground::SCALE)
+                    .logarithmic(true)
+                    .text("Scale"),
+            );
             ui.spaced_checkbox(&mut shader.animated, "Animate background");
             ui.add_enabled(
                 shader.animated,
-                egui::Slider::new(&mut shader.speed, 0.0..=2.0).text("Speed"),
+                egui::Slider::new(&mut shader.speed, crate::theme::ShaderBackground::SPEED)
+                    .text("Speed"),
             );
             let mut own_colors = shader.colors.is_some();
             if ui
@@ -9645,6 +9906,7 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
+        self.theme_editor_target_row(ui);
         self.sync_theme_editor_to_current();
         let locale = self.locale.clone();
         let mut selected_profile = None;
@@ -11151,8 +11413,26 @@ impl ButtonsApp {
                     .get_or_insert_with(|| ThemePreviewSnapshot {
                         preferences: self.preferences.clone(),
                         applied_preferences: self.preferences.clone(),
+                        pane: None,
                     });
-                if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
+                if let Some(tab) = self
+                    .theme_editor_pane
+                    .filter(|tab| self.tabs.iter().any(|t| t.id == *tab))
+                {
+                    // Only this pane changes; the shared theme stays as it was.
+                    if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
+                        if snapshot.pane.is_none() {
+                            snapshot.pane = Some((tab, self.theme_overrides.get(&tab).cloned()));
+                        }
+                    }
+                    self.theme_overrides.insert(tab, id);
+                    self.theme_editor_status = Some(
+                        "Previewing on this pane only. Save to keep it or discard to restore."
+                            .into(),
+                    );
+                } else if let Some(index) =
+                    self.themes.all().iter().position(|theme| theme.id == id)
+                {
                     let theme = self.themes.all()[index].clone();
                     if let Some(snapshot) = &self.theme_editor_preview_snapshot {
                         restore_preview_preferences(&mut self.preferences, snapshot);
@@ -11195,6 +11475,14 @@ impl ButtonsApp {
         self.theme_editor_preview_due = None;
         if let Some(snapshot) = self.theme_editor_preview_snapshot.take() {
             restore_preview_preferences(&mut self.preferences, &snapshot);
+            if let Some((tab, previous)) = snapshot.pane {
+                if self.tabs.iter().any(|t| t.id == tab) {
+                    match previous {
+                        Some(id) => self.theme_overrides.insert(tab, id),
+                        None => self.theme_overrides.remove(&tab),
+                    };
+                }
+            }
             self.reload_personal_themes();
         }
     }
@@ -11228,11 +11516,22 @@ impl ButtonsApp {
             file_name.trim_end_matches(".json")
         );
         let scopes = &self.preferences.theme_apply;
-        let keep_existing = self.theme_overrides.values().any(|id| id == &existing_id)
-            || (!scopes.app && self.preferences.app_theme_id == existing_id)
-            || (!scopes.terminal && self.preferences.terminal_theme_id == existing_id)
-            || (!scopes.gradient && self.preferences.gradient_theme_id == existing_id)
-            || (!scopes.effects && self.preferences.effects_theme_id == existing_id);
+        let pane = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
+        let pane_only = pane.is_some();
+        // Replacing a file in use elsewhere would change those panes too.
+        let keep_existing = self
+            .theme_overrides
+            .iter()
+            .any(|(tab, id)| Some(*tab) != pane && id == &existing_id)
+            || ((pane_only || !scopes.app) && self.preferences.app_theme_id == existing_id)
+            || ((pane_only || !scopes.terminal)
+                && self.preferences.terminal_theme_id == existing_id)
+            || ((pane_only || !scopes.gradient)
+                && self.preferences.gradient_theme_id == existing_id)
+            || ((pane_only || !scopes.effects) && self.preferences.effects_theme_id == existing_id)
+            || (pane_only && self.preferences.theme_id == existing_id);
         let replace = self.theme_editor_file_exists && !keep_existing;
         if self.theme_editor_file_exists && keep_existing {
             file_name =
@@ -11284,7 +11583,11 @@ impl ButtonsApp {
                         .unwrap()
                         .trim_end_matches(".json")
                 );
-                if let Some(index) = self.themes.all().iter().position(|theme| theme.id == id) {
+                if let Some(tab) = pane {
+                    self.theme_overrides.insert(tab, id.clone());
+                } else if let Some(index) =
+                    self.themes.all().iter().position(|theme| theme.id == id)
+                {
                     self.apply_theme_sources(
                         self.themes.all()[index].clone(),
                         self.preferences.calm_mode,
@@ -11293,14 +11596,23 @@ impl ButtonsApp {
                 self.theme_editor_source_id = Some(id);
                 self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.persist_native_preferences();
-                self.theme_editor_status = Some(crate::i18n::literal(
-                    &self.locale,
+                self.theme_editor_status = Some(if pane.is_some() {
                     if keep_existing {
-                        "Shared theme saved as a new variant to preserve individual tabs and unchecked sections."
+                        "Saved as a new variant and applied to this pane; other panes keep theirs."
+                            .into()
                     } else {
-                        "Shared theme saved. Selected Apply sections are active; individual tab themes are kept."
-                    },
-                ));
+                        "Saved and applied to this pane.".into()
+                    }
+                } else {
+                    crate::i18n::literal(
+                        &self.locale,
+                        if keep_existing {
+                            "Shared theme saved as a new variant to preserve individual tabs and unchecked sections."
+                        } else {
+                            "Shared theme saved. Selected Apply sections are active; individual tab themes are kept."
+                        },
+                    )
+                });
             }
             Err(error) => {
                 self.theme_editor_status = Some(crate::i18n::formatted_literal(
@@ -12172,7 +12484,13 @@ impl ButtonsApp {
         if self.theme_editor_preview_snapshot.is_some() {
             return;
         }
-        let id = self.preferences.theme_id.clone();
+        let pane_theme = self
+            .theme_editor_pane
+            .and_then(|tab| self.theme_overrides.get(&tab))
+            .cloned();
+        let id = pane_theme
+            .clone()
+            .unwrap_or_else(|| self.preferences.theme_id.clone());
         // A discarded new draft clears its document but keeps the source; recreate it here.
         if self.theme_editor_source_id.as_deref() == Some(&id)
             && self.theme_editor_document.is_some()
@@ -12181,8 +12499,113 @@ impl ButtonsApp {
         }
         if self.themes.personal_document(&id).is_some() {
             self.load_personal_theme_draft(&id);
+        } else if let Some(id) = pane_theme {
+            self.start_pane_theme_copy(&id);
         } else {
             self.start_personal_theme_draft();
+        }
+    }
+
+    /// Starts an unsaved copy of a built-in theme that one pane uses.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn start_pane_theme_copy(&mut self, id: &str) {
+        self.restore_personal_theme_preview();
+        let Some(store) = self.native_store.as_ref() else {
+            return;
+        };
+        let theme = self.themes.get(id).clone();
+        let name = format!("{} Copy", theme.name);
+        let mut document = crate::theme_files::document_from_theme(&theme, &name);
+        document["metadata"]["id"] = Value::String(
+            crate::theme_files::suggested_file_name(&name)
+                .trim_end_matches(".json")
+                .to_owned(),
+        );
+        let file_name =
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        self.theme_editor_source_id = Some(id.to_owned());
+        self.theme_editor_document = Some(document.clone());
+        self.theme_editor_original_document = Some(document);
+        self.theme_editor_file_name = Some(file_name);
+        self.theme_editor_file_exists = false;
+        self.theme_editor_confirm_delete = false;
+        self.theme_editor_status = None;
+    }
+
+    /// "Edit for: All panes / Pane 1 / Pane 2 …". In pane mode the editor follows
+    /// the focused pane, so clicking a terminal picks what Settings edits.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn theme_editor_target_row(&mut self, ui: &mut egui::Ui) {
+        let displayed = if self.rendered_panes.is_empty() {
+            self.visible_panes.clone()
+        } else {
+            self.rendered_panes.clone()
+        };
+        if displayed.len() < 2 && !self.theme_editor_pane_mode && self.theme_editor_pane.is_none() {
+            return;
+        }
+        let colors = self.colors();
+        let distinct = self.preferences.pane_colors_distinct;
+        let mut pane_mode = self.theme_editor_pane_mode;
+        let mut focus = None;
+        wrapping_row(ui, |ui| {
+            ui.spaced_label("Edit for:");
+            if ui
+                .selectable_label(!pane_mode, "All panes")
+                .on_hover_text("The shared theme, used by every pane that has no theme of its own.")
+                .clicked()
+            {
+                pane_mode = false;
+            }
+            for (slot, &index) in displayed.iter().enumerate() {
+                let number = slot + 1;
+                let color = pane_indicator_color(&colors, number, distinct);
+                let label = RichText::new(format!("Pane {number}"));
+                let button = if pane_mode && index == self.focused {
+                    egui::Button::new(label.strong().color(contrasting_text(color))).fill(color)
+                } else {
+                    egui::Button::new(label.color(color)).stroke(Stroke::new(1.0_f32, color))
+                };
+                if ui
+                    .add(button)
+                    .on_hover_text(
+                        "Give this pane its own look. Clicking inside the pane picks it too.",
+                    )
+                    .clicked()
+                {
+                    pane_mode = true;
+                    focus = Some(index);
+                }
+            }
+        });
+        if let Some(index) = focus {
+            self.activate_tab(index);
+        }
+        self.theme_editor_pane_mode = pane_mode;
+        let wanted = pane_mode
+            .then(|| self.tabs.get(self.focused).map(|tab| tab.id))
+            .flatten();
+        if wanted == self.theme_editor_pane {
+            return;
+        }
+        let edited = self
+            .theme_editor_document
+            .as_ref()
+            .zip(self.theme_editor_original_document.as_ref())
+            .is_some_and(|(draft, original)| draft != original);
+        if edited {
+            let current = self
+                .theme_editor_pane
+                .and_then(|tab| self.tabs.iter().position(|t| t.id == tab))
+                .and_then(|index| displayed.iter().position(|slot| *slot == index))
+                .map_or("all panes".to_owned(), |slot| format!("pane {}", slot + 1));
+            ui.spaced_colored_label(
+                colors.warning,
+                format!("Still editing {current}. Save or discard those changes to switch."),
+            );
+        } else {
+            self.discard_theme_editor_session();
+            self.theme_editor_pane = wanted;
         }
     }
 
@@ -12263,6 +12686,11 @@ impl ButtonsApp {
                 &mut self.preferences.show_action_buttons,
                 crate::i18n::literal(&self.locale, "Show menu buttons on tabs and presets"),
             );
+            ui.spaced_checkbox(
+                &mut self.preferences.pane_colors_distinct,
+                "Give each pane its own color",
+            )
+            .on_hover_text("Tabs and pane borders share one color per pane. The tab with keyboard focus is filled with its color. Off uses the theme's two accent colors.");
             ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Right-click a tab or preset for its menu. Menu buttons are optional.",
@@ -14261,6 +14689,7 @@ struct PaneRenderState<'a> {
     pane_rects: &'a mut std::collections::BTreeMap<u64, egui::Rect>,
     hovered_tab: Option<u64>,
     indicator_colors: crate::theme::AppColors,
+    distinct_pane_colors: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -14318,15 +14747,24 @@ fn render_pane_tree(
                 .position(|pane| pane == index)
                 .unwrap_or(0)
                 + 1;
-            let indicator = pane_indicator_color(&state.indicator_colors, number);
+            let indicator =
+                pane_indicator_color(&state.indicator_colors, number, state.distinct_pane_colors);
             let hovered = response.hovered() || state.hovered_tab == Some(tab.id);
-            if hovered || state.focused == *index {
-                pane.painter().rect_stroke(
-                    rect.shrink(1.0),
-                    2.0,
-                    Stroke::new(if hovered { 2.0_f32 } else { 1.0_f32 }, indicator),
-                    egui::StrokeKind::Inside,
-                );
+            let focused = state.focused == *index;
+            // Focus is the strongest border; with several panes each keeps a
+            // faint border in its own color so it matches its tab.
+            let border = if focused {
+                Some(Stroke::new(2.0_f32, indicator))
+            } else if hovered {
+                Some(Stroke::new(1.0_f32, indicator))
+            } else if state.distinct_pane_colors && state.pane_indices.len() > 1 {
+                Some(Stroke::new(1.0_f32, indicator.gamma_multiply(0.45)))
+            } else {
+                None
+            };
+            if let Some(border) = border {
+                pane.painter()
+                    .rect_stroke(rect.shrink(1.0), 2.0, border, egui::StrokeKind::Inside);
             }
             if !state.modal_open
                 && local_feature_available(
@@ -14660,11 +15098,43 @@ fn pane_state_after_close(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn pane_indicator_color(colors: &crate::theme::AppColors, number: usize) -> Color32 {
-    if number % 2 == 1 {
+/// Pane slot colors: distinct hues that stay readable on dark and light tabs.
+const PANE_COLORS: [Color32; 10] = [
+    Color32::from_rgb(76, 154, 255),  // blue
+    Color32::from_rgb(255, 159, 67),  // orange
+    Color32::from_rgb(46, 204, 113),  // green
+    Color32::from_rgb(255, 92, 168),  // pink
+    Color32::from_rgb(250, 204, 21),  // yellow
+    Color32::from_rgb(34, 211, 238),  // cyan
+    Color32::from_rgb(167, 139, 250), // violet
+    Color32::from_rgb(248, 113, 113), // red
+    Color32::from_rgb(163, 230, 53),  // lime
+    Color32::from_rgb(214, 167, 120), // tan
+];
+
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_indicator_color(
+    colors: &crate::theme::AppColors,
+    number: usize,
+    distinct: bool,
+) -> Color32 {
+    if distinct {
+        PANE_COLORS[number.max(1).saturating_sub(1) % PANE_COLORS.len()]
+    } else if number % 2 == 1 {
         colors.accent
     } else {
         colors.accent_alt
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+/// Black or white, whichever reads better on `fill`.
+fn contrasting_text(fill: Color32) -> Color32 {
+    let luminance = 0.2126 * fill.r() as f32 + 0.7152 * fill.g() as f32 + 0.0722 * fill.b() as f32;
+    if luminance > 140.0 {
+        Color32::from_rgb(16, 16, 20)
+    } else {
+        Color32::WHITE
     }
 }
 
@@ -15131,12 +15601,34 @@ fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[Strin
     });
 }
 
+/// Opens an https sign-in page in the default browser from a worker thread.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_in_browser(url: &str) {
+    if !url.starts_with("https://") {
+        return;
+    }
+    #[cfg(windows)]
+    let command = std::process::Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let command = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(not(any(windows, target_os = "macos")))]
+    let command = std::process::Command::new("xdg-open").arg(url).spawn();
+    let _ = command;
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn provider_key(
     session: &SessionCredentialStore,
     expected_reference: &str,
     stored_reference: Option<&str>,
 ) -> Result<Option<Zeroizing<String>>, credentials::CredentialError> {
+    // A ChatGPT sign-in supplies a fresh access token instead of a saved key.
+    if stored_reference.and_then(crate::assistant::chatgpt::marked) == Some(expected_reference) {
+        return crate::assistant::chatgpt::access_token(&SystemCredentialStore, expected_reference)
+            .map(Some);
+    }
     match session.get(expected_reference) {
         Ok(key) => return Ok(Some(key)),
         Err(credentials::CredentialError::Missing) => {}
@@ -18476,6 +18968,7 @@ Start-Sleep -Seconds 300
             model: "fake-ok".into(),
             credential_ref: None,
             models_endpoint: None,
+            chatgpt_plan: false,
             api: Default::default(),
         };
         preferences
@@ -21016,6 +21509,66 @@ Start-Sleep -Seconds 300
             assert_ne!(candidate, "basic2");
             assert!(app.themes.all().iter().any(|theme| theme.id == candidate));
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pane_editor_previews_and_saves_only_on_its_pane() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-pane-editor-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        let (first, second) = (app.tabs[0].id, app.tabs[1].id);
+        app.theme_overrides.insert(second, "aurora".into());
+        let shared = app.preferences.clone();
+
+        app.theme_editor_pane = Some(second);
+        app.sync_theme_editor_to_current();
+        assert_eq!(app.theme_editor_source_id.as_deref(), Some("aurora"));
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
+        app.theme_editor_document = Some(draft);
+        app.preview_personal_theme_draft();
+        assert!(app.theme_overrides[&second].starts_with("preview:"));
+        assert!(!app.theme_overrides.contains_key(&first));
+        assert_eq!(app.preferences.effects_theme_id, shared.effects_theme_id);
+
+        app.cancel_personal_theme_draft();
+        assert_eq!(app.theme_overrides[&second], "aurora");
+        app.sync_theme_editor_to_current();
+
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
+        app.theme_editor_document = Some(draft);
+        app.preview_personal_theme_draft();
+        app.save_personal_theme_draft();
+        let saved = app.theme_overrides[&second].clone();
+        assert!(saved.starts_with("personal:"), "{saved}");
+        assert!(!app.theme_overrides.contains_key(&first));
+        assert_eq!(app.preferences.theme_id, shared.theme_id);
+        assert_eq!(app.preferences.effects_theme_id, shared.effects_theme_id);
+        assert_eq!(
+            app.terminal_presentation_for(second)
+                .terminal_colors
+                .background,
+            "#123456"
+        );
+        std::fs::remove_dir_all(base).unwrap();
     }
 
     #[cfg(not(target_arch = "wasm32"))]

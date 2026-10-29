@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ButtonsCLI
+Comment=Terminal workspace with command buttons, tiled panes and themes
+Exec=buttonscli
+Icon=buttonscli
+Terminal=false
+Categories=System;TerminalEmulator;Development;
+Keywords=terminal;shell;ssh;console;
+StartupWMClass=buttonscli

@@ -2,31 +2,7 @@
 
 # ButtonsCLI Native
 
-A fast terminal app for people who prefer using a mouse, clicking buttons instead of memorizing key combos, who want a more normal way to customize the appearance without editing json files. I hurt the nerve in one of my arms and can't type fast right now so this lets me click to paste common commands (VPS server related, etc) and generate them.
-
-## Several AI features and other things to save time like:
-
-The Buttons, obviously. All they do is paste long commands. You create a button and set it to some text, with optional press enter for you.
-
-Auto organizing panes, auto arrange in grid, row, etc
-
-Theme/shader gen from prompt - (with auto self healing) so you can tell it "make the app look like halloween" and it does it.
-
-AI Agent Control of app - ability to control all tabs (via MCP or CLI tool, you click "Agent Inst" which copies instructions for agent to clipboard, paste into Claude, Codex, etc), they can then open new panes, work on all at the same time etc - I wanted this so i can better see what they're doing
-
-## Very fine grained control over a lot of the app
-
-Choose different fonts for each terminal pane, each part of the UI, set them all to different themes, shaders, etc. I went out of my way to make it anti-minimal with the user interface.
-
-Right click menus all over the app 
-
-**Alacritty Engine used for xxxxx. Low ram even with tons of visuals and UI, many panes/tabs open**
-
-I made a Tauri/Rust version of this the first time but i cannot stand a terminal inside the Webview! Too laggy... feels bad. This one is fast. A native terminal workspace built in Rust, with tiled shells, command buttons, borderline ridiculous level of control over the apperance. Analog TV style noise for when you get bored with "normal colors"
-
-I'll work on getting the releases working but for now if you have rust/cargo installed just 
-
-ai update or check to see what info is out of date:
+A fast terminal app for people who'd rather use a mouse: click buttons instead of memorizing key combos, and customize how it looks without editing JSON files. I hurt a nerve in one of my arms and can't type fast right now, so this lets me click to paste common commands (VPS server stuff, etc.) and generate new ones.
 
 [![CI](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml/badge.svg)](https://github.com/detroittommy879/buttonscli-native/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/built_with-Rust-e06c75?style=flat-square)
@@ -37,32 +13,59 @@ ai update or check to see what info is out of date:
 
 </div>
 
-![ButtonsCLI Native with six numbered panes, command and SSH docks, and individually themed live terminals](docs/images/main.png)
+![Three stacked terminals with animated shader backgrounds and a command dock, next to Settings showing four AI-generated shader versions](docs/images/main.png)
 
-ButtonsCLI Native brings your terminal sessions and frequently used commands
-into one configurable desktop workspace. Keep a local shell, remote SSH
-sessions, build output, and a system monitor visible together; give each pane
-its own theme and turn repeated commands into buttons. The UI uses egui/wgpu
-and the terminal engine uses Alacritty through a vendored egui adapter.
+## AI features and other things to save time
 
-**Ready for daily terminal use on Windows.** This native Rust rebuild of
-[ButtonsCLI](https://buttonscli.com) is used daily by its creator, who reports
-that the core workflow is close to or on par with the original app. `main` is
-the recommended stable source branch; clone or install from it for the latest
-daily-use version. Optional AI and agent features remain previews. See
-[current status](#current-status) and the [October 7 changelog](CHANGELOG.md).
+- **The buttons**, obviously. All they do is paste long commands. You make a
+  button, give it some text, and optionally have it press Enter for you.
+- **Auto organizing panes**: auto arrange in a grid, row, etc.
+- **Theme/shader generation from a prompt** (with auto self-healing), so you can
+  tell it "make the app look like halloween" and it does it. Shaders get written
+  as several versions at once, checked by a second "judge" model, and you pick
+  the one you like from little live previews.
+- **AI agent control of the app**: an agent can control all the tabs through MCP
+  or a CLI tool. Click "Agent Inst.", which copies instructions to your
+  clipboard, and paste them into Claude, Codex, etc. It can then open new panes
+  and work in all of them at the same time. I wanted this so I can better see
+  what they're doing.
+- **Bring your own AI**: any OpenAI-compatible or Anthropic API key, or just
+  sign in with ChatGPT and use your Plus/Pro plan, no API key needed.
+
+## Very fine-grained control over a lot of the app
+
+Pick different fonts for each terminal pane and each part of the UI, and give
+them all different themes, shaders, etc. I went out of my way to make the UI
+anti-minimal. There are right-click menus all over the app.
+
+**The terminal itself runs on the Alacritty engine, so RAM stays low even with
+tons of visuals and UI and lots of panes/tabs open.**
+
+I made a Tauri/Rust version of this the first time, but I can't stand a terminal
+inside a webview! Too laggy... it feels bad. This one is fast: a native terminal
+workspace built in Rust, with tiled shells, command buttons, and a borderline
+ridiculous level of control over the appearance. There's analog TV style noise
+for when you get bored of "normal colors".
+
+I'm still working on getting releases going. For now, if you have Rust/Cargo
+installed, just use the install command in [Get started](#get-started).
+
+I use it every day on Windows and the core terminal stuff is about on par with
+the original [ButtonsCLI](https://buttonscli.com) now. `main` is the branch to
+install from. The AI and agent features still count as previews. See
+[current status](#current-status) and the [changelog](CHANGELOG.md).
 
 ## What you can do today
 
 | | In the app |
 | --- | --- |
 | **Work across shells** | Real local PTYs, shell profiles, working directories, PowerShell/CMD and Windows WSL choices. SSH runs through your chosen shell. |
-| **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. |
+| **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. Save a set of open terminals as a named tab group and reopen it later. |
 | **Put commands on buttons** | Separate command and SSH docks with editable presets. Choose whether a button types the command or also sends Enter. Docks resize, collapse, and auto-hide. |
 | **Use the terminal normally** | Scrollback and scrollbars, selection, copy/paste, hyperlinks, regex search, select-all, clear-screen, and live PTY resizing. |
-| **Make every pane recognizable** | 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
-| **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. Calm effects pauses motion; window opacity works on Windows. |
-| **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Preview an import from the original app into a separate native profile. Provider keys transfer only when selected explicitly. |
+| **Make every pane recognizable** | Each pane and its tab share their own color, and the tab that gets your typing is filled in. 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
+| **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. 34 built-in GPU shader backgrounds (including VHS and CRT static), your own WGSL shader code with sliders, or AI-written shaders. Calm effects pauses motion; window opacity works on Windows. |
+| **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Import from the original app into a separate native profile and switch profiles from the status bar. Re-importing keeps your saved themes and favorites. Provider keys transfer only when selected explicitly. |
 | **Launch a workspace** | Start multiple tabs with a chosen shell/directory and optional commands for specific tabs. Startup options are available without AI or agent-control access. |
 
 Right-click tabs, panes, or presets for their actions. Detached Settings previews
@@ -154,7 +157,7 @@ Bindings can be edited or cleared in **Settings → Shortcuts**.
 for the stated workflow, not a promise of zero bugs or complete legacy parity.
 “Complete” means the core feature is implemented and covered by Windows checks
 and daily use. Approximate percentages are editorial progress estimates, not
-test pass rates or reliability measurements. Updated October 7, 2026.
+test pass rates or reliability measurements. Updated October 28, 2026.
 
 | Area | Readiness | What works / what remains |
 | --- | --- | --- |
@@ -163,10 +166,10 @@ test pass rates or reliability measurements. Updated October 7, 2026.
 | **Themes, fonts and Settings** | **Complete for the core Windows workflow** | Per-tab appearance, favorites, personal JSON import/export, scoped preview/save, font tracking and detached Settings. Advanced theme collections and persistent tab assignment rules are proposals. |
 | **AI Help** | **Working preview, roughly 70% ready** | Streaming, provider settings, optional context and reviewed actions work in fixture tests; real Mistral backend checks also passed. Broader real-provider GUI, accessibility and hosted access acceptance remain. |
 | **CLI / MCP agent control** | **Working preview, roughly 70% ready** | Authenticated local API, live Windows CLI checks and 14-tool fake-API coverage. Full live tool/client coverage, GUI handoff and Linux/macOS acceptance remain. |
-| **AI theme generation** | **Palette preview** | Validated palette drafts and provider tests exist. Full appearance generation with fonts/effects and native shaders is [planned](docs/AI-THEME-AND-SHADER-PLAN.md). |
-| **Effects / Shader Lab** | **Supported effects work; shader work unfinished** | Gradients, scanlines, noise, row banding and analog static render natively. Legacy GLSL, Shader Lab and HSync warp do not run. |
+| **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to six versions in parallel, a judge model checks or fixes each one, and every result is compiled before you see it. Full appearance generation with fonts and effects in one go is still [planned](docs/AI-THEME-AND-SHADER-PLAN.md). |
+| **Effects / shaders** | **Native shaders work; legacy shaders don't** | Gradients, scanlines, noise, row banding, analog static, 34 shader presets and custom WGSL shaders render natively. Old GLSL shaders from the original app, its Shader Lab and HSync warp do not run. |
 | **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
-| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Hosted entitlement integration, downloadable releases, production signing, updater activation and rollback remain; old feedback/runtime-config services are disabled. |
+| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are [planned](docs/RELEASE-AND-MESSAGES-PLAN.md) but not done; old feedback/runtime-config services are disabled. |
 
 AI Help, AI theme generation and CLI/MCP control require an explicit
 [local feature flag](docs/LOCAL-FEATURE-FLAGS.md) for release testing. The core
@@ -199,12 +202,14 @@ limits are in [Native agent control](docs/CONTROL-API.md).
   have isolated Windows fixture coverage.
 - Finish agent-control GUI handoff and broader MCP-client/tool acceptance,
   including Linux and macOS runtime checks.
-- Complete signed release/update activation and rollback.
+- Version numbers, downloadable releases (zip, MSIX, Linux and macOS packages),
+  the Microsoft Store listing, and updates.
 - Continue keyboard, clipboard, DPI, accessibility, IME and performance review
-  across platforms; finish the remaining native effects and Shader Lab work.
+  across platforms. Translations are missing for a lot of the newer screens.
 
-Sessions are **not restored after an app restart**. Settings, presets, personal
-themes and favorites persist; live shells and session-only theme choices do not.
+Live shells are **not restored after an app restart**. Settings, presets,
+personal themes, favorites and saved tab groups persist; running shells and
+session-only theme choices do not.
 For detailed boundaries, see [Current limitations](docs/LIMITATIONS.md) and the
 [Verification record](docs/VERIFICATION.md).
 

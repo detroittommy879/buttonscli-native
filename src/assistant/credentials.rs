@@ -14,6 +14,8 @@ pub(crate) enum CredentialError {
     InvalidReference,
     Missing,
     Unavailable,
+    /// A ChatGPT connection needs a new sign-in or plan-usage permission.
+    SignInNeeded,
 }
 
 impl std::fmt::Display for CredentialError {
@@ -22,6 +24,9 @@ impl std::fmt::Display for CredentialError {
             Self::InvalidReference => "credential reference is invalid",
             Self::Missing => "saved credential was not found",
             Self::Unavailable => "the operating-system credential store is unavailable",
+            Self::SignInNeeded => {
+                "sign in with ChatGPT again in Settings → AI providers (and allow plan usage)"
+            }
         };
         f.write_str(message)
     }

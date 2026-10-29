@@ -112,8 +112,17 @@ pub(crate) fn collect_models(body: &[u8]) -> Result<Vec<String>, ClientError> {
     for list in ["data", "models"] {
         if let Some(entries) = value.get(list).and_then(Value::as_array) {
             for entry in entries {
+                // The ChatGPT plan catalog lists `slug`s and marks hidden ones.
+                if entry
+                    .get("visibility")
+                    .and_then(Value::as_str)
+                    .is_some_and(|visibility| visibility != "list")
+                {
+                    continue;
+                }
                 let id = entry
                     .as_str()
+                    .or_else(|| entry.get("slug").and_then(Value::as_str))
                     .or_else(|| entry.get("id").and_then(Value::as_str))
                     .or_else(|| entry.get("name").and_then(Value::as_str));
                 if let Some(id) = id.map(str::trim).filter(|id| {
@@ -212,11 +221,26 @@ pub(crate) fn test_connection(
         })
         .map_err(ClientError::Transport)?;
     if !(200..300).contains(&response.status) {
-        return Err(http_error(
+        let error = http_error(
             response.status,
             &response.body,
             redaction_key.as_deref().map(String::as_str),
-        ));
+        );
+        // The ChatGPT plan's Responses endpoint only accepts streamed requests.
+        if matches!(&error, ClientError::HttpDetail(400, message) if message.to_ascii_lowercase().contains("stream"))
+        {
+            return stream_completion(
+                transport,
+                provider,
+                redaction_key,
+                ("Reply briefly.", "Reply OK."),
+                &[],
+                &AtomicBool::new(false),
+                &mut |_| {},
+            )
+            .map(|_| ());
+        }
+        return Err(error);
     }
     provider_content(&response.body, provider).map(|_| ())
 }
@@ -668,6 +692,15 @@ fn completion_content(body: &[u8], responses: bool) -> Result<String, ClientErro
 #[cfg(test)]
 mod tests {
     #[test]
+    fn chatgpt_plan_catalog_lists_visible_slugs() {
+        let body = br#"{"models":[
+            {"slug":"gpt-plan","display_name":"GPT","visibility":"list"},
+            {"slug":"internal","display_name":"Hidden","visibility":"hide"}
+        ]}"#;
+        assert_eq!(super::collect_models(body).unwrap(), vec!["gpt-plan"]);
+    }
+
+    #[test]
     fn responses_routes_and_bodies_preserve_history_without_chat_only_fields() {
         use super::super::provider::ProviderApi;
         let provider = ProviderProfile {
@@ -820,6 +853,20 @@ mod tests {
             replies: std::sync::Mutex::new(replies.into()),
             calls: std::sync::atomic::AtomicUsize::new(0),
         }
+    }
+
+    #[test]
+    fn test_connection_streams_when_the_provider_requires_it() {
+        let transport = scripted(vec![
+            (400, r#"{"error":{"message":"Stream must be set to true"}}"#),
+            (200, r#"{"choices":[{"message":{"content":"OK"}}]}"#),
+        ]);
+        let provider = ProviderProfile {
+            model: "m".into(),
+            ..Default::default()
+        };
+        assert_eq!(test_connection(&transport, &provider, None), Ok(()));
+        assert_eq!(transport.calls.load(Ordering::Relaxed), 2);
     }
 
     #[test]
@@ -1109,6 +1156,7 @@ mod tests {
             model: "codestral-latest".into(),
             credential_ref: None,
             models_endpoint: None,
+            chatgpt_plan: false,
             api: Default::default(),
         };
         let transport = super::super::transport::ReqwestTransport;

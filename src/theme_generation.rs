@@ -630,6 +630,7 @@ mod tests {
             model: "fixture-model".into(),
             credential_ref: None,
             models_endpoint: None,
+            chatgpt_plan: false,
             api: Default::default(),
         }
     }
