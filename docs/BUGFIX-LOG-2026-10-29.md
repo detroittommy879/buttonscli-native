@@ -63,3 +63,24 @@ the new provider screen and the pane row (no ChatGPT account here).
   count; the layout is applied only with 2+ tabs.
 - Plan doc for panel/button shaders and par-term ideas:
   `docs/PLANS-2026-10-29-PANEL-SHADERS.md`.
+
+## Pane editing without forced saves (user report after testing)
+
+- Symptoms: "Still editing pane 3. Save or discard…" blocked switching; the
+  footer "Save copy" turned a pane edit into the shared theme, so every pane
+  changed; unsaved pane edits were lost on restart (only the shared one stayed).
+- Causes: `save_appearance_copy` merges the editor draft into the shared
+  appearance and drops the pane preview snapshot without restoring it.
+  "Keep changes and close" cancelled the preview, and so did quitting, and
+  `pane_looks` skips `preview:` ids.
+- Fix: `autosave_theme_draft` saves an edited draft under the next numbered
+  name (`name_draft_as_next_version`, "X Copy" → "X vN") when switching panes,
+  on Keep and close, on quit with Settings open, and before saving a bundle.
+  "Save copy" in pane mode calls `save_pane_theme_copy` (that pane only).
+  Saving over a theme used by another pane, the shared sources or a saved
+  bundle now makes a new numbered file and name instead of a same-named copy.
+- Shaders/Edit pages have a "Save theme bundle" row; an empty name becomes
+  "Bundle N".
+- Test: `pane_edits_save_with_numbered_names_and_never_touch_other_panes`
+  (also drives the real "Edit for" row). fmt, 344 tests, both clippy runs and
+  the release build pass. Not checked by eye in the running app.

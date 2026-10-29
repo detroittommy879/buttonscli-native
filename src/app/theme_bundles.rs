@@ -145,22 +145,32 @@ impl ButtonsApp {
     }
 
     /// Saves the current looks as `name`, replacing a bundle with that name.
-    pub(super) fn save_theme_bundle(&mut self, name: &str) -> Result<(), String> {
-        let name = name.trim();
+    /// An empty name becomes the first free "Bundle N". Unsaved editor edits
+    /// are saved first, so the bundle holds what is on screen.
+    pub(super) fn save_theme_bundle(&mut self, name: &str) -> Result<String, String> {
+        let mut name = name.trim().to_owned();
         if name.is_empty() {
-            return Err("A bundle name is required.".into());
+            name = (1..)
+                .map(|number| format!("Bundle {number}"))
+                .find(|candidate| {
+                    !self
+                        .preferences
+                        .theme_bundles
+                        .iter()
+                        .any(|bundle| &bundle.name == candidate)
+                })
+                .unwrap();
         }
-        if self.theme_editor_preview_snapshot.is_some() {
-            return Err("Save or discard the theme preview first.".into());
-        }
-        let bundle = self.capture_theme_bundle(name);
+        self.autosave_theme_draft()?;
+        self.restore_personal_theme_preview();
+        let bundle = self.capture_theme_bundle(&name);
         let bundles = &mut self.preferences.theme_bundles;
         match bundles.iter_mut().find(|existing| existing.name == name) {
             Some(existing) => *existing = bundle,
             None => bundles.push(bundle),
         }
         self.persist_native_preferences();
-        Ok(())
+        Ok(name)
     }
 
     /// Applies a bundle to the open terminals by slot. Missing themes, fonts
@@ -296,7 +306,7 @@ impl ButtonsApp {
         ui.horizontal(|ui| {
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.bundle_name_draft)
-                    .hint_text("Bundle name, e.g. Halloween")
+                    .hint_text("Bundle name, or empty for Bundle 1, 2, …")
                     .desired_width(220.0),
             );
             save = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -306,17 +316,14 @@ impl ButtonsApp {
                 .iter()
                 .any(|bundle| bundle.name == self.bundle_name_draft.trim());
             save |= ui
-                .add_enabled(
-                    !self.bundle_name_draft.trim().is_empty(),
-                    crate::ui_text::button(
-                        ui,
-                        if replacing {
-                            "Replace bundle"
-                        } else {
-                            "Save current looks"
-                        },
-                    ),
-                )
+                .add(crate::ui_text::button(
+                    ui,
+                    if replacing {
+                        "Replace bundle"
+                    } else {
+                        "Save current looks"
+                    },
+                ))
                 .on_hover_text(format!(
                     "{} panes · {}",
                     self.tabs.len().min(MAX_PANE_LOOKS),
@@ -327,7 +334,7 @@ impl ButtonsApp {
         if save {
             let name = self.bundle_name_draft.trim().to_owned();
             self.bundle_message = Some(match self.save_theme_bundle(&name) {
-                Ok(()) => format!("Saved theme bundle \"{name}\"."),
+                Ok(name) => format!("Saved theme bundle \"{name}\"."),
                 Err(error) => error,
             });
         }

@@ -5440,6 +5440,13 @@ impl ButtonsApp {
             {
                 self.theme_editor_preview_due = None;
             }
+            // Keep saves what the editor shows (numbered if new); Revert drops it.
+            #[cfg(not(target_arch = "wasm32"))]
+            if action == SettingsCloseAction::Keep {
+                if let Err(error) = self.autosave_theme_draft() {
+                    self.notice = Some(format!("Theme changes were not saved: {error}"));
+                }
+            }
             #[cfg(not(target_arch = "wasm32"))]
             if self.theme_editor_preview_snapshot.is_some() {
                 self.cancel_personal_theme_draft();
@@ -5686,11 +5693,22 @@ impl ButtonsApp {
                 // Forking a theme only makes sense next to the theme and font controls.
                 #[cfg(not(target_arch = "wasm32"))]
                 if matches!(self.settings_tab, SettingsTab::Themes | SettingsTab::Fonts) {
-                    let dirty = self.appearance_is_dirty();
+                    // Editing one pane: a copy is that pane's own new theme, never the shared one.
+                    let pane = self.theme_editor_pane.is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
+                    let dirty = if pane { self.theme_draft_edited() } else { self.appearance_is_dirty() };
                     let color = if dirty { Color32::from_rgb(100, 245, 175) } else { ui.visuals().weak_text_color() };
                     let response = ui.add_enabled(dirty && self.native_store.is_some(), egui::Button::new(RichText::new("● Save copy").color(color)));
-                    if response.on_hover_text("Save current shared appearance and pending editor changes as the next numbered version. Individual terminal overrides stay in place.").clicked() {
-                        self.save_appearance_copy();
+                    let hover = if pane {
+                        "Save this pane's look as the next numbered theme. Other panes keep theirs."
+                    } else {
+                        "Save current shared appearance and pending editor changes as the next numbered version. Individual terminal overrides stay in place."
+                    };
+                    if response.on_hover_text(hover).clicked() {
+                        if pane {
+                            self.save_pane_theme_copy();
+                        } else {
+                            self.save_appearance_copy();
+                        }
                         ctx.request_repaint();
                     }
                     if let Some(status) = &self.appearance_save_status {
@@ -9283,6 +9301,7 @@ impl ButtonsApp {
             return;
         }
         self.theme_editor_target_row(ui);
+        self.theme_editor_bundle_row(ui);
         self.sync_theme_editor_to_current();
         let base = self.colors().settings_background;
         ui.spaced_heading("Shader backgrounds");
@@ -9940,6 +9959,7 @@ impl ButtonsApp {
             return;
         }
         self.theme_editor_target_row(ui);
+        self.theme_editor_bundle_row(ui);
         self.sync_theme_editor_to_current();
         let locale = self.locale.clone();
         let mut selected_profile = None;
@@ -11335,6 +11355,87 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn theme_draft_edited(&self) -> bool {
+        self.theme_editor_document
+            .as_ref()
+            .zip(self.theme_editor_original_document.as_ref())
+            .is_some_and(|(draft, original)| draft != original)
+    }
+
+    /// Points the draft at a new file with the next numbered name, so saving it
+    /// leaves the theme it came from alone ("pur v10" → "pur v11").
+    #[cfg(not(target_arch = "wasm32"))]
+    fn name_draft_as_next_version(&mut self) {
+        let (Some(store), Some(document)) = (
+            self.native_store.as_ref(),
+            self.theme_editor_document.as_mut(),
+        ) else {
+            return;
+        };
+        let current = document["metadata"]["name"]
+            .as_str()
+            .unwrap_or("Custom theme");
+        let base = current.strip_suffix(" Copy").unwrap_or(current).to_owned();
+        let name = next_theme_version(
+            &base,
+            self.themes.all().iter().map(|theme| theme.name.as_str()),
+        );
+        let file_name =
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        document["metadata"]["name"] = json!(name);
+        document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
+        self.theme_editor_file_name = Some(file_name);
+        self.theme_editor_file_exists = false;
+        self.theme_editor_file_digest = None;
+    }
+
+    /// Saves an edited editor draft without asking, so switching panes, closing
+    /// Settings or quitting keeps what is on screen. A draft with no file yet
+    /// gets the next numbered name. Returns the saved name, `Ok(None)` when
+    /// nothing was edited.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn autosave_theme_draft(&mut self) -> Result<Option<String>, String> {
+        if !self.theme_draft_edited() || self.native_store.is_none() {
+            return Ok(None);
+        }
+        if !self.theme_editor_file_exists {
+            self.name_draft_as_next_version();
+        }
+        self.save_personal_theme_draft();
+        if self.theme_draft_edited() {
+            return Err(self
+                .theme_editor_status
+                .clone()
+                .unwrap_or_else(|| "Theme save failed.".into()));
+        }
+        Ok(self.theme_editor_document.as_ref().map(|document| {
+            document["metadata"]["name"]
+                .as_str()
+                .unwrap_or("theme")
+                .to_owned()
+        }))
+    }
+
+    /// "Save copy" while editing one pane: a new numbered theme for that pane only.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_pane_theme_copy(&mut self) {
+        self.name_draft_as_next_version();
+        self.save_personal_theme_draft();
+        self.appearance_save_status = Some(if self.theme_draft_edited() {
+            format!(
+                "Save failed: {}",
+                self.theme_editor_status.clone().unwrap_or_default()
+            )
+        } else {
+            let name = self
+                .theme_editor_document
+                .as_ref()
+                .and_then(|document| document["metadata"]["name"].as_str().map(str::to_owned));
+            format!("Saved {} for this pane", name.unwrap_or_default())
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn refresh_theme_file_digest(&mut self) {
         self.theme_editor_file_digest = match (&self.native_store, &self.theme_editor_file_name) {
             (Some(store), Some(file_name)) if self.theme_editor_file_exists => {
@@ -11536,7 +11637,7 @@ impl ButtonsApp {
         ) else {
             return;
         };
-        let name = document["metadata"]["name"]
+        let mut name = document["metadata"]["name"]
             .as_str()
             .unwrap_or("Custom theme")
             .to_owned();
@@ -11568,9 +11669,22 @@ impl ButtonsApp {
             || ((pane_only || !scopes.gradient)
                 && self.preferences.gradient_theme_id == existing_id)
             || ((pane_only || !scopes.effects) && self.preferences.effects_theme_id == existing_id)
-            || (pane_only && self.preferences.theme_id == existing_id);
+            || (pane_only && self.preferences.theme_id == existing_id)
+            // A saved theme bundle must keep looking the way it was saved.
+            || self.preferences.theme_bundles.iter().any(|bundle| {
+                [&bundle.theme_id, &bundle.app_theme_id, &bundle.terminal_theme_id, &bundle.gradient_theme_id, &bundle.effects_theme_id]
+                    .into_iter()
+                    .any(|id| id == &existing_id)
+                    || bundle.panes.iter().any(|look| look.theme_id.as_ref() == Some(&existing_id))
+            });
         let replace = self.theme_editor_file_exists && !keep_existing;
         if self.theme_editor_file_exists && keep_existing {
+            // A new file next to the one in use gets its own numbered name.
+            name = next_theme_version(
+                &name,
+                self.themes.all().iter().map(|theme| theme.name.as_str()),
+            );
+            document["metadata"]["name"] = json!(name);
             file_name =
                 crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
         }
@@ -12625,24 +12739,60 @@ impl ButtonsApp {
         if wanted == self.theme_editor_pane {
             return;
         }
-        let edited = self
-            .theme_editor_document
-            .as_ref()
-            .zip(self.theme_editor_original_document.as_ref())
-            .is_some_and(|(draft, original)| draft != original);
-        if edited {
-            let current = self
-                .theme_editor_pane
-                .and_then(|tab| self.tabs.iter().position(|t| t.id == tab))
-                .and_then(|index| displayed.iter().position(|slot| *slot == index))
-                .map_or("all panes".to_owned(), |slot| format!("pane {}", slot + 1));
-            ui.spaced_colored_label(
-                colors.warning,
-                format!("Still editing {current}. Save or discard those changes to switch."),
+        let current = self
+            .theme_editor_pane
+            .and_then(|tab| self.tabs.iter().position(|t| t.id == tab))
+            .and_then(|index| displayed.iter().position(|slot| *slot == index))
+            .map_or("All panes".to_owned(), |slot| format!("Pane {}", slot + 1));
+        // Switching keeps the edits: they are saved under the next numbered name.
+        let saved = match self.autosave_theme_draft() {
+            Ok(saved) => saved,
+            Err(error) => {
+                ui.spaced_colored_label(
+                    colors.warning,
+                    format!("Could not save {current}'s changes, so it is still selected: {error}"),
+                );
+                return;
+            }
+        };
+        self.discard_theme_editor_session();
+        self.theme_editor_pane = wanted;
+        if let Some(name) = saved {
+            self.theme_editor_status = Some(format!("{current}'s changes were saved as {name}."));
+        }
+    }
+
+    /// Saves every pane's current look as a theme bundle straight from the
+    /// editor. An empty name gets "Bundle 1", "Bundle 2", …
+    #[cfg(not(target_arch = "wasm32"))]
+    fn theme_editor_bundle_row(&mut self, ui: &mut egui::Ui) {
+        let mut save = false;
+        wrapping_row(ui, |ui| {
+            let response = ui.add(
+                egui::TextEdit::singleline(&mut self.bundle_name_draft)
+                    .hint_text("Bundle name (optional)")
+                    .desired_width(180.0),
             );
-        } else {
-            self.discard_theme_editor_session();
-            self.theme_editor_pane = wanted;
+            save = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+            save |= ui
+                .spaced_button("Save theme bundle")
+                .on_hover_text(
+                    "Save the look of every pane, the shared theme and the layout together. Unsaved edits are saved first. Find bundles in Library or File → Apply theme bundle.",
+                )
+                .clicked();
+        });
+        if save {
+            let name = self.bundle_name_draft.trim().to_owned();
+            self.bundle_message = Some(match self.save_theme_bundle(&name) {
+                Ok(name) => {
+                    self.bundle_name_draft.clear();
+                    format!("Saved theme bundle \"{name}\".")
+                }
+                Err(error) => error,
+            });
+        }
+        if let Some(message) = &self.bundle_message {
+            ui.spaced_label(RichText::new(message.as_str()).color(self.colors().muted));
         }
     }
 
@@ -16258,6 +16408,14 @@ impl eframe::App for ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
+        // Quitting with Settings open keeps the edited look, like Keep and close.
+        if self.show_settings {
+            if let Err(error) = self.autosave_theme_draft() {
+                log::warn!("theme changes were not saved on exit: {error}");
+            }
+        }
+        self.restore_personal_theme_preview();
+        self.persist_native_preferences();
         self.save_terminal_history(None);
         self.history_writer.take();
         #[cfg(not(target_arch = "wasm32"))]
@@ -21609,6 +21767,105 @@ Start-Sleep -Seconds 300
                 .background,
             "#123456"
         );
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn pane_edits_save_with_numbered_names_and_never_touch_other_panes() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-pane-autosave-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        let (first, second) = (app.tabs[0].id, app.tabs[1].id);
+        let shared = app.preferences.theme_id.clone();
+        let shared_name = app.themes.get(&shared).name.clone();
+        let edit = |app: &mut ButtonsApp, color: &str| {
+            app.sync_theme_editor_to_current();
+            let mut draft = app.theme_editor_document.clone().unwrap();
+            set_theme_document_value(&mut draft, "/theme/terminal/background", json!(color));
+            app.theme_editor_document = Some(draft);
+            app.preview_personal_theme_draft();
+        };
+
+        // Editing pane 2, then moving on, saves it under the next number.
+        app.theme_editor_pane = Some(second);
+        edit(&mut app, "#123456");
+        let saved = app.autosave_theme_draft().unwrap().unwrap();
+        assert_eq!(saved, next_theme_version(&shared_name, std::iter::empty()));
+        app.discard_theme_editor_session();
+        let second_theme = app.theme_overrides[&second].clone();
+        assert!(second_theme.starts_with("personal:"), "{second_theme}");
+
+        // Save copy on pane 1 gives it its own theme; pane 2 and the shared theme stay.
+        app.theme_editor_pane = Some(first);
+        edit(&mut app, "#654321");
+        app.save_pane_theme_copy();
+        assert!(!app.theme_draft_edited());
+        let first_theme = app.theme_overrides[&first].clone();
+        assert!(first_theme.starts_with("personal:"), "{first_theme}");
+        assert_ne!(first_theme, second_theme);
+        assert_eq!(app.theme_overrides[&second], second_theme);
+        assert_eq!(app.preferences.theme_id, shared);
+        assert_eq!(
+            app.terminal_presentation_for(first)
+                .terminal_colors
+                .background,
+            "#654321"
+        );
+        assert_eq!(
+            app.terminal_presentation_for(second)
+                .terminal_colors
+                .background,
+            "#123456"
+        );
+
+        // Both looks are what a restart restores, and a bundle can be saved with no name.
+        let looks = app.preferences_to_save().pane_looks;
+        let ids: Vec<_> = looks
+            .iter()
+            .filter_map(|look| look.theme_id.clone())
+            .collect();
+        assert!(
+            ids.contains(&first_theme) && ids.contains(&second_theme),
+            "{ids:?}"
+        );
+        assert_eq!(app.save_theme_bundle("").unwrap(), "Bundle 1");
+        assert_eq!(app.save_theme_bundle(" ").unwrap(), "Bundle 2");
+
+        // The "Edit for" row switches panes with unsaved edits instead of blocking.
+        app.theme_editor_pane_mode = true;
+        app.focused = 0;
+        edit(&mut app, "#111111");
+        app.focused = 1;
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| app.theme_editor_target_row(ui));
+        });
+        assert_eq!(app.theme_editor_pane, Some(second));
+        assert!(!app.theme_draft_edited());
+        assert_ne!(app.theme_overrides[&first], first_theme);
+        assert_eq!(
+            app.terminal_presentation_for(first)
+                .terminal_colors
+                .background,
+            "#111111"
+        );
+        assert_eq!(app.theme_overrides[&second], second_theme);
         std::fs::remove_dir_all(base).unwrap();
     }
 

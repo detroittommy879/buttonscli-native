@@ -32,6 +32,9 @@
   must keep `chatgpt:native:v1:<hex>`; use `chatgpt::saved_key` in key loaders.
 - The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
   preview/save touch only that pane's `theme_overrides`, never shared sources.
+  Edits never block: `autosave_theme_draft` saves them under the next numbered
+  name when switching panes, on Keep and close, and on quit. Never overwrite
+  a theme file that another pane, the shared sources or a bundle uses.
 - Theme bundles and `pane_looks` are keyed by slot (`slot_order`: displayed
   panes, then other tabs), never by PTY ID. `preferences_to_save` fills
   `pane_looks`; unused slots wait in `pending_pane_looks` for new tabs.
