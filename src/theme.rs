@@ -495,6 +495,11 @@ impl ShaderBackground {
 
     /// First preset that ignores c1–c3 and draws its own full-spectrum colors.
     pub const FIRST_VIVID: usize = 17;
+    /// Slider and file limits. Strength 1.0 lets a bright shader cover the
+    /// theme background completely; text keeps its own colors on top.
+    pub const STRENGTH: std::ops::RangeInclusive<f32> = 0.0..=1.0;
+    pub const SPEED: std::ops::RangeInclusive<f32> = 0.0..=6.0;
+    pub const SCALE: std::ops::RangeInclusive<f32> = 0.1..=10.0;
 
     pub fn preset_index(&self) -> Option<usize> {
         Self::PRESETS.iter().position(|(id, _)| *id == self.preset)
@@ -510,9 +515,11 @@ impl ShaderBackground {
         {
             return None;
         }
-        shader.strength = shader.strength.clamp(0.0, 0.65);
-        shader.speed = shader.speed.clamp(0.0, 2.0);
-        shader.scale = shader.scale.clamp(0.25, 4.0);
+        shader.strength = shader
+            .strength
+            .clamp(*Self::STRENGTH.start(), *Self::STRENGTH.end());
+        shader.speed = shader.speed.clamp(*Self::SPEED.start(), *Self::SPEED.end());
+        shader.scale = shader.scale.clamp(*Self::SCALE.start(), *Self::SCALE.end());
         if shader
             .colors
             .as_ref()
@@ -1247,7 +1254,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             (shader.strength, shader.speed, shader.scale),
-            (0.65, 0.0, 4.0)
+            (1.0, 0.0, 10.0)
         );
         assert!(
             ShaderBackground::from_value(&serde_json::json!({"version":2,"preset":"ink"}))

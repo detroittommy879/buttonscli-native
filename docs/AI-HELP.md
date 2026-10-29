@@ -26,8 +26,9 @@ Open **Settings → AI providers** to add a provider, choose the active provider
 
 **Add connection → ChatGPT plan (sign in)**, then **Continue with ChatGPT**. Your
 browser opens OpenAI's sign-in page; pick the account and allow ButtonsCLI to use
-your plan. Back in the app the connection shows "Connected as …", and **Discover
-models** lists the models your plan allows. Every AI feature (Help, themes,
+your plan. Back in the app the connection shows "Connected as …" and the model list
+loads by itself (**Discover models** refreshes it). The URL, format and key
+fields are hidden for these connections. Every AI feature (Help, themes,
 shaders, the judge model, simulated terminals) can then use it like any other
 connection. **Manage usage** opens chatgpt.com/settings/usage; **Sign out**
 forgets the tokens here and asks OpenAI to end the connection.

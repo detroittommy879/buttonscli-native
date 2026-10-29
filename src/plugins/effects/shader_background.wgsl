@@ -238,6 +238,6 @@ fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     }
     let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);
     let shade = select(color, clamp(vivid, vec3<f32>(0.0), vec3<f32>(1.0)), vivid.x >= 0.0);
-    // Bound strength in the host and keep the base color dominant for legibility.
-    return vec4<f32>(mix(u.base.rgb, shade, clamp(glow * u.settings.y, 0.0, 0.65)), 1.0);
+    // The host bounds strength (0..1); at 1 a full glow replaces the base color.
+    return vec4<f32>(mix(u.base.rgb, shade, clamp(glow * u.settings.y, 0.0, 1.0)), 1.0);
 }
