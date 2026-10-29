@@ -40,3 +40,22 @@ Traps:
 
 Validation: `cargo fmt --check`, `cargo test --locked` (331 passed, 33 ignored), clippy
 all-targets and wasm clippy pass. Not run: release build, Windows input probes.
+
+## README refresh and planning scans
+
+- README: lightly cleaned the hand-written intro (kept the voice), filled the placeholders,
+  new `main.png` alt text, and updated stale rows (AI shaders, custom WGSL, tab groups,
+  profile switcher, 34 shader presets, translations). Status date now October 28.
+- New [plans file](PLANS-2026-10-28.md): versions, manual-trigger release workflow, Store
+  checklist, metrics, security and language scans, tab color and shader-limit plans.
+- **Shader preview/terminal mismatch, cause found (not fixed):** `shader_background.rs`
+  caches evict by `cumulative_pass_nr()`, which is per viewport. Main-window entries always
+  look newest, so detached Settings previews evict each other and `paint` falls back to the
+  built-in preset pipeline. Fix plan is in the plans file, section 8.
+- `cargo audit` (installed with `cargo install cargo-audit --locked`): 12 advisories; rustls,
+  rustls-webpki, webpki-roots and ctutils are semver-compatible updates. `zip` advisories cover
+  `extract()`, which the app does not call.
+- i18n audit: `py -3 -I scripts/audit-i18n.py` works here (python is available via `py`).
+
+Traps:
+- egui 0.31 `Context::cumulative_pass_nr()` is per viewport; never compare it across windows.
