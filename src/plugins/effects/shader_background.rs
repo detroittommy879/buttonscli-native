@@ -610,6 +610,7 @@ mod tests {
                 let custom = crate::theme::CustomShader {
                     expression: body.into(),
                     variables: crate::theme::CustomShader::default().variables,
+                    ..Default::default()
                 };
                 let source =
                     custom_source(&custom).unwrap_or_else(|error| panic!("{body}: {error}"));

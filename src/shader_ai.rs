@@ -21,10 +21,12 @@ const MAX_REQUEST_CHARS: usize = 2_000;
 const RULES: &str = "The code is the body of a WGSL function that returns vec3<f32> RGB in 0..1. Write a few `let` lines and end with `return <color>;`. Not allowed: `var`, loops, `if`/`else`, `switch`, extra functions, arrays, structs. Use `select(a, b, condition)` or `mix`/`step` instead of if.
 
 Available values:
-- p: vec2<f32>, pane coordinates centred on 0 (about -1..1 vertically, wider horizontally)
+- p: vec2<f32>, pane coordinates centred on 0 (about -1..1 vertically, wider horizontally), already multiplied by the user's Scale slider
 - t: f32, time in seconds (already scaled by the user's speed)
-- c1, c2, c3: vec3<f32>, the theme's three colors
-- any slider variables listed below, as f32
+- strength: f32 from 0 to 1, the user's Strength slider. Always use it: it is how the user turns the whole effect up or down. At 0 the result should be just bg, at 1 the full effect. The simplest way is to end with `return mix(bg, color, strength);`; you can also use it to scale contrast or glow. Nothing else fades your result.
+- bg: vec3<f32>, the terminal background color behind the text
+- c1, c2, c3: vec3<f32>, three colors (the request says whether the user picked them)
+- any slider variables listed in the request, as f32
 
 Available helper functions:
 - hash(vec2<f32>) -> f32, random 0..1 per point
@@ -37,13 +39,16 @@ Plus WGSL built-ins: sin, cos, tan, abs, fract, floor, mix, smoothstep, step, le
 
 Write float literals with a decimal point (2.0, not 2) and keep both sides of every operator the same type (f32 with f32, vec3 with vec3). Keep it under 3000 characters. There are no loops, so draw at most a few copies of a shape by hand, or use fract()/floor() on coordinates to repeat a pattern.";
 
-const WRITER: &str = "You write small WGSL shader programs for an animated terminal background. Text is drawn on top, so keep it rich and colorful but not so bright or busy that text becomes hard to read.
+const WRITER: &str = "You write small WGSL shader programs for an animated terminal background. Text is drawn on top. At strength 1 the effect must be clearly visible and colorful, not mostly near-black: the user keeps text readable with the Strength slider, so do not make the pattern dim on its own. Avoid large areas of pure white.
 
-Reply with a short name in <name></name> tags and the code in <shader></shader> tags. Nothing outside the tags is used.";
+Reply with a short, fitting name in <name></name> tags and the code in <shader></shader> tags. Nothing outside the tags is used.";
 
-const JUDGE: &str = "You review WGSL shader code written by another model for an animated terminal background. You get the user's request, the code and, if it failed, the compiler error.
+const JUDGE: &str = "You review WGSL shader code written by another model for an animated terminal background. You get the user's request, their current settings, the code and, if it failed, the compiler error.
 
-If there is a compiler error, fix it with the smallest change that keeps the idea. If it compiles, check that it matches the request and stays readable behind text. If it is good, reply <verdict>keep</verdict>. Otherwise reply <verdict>improve</verdict> and the full improved code in <shader></shader> tags, plus one sentence why in <why></why>.";
+If there is a compiler error, fix it with the smallest change that keeps the idea. If it compiles, check that it matches the request, that it uses `strength` so the Strength slider works, that it is clearly visible at strength 1 (not mostly near-black), and that it follows the color and slider notes in the request. If it is good, reply <verdict>keep</verdict>. Otherwise reply <verdict>improve</verdict> and the full improved code in <shader></shader> tags, plus one sentence why in <why></why>. Keep slider names as they are.";
+
+/// Most sliders a shader can have (the GPU passes four values).
+const MAX_SLIDERS: usize = 4;
 
 /// Creative directions given to parallel lanes, one per lane.
 pub(crate) const DIRECTIONS: [(&str, &str); 6] = [
@@ -99,6 +104,34 @@ pub(crate) struct Request<'a> {
     pub(crate) direction: Option<(&'a str, &'a str)>,
     pub(crate) current: &'a CustomShader,
     pub(crate) current_error: Option<&'a str>,
+    pub(crate) look: &'a Look,
+}
+
+/// The Style settings the code will run with, turned into notes for the models.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Look {
+    /// c1–c3 as hex colors.
+    pub(crate) colors: [String; 3],
+    /// The user picked c1–c3 (Custom shader colors), so the palette must use them.
+    pub(crate) own_colors: bool,
+    pub(crate) background: String,
+    pub(crate) strength: f32,
+    pub(crate) animated: bool,
+    /// The user turned sliders on: use the current ones and add new ones if useful.
+    pub(crate) sliders: bool,
+}
+
+impl Default for Look {
+    fn default() -> Self {
+        Self {
+            colors: ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()],
+            own_colors: false,
+            background: "#101018".into(),
+            strength: 0.35,
+            animated: true,
+            sliders: false,
+        }
+    }
 }
 
 /// One lane: write, check, judge (review or repair), and one last repair by
@@ -122,11 +155,12 @@ pub(crate) fn generate(
     }
     // Without a judge setting, the writer reviews its own work.
     let judges = if judges.is_empty() { writers } else { judges };
-    let variables = request.current.variables.clone();
-    let compiles = |code: &str| {
+    let mut variables = request.current.variables.clone();
+    let compiles = |code: &str, variables: &[crate::theme::ShaderVariable]| {
         crate::plugins::effects::shader_expression::function(&CustomShader {
             expression: code.to_owned(),
-            variables: variables.clone(),
+            variables: variables.to_vec(),
+            ..Default::default()
         })
         .map(|_| ())
     };
@@ -147,9 +181,13 @@ pub(crate) fn generate(
         .filter(|name| name.len() <= 60)
         .unwrap_or_else(|| request.direction.map_or("AI shader", |d| d.0).to_owned());
     let mut code = extract_shader(&reply).ok_or("The model did not return a <shader> tag.")?;
+    if request.look.sliders {
+        let added = new_sliders(&reply, &variables);
+        variables.extend(added);
+    }
 
     report(Stage::Checking, 0);
-    let mut error = compiles(&code).err();
+    let mut error = compiles(&code, &variables).err();
     let mut note = String::new();
     let mut judge_name = None;
 
@@ -162,7 +200,7 @@ pub(crate) fn generate(
         },
         0,
     );
-    let judge_prompt = judge_prompt(brief, &code, error.as_deref(), request.current);
+    let judge_prompt = judge_prompt(brief, &code, error.as_deref(), &variables, request.look);
     if let Ok((verdict, judge)) = ask(
         transport,
         judges,
@@ -185,7 +223,7 @@ pub(crate) fn generate(
         judge_name = Some(judge);
         if let Some(improved) = extract_shader(&verdict) {
             report(Stage::Checking, 0);
-            match compiles(&improved) {
+            match compiles(&improved, &variables) {
                 Ok(()) => {
                     code = improved;
                     error = None;
@@ -221,7 +259,7 @@ pub(crate) fn generate(
         )?;
         let fixed = extract_shader(&fixed).ok_or("The model did not return a <shader> tag.")?;
         report(Stage::Checking, 0);
-        compiles(&fixed).map_err(|error| format!("Still does not compile: {error}"))?;
+        compiles(&fixed, &variables).map_err(|error| format!("Still does not compile: {error}"))?;
         code = fixed;
         note = "Fixed after a compiler error.".into();
     }
@@ -269,23 +307,94 @@ fn ask(
     Ok((reply, used))
 }
 
-fn variables_text(current: &CustomShader) -> String {
-    if current.variables.is_empty() {
-        return String::new();
+/// The user's settings and sliders as plain notes for both models.
+fn settings_text(variables: &[crate::theme::ShaderVariable], look: &Look) -> String {
+    let [c1, c2, c3] = &look.colors;
+    let mut text = format!(
+        "<settings>\nThe Strength slider is at {:.2} now; the code must look right anywhere from 0 to 1.\nbg (terminal background) is {}.\n",
+        look.strength, look.background
+    );
+    text.push_str(&if look.own_colors {
+        format!("The user picked these colors on purpose: c1 = {c1}, c2 = {c2}, c3 = {c3}. Build the palette from c1, c2 and c3 (darker or lighter shades of them are fine) and do not add other hues.\n")
+    } else {
+        format!("c1 = {c1}, c2 = {c2}, c3 = {c3} come from the theme. Use them, or your own colors if the request asks for specific colors.\n")
+    });
+    if !look.animated {
+        text.push_str("Animation is off, so t stays 0: it must look good as a still image.\n");
     }
-    let mut text = String::from("Slider variables:\n");
-    for variable in &current.variables {
-        text.push_str(&format!(
-            "- {} (from {} to {}, now {})\n",
-            variable.name, variable.min, variable.max, variable.value
-        ));
+    if !variables.is_empty() {
+        text.push_str("Slider variables the user can move:\n");
+        for variable in variables {
+            text.push_str(&format!(
+                "- {} (from {} to {}, now {})\n",
+                variable.name, variable.min, variable.max, variable.value
+            ));
+        }
+    }
+    text.push_str("</settings>\n");
+    text
+}
+
+/// Slider requests for the writer, when the user turned sliders on.
+fn sliders_text(variables: &[crate::theme::ShaderVariable]) -> String {
+    let free = MAX_SLIDERS.saturating_sub(variables.len());
+    let mut text = String::from("The user wants sliders for this shader. ");
+    if !variables.is_empty() {
+        text.push_str("Use the slider variables above where they fit. ");
+    }
+    if free > 0 {
+        text.push_str(&format!("You may add up to {free} new slider(s) for things the request mentions (the speed or size of one object, density, glow and so on): one per line inside <sliders></sliders> tags as `name min max default`, for example `bubble_size 0.1 2.0 0.6`. Names use lowercase letters, digits and underscores, and must not be p, t, strength, bg, c1, c2, c3 or knobs. Then use those names in the code."));
     }
     text.push('\n');
     text
 }
 
+/// New sliders the writer declared in `<sliders>`: valid, unused names only,
+/// up to the four-slider limit.
+fn new_sliders(
+    reply: &str,
+    existing: &[crate::theme::ShaderVariable],
+) -> Vec<crate::theme::ShaderVariable> {
+    let Some(text) = extract_tag(reply, "sliders") else {
+        return Vec::new();
+    };
+    let mut added: Vec<crate::theme::ShaderVariable> = Vec::new();
+    for line in text.lines() {
+        let parts: Vec<&str> = line.trim().trim_matches('`').split_whitespace().collect();
+        let [name, min, max, value] = parts[..] else {
+            continue;
+        };
+        let (Ok(min), Ok(max), Ok(value)) =
+            (min.parse::<f32>(), max.parse::<f32>(), value.parse::<f32>())
+        else {
+            continue;
+        };
+        let valid_name = name.len() <= 32
+            && name.as_bytes()[0].is_ascii_alphabetic()
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            && !crate::plugins::effects::shader_expression::RESERVED.contains(&name)
+            && !existing.iter().chain(&added).any(|v| v.name == name);
+        let valid_range = [min, max, value].iter().all(|v| v.is_finite())
+            && min < max
+            && min >= -100.0
+            && max <= 100.0;
+        if valid_name && valid_range && existing.len() + added.len() < MAX_SLIDERS {
+            added.push(crate::theme::ShaderVariable {
+                name: name.to_owned(),
+                min,
+                max,
+                value: value.clamp(min, max),
+            });
+        }
+    }
+    added
+}
+
 fn writer_prompt(request: &Request<'_>) -> String {
-    let mut prompt = variables_text(request.current);
+    let mut prompt = settings_text(&request.current.variables, request.look);
+    if request.look.sliders && !request.brief.trim().is_empty() {
+        prompt.push_str(&sliders_text(&request.current.variables));
+    }
     prompt.push_str(&format!(
         "<current_code>\n{}\n</current_code>\n",
         request.current.expression
@@ -309,8 +418,14 @@ fn writer_prompt(request: &Request<'_>) -> String {
     prompt
 }
 
-fn judge_prompt(brief: &str, code: &str, error: Option<&str>, current: &CustomShader) -> String {
-    let mut prompt = variables_text(current);
+fn judge_prompt(
+    brief: &str,
+    code: &str,
+    error: Option<&str>,
+    variables: &[crate::theme::ShaderVariable],
+    look: &Look,
+) -> String {
+    let mut prompt = settings_text(variables, look);
     prompt.push_str(&format!(
         "<request>\n{}\n</request>\n<code>\n{code}\n</code>\n",
         if brief.is_empty() {
@@ -405,6 +520,7 @@ mod tests {
                 brief: "rainbow",
                 direction: Some(DIRECTIONS[0]),
                 current: &CustomShader::default(),
+                look: &Look::default(),
                 current_error: None,
             },
             &AtomicBool::new(false),
@@ -416,6 +532,34 @@ mod tests {
         );
         let models = transport.1.into_inner().unwrap();
         (result, models, stages)
+    }
+
+    #[test]
+    fn prompts_carry_strength_colors_and_new_sliders() {
+        let look = Look {
+            own_colors: true,
+            animated: false,
+            sliders: true,
+            ..Look::default()
+        };
+        let request = Request {
+            brief: "red bubbles",
+            direction: None,
+            current: &CustomShader::default(),
+            current_error: None,
+            look: &look,
+        };
+        let prompt = writer_prompt(&request);
+        assert!(prompt.contains("c1 = #ff487b") && prompt.contains("do not add other hues"));
+        assert!(prompt.contains("t stays 0") && prompt.contains("<sliders>"));
+        assert!(RULES.contains("strength: f32") && RULES.contains("mix(bg, color, strength)"));
+
+        // Only valid, new names fit, up to four sliders in total (one exists).
+        let reply = "<sliders>\nbubble_size 0.1 2.0 0.6\nstrength 0 1 0.5\namount 0 1 0.5\nbad range 1 0 0\n`speed2 0 5 9`\nwobble 0 1 0.2\nextra 0 1 0.1\n</sliders>";
+        let added = new_sliders(reply, &CustomShader::default().variables);
+        let names: Vec<_> = added.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, ["bubble_size", "speed2", "wobble"]);
+        assert_eq!(added[1].value, 5.0);
     }
 
     #[test]
@@ -547,6 +691,7 @@ mod tests {
                             direction: Some(*direction),
                             current: &CustomShader::default(),
                             current_error: None,
+                            look: &Look::default(),
                         },
                         &AtomicBool::new(false),
                         &mut |stage, _| last = stage,

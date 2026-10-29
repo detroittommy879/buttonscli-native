@@ -422,6 +422,9 @@ impl Default for ShaderVariable {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct CustomShader {
+    /// What the AI (or the user) called it; shown in the Style picker.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub name: String,
     pub expression: String,
     pub variables: Vec<ShaderVariable>,
 }
@@ -429,6 +432,7 @@ pub struct CustomShader {
 impl Default for CustomShader {
     fn default() -> Self {
         Self {
+            name: String::new(),
             expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
             variables: vec![ShaderVariable::default()],
         }

@@ -65,6 +65,8 @@
   sources. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
   use ordinary page scrolling, with separate positions, not stacked resize panels.
 - Theme shader strings are inert metadata. Do not claim legacy GLSL effects execute.
+- Custom shader code gets `strength` and `bg`; code that uses `strength` is not faded by
+  the host. Shader AI prompts must keep the Style notes (`shader_ai::settings_text`).
 
 ## Validation and traps
 

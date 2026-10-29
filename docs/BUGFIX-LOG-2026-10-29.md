@@ -84,3 +84,28 @@ the new provider screen and the pane row (no ChatGPT account here).
 - Test: `pane_edits_save_with_numbered_names_and_never_touch_other_panes`
   (also drives the real "Edit for" row). fmt, 344 tests, both clippy runs and
   the release build pass. Not checked by eye in the running app.
+
+## Shader Strength, AI prompt context, Style section
+
+- Strength did nothing for dark AI shaders: custom code was only faded toward
+  the background by Strength, so at 1.0 a dark pattern stayed dark. Custom
+  code now gets `strength` (0..1) and `bg`. Code that uses `strength` owns it
+  (`shader_expression::combine` drops the host fade); old code is faded as before.
+  `strength` and `bg` are reserved slider names.
+- AI prompts (`shader_ai::settings_text`) now state: Strength must be used,
+  visible at 1 (not near-black), the user's picked c1–c3 (palette must use
+  them) or the theme's, animation off = still image, and current sliders.
+  With "Sliders for this shader" on, the writer may declare up to 4 new sliders
+  in `<sliders>name min max default</sliders>` (`new_sliders` validates them).
+- Style section: one Pattern picker ("Your code: <AI name>" or presets; code is
+  stashed while a preset is picked), Strength/Scale/Animate, then options
+  "My own colors" and "Sliders for this shader" (value sliders here). Code is
+  a collapsible section with a name field; slider ranges live there.
+- Choosing an AI result names the draft after it (`unused_theme_name`,
+  `name_theme_draft`), so it saves as a new theme; autosave keeps an unused
+  fresh name instead of numbering it.
+- Tests: `prompts_carry_strength_colors_and_new_sliders`,
+  `code_that_uses_strength_owns_it_and_other_code_is_faded`, shaders page
+  labels. 346 tests, both clippy runs, GPU shader tests (--include-ignored;
+  `render_shader_gallery` needs BUTTONSCLI_SHADER_GALLERY_DIR) and the release
+  build pass. Not checked by eye or against a live model.

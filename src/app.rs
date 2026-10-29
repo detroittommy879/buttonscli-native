@@ -978,6 +978,10 @@ struct ShaderAiState {
     fix_only: bool,
     /// How many versions "Generate" writes in parallel.
     count: usize,
+    /// "Sliders for this shader": AI may use and add sliders.
+    sliders: bool,
+    /// Code set aside when a preset was picked, to switch back to.
+    stash: Option<crate::theme::CustomShader>,
     lanes: Vec<ShaderLane>,
     generation: u64,
     cancel: Option<Arc<AtomicBool>>,
@@ -997,6 +1001,8 @@ impl Default for ShaderAiState {
             ready: None,
             fix_only: false,
             count: 4,
+            sliders: false,
+            stash: None,
             lanes: Vec::new(),
             generation: 0,
             cancel: None,
@@ -9329,10 +9335,15 @@ impl ButtonsApp {
             wrapping_row(ui, |ui| {
                 ui.spaced_label(
                     RichText::new(format!(
-                        "Editing: {}",
+                        "Editing: {}{}",
                         document["metadata"]["name"]
                             .as_str()
-                            .unwrap_or("Theme draft")
+                            .unwrap_or("Theme draft"),
+                        if self.theme_editor_file_exists {
+                            ""
+                        } else {
+                            " (new theme, not saved yet)"
+                        }
                     ))
                     .strong(),
                 );
@@ -9377,7 +9388,8 @@ impl ButtonsApp {
             }
         });
 
-        // 2. Built-in styles.
+        // 2. Style: which pattern, how strong, and the options AI and code share.
+        let mut sliders_note = None;
         settings_section(ui, base, 1, |ui| {
             ui.spaced_label(RichText::new("Style").strong());
             if ui
@@ -9390,19 +9402,63 @@ impl ButtonsApp {
             if !enabled {
                 return;
             }
+            // One picker: the theme's own code (AI or hand-written) or a preset.
+            let code_label = |custom: &crate::theme::CustomShader| {
+                if custom.name.is_empty() {
+                    "Your code".to_owned()
+                } else {
+                    format!("Your code: {}", custom.name)
+                }
+            };
+            let own_code = shader
+                .custom
+                .clone()
+                .or_else(|| self.shader_ai.stash.clone());
+            let selected = match &shader.custom {
+                Some(custom) => code_label(custom),
+                None => crate::theme::ShaderBackground::PRESETS[shader.preset_index().unwrap_or(0)]
+                    .1
+                    .to_owned(),
+            };
             let old_preset = shader.preset.clone();
-            egui::ComboBox::from_id_salt("shader-preset")
-                .selected_text(
-                    crate::theme::ShaderBackground::PRESETS[shader.preset_index().unwrap_or(0)].1,
-                )
-                .show_ui(ui, |ui| {
-                    for &(value, label) in crate::theme::ShaderBackground::PRESETS {
-                        ui.spaced_selectable_value(&mut shader.preset, value.into(), label);
-                    }
-                });
+            let mut pick_code = false;
+            wrapping_row(ui, |ui| {
+                ui.spaced_label("Pattern");
+                egui::ComboBox::from_id_salt("shader-preset")
+                    .selected_text(selected)
+                    .show_ui(ui, |ui| {
+                        if ui
+                            .selectable_label(
+                                shader.custom.is_some(),
+                                own_code.as_ref().map_or("Your code (new)".to_owned(), code_label),
+                            )
+                            .on_hover_text("Code written by Create with AI or by you, edited under Code below.")
+                            .clicked()
+                        {
+                            pick_code = true;
+                        }
+                        ui.separator();
+                        for &(value, label) in crate::theme::ShaderBackground::PRESETS {
+                            if ui
+                                .selectable_label(
+                                    shader.custom.is_none() && shader.preset == value,
+                                    label,
+                                )
+                                .clicked()
+                            {
+                                shader.preset = value.into();
+                                // Keep the code to switch back to it later.
+                                if let Some(custom) = shader.custom.take() {
+                                    self.shader_ai.stash = Some(custom);
+                                }
+                            }
+                        }
+                    });
+            });
+            if pick_code && shader.custom.is_none() {
+                shader.custom = Some(self.shader_ai.stash.take().unwrap_or_default());
+            }
             if shader.preset != old_preset {
-                // Picking a preset means "show me this one", not the custom code.
-                shader.custom = None;
                 let index = shader.preset_index().unwrap_or(0);
                 if (7..crate::theme::ShaderBackground::FIRST_VIVID).contains(&index) {
                     shader.colors = Some(["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
@@ -9414,28 +9470,38 @@ impl ButtonsApp {
                     crate::theme::ShaderBackground::STRENGTH,
                 )
                 .text("Strength"),
-            );
+            )
+            .on_hover_text("How strongly the pattern shows behind the text. Create with AI is told to use it, so lower it if text is hard to read.");
             ui.add(
                 egui::Slider::new(&mut shader.scale, crate::theme::ShaderBackground::SCALE)
                     .logarithmic(true)
                     .text("Scale"),
             );
-            ui.spaced_checkbox(&mut shader.animated, "Animate background");
-            ui.add_enabled(
-                shader.animated,
-                egui::Slider::new(&mut shader.speed, crate::theme::ShaderBackground::SPEED)
-                    .text("Speed"),
+            wrapping_row(ui, |ui| {
+                ui.spaced_checkbox(&mut shader.animated, "Animate");
+                ui.add_enabled(
+                    shader.animated,
+                    egui::Slider::new(&mut shader.speed, crate::theme::ShaderBackground::SPEED)
+                        .text("Speed"),
+                );
+            });
+
+            ui.add_space(4.0);
+            ui.spaced_label(
+                RichText::new("Options. Create with AI is told about the ones you turn on.")
+                    .color(self.colors().muted),
             );
             let mut own_colors = shader.colors.is_some();
-            if ui
-                .spaced_checkbox(&mut own_colors, "Custom shader colors")
-                .changed()
-            {
-                shader.colors =
-                    own_colors.then(|| ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
-            }
-            if let Some(colors) = &mut shader.colors {
-                ui.horizontal(|ui| {
+            wrapping_row(ui, |ui| {
+                if ui
+                    .spaced_checkbox(&mut own_colors, "My own colors")
+                    .on_hover_text("Off: c1–c3 come from the theme. On: these three colors are used, and AI builds its palette from them.")
+                    .changed()
+                {
+                    shader.colors =
+                        own_colors.then(|| ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]);
+                }
+                if let Some(colors) = &mut shader.colors {
                     for (index, color) in colors.iter_mut().enumerate() {
                         ui.push_id(index, |ui| {
                             ui.label(format!("c{}", index + 1));
@@ -9446,9 +9512,81 @@ impl ButtonsApp {
                             }
                         });
                     }
-                });
+                }
+            });
+            let variables = shader
+                .custom
+                .as_ref()
+                .map_or(0, |custom| custom.variables.len());
+            let mut sliders = self.shader_ai.sliders || variables > 0;
+            if ui
+                .spaced_checkbox(&mut sliders, "Sliders for this shader")
+                .on_hover_text("On: AI uses your sliders and can add up to four for things you describe, like \"alien speed\". Rename them or change ranges under Code.")
+                .changed()
+            {
+                self.shader_ai.sliders = sliders;
+                if !sliders {
+                    if let Some(custom) = &mut shader.custom {
+                        let code = custom.expression.clone();
+                        custom.variables.retain(|variable| {
+                            crate::plugins::effects::shader_expression::uses(&code, &variable.name)
+                        });
+                        if !custom.variables.is_empty() {
+                            sliders_note = Some(format!(
+                                "Still used by the code: {}. Remove them from the code first.",
+                                custom
+                                    .variables
+                                    .iter()
+                                    .map(|variable| variable.name.as_str())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ));
+                        }
+                    }
+                }
+            }
+            if let Some(custom) = &mut shader.custom {
+                for (index, variable) in custom.variables.iter_mut().enumerate() {
+                    if variable.min < variable.max {
+                        ui.push_id(("shader-slider-value", index), |ui| {
+                            ui.add(
+                                egui::Slider::new(&mut variable.value, variable.min..=variable.max)
+                                    .text(&variable.name),
+                            );
+                        });
+                    }
+                }
+            } else if sliders {
+                ui.spaced_label(
+                    RichText::new("AI results will come with sliders.").color(self.colors().muted),
+                );
+            }
+            if let Some(note) = &sliders_note {
+                ui.spaced_colored_label(self.colors().warning, note);
             }
         });
+
+        // What the AI is told about the Style settings above.
+        let look = ThemeDefinition::editor_document(&document)
+            .ok()
+            .map(|theme| {
+                let palette = shader_palette(&theme);
+                crate::shader_ai::Look {
+                    colors: shader.colors.clone().unwrap_or_else(|| {
+                        [palette[1], palette[2], palette[3]].map(crate::theme::to_hex)
+                    }),
+                    own_colors: shader.colors.is_some(),
+                    background: crate::theme::to_hex(palette[0]),
+                    strength: shader.strength,
+                    animated: shader.animated,
+                    sliders: self.shader_ai.sliders
+                        || shader
+                            .custom
+                            .as_ref()
+                            .is_some_and(|c| !c.variables.is_empty()),
+                }
+            })
+            .unwrap_or_default();
 
         // 3. Create with AI: several writers in parallel, each checked by a judge.
         if shader_ai_available() {
@@ -9482,10 +9620,34 @@ impl ButtonsApp {
                         )
                         .clicked()
                     {
-                        let current = shader.custom.clone().unwrap_or_default();
-                        self.start_shader_ai(ui.ctx(), current, None, self.shader_ai.count);
+                        // Sliders only carry over when they are on.
+                        let mut current = shader.custom.clone().unwrap_or_default();
+                        if !look.sliders {
+                            current.variables.clear();
+                        }
+                        self.start_shader_ai(
+                            ui.ctx(),
+                            current,
+                            None,
+                            self.shader_ai.count,
+                            look.clone(),
+                        );
                     }
                 });
+                let mut notes = vec!["uses Strength"];
+                if look.own_colors {
+                    notes.push("your colors");
+                }
+                if look.sliders {
+                    notes.push("sliders");
+                }
+                if !look.animated {
+                    notes.push("a still image");
+                }
+                ui.spaced_label(
+                    RichText::new(format!("AI is told: {}.", notes.join(", ")))
+                        .color(self.colors().muted),
+                );
                 if let Some(message) = &self.shader_ai.message {
                     ui.spaced_label(message);
                 }
@@ -9497,126 +9659,140 @@ impl ButtonsApp {
             });
         }
 
-        // 4. Custom code, for people who want to tweak what AI wrote.
+        // 4. Code: what AI wrote (or your own), for people who want to tweak it.
         settings_section(ui, base, 3, |ui| {
-            let mut custom = shader.custom.is_some();
-            if ui
-                .spaced_checkbox(&mut custom, "Custom shader code")
-                .changed()
-            {
-                shader.custom = custom.then(Default::default);
-                if custom {
-                    enabled = true;
-                }
-            }
             let Some(custom) = &mut shader.custom else {
+                ui.spaced_label(RichText::new("Code").strong());
+                ui.spaced_label("This theme uses a preset. Pick \"Your code\" under Pattern, or use Create with AI, to get code you can edit here.");
                 return;
             };
             if let Some(expression) = self.shader_ai.ready.take() {
                 self.shader_ai.undo = Some(std::mem::replace(&mut custom.expression, expression));
             }
-            ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, c1–c3 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`.");
-            wrapping_row(ui, |ui| {
-                ui.spaced_menu_button("Load example", |ui| {
-                    for (label, example) in SHADER_EXAMPLES {
-                        if ui.spaced_button(*label).clicked() {
-                            custom.expression = (*example).into();
-                            ui.close_menu();
-                        }
-                    }
-                });
-                if self.shader_ai.undo.is_some()
-                    && !self.shader_ai.busy
-                    && ui.spaced_button("Undo AI change").clicked()
-                {
-                    custom.expression = self.shader_ai.undo.take().unwrap_or_default();
-                    self.shader_ai.message = None;
-                }
-            });
-            ui.add(
-                egui::TextEdit::multiline(&mut custom.expression)
-                    .code_editor()
-                    .desired_rows(8)
-                    .desired_width(f32::INFINITY)
-                    .char_limit(crate::plugins::effects::shader_expression::MAX_SOURCE_BYTES),
-            );
             // Compile status is checked live (cached), so it doubles as the check button.
             let compile = crate::plugins::effects::shader_expression::function(custom);
-            match &compile {
-                Ok(_) => {
-                    ui.spaced_label(
-                        RichText::new("✓ Compiles. The preview at the top is live.")
-                            .color(Color32::from_rgb(100, 245, 175)),
-                    );
-                }
-                Err(error) => {
-                    ui.add(
-                        egui::Label::new(
-                            RichText::new(format!("Shader error:\n{error}"))
-                                .monospace()
-                                .color(Color32::LIGHT_RED),
-                        )
-                        .wrap(),
-                    );
-                    if shader_ai_available()
-                        && !self.shader_ai.busy
-                        && ui.spaced_button("Fix with AI").clicked()
-                    {
-                        let fix = custom.clone();
-                        self.shader_ai.fix_only = true;
-                        self.start_shader_ai(ui.ctx(), fix, Some(error.clone()), 1);
-                    }
-                }
-            }
-            ui.spaced_label("Sliders: name a variable, then use that name in the code.");
-            let mut remove = None;
-            for (index, variable) in custom.variables.iter_mut().enumerate() {
-                ui.push_id(("shader-variable", index), |ui| {
+            let title = match &compile {
+                Ok(_) => "Code ✓ compiles",
+                Err(_) => "Code ✗ has an error",
+            };
+            egui::CollapsingHeader::new(RichText::new(title).strong())
+                .id_salt("shader-code")
+                .default_open(compile.is_err())
+                .show(ui, |ui| {
                     wrapping_row(ui, |ui| {
+                        ui.spaced_label("Name");
                         ui.add(
-                            egui::TextEdit::singleline(&mut variable.name)
-                                .desired_width(90.0)
-                                .char_limit(32),
+                            egui::TextEdit::singleline(&mut custom.name)
+                                .hint_text("Untitled")
+                                .desired_width(200.0)
+                                .char_limit(60),
                         );
-                        ui.add(
-                            egui::DragValue::new(&mut variable.min)
-                                .range(-100.0..=100.0)
-                                .prefix("Min "),
-                        );
-                        ui.add(
-                            egui::DragValue::new(&mut variable.max)
-                                .range(-100.0..=100.0)
-                                .prefix("Max "),
-                        );
-                        if ui.button("Remove").clicked() {
-                            remove = Some(index);
+                    });
+                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c3 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
+                    wrapping_row(ui, |ui| {
+                        ui.spaced_menu_button("Load example", |ui| {
+                            for (label, example) in SHADER_EXAMPLES {
+                                if ui.spaced_button(*label).clicked() {
+                                    custom.expression = (*example).into();
+                                    custom.name = (*label).into();
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                        if self.shader_ai.undo.is_some()
+                            && !self.shader_ai.busy
+                            && ui.spaced_button("Undo AI change").clicked()
+                        {
+                            custom.expression = self.shader_ai.undo.take().unwrap_or_default();
+                            self.shader_ai.message = None;
                         }
                     });
-                    if variable.min < variable.max {
-                        ui.add(
-                            egui::Slider::new(&mut variable.value, variable.min..=variable.max)
-                                .text(&variable.name),
-                        );
+                    ui.add(
+                        egui::TextEdit::multiline(&mut custom.expression)
+                            .code_editor()
+                            .desired_rows(8)
+                            .desired_width(f32::INFINITY)
+                            .char_limit(crate::plugins::effects::shader_expression::MAX_SOURCE_BYTES),
+                    );
+                    match &compile {
+                        Ok(_) => {
+                            ui.spaced_label(
+                                RichText::new("✓ Compiles. The preview at the top is live.")
+                                    .color(Color32::from_rgb(100, 245, 175)),
+                            );
+                        }
+                        Err(error) => {
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(format!("Shader error:\n{error}"))
+                                        .monospace()
+                                        .color(Color32::LIGHT_RED),
+                                )
+                                .wrap(),
+                            );
+                            if shader_ai_available()
+                                && !self.shader_ai.busy
+                                && ui.spaced_button("Fix with AI").clicked()
+                            {
+                                let fix = custom.clone();
+                                self.shader_ai.fix_only = true;
+                                self.start_shader_ai(
+                                    ui.ctx(),
+                                    fix,
+                                    Some(error.clone()),
+                                    1,
+                                    look.clone(),
+                                );
+                            }
+                        }
+                    }
+                    if !look.sliders {
+                        return;
+                    }
+                    ui.spaced_label("Sliders: name a variable, then use that name in the code. Drag them under Style.");
+                    let mut remove = None;
+                    for (index, variable) in custom.variables.iter_mut().enumerate() {
+                        ui.push_id(("shader-variable", index), |ui| {
+                            wrapping_row(ui, |ui| {
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut variable.name)
+                                        .desired_width(90.0)
+                                        .char_limit(32),
+                                );
+                                ui.add(
+                                    egui::DragValue::new(&mut variable.min)
+                                        .range(-100.0..=100.0)
+                                        .prefix("Min "),
+                                );
+                                ui.add(
+                                    egui::DragValue::new(&mut variable.max)
+                                        .range(-100.0..=100.0)
+                                        .prefix("Max "),
+                                );
+                                if ui.button("Remove").clicked() {
+                                    remove = Some(index);
+                                }
+                            });
+                        });
+                    }
+                    if let Some(index) = remove {
+                        custom.variables.remove(index);
+                    }
+                    if custom.variables.len() < 4 && ui.spaced_button("Add slider").clicked() {
+                        let mut suffix = 1;
+                        while custom
+                            .variables
+                            .iter()
+                            .any(|variable| variable.name == format!("param{suffix}"))
+                        {
+                            suffix += 1;
+                        }
+                        custom.variables.push(crate::theme::ShaderVariable {
+                            name: format!("param{suffix}"),
+                            ..Default::default()
+                        });
                     }
                 });
-            }
-            if let Some(index) = remove {
-                custom.variables.remove(index);
-            }
-            if custom.variables.len() < 4 && ui.spaced_button("Add slider").clicked() {
-                let mut suffix = 1;
-                while custom
-                    .variables
-                    .iter()
-                    .any(|variable| variable.name == format!("param{suffix}"))
-                {
-                    suffix += 1;
-                }
-                custom.variables.push(crate::theme::ShaderVariable {
-                    name: format!("param{suffix}"),
-                    ..Default::default()
-                });
-            }
         });
 
         if let Some(candidate) = chosen {
@@ -9639,14 +9815,17 @@ impl ButtonsApp {
                     *variable = old.clone();
                 }
             }
+            let theme_name = self.unused_theme_name(&candidate.name);
+            self.shader_ai.message = Some(format!(
+                "Using \"{}\". It saves as a new theme, \"{theme_name}\", so the one you started from stays as it was.",
+                candidate.name
+            ));
             shader.custom = Some(crate::theme::CustomShader {
+                name: candidate.name,
                 expression: candidate.code,
                 variables,
             });
-            self.shader_ai.message = Some(format!(
-                "Using \"{}\". Preview on terminals or save below.",
-                candidate.name
-            ));
+            self.name_theme_draft(&mut document, &theme_name);
         }
         if enabled {
             crate::theme_files::overlay_appearance(
@@ -9784,6 +9963,7 @@ impl ButtonsApp {
                         // Use the sliders the code was checked with: it may
                         // reference them, and the draft may have none yet.
                         preview.custom = Some(crate::theme::CustomShader {
+                            name: candidate.name.clone(),
                             expression: candidate.code.clone(),
                             variables: candidate.variables.clone(),
                         });
@@ -10629,6 +10809,7 @@ impl ButtonsApp {
         current: crate::theme::CustomShader,
         error: Option<String>,
         count: usize,
+        look: crate::shader_ai::Look,
     ) {
         if self.shader_ai.busy {
             return;
@@ -10677,13 +10858,14 @@ impl ButtonsApp {
             .collect();
         let brief = self.shader_ai.prompt.clone();
         for lane in 0..count {
-            let (writers, judges, profile, brief, current, error) = (
+            let (writers, judges, profile, brief, current, error, look) = (
                 writers.clone(),
                 judges.clone(),
                 profile.clone(),
                 brief.clone(),
                 current.clone(),
                 error.clone(),
+                look.clone(),
             );
             let session = Arc::clone(&self.credential_session);
             let sender = self.shader_ai.tx.clone();
@@ -10707,6 +10889,7 @@ impl ButtonsApp {
                         direction: (count > 1).then_some(crate::shader_ai::DIRECTIONS[lane]),
                         current: &current,
                         current_error: error.as_deref(),
+                        look: &look,
                     },
                     &cancel,
                     &mut |stage, chars| {
@@ -11376,12 +11559,54 @@ impl ButtonsApp {
             .as_str()
             .unwrap_or("Custom theme");
         let base = current.strip_suffix(" Copy").unwrap_or(current).to_owned();
-        let name = next_theme_version(
-            &base,
-            self.themes.all().iter().map(|theme| theme.name.as_str()),
-        );
+        let taken = self
+            .themes
+            .all()
+            .iter()
+            .any(|theme| !theme.id.starts_with("preview:") && theme.name == current);
+        let name = if current.ends_with(" Copy") || taken {
+            next_theme_version(
+                &base,
+                self.themes.all().iter().map(|theme| theme.name.as_str()),
+            )
+        } else {
+            current.to_owned()
+        };
         let file_name =
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
+        document["metadata"]["name"] = json!(name);
+        document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
+        self.theme_editor_file_name = Some(file_name);
+        self.theme_editor_file_exists = false;
+        self.theme_editor_file_digest = None;
+    }
+
+    /// `name` if no saved theme uses it, else its next numbered version.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn unused_theme_name(&self, name: &str) -> String {
+        let saved = || {
+            self.themes
+                .all()
+                .iter()
+                .filter(|theme| !theme.id.starts_with("preview:"))
+                .map(|theme| theme.name.as_str())
+        };
+        if saved().any(|existing| existing == name) {
+            next_theme_version(name, saved())
+        } else {
+            name.to_owned()
+        }
+    }
+
+    /// Makes `document` (the editor draft being built) a new theme called
+    /// `name`, so saving it leaves the theme it started from alone.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn name_theme_draft(&mut self, document: &mut Value, name: &str) {
+        let Some(store) = &self.native_store else {
+            return;
+        };
+        let file_name =
+            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), name);
         document["metadata"]["name"] = json!(name);
         document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
         self.theme_editor_file_name = Some(file_name);
@@ -16452,6 +16677,7 @@ mod tests {
             let custom = crate::theme::CustomShader {
                 expression: (*expression).into(),
                 variables: Vec::new(),
+                ..Default::default()
             };
             assert!(
                 crate::plugins::effects::shader_expression::function(&custom).is_ok(),
@@ -20812,6 +21038,18 @@ Start-Sleep -Seconds 300
         );
         assert!(text_position(&output, "Shader backgrounds").is_some());
         assert!(text_position(&output, "Preview on terminals").is_some());
+        // Style: one pattern picker, then the options AI is told about; the
+        // code (with the slider's value) sits in its own section.
+        for label in [
+            "Pattern",
+            "Your code",
+            "My own colors",
+            "Sliders for this shader",
+            "amount",
+            "Code ✓ compiles",
+        ] {
+            assert!(text_position(&output, label).is_some(), "{label}");
+        }
         assert_eq!(
             output
                 .shapes
