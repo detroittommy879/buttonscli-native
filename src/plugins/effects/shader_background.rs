@@ -52,7 +52,6 @@ pub(crate) fn callback(
             rect,
             format,
             terminal,
-            frame: ui.ctx().cumulative_pass_nr(),
             values: [
                 if shader.animated {
                     time.rem_euclid(3600.0) * shader.speed
@@ -74,7 +73,6 @@ struct Background {
     rect: Rect,
     format: wgpu::TextureFormat,
     terminal: u64,
-    frame: u64,
     values: [f32; 4],
     colors: [Color32; 4],
     knobs: [f32; 4],
@@ -84,7 +82,7 @@ struct Background {
 struct PaneUniform {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    last_frame: u64,
+    last_used: u64,
 }
 
 struct Resources {
@@ -92,6 +90,8 @@ struct Resources {
     layout: wgpu::BindGroupLayout,
     panes: HashMap<u64, PaneUniform>,
     custom_pipelines: HashMap<String, (wgpu::RenderPipeline, u64)>,
+    /// One use counter for every window; see [`super::make_room`].
+    uses: u64,
 }
 
 impl Resources {
@@ -115,6 +115,7 @@ impl Resources {
             layout,
             panes: HashMap::new(),
             custom_pipelines: HashMap::new(),
+            uses: 0,
         }
     }
 }
@@ -180,41 +181,27 @@ impl egui_wgpu::CallbackTrait for Background {
         let resources = resources
             .get_mut::<Resources>()
             .expect("initialized shader background resources");
+        resources.uses += 1;
+        let now = resources.uses;
         if let Some(source) = &self.custom_source {
             if !resources.custom_pipelines.contains_key(source) {
-                if resources.custom_pipelines.len() >= MAX_BUFFERS {
-                    if let Some(oldest) = resources
-                        .custom_pipelines
-                        .iter()
-                        .min_by_key(|(_, (_, frame))| *frame)
-                        .map(|(source, _)| source.clone())
-                    {
-                        resources.custom_pipelines.remove(&oldest);
-                    }
-                }
+                super::make_room(&mut resources.custom_pipelines, MAX_BUFFERS, |(_, used)| {
+                    *used
+                });
                 resources.custom_pipelines.insert(
                     source.clone(),
                     (
                         pipeline(device, self.format, &resources.layout, source),
-                        self.frame,
+                        now,
                     ),
                 );
             }
-            resources.custom_pipelines.get_mut(source).unwrap().1 = self.frame;
+            resources.custom_pipelines.get_mut(source).unwrap().1 = now;
         }
         if !resources.panes.contains_key(&self.terminal) {
             // Only tiny uniform buffers are cached, with a hard bound even
             // after many tab-close/reopen cycles. No pane image is retained.
-            if resources.panes.len() >= MAX_BUFFERS {
-                if let Some(oldest) = resources
-                    .panes
-                    .iter()
-                    .min_by_key(|(_, pane)| pane.last_frame)
-                    .map(|(id, _)| *id)
-                {
-                    resources.panes.remove(&oldest);
-                }
-            }
+            super::make_room(&mut resources.panes, MAX_BUFFERS, |pane| pane.last_used);
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("shader background pane"),
                 size: 112,
@@ -234,7 +221,7 @@ impl egui_wgpu::CallbackTrait for Background {
                 PaneUniform {
                     buffer,
                     bind_group,
-                    last_frame: self.frame,
+                    last_used: now,
                 },
             );
         }
@@ -242,7 +229,7 @@ impl egui_wgpu::CallbackTrait for Background {
             .panes
             .get_mut(&self.terminal)
             .expect("initialized pane uniforms");
-        pane.last_frame = self.frame;
+        pane.last_used = now;
         let scale = screen.pixels_per_point;
         let values = [
             self.rect.left() * scale,
@@ -283,11 +270,15 @@ impl egui_wgpu::CallbackTrait for Background {
         let Some(pane) = resources.panes.get(&self.terminal) else {
             return;
         };
-        let selected = self
-            .custom_source
-            .as_ref()
-            .and_then(|source| resources.custom_pipelines.get(source))
-            .map_or(&resources.pipeline, |(pipeline, _)| pipeline);
+        // A missing custom pipeline draws nothing: the preset pipeline would
+        // show a different shader than the one asked for.
+        let selected = match &self.custom_source {
+            Some(source) => match resources.custom_pipelines.get(source) {
+                Some((pipeline, _)) => pipeline,
+                None => return,
+            },
+            None => &resources.pipeline,
+        };
         pass.set_pipeline(selected);
         pass.set_bind_group(0, &pane.bind_group, &[]);
         pass.draw(0..3, 0..1);
