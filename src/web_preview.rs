@@ -1,7 +1,7 @@
 //! Optional loopback-only web preview. Provider secrets stay in OS credentials.
 use crate::assistant::{
     client::ClientError,
-    credentials::{self, CredentialStore, SystemCredentialStore},
+    credentials::SystemCredentialStore,
     provider::{AiTask, ProviderProfile},
     simulation::generate_turn,
 };
@@ -156,14 +156,12 @@ async fn turn(State(state): State<ServerState>, Json(request): Json<TurnRequest>
             &crate::assistant::transport::ReqwestTransport,
             &state.providers,
             &mut |provider| {
-                let reference = credentials::reference(&state.profile, &provider.id);
-                if provider.credential_ref.as_deref() != Some(reference.as_str()) {
-                    return Ok(None);
-                }
-                SystemCredentialStore
-                    .get(&reference)
-                    .map(Some)
-                    .map_err(|_| ClientError::Credential)
+                crate::assistant::chatgpt::saved_key(
+                    &SystemCredentialStore,
+                    &state.profile,
+                    provider,
+                )
+                .map_err(|_| ClientError::Credential)
             },
             &crate::assistant::simulation_protocol::Prompts {
                 system: request.system,

@@ -28,9 +28,16 @@
 - ChatGPT connections store `chatgpt:<reference>` in `credential_ref`; `provider_key`
   turns it into a fresh token. Never save those tokens as a plain API key.
   `chatgpt_plan` providers hide URL/format/key fields; that endpoint rejects
-  non-streaming requests, so probes must stream.
+  non-streaming requests, so probes must stream. `ProviderSettings::normalize`
+  must keep `chatgpt:native:v1:<hex>`; use `chatgpt::saved_key` in key loaders.
 - The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
   preview/save touch only that pane's `theme_overrides`, never shared sources.
+  Edits never block: `autosave_theme_draft` saves them under the next numbered
+  name when switching panes, on Keep and close, and on quit. Never overwrite
+  a theme file that another pane, the shared sources or a bundle uses.
+- Theme bundles and `pane_looks` are keyed by slot (`slot_order`: displayed
+  panes, then other tabs), never by PTY ID. `preferences_to_save` fills
+  `pane_looks`; unused slots wait in `pending_pane_looks` for new tabs.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
@@ -58,6 +65,8 @@
   sources. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
   use ordinary page scrolling, with separate positions, not stacked resize panels.
 - Theme shader strings are inert metadata. Do not claim legacy GLSL effects execute.
+- Custom shader code gets `strength` and `bg`; code that uses `strength` is not faded by
+  the host. Shader AI prompts must keep the Style notes (`shader_ai::settings_text`).
 
 ## Validation and traps
 

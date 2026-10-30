@@ -29,7 +29,7 @@ use zeroize::Zeroizing;
 use super::credentials::{reference, CredentialError, CredentialStore};
 
 const ISSUER: &str = "https://auth.openai.com";
-pub(crate) const RESOURCE: &str = "https://api.openai.com/v1";
+pub(crate) const RESOURCE: &str = super::provider::CHATGPT_RESOURCE;
 const SCOPES: &str =
     "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
 const SHARING_SCOPE: &str = "chatgpt.tokens.use.direct";
@@ -38,7 +38,7 @@ const DYNAMIC_CLIENT: &str = "dynamic_agent_client";
 /// Where people review and limit what apps use from their plan.
 pub(crate) const USAGE_URL: &str = "https://chatgpt.com/settings/usage";
 /// A provider's `credential_ref` is this prefix plus its normal reference.
-const MARKER: &str = "chatgpt:";
+const MARKER: &str = super::provider::CHATGPT_MARKER;
 const CHUNK: usize = 1_000;
 const MAX_CHUNKS: usize = 24;
 const SIGN_IN_WAIT: Duration = Duration::from_secs(300);
@@ -674,6 +674,51 @@ fn refresh(
     Ok(connection)
 }
 
+/// The OS-saved key for `provider`: a fresh access token for a ChatGPT sign-in,
+/// else its saved API key. `None` when it has neither.
+pub(crate) fn saved_key(
+    store: &dyn CredentialStore,
+    profile: &str,
+    provider: &super::provider::ProviderProfile,
+) -> Result<Option<Zeroizing<String>>, CredentialError> {
+    let reference_ = reference(profile, &provider.id);
+    match provider.credential_ref.as_deref() {
+        Some(stored) if marked(stored) == Some(reference_.as_str()) => {
+            access_token(store, &reference_).map(Some)
+        }
+        Some(stored) if stored == reference_ => store.get(&reference_).map(Some),
+        _ => Ok(None),
+    }
+}
+
+/// Puts the sign-in marker back on OpenAI connections whose tokens are still
+/// saved but whose `credential_ref` is empty (builds before Oct 30 dropped it
+/// while normalizing settings). Returns whether anything changed.
+pub(crate) fn reconnect_saved(
+    store: &dyn CredentialStore,
+    profile: &str,
+    settings: &mut super::provider::ProviderSettings,
+) -> bool {
+    let mut changed = false;
+    for provider in &mut settings.providers {
+        if provider.credential_ref.is_some()
+            || !(provider.chatgpt_plan || provider.endpoint.trim_end_matches('/') == RESOURCE)
+        {
+            continue;
+        }
+        let reference_ = reference(profile, &provider.id);
+        if load(store, &reference_).is_ok() {
+            provider.credential_ref = Some(marker(&reference_));
+            provider.chatgpt_plan = true;
+            changed = true;
+        }
+    }
+    if changed {
+        settings.normalize(&mut Vec::new());
+    }
+    changed
+}
+
 /// Forgets the connection here and asks OpenAI to end it (best effort).
 pub(crate) fn sign_out(store: &dyn CredentialStore, reference_: &str) -> Result<(), String> {
     let _guard = REFRESH
@@ -746,6 +791,128 @@ mod tests {
         assert_eq!(
             load(&store, &reference_).err(),
             Some(CredentialError::Missing)
+        );
+    }
+
+    #[test]
+    fn sign_in_marker_survives_normalizing_and_is_restored_when_dropped() {
+        use super::super::provider::{ProviderApi, ProviderProfile, ProviderSettings};
+        let store = SessionCredentialStore::default();
+        let provider = |id: &str, endpoint: &str| ProviderProfile {
+            id: id.into(),
+            name: id.into(),
+            endpoint: endpoint.into(),
+            ..ProviderProfile::default()
+        };
+        let mut settings = ProviderSettings {
+            providers: vec![
+                provider("plan", "https://api.openai.com/v1/"),
+                provider("other", "https://openrouter.ai/api/v1"),
+            ],
+            ..ProviderSettings::default()
+        };
+        let plan = reference("profile", "plan");
+        settings.providers[0].credential_ref = Some(marker(&plan));
+        settings.normalize(&mut Vec::new());
+        assert_eq!(
+            settings.providers[0].credential_ref.as_deref(),
+            Some(marker(&plan).as_str())
+        );
+        assert!(settings.providers[0].chatgpt_plan);
+        assert_eq!(settings.providers[0].api, ProviderApi::Responses);
+
+        // What earlier builds saved: no marker, tokens still in the store.
+        settings.providers[0].credential_ref = None;
+        assert!(!reconnect_saved(&store, "profile", &mut settings));
+        save(&store, &plan, &connection(10)).unwrap();
+        save(&store, &reference("profile", "other"), &connection(10)).unwrap();
+        assert!(reconnect_saved(&store, "profile", &mut settings));
+        assert_eq!(
+            settings.providers[0].credential_ref.as_deref(),
+            Some(marker(&plan).as_str())
+        );
+        // Only OpenAI's endpoint can be a ChatGPT connection.
+        assert_eq!(settings.providers[1].credential_ref, None);
+        assert!(!reconnect_saved(&store, "profile", &mut settings));
+    }
+
+    /// Every AI task's first model on the active profile, as the app would
+    /// send it after reconnecting. Reads native.json without saving it.
+    #[test]
+    #[ignore = "sends real requests; set BUTTONSCLI_TEST_LIVE_CHATGPT=1"]
+    fn live_chatgpt_sign_in_reaches_every_ai_task() {
+        use super::super::provider::{AiTask, ProviderSettings};
+        use crate::assistant::credentials::SystemCredentialStore;
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_LIVE_CHATGPT").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        let document: Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let mut settings: ProviderSettings =
+            serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
+        settings.normalize(&mut Vec::new());
+        println!(
+            "reconnected: {}",
+            reconnect_saved(&SystemCredentialStore, &profile, &mut settings)
+        );
+        let transport = super::super::transport::ReqwestTransport;
+        for task in [
+            AiTask::Help,
+            AiTask::Theme,
+            AiTask::Shader,
+            AiTask::ShaderJudge,
+            AiTask::Simulation,
+        ] {
+            let Some(provider) = settings.chain(task).into_iter().next() else {
+                println!("{task:?}: no provider");
+                continue;
+            };
+            let key = saved_key(&SystemCredentialStore, &profile, &provider);
+            let result = key.map_err(|error| error.to_string()).and_then(|key| {
+                super::super::client::stream_completion(
+                    &transport,
+                    &provider,
+                    key,
+                    ("Reply briefly.", "Reply OK."),
+                    &[],
+                    &AtomicBool::new(false),
+                    &mut |_| {},
+                )
+                .map_err(|error| error.to_string())
+            });
+            println!(
+                "{task:?} via {} ({}, plan={}): {:?}",
+                provider.name,
+                provider.model,
+                provider.chatgpt_plan,
+                result.map(|reply| reply.chars().take(40).collect::<String>())
+            );
+        }
+        let plan = settings
+            .providers
+            .iter()
+            .find(|provider| provider.chatgpt_plan)
+            .expect("a ChatGPT connection");
+        let key = saved_key(&SystemCredentialStore, &profile, plan).unwrap();
+        println!(
+            "test_connection: {:?}",
+            super::super::client::test_connection(&transport, plan, key.clone())
+                .map_err(|error| error.to_string())
+        );
+        println!(
+            "models: {:?}",
+            super::super::client::discover_models(&transport, plan, key)
+                .map(|models| models.len())
+                .map_err(|error| error.to_string())
         );
     }
 

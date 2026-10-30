@@ -301,6 +301,12 @@ pub(crate) struct Preferences {
     pub(crate) custom_shell_profiles: Vec<ShellProfile>,
     pub(crate) quick_secrets_auto_lock_minutes: u32,
     pub(crate) tab_groups: TabGroupPreferences,
+    /// Each pane slot's theme and font when the app last saved (P1 first),
+    /// reapplied to the terminals opened at the next start.
+    pub(crate) pane_looks: Vec<PaneLook>,
+    pub(crate) theme_bundles: Vec<ThemeBundle>,
+    /// Shaders saved by name; listed in the Pattern picker next to the presets.
+    pub(crate) saved_shaders: Vec<crate::theme::CustomShader>,
 }
 
 impl Default for Preferences {
@@ -359,8 +365,43 @@ impl Default for Preferences {
             custom_shell_profiles: Vec::new(),
             quick_secrets_auto_lock_minutes: 15,
             tab_groups: TabGroupPreferences::default(),
+            pane_looks: Vec::new(),
+            theme_bundles: Vec::new(),
+            saved_shaders: Vec::new(),
         }
     }
+}
+
+/// Most shaders the Pattern picker keeps.
+pub(crate) const MAX_SAVED_SHADERS: usize = 64;
+/// Most pane slots a theme bundle or the saved pane looks remember.
+pub(crate) const MAX_PANE_LOOKS: usize = 8;
+
+/// One pane slot's look. `None` uses the shared theme or font.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct PaneLook {
+    pub(crate) theme_id: Option<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) font: Option<crate::fonts::PaneFont>,
+}
+
+/// Saved looks for the panes on screen, applied by slot to whatever terminals
+/// are open: the shared theme sources, up to eight pane looks and the layout.
+/// Unlike a tab group it never opens or closes terminals.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct ThemeBundle {
+    pub(crate) name: String,
+    pub(crate) theme_id: String,
+    pub(crate) app_theme_id: String,
+    pub(crate) terminal_theme_id: String,
+    pub(crate) gradient_theme_id: String,
+    pub(crate) effects_theme_id: String,
+    pub(crate) panes: Vec<PaneLook>,
+    /// "single", "columns", "rows" or "grid"; empty keeps the current layout.
+    pub(crate) layout: String,
+    pub(crate) visible_panes: usize,
 }
 
 /// Named sets of open terminals that can be reopened later.
@@ -566,6 +607,12 @@ impl Preferences {
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
+        self.pane_looks.truncate(MAX_PANE_LOOKS);
+        self.theme_bundles.truncate(64);
+        self.saved_shaders.truncate(MAX_SAVED_SHADERS);
+        for bundle in &mut self.theme_bundles {
+            bundle.panes.truncate(MAX_PANE_LOOKS);
+        }
         self.simulation.persona = self.simulation.persona.chars().take(512).collect();
         self.simulation.prompt = self.simulation.prompt.chars().take(8192).collect();
         self.shortcuts.normalize();

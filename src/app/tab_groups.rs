@@ -3,7 +3,7 @@
 use super::*;
 use crate::settings::{SavedTab, TabGroup};
 
-fn layout_name(layout: PaneLayout) -> &'static str {
+pub(super) fn layout_name(layout: PaneLayout) -> &'static str {
     match layout {
         PaneLayout::Single => "single",
         PaneLayout::Columns => "columns",
@@ -12,7 +12,7 @@ fn layout_name(layout: PaneLayout) -> &'static str {
     }
 }
 
-fn parse_layout(name: &str) -> PaneLayout {
+pub(super) fn parse_layout(name: &str) -> PaneLayout {
     match name {
         "columns" => PaneLayout::Columns,
         "rows" => PaneLayout::Rows,

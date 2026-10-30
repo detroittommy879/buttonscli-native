@@ -385,7 +385,7 @@ mod tests {
     #[test]
     #[ignore = "sends real requests with the active profile's simulation model; set BUTTONSCLI_TEST_LIVE_SIM=1"]
     fn live_simulation_with_active_profile() {
-        use super::super::credentials::{CredentialStore, SystemCredentialStore};
+        use super::super::credentials::SystemCredentialStore;
         assert_eq!(
             std::env::var("BUTTONSCLI_TEST_LIVE_SIM").as_deref(),
             Ok("1")
@@ -415,13 +415,7 @@ mod tests {
                 &super::super::transport::ReqwestTransport,
                 &chain,
                 &mut |provider| {
-                    let reference = super::super::credentials::reference(&profile, &provider.id);
-                    if provider.credential_ref.as_deref() != Some(reference.as_str()) {
-                        return Ok(None);
-                    }
-                    SystemCredentialStore
-                        .get(&reference)
-                        .map(Some)
+                    super::super::chatgpt::saved_key(&SystemCredentialStore, &profile, provider)
                         .map_err(|_| ClientError::Credential)
                 },
                 &prompts,

@@ -5,10 +5,22 @@ use eframe::wgpu::naga;
 
 pub(crate) const MAX_SOURCE_BYTES: usize = crate::theme::MAX_CUSTOM_SHADER_BYTES;
 
-fn is_body(source: &str) -> bool {
+/// The generated function's first line. `strength` is the user's Strength
+/// slider (0..1) and `bg` the terminal background color.
+const HEADER: &str = "fn custom_pattern(p: vec2<f32>, t: f32, knobs: vec4<f32>, c1: vec3<f32>, c2: vec3<f32>, c3: vec3<f32>, strength: f32, bg: vec3<f32>) -> vec3<f32> {\n";
+
+/// Names the code gets for free; sliders cannot reuse them.
+pub(crate) const RESERVED: [&str; 8] = ["p", "t", "knobs", "c1", "c2", "c3", "strength", "bg"];
+
+/// Whether `source` uses `name` as a whole identifier.
+pub(crate) fn uses(source: &str, name: &str) -> bool {
     source
         .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-        .any(|word| word == "return")
+        .any(|word| word == name)
+}
+
+fn is_body(source: &str) -> bool {
+    uses(source, "return")
 }
 
 pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
@@ -23,7 +35,7 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
         return Err("Array types are disabled in color expressions.".into());
     }
     let mut names = std::collections::HashSet::new();
-    let mut source = String::from("fn custom_pattern(p: vec2<f32>, t: f32, knobs: vec4<f32>, c1: vec3<f32>, c2: vec3<f32>, c3: vec3<f32>) -> vec3<f32> {\n");
+    let mut source = String::from(HEADER);
     for (index, variable) in custom.variables.iter().enumerate() {
         let name = &variable.name;
         if name.is_empty()
@@ -31,10 +43,10 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
             || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
             || !name.as_bytes()[0].is_ascii_alphabetic()
             || name.starts_with("__")
-            || ["p", "t", "knobs", "c1", "c2", "c3"].contains(&name.as_str())
+            || RESERVED.contains(&name.as_str())
             || !names.insert(name)
         {
-            return Err("Variable names must be unique letters/numbers/underscores, start with a letter, and avoid p, t, knobs and c1–c3.".into());
+            return Err("Variable names must be unique letters/numbers/underscores, start with a letter, and avoid p, t, knobs, c1–c3, strength and bg.".into());
         }
         if ![variable.min, variable.max, variable.value]
             .into_iter()
@@ -91,10 +103,18 @@ pub(crate) const SOURCE: &str = concat!(
 );
 
 fn combine(source: &str) -> String {
-    let full = SOURCE.replace(
+    let mut full = SOURCE.replace(
         "let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);",
-        "let color = clamp(custom_pattern(p, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);"
+        "let color = clamp(custom_pattern(p, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb, u.settings.y, u.base.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);"
     );
+    // Code that uses `strength` decides how it shows; otherwise the host fades
+    // the pattern into the background by Strength, as before.
+    if uses(source.strip_prefix(HEADER).unwrap_or(source), "strength") {
+        full = full.replace(
+            "clamp(glow * u.settings.y, 0.0, 1.0)",
+            "clamp(glow, 0.0, 1.0)",
+        );
+    }
     format!("{full}\n{source}")
 }
 
@@ -231,6 +251,34 @@ mod tests {
         custom = CustomShader::default();
         custom.variables[0].name = "noise".into();
         assert!(function(&custom).is_err(), "helper names are reserved");
+    }
+
+    #[test]
+    fn code_that_uses_strength_owns_it_and_other_code_is_faded() {
+        let owns = CustomShader {
+            expression:
+                "let color = palette(p.x + t);\nreturn mix(bg, color * (0.5 + strength), strength);"
+                    .into(),
+            ..Default::default()
+        };
+        let program = program(&owns).unwrap();
+        assert!(!program.contains("glow * u.settings.y"));
+        assert!(program.contains("u.settings.y, u.base.rgb)"));
+        let faded = program_for("palette(p.x + t)");
+        assert!(faded.contains("glow * u.settings.y"));
+        // A slider can't take a name the code already gets.
+        let mut clash = CustomShader::default();
+        clash.variables[0].name = "strength".into();
+        assert!(function(&clash).is_err());
+    }
+
+    fn program_for(expression: &str) -> String {
+        program(&CustomShader {
+            expression: expression.into(),
+            variables: Vec::new(),
+            ..Default::default()
+        })
+        .unwrap()
     }
 
     #[test]
