@@ -305,6 +305,8 @@ pub(crate) struct Preferences {
     /// reapplied to the terminals opened at the next start.
     pub(crate) pane_looks: Vec<PaneLook>,
     pub(crate) theme_bundles: Vec<ThemeBundle>,
+    /// Shaders saved by name; listed in the Pattern picker next to the presets.
+    pub(crate) saved_shaders: Vec<crate::theme::CustomShader>,
 }
 
 impl Default for Preferences {
@@ -365,10 +367,13 @@ impl Default for Preferences {
             tab_groups: TabGroupPreferences::default(),
             pane_looks: Vec::new(),
             theme_bundles: Vec::new(),
+            saved_shaders: Vec::new(),
         }
     }
 }
 
+/// Most shaders the Pattern picker keeps.
+pub(crate) const MAX_SAVED_SHADERS: usize = 64;
 /// Most pane slots a theme bundle or the saved pane looks remember.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
@@ -604,6 +609,7 @@ impl Preferences {
         self.provider_settings.normalize(&mut Vec::new());
         self.pane_looks.truncate(MAX_PANE_LOOKS);
         self.theme_bundles.truncate(64);
+        self.saved_shaders.truncate(MAX_SAVED_SHADERS);
         for bundle in &mut self.theme_bundles {
             bundle.panes.truncate(MAX_PANE_LOOKS);
         }

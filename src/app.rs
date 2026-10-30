@@ -982,6 +982,8 @@ struct ShaderAiState {
     sliders: bool,
     /// Code set aside when a preset was picked, to switch back to.
     stash: Option<crate::theme::CustomShader>,
+    /// Last "Save to shader list" result, shown under the Pattern picker.
+    list_note: Option<String>,
     lanes: Vec<ShaderLane>,
     generation: u64,
     cancel: Option<Arc<AtomicBool>>,
@@ -1003,6 +1005,7 @@ impl Default for ShaderAiState {
             count: 4,
             sliders: false,
             stash: None,
+            list_note: None,
             lanes: Vec::new(),
             generation: 0,
             cancel: None,
@@ -9422,6 +9425,8 @@ impl ButtonsApp {
             };
             let old_preset = shader.preset.clone();
             let mut pick_code = false;
+            let saved = self.preferences.saved_shaders.clone();
+            let mut pick_saved = None;
             wrapping_row(ui, |ui| {
                 ui.spaced_label("Pattern");
                 egui::ComboBox::from_id_salt("shader-preset")
@@ -9438,6 +9443,22 @@ impl ButtonsApp {
                             pick_code = true;
                         }
                         ui.separator();
+                        if !saved.is_empty() {
+                            ui.label(RichText::new("Saved shaders").small().weak());
+                            for item in &saved {
+                                if ui
+                                    .selectable_label(
+                                        shader.custom.as_ref() == Some(item),
+                                        format!("★ {}", item.name),
+                                    )
+                                    .clicked()
+                                {
+                                    pick_saved = Some(item.clone());
+                                }
+                            }
+                            ui.separator();
+                            ui.label(RichText::new("Presets").small().weak());
+                        }
                         for &(value, label) in crate::theme::ShaderBackground::PRESETS {
                             if ui
                                 .selectable_label(
@@ -9455,8 +9476,54 @@ impl ButtonsApp {
                         }
                     });
             });
+            if let Some(item) = pick_saved {
+                // Unsaved code is set aside, so "Your code" can bring it back.
+                if let Some(current) = shader.custom.take().filter(|c| !saved.contains(c)) {
+                    self.shader_ai.stash = Some(current);
+                }
+                shader.custom = Some(item);
+            }
             if pick_code && shader.custom.is_none() {
                 shader.custom = Some(self.shader_ai.stash.take().unwrap_or_default());
+            }
+            // Name and keep this code in the saved list, right under the picker.
+            if let Some(custom) = &mut shader.custom {
+                wrapping_row(ui, |ui| {
+                    ui.spaced_label("Name");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut custom.name)
+                            .hint_text("Untitled")
+                            .desired_width(200.0)
+                            .char_limit(60),
+                    );
+                    let listed = self
+                        .preferences
+                        .saved_shaders
+                        .iter()
+                        .position(|item| !custom.name.is_empty() && item.name == custom.name);
+                    let label = if listed.is_some() {
+                        "Update in shader list"
+                    } else {
+                        "Save to shader list"
+                    };
+                    let hover = "Keep this shader under Pattern → Saved shaders, to use in any theme. The same name replaces the saved one.";
+                    if ui.spaced_button(label).on_hover_text(hover).clicked() {
+                        custom.name = self.save_shader_to_list(custom.clone());
+                        self.shader_ai.list_note =
+                            Some(format!("Saved \"{}\" to the shader list.", custom.name));
+                    }
+                    if let Some(index) = listed {
+                        if ui.spaced_button("Remove from list").clicked() {
+                            self.preferences.saved_shaders.remove(index);
+                            self.persist_native_preferences();
+                            self.shader_ai.list_note =
+                                Some(format!("Removed \"{}\" from the shader list.", custom.name));
+                        }
+                    }
+                });
+                if let Some(note) = &self.shader_ai.list_note {
+                    ui.spaced_label(RichText::new(note.as_str()).color(self.colors().muted));
+                }
             }
             if shader.preset != old_preset {
                 let index = shader.preset_index().unwrap_or(0);
@@ -9679,15 +9746,6 @@ impl ButtonsApp {
                 .id_salt("shader-code")
                 .default_open(compile.is_err())
                 .show(ui, |ui| {
-                    wrapping_row(ui, |ui| {
-                        ui.spaced_label("Name");
-                        ui.add(
-                            egui::TextEdit::singleline(&mut custom.name)
-                                .hint_text("Untitled")
-                                .desired_width(200.0)
-                                .char_limit(60),
-                        );
-                    });
                     ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c3 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
                     wrapping_row(ui, |ui| {
                         ui.spaced_menu_button("Load example", |ui| {
@@ -9998,7 +10056,26 @@ impl ButtonsApp {
                             candidate.note
                         ));
                         ui.label(RichText::new(&candidate.name).strong());
-                        if response.clicked() || ui.button("Use this one").clicked() {
+                        let mut use_it = response.clicked();
+                        wrapping_row(ui, |ui| {
+                            use_it |= ui.button("Use this one").clicked();
+                            if ui
+                                .button("Save")
+                                .on_hover_text(
+                                    "Add it to Pattern → Saved shaders without using it now.",
+                                )
+                                .clicked()
+                            {
+                                let name = self.save_shader_to_list(crate::theme::CustomShader {
+                                    name: candidate.name.clone(),
+                                    expression: candidate.code.clone(),
+                                    variables: candidate.variables.clone(),
+                                });
+                                self.shader_ai.message =
+                                    Some(format!("Saved \"{name}\" to the shader list."));
+                            }
+                        });
+                        if use_it {
                             chosen = Some(candidate.clone());
                         }
                     });
@@ -11579,6 +11656,30 @@ impl ButtonsApp {
         self.theme_editor_file_name = Some(file_name);
         self.theme_editor_file_exists = false;
         self.theme_editor_file_digest = None;
+    }
+
+    /// Adds `shader` to the Pattern picker's saved list, replacing one with the
+    /// same name. An unnamed shader becomes "Shader N". Returns the name used.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn save_shader_to_list(&mut self, mut shader: crate::theme::CustomShader) -> String {
+        shader.name = shader.name.trim().to_owned();
+        let list = &mut self.preferences.saved_shaders;
+        if shader.name.is_empty() {
+            shader.name = (1..)
+                .map(|number| format!("Shader {number}"))
+                .find(|name| !list.iter().any(|item| &item.name == name))
+                .unwrap();
+        }
+        let name = shader.name.clone();
+        match list.iter_mut().find(|item| item.name == name) {
+            Some(item) => *item = shader,
+            None => {
+                list.insert(0, shader);
+                list.truncate(crate::settings::MAX_SAVED_SHADERS);
+            }
+        }
+        self.persist_native_preferences();
+        name
     }
 
     /// `name` if no saved theme uses it, else its next numbered version.
@@ -21047,6 +21148,7 @@ Start-Sleep -Seconds 300
             "Sliders for this shader",
             "amount",
             "Code ✓ compiles",
+            "Save to shader list",
         ] {
             assert!(text_position(&output, label).is_some(), "{label}");
         }
@@ -21131,6 +21233,41 @@ Start-Sleep -Seconds 300
             });
         });
         assert_eq!(callbacks(&output), 1, "the candidate thumbnail draws");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn shaders_save_to_the_list_by_name() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let shader = crate::theme::CustomShader::default();
+        assert_eq!(app.save_shader_to_list(shader.clone()), "Shader 1");
+        assert_eq!(app.save_shader_to_list(shader.clone()), "Shader 2");
+        let named = crate::theme::CustomShader {
+            name: " Lava ".into(),
+            ..shader.clone()
+        };
+        assert_eq!(app.save_shader_to_list(named.clone()), "Lava");
+        let changed = crate::theme::CustomShader {
+            expression: "c2".into(),
+            ..named
+        };
+        app.save_shader_to_list(changed);
+        let names: Vec<_> = app
+            .preferences
+            .saved_shaders
+            .iter()
+            .map(|item| item.name.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            ["Lava", "Shader 2", "Shader 1"],
+            "newest first, same name replaced"
+        );
+        assert_eq!(app.preferences.saved_shaders[0].expression, "c2");
+        // The list survives a save and reload of preferences.
+        let reloaded: Preferences =
+            serde_json::from_value(serde_json::to_value(&app.preferences).unwrap()).unwrap();
+        assert_eq!(reloaded.saved_shaders, app.preferences.saved_shaders);
     }
 
     #[test]

@@ -109,3 +109,17 @@ the new provider screen and the pane row (no ChatGPT account here).
   labels. 346 tests, both clippy runs, GPU shader tests (--include-ignored;
   `render_shader_gallery` needs BUTTONSCLI_SHADER_GALLERY_DIR) and the release
   build pass. Not checked by eye or against a live model.
+
+## Saved shader list
+
+- `Preferences::saved_shaders` (up to 64, newest first). Pattern picker shows
+  them under "Saved shaders" above the presets; picking one sets unsaved code
+  aside in `shader_ai.stash`.
+- Name + "Save to shader list" / "Update in shader list" / "Remove from list"
+  sit right under the picker (the Code section starts collapsed, so a button
+  there was hidden). Each AI result has a "Save" button too. Unnamed = "Shader N".
+- Trap: after `git stash pop`, `src/app.rs` came back with CRLF endings, and
+  scripted edits that assume LF stop matching. Normalize first; bash heredocs
+  here also collapse `\`, so put edit scripts in files or use the Edit tool.
+- Test: `shaders_save_to_the_list_by_name`. 347 tests, both clippy runs and
+  the release build pass.
