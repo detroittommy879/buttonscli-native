@@ -65,8 +65,13 @@
   sources. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
   use ordinary page scrolling, with separate positions, not stacked resize panels.
 - Theme shader strings are inert metadata. Do not claim legacy GLSL effects execute.
-- Custom shader code gets `strength` and `bg`; code that uses `strength` is not faded by
-  the host. Shader AI prompts must keep the Style notes (`shader_ai::settings_text`).
+- Custom shader code gets `strength`, `bg` and c1–c5; `CustomShader::y_up` (default on)
+  flips p.y for code only, never presets. Code that uses `strength` is not faded by the
+  host. The uniform is 144 bytes: base, c1–c3, knobs, c4, c5 (GPU tests build it by
+  hand). `ShaderBackground::theme_colors` keeps the shader's own colors while unused.
+  Shader AI prompts must keep the Style notes (`shader_ai::settings_text`).
+- Built-in shaders/bundles: `assets/library/*.json` (`src/library.rs`), filled by
+  Settings → Release picks (`src/app/release_picks.rs`).
 
 ## Validation and traps
 

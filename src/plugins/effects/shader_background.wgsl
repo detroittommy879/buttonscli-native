@@ -7,6 +7,8 @@ struct Uniforms {
     second: vec4<f32>,
     third: vec4<f32>,
     knobs: vec4<f32>,
+    fourth: vec4<f32>,
+    fifth: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 

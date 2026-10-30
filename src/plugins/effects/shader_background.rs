@@ -21,7 +21,7 @@ pub(crate) fn callback(
     shader: &ShaderBackground,
     terminal: u64,
     time: f32,
-    mut colors: [Color32; 4],
+    mut colors: [Color32; 6],
 ) -> Option<egui::PaintCallback> {
     if ui.input(|input| input.viewport().minimized.unwrap_or(false)) {
         return None;
@@ -29,7 +29,8 @@ pub(crate) fn callback(
     let format = ui
         .ctx()
         .data(|data| data.get_temp::<wgpu::TextureFormat>(Id::new(FORMAT_ID)))?;
-    if let Some(palette) = &shader.colors {
+    // The shader's own colors replace the theme's; missing ones keep the theme's.
+    if let Some(palette) = shader.colors.as_ref().filter(|_| !shader.theme_colors) {
         for (target, color) in colors[1..].iter_mut().zip(palette) {
             *target = crate::theme::parse_color(color)?;
         }
@@ -74,7 +75,8 @@ struct Background {
     format: wgpu::TextureFormat,
     terminal: u64,
     values: [f32; 4],
-    colors: [Color32; 4],
+    /// Background, then c1–c5.
+    colors: [Color32; 6],
     knobs: [f32; 4],
     custom_source: Option<String>,
 }
@@ -204,7 +206,7 @@ impl egui_wgpu::CallbackTrait for Background {
             super::make_room(&mut resources.panes, MAX_BUFFERS, |pane| pane.last_used);
             let buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("shader background pane"),
-                size: 112,
+                size: 144,
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -241,17 +243,20 @@ impl egui_wgpu::CallbackTrait for Background {
             self.values[2],
             self.values[3],
         ];
+        // Uniform order: geometry, settings, base, c1–c3, knobs, c4, c5.
+        let rgba = |color: &Color32| {
+            [
+                color.r() as f32 / 255.0,
+                color.g() as f32 / 255.0,
+                color.b() as f32 / 255.0,
+                1.0,
+            ]
+        };
         let bytes: Vec<u8> = values
             .into_iter()
-            .chain(self.colors.into_iter().flat_map(|color| {
-                [
-                    color.r() as f32 / 255.0,
-                    color.g() as f32 / 255.0,
-                    color.b() as f32 / 255.0,
-                    1.0,
-                ]
-            }))
+            .chain(self.colors[..4].iter().flat_map(rgba))
             .chain(self.knobs)
+            .chain(self.colors[4..].iter().flat_map(rgba))
             .flat_map(f32::to_le_bytes)
             .collect();
         queue.write_buffer(&pane.buffer, 0, &bytes);
@@ -304,7 +309,7 @@ mod tests {
             let _ = ctx.run(Default::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     assert!(
-                        callback(ui, ui.max_rect(), &shader, 1, 0.0, [Color32::BLACK; 4]).is_none()
+                        callback(ui, ui.max_rect(), &shader, 1, 0.0, [Color32::BLACK; 6]).is_none()
                     );
                 });
             });
@@ -330,9 +335,11 @@ mod tests {
         knob: f32,
     ) -> Vec<u8> {
         use wgpu::util::DeviceExt;
-        let mut values: [f32; 28] = [
+        // geometry, settings, base, c1–c3, knobs, c4, c5 (the real uniform order).
+        let mut values: [f32; 36] = [
             0.0, 0.0, 64.0, 32.0, time, 0.6, 1.0, preset, 0.02, 0.03, 0.05, 1.0, 0.1, 0.7, 0.5,
-            1.0, 0.4, 0.1, 0.8, 1.0, 0.2, 0.3, 0.6, 1.0, 3.0, 0.0, 0.0, 0.0,
+            1.0, 0.4, 0.1, 0.8, 1.0, 0.2, 0.3, 0.6, 1.0, 3.0, 0.0, 0.0, 0.0, 0.9, 0.5, 0.2, 1.0,
+            0.3, 0.9, 0.4, 1.0,
         ];
         values[24] = knob;
         let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
@@ -457,7 +464,7 @@ mod tests {
             let resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
             for (index, (id, _)) in ShaderBackground::PRESETS.iter().enumerate() {
                 // Dark terminal base with the editor's pink/cyan/gold colors.
-                let values: [f32; 28] = [
+                let values: [f32; 36] = [
                     0.0,
                     0.0,
                     width as f32,
@@ -486,6 +493,14 @@ mod tests {
                     0.0,
                     0.0,
                     0.0,
+                    0.49,
+                    0.36,
+                    1.0,
+                    1.0,
+                    0.24,
+                    0.86,
+                    0.52,
+                    1.0,
                 ];
                 let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
                 let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
