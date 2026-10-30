@@ -395,8 +395,24 @@ pub struct ShaderBackground {
     pub speed: f32,
     pub scale: f32,
     pub animated: bool,
-    pub colors: Option<[String; 3]>,
+    /// This shader's own c1–c5 (older themes have three). Kept while
+    /// `theme_colors` is on, so switching back restores them.
+    pub colors: Option<Vec<String>>,
+    /// Use the theme's colors even when `colors` holds the shader's own.
+    pub theme_colors: bool,
     pub custom: Option<CustomShader>,
+}
+
+/// Most colors a shader gets (c1–c5).
+pub const MAX_SHADER_COLORS: usize = 5;
+
+/// A shader kept in the Pattern picker's list, with the colors it was saved with.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SavedShader {
+    #[serde(flatten)]
+    pub shader: CustomShader,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub colors: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -427,6 +443,9 @@ pub struct CustomShader {
     pub name: String,
     pub expression: String,
     pub variables: Vec<ShaderVariable>,
+    /// p.y grows upward, like most shader examples. Off keeps screen order
+    /// (y grows downward), which older code was written against.
+    pub y_up: bool,
 }
 
 impl Default for CustomShader {
@@ -435,6 +454,7 @@ impl Default for CustomShader {
             name: String::new(),
             expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
             variables: vec![ShaderVariable::default()],
+            y_up: true,
         }
     }
 }
@@ -449,6 +469,7 @@ impl Default for ShaderBackground {
             scale: 1.0,
             animated: true,
             colors: None,
+            theme_colors: false,
             custom: None,
         }
     }
@@ -524,11 +545,11 @@ impl ShaderBackground {
             .clamp(*Self::STRENGTH.start(), *Self::STRENGTH.end());
         shader.speed = shader.speed.clamp(*Self::SPEED.start(), *Self::SPEED.end());
         shader.scale = shader.scale.clamp(*Self::SCALE.start(), *Self::SCALE.end());
-        if shader
-            .colors
-            .as_ref()
-            .is_some_and(|colors| colors.iter().any(|color| parse_color(color).is_none()))
-        {
+        if shader.colors.as_ref().is_some_and(|colors| {
+            colors.is_empty()
+                || colors.len() > MAX_SHADER_COLORS
+                || colors.iter().any(|color| parse_color(color).is_none())
+        }) {
             return None;
         }
         if let Some(custom) = &mut shader.custom {
@@ -692,6 +713,12 @@ fn native_themes() -> Vec<ThemeDefinition> {
         }
     })
     .collect()
+}
+
+/// Parses a theme file the way `assets/themes/` files are loaded.
+#[cfg(test)]
+pub(crate) fn parse_bundled_theme(file_id: &str, json: &str) -> Result<ThemeDefinition, String> {
+    parse_legacy_theme(file_id, json).map_err(|error| error.to_string())
 }
 
 fn parse_legacy_theme(file_id: &str, json: &str) -> Result<ThemeDefinition, serde_json::Error> {

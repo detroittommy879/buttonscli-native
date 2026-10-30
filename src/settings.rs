@@ -306,7 +306,7 @@ pub(crate) struct Preferences {
     pub(crate) pane_looks: Vec<PaneLook>,
     pub(crate) theme_bundles: Vec<ThemeBundle>,
     /// Shaders saved by name; listed in the Pattern picker next to the presets.
-    pub(crate) saved_shaders: Vec<crate::theme::CustomShader>,
+    pub(crate) saved_shaders: Vec<crate::theme::SavedShader>,
 }
 
 impl Default for Preferences {

@@ -21,11 +21,11 @@ const MAX_REQUEST_CHARS: usize = 2_000;
 const RULES: &str = "The code is the body of a WGSL function that returns vec3<f32> RGB in 0..1. Write a few `let` lines and end with `return <color>;`. Not allowed: `var`, loops, `if`/`else`, `switch`, extra functions, arrays, structs. Use `select(a, b, condition)` or `mix`/`step` instead of if.
 
 Available values:
-- p: vec2<f32>, pane coordinates centred on 0 (about -1..1 vertically, wider horizontally), already multiplied by the user's Scale slider
+- p: vec2<f32>, pane coordinates centred on 0 (about -1..1 vertically, wider horizontally), already multiplied by the user's Scale slider; the settings say which way p.y points
 - t: f32, time in seconds (already scaled by the user's speed)
 - strength: f32 from 0 to 1, the user's Strength slider. Always use it: it is how the user turns the whole effect up or down. At 0 the result should be just bg, at 1 the full effect. The simplest way is to end with `return mix(bg, color, strength);`; you can also use it to scale contrast or glow. Nothing else fades your result.
 - bg: vec3<f32>, the terminal background color behind the text
-- c1, c2, c3: vec3<f32>, three colors (the request says whether the user picked them)
+- c1, c2, c3, c4, c5: vec3<f32>, five colors (the settings say where they come from). Use these names instead of hard-coding hex colors, so the user can change them later
 - any slider variables listed in the request, as f32
 
 Available helper functions:
@@ -97,6 +97,10 @@ pub(crate) struct Candidate {
     pub(crate) writer: String,
     pub(crate) judge: Option<String>,
     pub(crate) note: String,
+    /// c1–c5 the writer chose, when it was asked to pick colors.
+    pub(crate) colors: Option<Vec<String>>,
+    /// Which way p.y pointed when it was written.
+    pub(crate) y_up: bool,
 }
 
 pub(crate) struct Request<'a> {
@@ -110,26 +114,39 @@ pub(crate) struct Request<'a> {
 /// The Style settings the code will run with, turned into notes for the models.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Look {
-    /// c1–c3 as hex colors.
-    pub(crate) colors: [String; 3],
-    /// The user picked c1–c3 (Custom shader colors), so the palette must use them.
+    /// c1–c5 as hex colors, as the code would get them now.
+    pub(crate) colors: [String; 5],
+    /// c1–c5 are the shader's own (picked by the user or an earlier AI run),
+    /// not the theme's.
     pub(crate) own_colors: bool,
+    /// The writer chooses a new palette and returns it in `<colors>`.
+    pub(crate) ai_colors: bool,
     pub(crate) background: String,
     pub(crate) strength: f32,
     pub(crate) animated: bool,
     /// The user turned sliders on: use the current ones and add new ones if useful.
     pub(crate) sliders: bool,
+    /// p.y grows upward (the code's "Y up" setting).
+    pub(crate) y_up: bool,
 }
 
 impl Default for Look {
     fn default() -> Self {
         Self {
-            colors: ["#ff487b".into(), "#36dcff".into(), "#ffc857".into()],
+            colors: [
+                "#ff487b".into(),
+                "#36dcff".into(),
+                "#ffc857".into(),
+                "#7c5cff".into(),
+                "#3ddc84".into(),
+            ],
             own_colors: false,
+            ai_colors: true,
             background: "#101018".into(),
             strength: 0.35,
             animated: true,
             sliders: false,
+            y_up: true,
         }
     }
 }
@@ -185,6 +202,20 @@ pub(crate) fn generate(
         let added = new_sliders(&reply, &variables);
         variables.extend(added);
     }
+    // The judge reviews the code with the palette it will actually get.
+    let colors = request
+        .look
+        .ai_colors
+        .then(|| picked_colors(&reply))
+        .flatten();
+    let mut judge_look = request.look.clone();
+    if let Some(colors) = &colors {
+        for (target, color) in judge_look.colors.iter_mut().zip(colors) {
+            target.clone_from(color);
+        }
+        judge_look.own_colors = true;
+    }
+    judge_look.ai_colors = false;
 
     report(Stage::Checking, 0);
     let mut error = compiles(&code, &variables).err();
@@ -200,7 +231,7 @@ pub(crate) fn generate(
         },
         0,
     );
-    let judge_prompt = judge_prompt(brief, &code, error.as_deref(), &variables, request.look);
+    let judge_prompt = judge_prompt(brief, &code, error.as_deref(), &variables, &judge_look);
     if let Ok((verdict, judge)) = ask(
         transport,
         judges,
@@ -271,7 +302,117 @@ pub(crate) fn generate(
         writer,
         judge: judge_name,
         note,
+        colors,
+        y_up: request.look.y_up,
     })
+}
+
+/// The writer's `<colors>`: 2 to 5 valid hex colors, else none.
+fn picked_colors(reply: &str) -> Option<Vec<String>> {
+    let text = extract_tag(reply, "colors")?;
+    let colors: Vec<String> = text
+        .split(|c: char| c.is_whitespace() || c == ',')
+        .map(|word| word.trim_matches(|c: char| c == '`' || c == '"'))
+        .filter(|word| crate::theme::parse_color(word).is_some() && word.starts_with('#'))
+        .take(crate::theme::MAX_SHADER_COLORS)
+        .map(str::to_ascii_lowercase)
+        .collect();
+    (colors.len() >= 2).then_some(colors)
+}
+
+/// Loose inspiration for "Random idea", picked at random.
+const IDEA_SUBJECTS: &[&str] = &[
+    "jellyfish",
+    "auroras",
+    "circuit boards",
+    "a koi pond",
+    "desert dunes",
+    "rain on glass",
+    "a spiral galaxy",
+    "fireflies",
+    "origami cranes",
+    "a lava lamp",
+    "the deep sea",
+    "city lights at night",
+    "snowfall",
+    "a coral reef",
+    "a retro grid",
+    "cherry blossoms",
+    "soap bubbles",
+    "ink drops in water",
+    "sand ripples",
+    "comets",
+    "crystal caves",
+    "lightning storms",
+    "campfire smoke",
+    "a beehive",
+    "tidal waves",
+    "a disco floor",
+    "planets in orbit",
+    "fish scales",
+    "stained glass",
+    "a starship warp jump",
+    "a field of wheat",
+    "pixel art clouds",
+    "a heartbeat monitor",
+    "molten gold",
+];
+const IDEA_STYLES: &[&str] = &[
+    "8-bit pixel art",
+    "watercolor",
+    "neon",
+    "minimal geometric",
+    "retro VHS",
+    "art deco",
+    "vaporwave",
+    "cozy and calm",
+    "eerie",
+    "dreamy",
+    "holographic",
+    "hand-drawn",
+    "cyberpunk",
+    "underwater",
+    "cosmic",
+    "playful cartoon",
+    "elegant and slow",
+    "glitchy",
+    "op-art",
+];
+
+/// Asks the shader model for one short, surprising background idea.
+pub(crate) fn random_idea(
+    transport: &dyn HttpTransport,
+    writers: &[ProviderProfile],
+    load_key: &mut KeyLoader<'_>,
+    cancelled: &AtomicBool,
+) -> Result<String, String> {
+    if writers.is_empty() {
+        return Err("Choose a shader model in AI models first.".into());
+    }
+    let pick = |list: &[&'static str]| list[fastrand::usize(..list.len())];
+    let prompt = format!(
+        "Suggest one fresh idea for an animated background that sits behind terminal text. Loose inspiration: {} in a {} style (twist it or combine it if that is more fun). Say what moves and how, the mood, and the colors, in one or two sentences under 220 characters. Reply with the idea only, no quotes or preamble.",
+        pick(IDEA_SUBJECTS),
+        pick(IDEA_STYLES)
+    );
+    let (reply, _) = ask(
+        transport,
+        writers,
+        load_key,
+        "You invent short, vivid ideas for animated shader backgrounds. They must be drawable with simple math: no text, photos or 3D models.",
+        &prompt,
+        &[],
+        cancelled,
+        &mut |_| {},
+    )?;
+    let idea = reply
+        .trim()
+        .trim_matches(|c: char| c == '"' || c == '\'')
+        .trim();
+    if idea.is_empty() {
+        return Err("The model returned an empty idea.".into());
+    }
+    Ok(truncate(idea, 400))
 }
 
 /// Streams one request and returns the reply and "provider · model".
@@ -309,15 +450,29 @@ fn ask(
 
 /// The user's settings and sliders as plain notes for both models.
 fn settings_text(variables: &[crate::theme::ShaderVariable], look: &Look) -> String {
-    let [c1, c2, c3] = &look.colors;
+    let named = look
+        .colors
+        .iter()
+        .enumerate()
+        .map(|(index, color)| format!("c{} = {color}", index + 1))
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut text = format!(
-        "<settings>\nThe Strength slider is at {:.2} now; the code must look right anywhere from 0 to 1.\nbg (terminal background) is {}.\n",
-        look.strength, look.background
+        "<settings>\nThe Strength slider is at {:.2} now; the code must look right anywhere from 0 to 1.\nbg (terminal background) is {}.\n{}\n",
+        look.strength,
+        look.background,
+        if look.y_up {
+            "p.y grows upward: positive y is the top of the pane, so things fall toward negative y."
+        } else {
+            "p.y grows downward: positive y is the bottom of the pane, so things fall toward positive y."
+        }
     );
-    text.push_str(&if look.own_colors {
-        format!("The user picked these colors on purpose: c1 = {c1}, c2 = {c2}, c3 = {c3}. Build the palette from c1, c2 and c3 (darker or lighter shades of them are fine) and do not add other hues.\n")
+    text.push_str(&if look.ai_colors {
+        format!("Choose your own palette of 2 to 5 colors that fits the request, and put them in <colors></colors> tags as #RRGGBB values separated by spaces, in order: they become c1 to c5 (unlisted ones keep their current value). Current values for reference: {named}.\n")
+    } else if look.own_colors {
+        format!("These colors were chosen for this shader on purpose: {named}. Build the palette from c1 to c5 (darker or lighter shades are fine) and do not add other hues.\n")
     } else {
-        format!("c1 = {c1}, c2 = {c2}, c3 = {c3} come from the theme. Use them, or your own colors if the request asks for specific colors.\n")
+        format!("{named} come from the user's theme. Build the palette from them so the shader matches the theme.\n")
     });
     if !look.animated {
         text.push_str("Animation is off, so t stays 0: it must look good as a still image.\n");
@@ -395,10 +550,15 @@ fn writer_prompt(request: &Request<'_>) -> String {
     if request.look.sliders && !request.brief.trim().is_empty() {
         prompt.push_str(&sliders_text(&request.current.variables));
     }
-    prompt.push_str(&format!(
-        "<current_code>\n{}\n</current_code>\n",
-        request.current.expression
-    ));
+    // No current code means a fresh start: nothing from the old shader leaks in.
+    if request.current.expression.trim().is_empty() {
+        prompt.push_str("Write a new shader from scratch.\n");
+    } else {
+        prompt.push_str(&format!(
+            "<current_code>\n{}\n</current_code>\nChange this code as the request asks and keep what it does not mention.\n",
+            request.current.expression
+        ));
+    }
     if let Some(error) = request.current_error {
         prompt.push_str(&format!(
             "<compile_error>\n{}\n</compile_error>\n",
@@ -538,6 +698,7 @@ mod tests {
     fn prompts_carry_strength_colors_and_new_sliders() {
         let look = Look {
             own_colors: true,
+            ai_colors: false,
             animated: false,
             sliders: true,
             ..Look::default()
@@ -550,9 +711,29 @@ mod tests {
             look: &look,
         };
         let prompt = writer_prompt(&request);
-        assert!(prompt.contains("c1 = #ff487b") && prompt.contains("do not add other hues"));
+        assert!(prompt.contains("c5 = #3ddc84") && prompt.contains("do not add other hues"));
         assert!(prompt.contains("t stays 0") && prompt.contains("<sliders>"));
+        assert!(prompt.contains("p.y grows upward") && prompt.contains("<current_code>"));
         assert!(RULES.contains("strength: f32") && RULES.contains("mix(bg, color, strength)"));
+
+        // A fresh start sends no old code; AI colors ask for a <colors> tag.
+        let fresh = CustomShader {
+            expression: String::new(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        let prompt = writer_prompt(&Request {
+            current: &fresh,
+            look: &Look::default(),
+            ..request
+        });
+        assert!(!prompt.contains("<current_code>") && prompt.contains("from scratch"));
+        assert!(prompt.contains("<colors></colors>"));
+        assert_eq!(
+            picked_colors("<colors>#FF0000, `#00ff00` nope #12345 #0000ff</colors>"),
+            Some(vec!["#ff0000".into(), "#00ff00".into(), "#0000ff".into()])
+        );
+        assert_eq!(picked_colors("<colors>#ff0000</colors>"), None);
 
         // Only valid, new names fit, up to four sliders in total (one exists).
         let reply = "<sliders>\nbubble_size 0.1 2.0 0.6\nstrength 0 1 0.5\namount 0 1 0.5\nbad range 1 0 0\n`speed2 0 5 9`\nwobble 0 1 0.2\nextra 0 1 0.1\n</sliders>";
@@ -669,6 +850,16 @@ mod tests {
             serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
         let writers = settings.chain(crate::assistant::provider::AiTask::Shader);
         let judges = settings.chain(crate::assistant::provider::AiTask::ShaderJudge);
+        let idea = random_idea(
+            &crate::assistant::transport::ReqwestTransport,
+            &writers,
+            &mut |provider| {
+                crate::assistant::chatgpt::saved_key(&SystemCredentialStore, &profile, provider)
+                    .map_err(|_| crate::assistant::client::ClientError::Credential)
+            },
+            &AtomicBool::new(false),
+        );
+        println!("--- random idea: {idea:?}");
         std::thread::scope(|scope| {
             for (index, direction) in DIRECTIONS.iter().take(3).enumerate() {
                 let (writers, judges, profile) = (&writers, &judges, &profile);
@@ -689,9 +880,17 @@ mod tests {
                         &Request {
                             brief: "bouncing fireballs with gravity",
                             direction: Some(*direction),
-                            current: &CustomShader::default(),
+                            // A fresh start, with AI-picked colors and sliders on.
+                            current: &CustomShader {
+                                expression: String::new(),
+                                variables: Vec::new(),
+                                ..Default::default()
+                            },
                             current_error: None,
-                            look: &Look::default(),
+                            look: &Look {
+                                sliders: true,
+                                ..Look::default()
+                            },
                         },
                         &AtomicBool::new(false),
                         &mut |stage, _| last = stage,

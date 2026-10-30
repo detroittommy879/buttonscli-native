@@ -7,10 +7,12 @@ pub(crate) const MAX_SOURCE_BYTES: usize = crate::theme::MAX_CUSTOM_SHADER_BYTES
 
 /// The generated function's first line. `strength` is the user's Strength
 /// slider (0..1) and `bg` the terminal background color.
-const HEADER: &str = "fn custom_pattern(p: vec2<f32>, t: f32, knobs: vec4<f32>, c1: vec3<f32>, c2: vec3<f32>, c3: vec3<f32>, strength: f32, bg: vec3<f32>) -> vec3<f32> {\n";
+const HEADER: &str = "fn custom_pattern(p: vec2<f32>, t: f32, knobs: vec4<f32>, c1: vec3<f32>, c2: vec3<f32>, c3: vec3<f32>, c4: vec3<f32>, c5: vec3<f32>, strength: f32, bg: vec3<f32>) -> vec3<f32> {\n";
 
 /// Names the code gets for free; sliders cannot reuse them.
-pub(crate) const RESERVED: [&str; 8] = ["p", "t", "knobs", "c1", "c2", "c3", "strength", "bg"];
+pub(crate) const RESERVED: [&str; 10] = [
+    "p", "t", "knobs", "c1", "c2", "c3", "c4", "c5", "strength", "bg",
+];
 
 /// Whether `source` uses `name` as a whole identifier.
 pub(crate) fn uses(source: &str, name: &str) -> bool {
@@ -46,7 +48,7 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
             || RESERVED.contains(&name.as_str())
             || !names.insert(name)
         {
-            return Err("Variable names must be unique letters/numbers/underscores, start with a letter, and avoid p, t, knobs, c1–c3, strength and bg.".into());
+            return Err("Variable names must be unique letters/numbers/underscores, start with a letter, and avoid p, t, knobs, c1–c5, strength and bg.".into());
         }
         if ![variable.min, variable.max, variable.value]
             .into_iter()
@@ -90,7 +92,7 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
 }
 
 pub(crate) fn program(custom: &CustomShader) -> Result<String, String> {
-    Ok(combine(&function(custom)?))
+    Ok(combine(&function(custom)?, custom.y_up))
 }
 
 /// Helpers (`hash`, `noise`, `cloud`, `stars`, `palette`, `hsv`) shared by the
@@ -102,10 +104,13 @@ pub(crate) const SOURCE: &str = concat!(
     include_str!("shader_background.wgsl")
 );
 
-fn combine(source: &str) -> String {
+/// `y_up` flips p.y so it grows upward, as most shader code expects; screen
+/// pixels (and the presets) count downward.
+fn combine(source: &str, y_up: bool) -> String {
+    let position = if y_up { "vec2<f32>(p.x, -p.y)" } else { "p" };
     let mut full = SOURCE.replace(
         "let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);",
-        "let color = clamp(custom_pattern(p, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb, u.settings.y, u.base.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);"
+        &format!("let color = clamp(custom_pattern({position}, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb, u.fourth.rgb, u.fifth.rgb, u.settings.y, u.base.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);")
     );
     // Code that uses `strength` decides how it shows; otherwise the host fades
     // the pattern into the background by Strength, as before.
@@ -215,7 +220,7 @@ fn validate(source: &str) -> Result<(), String> {
     .map_err(|error| error.to_string())?;
     // Check the complete fragment too, including name collisions and stage rules,
     // before any user expression reaches wgpu's pipeline creation.
-    let full = combine(source);
+    let full = combine(source, true);
     let module =
         naga::front::wgsl::parse_str(&full).map_err(|error| error.emit_to_string(&full))?;
     naga::valid::Validator::new(
@@ -266,6 +271,21 @@ mod tests {
         assert!(program.contains("u.settings.y, u.base.rgb)"));
         let faded = program_for("palette(p.x + t)");
         assert!(faded.contains("glow * u.settings.y"));
+        // Y up (the default) flips p.y for the code; c4 and c5 reach it too.
+        assert!(program.contains("custom_pattern(vec2<f32>(p.x, -p.y), t"));
+        assert!(program.contains("u.fourth.rgb, u.fifth.rgb"));
+        let screen_order = super::program(&CustomShader {
+            y_up: false,
+            ..owns.clone()
+        })
+        .unwrap();
+        assert!(screen_order.contains("custom_pattern(p, t"));
+        assert!(function(&CustomShader {
+            expression: "return mix(c4, c5, 0.5);".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        })
+        .is_ok());
         // A slider can't take a name the code already gets.
         let mut clash = CustomShader::default();
         clash.variables[0].name = "strength".into();

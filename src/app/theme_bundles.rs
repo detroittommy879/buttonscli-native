@@ -177,10 +177,12 @@ impl ButtonsApp {
     /// or a layout that does not fit are skipped, not errors. Returns a short
     /// summary, or `None` when there is no bundle with that name.
     pub(super) fn apply_theme_bundle(&mut self, ctx: &egui::Context, name: &str) -> Option<String> {
+        // The user's bundles win over a built-in one with the same name.
         let bundle = self
             .preferences
             .theme_bundles
             .iter()
+            .chain(crate::library::bundles())
             .find(|bundle| bundle.name == name)
             .cloned()?;
         self.restore_personal_theme_preview();
@@ -268,15 +270,20 @@ impl ButtonsApp {
 
     /// File menu: apply a saved bundle.
     pub(super) fn theme_bundle_menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if self.preferences.theme_bundles.is_empty() {
-            return;
-        }
-        let names: Vec<String> = self
+        let mut names: Vec<String> = self
             .preferences
             .theme_bundles
             .iter()
             .map(|bundle| bundle.name.clone())
             .collect();
+        for bundle in crate::library::bundles() {
+            if !names.contains(&bundle.name) {
+                names.push(bundle.name.clone());
+            }
+        }
+        if names.is_empty() {
+            return;
+        }
         let mut apply = None;
         ui.spaced_menu_button(
             crate::i18n::literal(&self.locale, "Apply theme bundle"),
@@ -366,6 +373,25 @@ impl ButtonsApp {
                     }
                     if ui.spaced_button("Delete").clicked() {
                         delete = Some(index);
+                    }
+                });
+            });
+        }
+        for bundle in crate::library::bundles() {
+            if self
+                .preferences
+                .theme_bundles
+                .iter()
+                .any(|own| own.name == bundle.name)
+            {
+                continue;
+            }
+            ui.push_id(("built-in-bundle", bundle.name.as_str()), |ui| {
+                ui.horizontal(|ui| {
+                    ui.spaced_label(RichText::new(format!("◆ {}", bundle.name)).strong())
+                        .on_hover_text("Comes with ButtonsCLI.");
+                    if ui.spaced_button("Apply").clicked() {
+                        apply = Some(bundle.name.clone());
                     }
                 });
             });

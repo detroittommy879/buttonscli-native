@@ -505,6 +505,7 @@ impl ProviderSettings {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(test)]
     pub(crate) fn active(&self) -> Option<&ProviderProfile> {
         self.providers
             .iter()

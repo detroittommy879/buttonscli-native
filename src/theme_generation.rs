@@ -89,9 +89,11 @@ pub(crate) fn generate_candidate(
         seed,
         base_document,
         cancelled,
+        &mut |_| {},
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_with_fallback(
     transport: &dyn HttpTransport,
     providers: &[ProviderProfile],
@@ -100,8 +102,11 @@ pub(crate) fn generate_with_fallback(
     seed: &Value,
     base_document: &Value,
     cancelled: &AtomicBool,
+    // Characters received so far (the correction attempt continues the count).
+    progress: &mut dyn FnMut(usize),
 ) -> Result<ThemeCandidate, String> {
     let request = request.trim();
+    let mut received = 0_usize;
     if request.is_empty() || request.chars().count() > MAX_PROMPT_CHARS {
         return Err("Enter a theme description up to 4,096 characters.".into());
     }
@@ -122,7 +127,10 @@ pub(crate) fn generate_with_fallback(
         (system, &first_prompt),
         &[],
         cancelled,
-        &mut |_| {},
+        &mut |delta| {
+            received += delta.chars().count();
+            progress(received);
+        },
     )
     .map_err(|error| error.to_string())?;
     let provider = &used;
@@ -140,7 +148,10 @@ pub(crate) fn generate_with_fallback(
                 (system, &correction),
                 &history,
                 cancelled,
-                &mut |_| {},
+                &mut |delta| {
+                    received += delta.chars().count();
+                    progress(received);
+                },
             )
             .map_err(|error| error.to_string())?;
             candidate_with_fonts(&second, base_document, seed.get("fontCatalog"))
@@ -181,7 +192,9 @@ fn generation_prompt(request: &str, seed: &Value) -> String {
          \"brightBlack\":\"#RRGGBB\",\"brightRed\":\"#RRGGBB\",\
          \"brightGreen\":\"#RRGGBB\",\"brightYellow\":\"#RRGGBB\",\
          \"brightBlue\":\"#RRGGBB\",\"brightMagenta\":\"#RRGGBB\",\
-         \"brightCyan\":\"#RRGGBB\",\"brightWhite\":\"#RRGGBB\"}}}}}}\n\
+         \"brightCyan\":\"#RRGGBB\",\"brightWhite\":\"#RRGGBB\"}},\
+         \"gradient\":[\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\"]}}}}\n\
+         gradient is four colors for the terminal background gradient and shader colors: first a deep tone close to terminalBackground, then three accent colors that define the theme's character.\n\
          Do not return Markdown, comments, effects, or shader code.\n\
          When fontCatalog is provided, include a top-level typography object with all seven zones: shell, tabs, presetDock, settings, assistant, statusBar, terminal. Each zone has fontFamily (exact catalog name), fontWeight (one of that family's real weights), fontSize (8 to 32), and letterSpacing (-1 to 4; terminal must be 0). Terminal requires terminal:true in the catalog. Use deliberate family and size contrasts appropriate to the brief; avoid defaulting every zone to the same font. Installed/custom fonts may only be used if listed. No invented fonts.\n\
          Example zone: \"tabs\":{{\"fontFamily\":\"Roboto Bundled\",\"fontWeight\":500,\"fontSize\":18,\"letterSpacing\":0.5}}.\n\
@@ -363,6 +376,21 @@ pub(crate) fn candidate_from_response(
             &format!("/theme/terminal/ansiColors/{key}"),
             &ansi_colors[key],
         )?;
+    }
+    // Optional: without new gradient colors the old theme's would show through.
+    if let Some(gradient) = palette
+        .get("gradient")
+        .and_then(Value::as_array)
+        .filter(|colors| {
+            colors.len() == 4 && colors.iter().all(|c| c.as_str().is_some_and(valid_hex))
+        })
+    {
+        result["theme"]["terminal"]["gradientColors"] = Value::Array(
+            gradient
+                .iter()
+                .map(|color| json!(color.as_str().unwrap_or_default().to_ascii_lowercase()))
+                .collect(),
+        );
     }
     crate::theme::validate_personal_document(&result)?;
     Ok(ThemeCandidate {
@@ -871,5 +899,72 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("cancelled"));
         assert_eq!(*transport.requests.lock().unwrap(), 0);
+    }
+
+    /// Live run against the active profile's Theme model (read-only; only the
+    /// normal ChatGPT token refresh may write to the OS store).
+    #[test]
+    #[ignore = "set BUTTONSCLI_TEST_LIVE_CHATGPT=1; calls the active profile's real model"]
+    fn live_theme_generation_with_active_profile() {
+        use crate::assistant::chatgpt::{reconnect_saved, saved_key};
+        use crate::assistant::credentials::SystemCredentialStore;
+        use crate::assistant::provider::{AiTask, ProviderSettings};
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_LIVE_CHATGPT").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        let native: Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let mut settings: ProviderSettings =
+            serde_json::from_value(native["preferences"]["provider_settings"].clone()).unwrap();
+        settings.normalize(&mut Vec::new());
+        reconnect_saved(&SystemCredentialStore, &profile, &mut settings);
+        let providers = settings.chain(AiTask::Theme);
+        println!(
+            "theme chain: {:?}",
+            providers
+                .iter()
+                .map(|p| format!("{} · {}", p.name, p.model))
+                .collect::<Vec<_>>()
+        );
+        let catalog = crate::theme::ThemeCatalog::load();
+        let base = crate::theme_files::document_from_theme(catalog.get("basic2"), "Base");
+        let mut seed = seed_palette(&base);
+        seed["fontCatalog"] = crate::fonts::FontCatalog::load(None)
+            .0
+            .generation_catalog(false);
+        for brief in [
+            "deep ocean blues with warm amber highlights",
+            "cyberpunk neon pink and green on black",
+            "soft pastel morning, light mode",
+        ] {
+            let started = std::time::Instant::now();
+            let result = generate_with_fallback(
+                &crate::assistant::transport::ReqwestTransport,
+                &providers,
+                &mut |provider| {
+                    saved_key(&SystemCredentialStore, &profile, provider)
+                        .map_err(|_| crate::assistant::client::ClientError::Credential)
+                },
+                brief,
+                &seed,
+                &base,
+                &AtomicBool::new(false),
+                &mut |_| {},
+            );
+            println!(
+                "{brief}: {:.1}s {:?}",
+                started.elapsed().as_secs_f32(),
+                result.map(|c| c.document["metadata"]["name"].clone())
+            );
+        }
     }
 }
