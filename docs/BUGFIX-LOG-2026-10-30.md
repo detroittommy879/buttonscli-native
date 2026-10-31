@@ -51,3 +51,16 @@
   `~/.buttonscli-native/`, not next to the exe. `enable_all` now also shows it.
 - Validation: fmt, 350 tests, both clippy runs; live run returned 4 ideas and
   Ready lanes. Not clicked through in the app.
+
+## User guide (night of 2026-10-30)
+
+- New `docs/guide/`: 12 Markdown pages with title/description front matter
+  (getting started, workspace, themes, bundles, shaders, AI shaders, shader code,
+  AI themes, AI setup, sharing, troubleshooting, gallery), `llms.txt` draft,
+  image shot list (`IMAGES.md`) and `docs/DOCS-SITE-PLAN.md` (Starlight pick,
+  AI-docs features, multi-accent dark colors, translations).
+- UI labels checked against the code; corrected Providers → AI providers,
+  Generate theme, Cancel generation, + Add command preset, Calm (a Library button).
+- Gallery: `native_theme_eval_capture` on the 18 Release-picked themes (owned
+  profile, synthetic text), resized to 1000 px JPG (1.7 MB total).
+- Release picks themselves (assets/themes, assets/library) left uncommitted.

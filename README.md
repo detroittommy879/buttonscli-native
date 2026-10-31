@@ -215,6 +215,9 @@ For detailed boundaries, see [Current limitations](docs/LIMITATIONS.md) and the
 
 ## Documentation
 
+**New: the [user guide](docs/guide/index.md)** covers themes, bundles, shader
+backgrounds, AI shaders and themes, and setup, with a [theme gallery](docs/guide/theme-gallery.md).
+
 | Start here | Customize and develop |
 | --- | --- |
 | [Native guide](docs/NATIVE-GUIDE.md) | [Personal themes](docs/PERSONAL-THEMES.md) · [Fonts](docs/FONTS.md) |

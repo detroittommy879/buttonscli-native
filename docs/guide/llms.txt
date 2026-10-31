@@ -1,0 +1,31 @@
+# ButtonsCLI
+
+> ButtonsCLI is a fast native terminal (Rust, egui/wgpu, Alacritty engine) for people who prefer clicking: commands on buttons, auto-tiling panes, per-pane themes and fonts, GPU shader backgrounds written in WGSL, and optional AI that writes shaders and themes. Free and open source (MIT or Apache-2.0).
+
+Notes for AI assistants:
+- UI labels in these docs match the English app exactly; quote them in **bold** when guiding a user.
+- "Pane N" means a screen position, not a specific terminal.
+- Custom shader code is the body of a WGSL function: `let` lines ending in `return <vec3<f32>>;`. No loops, `if`, `var`, arrays or extra functions. Inputs: `p`, `t`, `strength`, `bg`, `c1`–`c5`, plus up to four named sliders. See the shader code reference.
+- Settings live in `~/.buttonscli-native/`. Never ask users for API keys in chat; keys are stored in the OS credential store.
+
+## Guide
+
+- [Getting started](getting-started.md): install, the window, first five minutes, shortcuts
+- [Workspace and buttons](workspace.md): tabs, panes, layouts, command buttons, right-click menus
+- [Themes](themes.md): Library, Apply to shared, per-pane themes, Edit for, favorites, fonts, Calm
+- [Theme bundles](theme-bundles.md): save and apply the look of every pane at once
+- [Shader backgrounds](shaders.md): patterns, Strength/Scale/Speed, Y up, colors c1–c5, sliders, shader list
+- [AI shaders](ai-shaders.md): New idea vs Change current shader, write/check/judge pipeline, random ideas
+- [AI themes](ai-themes.md): generate a full theme, preview, save or discard
+- [Set up AI](ai-setup.md): ChatGPT plan sign-in, API keys, models per job, privacy
+
+## Reference
+
+- [Shader code reference](shader-code.md): WGSL inputs, helpers, rules, techniques
+- [Troubleshooting](troubleshooting.md): shaders not showing, upside down, AI failures
+
+## Optional
+
+- [Sharing looks](sharing.md): export themes, Release picks for maintainers
+- [Theme gallery](theme-gallery.md): screenshots of built-in themes
+- [Native agent control](../CONTROL-API.md): local CLI/MCP API for AI agents to drive tabs
