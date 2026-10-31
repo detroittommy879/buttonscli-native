@@ -30,8 +30,9 @@ saved buttons, fonts, themes and providers. The fake-provider PowerShell launche
 intentionally uses a temporary profile and is only for isolated fixture tests.
 This file is independent of profile settings and applies to all native profiles.
 
-`"release_picks": true` shows **Settings → Release picks** in optimized builds
-(debug builds always show it). It copies chosen personal themes, saved shaders
+`"release_picks": true` (or `"enable_all": true`) shows **Settings → Release
+picks** in optimized builds (debug builds always show it). The file is only read
+from `~/.buttonscli-native/`, never from next to the executable. It copies chosen personal themes, saved shaders
 and theme bundles into a source checkout's `assets/` so the next build ships
 them: themes go to `assets/themes/`, shaders and bundles to `assets/library/`.
 The original Tauri app's settings are not modified. To bring original settings

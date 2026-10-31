@@ -379,40 +379,77 @@ const IDEA_STYLES: &[&str] = &[
     "op-art",
 ];
 
-/// Asks the shader model for one short, surprising background idea.
-pub(crate) fn random_idea(
+const IDEAS: &str = "You invent ideas for animated backgrounds that sit behind terminal text. Each idea is handed to another model that turns it into one small WGSL fragment shader: a single pass that colors each pixel from its position p, the time t and a few colors. There are no textures, images, text, 3D models, loops or memory of earlier frames, so pitch looks that math can draw: noise and domain warping, signed distance shapes, polar and spiral coordinates, fract()/floor() tiling, cell patterns from hash(), interfering waves, smooth gradients and glow.
+
+Be smart about it: say which technique or trick makes each idea work, for example \"domain-warped noise for the smoke\" or \"polar coordinates bent by a sine to make petals\". Keep the set varied: about half should be simple and elegant, the rest more ambitious, layering two or three techniques. Make every idea differ from the others in subject, motion and palette.
+
+Write each idea in one to three sentences under 300 characters: what you see, how it moves, the mood and the colors.";
+
+/// Most ideas one "Random ideas" request asks for (one per version).
+pub(crate) const MAX_IDEAS: usize = DIRECTIONS.len();
+
+/// The request for `count` ideas, with loose subject/style sparks.
+fn ideas_prompt(count: usize, sparks: &[String]) -> String {
+    let tags = (1..=count)
+        .map(|index| format!("<idea{index}>...</idea{index}>"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "Suggest {count} different idea{} for animated backgrounds. Loose sparks, to use, twist, combine or ignore: {}.\n\nReply with exactly these tags and nothing else:\n{tags}",
+        if count == 1 { "" } else { "s" },
+        sparks.join("; ")
+    )
+}
+
+/// The ideas in `<idea1>`…`<ideaN>`, cleaned up, without repeats.
+fn parse_ideas(reply: &str, count: usize) -> Vec<String> {
+    let mut ideas: Vec<String> = Vec::new();
+    for index in 1..=count {
+        let Some(idea) = extract_tag(reply, &format!("idea{index}")) else {
+            continue;
+        };
+        let idea = truncate(
+            idea.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace()),
+            400,
+        );
+        if !idea.is_empty() && !ideas.contains(&idea) {
+            ideas.push(idea);
+        }
+    }
+    ideas
+}
+
+/// Asks the shader model for `count` varied background ideas in one reply.
+pub(crate) fn random_ideas(
     transport: &dyn HttpTransport,
     writers: &[ProviderProfile],
     load_key: &mut KeyLoader<'_>,
+    count: usize,
     cancelled: &AtomicBool,
-) -> Result<String, String> {
+) -> Result<Vec<String>, String> {
     if writers.is_empty() {
         return Err("Choose a shader model in AI models first.".into());
     }
+    let count = count.clamp(1, MAX_IDEAS);
     let pick = |list: &[&'static str]| list[fastrand::usize(..list.len())];
-    let prompt = format!(
-        "Suggest one fresh idea for an animated background that sits behind terminal text. Loose inspiration: {} in a {} style (twist it or combine it if that is more fun). Say what moves and how, the mood, and the colors, in one or two sentences under 220 characters. Reply with the idea only, no quotes or preamble.",
-        pick(IDEA_SUBJECTS),
-        pick(IDEA_STYLES)
-    );
+    let sparks: Vec<String> = (0..count)
+        .map(|_| format!("{} ({})", pick(IDEA_SUBJECTS), pick(IDEA_STYLES)))
+        .collect();
     let (reply, _) = ask(
         transport,
         writers,
         load_key,
-        "You invent short, vivid ideas for animated shader backgrounds. They must be drawable with simple math: no text, photos or 3D models.",
-        &prompt,
+        IDEAS,
+        &ideas_prompt(count, &sparks),
         &[],
         cancelled,
         &mut |_| {},
     )?;
-    let idea = reply
-        .trim()
-        .trim_matches(|c: char| c == '"' || c == '\'')
-        .trim();
-    if idea.is_empty() {
-        return Err("The model returned an empty idea.".into());
+    let ideas = parse_ideas(&reply, count);
+    if ideas.is_empty() {
+        return Err("The model returned no ideas.".into());
     }
-    Ok(truncate(idea, 400))
+    Ok(ideas)
 }
 
 /// Streams one request and returns the reply and "provider · model".
@@ -800,6 +837,18 @@ mod tests {
     }
 
     #[test]
+    fn ideas_come_back_numbered_in_one_reply() {
+        let prompt = ideas_prompt(3, &["comets (neon)".into(), "snowfall (eerie)".into()]);
+        assert!(prompt.starts_with("Suggest 3 different ideas"));
+        assert!(prompt.contains("comets (neon); snowfall (eerie)"));
+        assert!(prompt.contains("<idea3>...</idea3>") && !prompt.contains("<idea4>"));
+        assert!(IDEAS.contains("WGSL") && IDEAS.contains("about half should be simple"));
+        let reply = "Sure!\n<idea1> \"Ink drops bloom\" </idea1>\n<idea2>Petals</idea2>\n<idea3>Petals</idea3><idea4>extra</idea4>";
+        assert_eq!(parse_ideas(reply, 3), ["Ink drops bloom", "Petals"]);
+        assert!(parse_ideas("no tags here", 3).is_empty());
+    }
+
+    #[test]
     fn writer_gets_a_last_try_when_the_judge_cannot_fix_it() {
         let (result, models, _) = run(
             vec![
@@ -850,16 +899,17 @@ mod tests {
             serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
         let writers = settings.chain(crate::assistant::provider::AiTask::Shader);
         let judges = settings.chain(crate::assistant::provider::AiTask::ShaderJudge);
-        let idea = random_idea(
+        let ideas = random_ideas(
             &crate::assistant::transport::ReqwestTransport,
             &writers,
             &mut |provider| {
                 crate::assistant::chatgpt::saved_key(&SystemCredentialStore, &profile, provider)
                     .map_err(|_| crate::assistant::client::ClientError::Credential)
             },
+            4,
             &AtomicBool::new(false),
         );
-        println!("--- random idea: {idea:?}");
+        println!("--- random ideas: {ideas:#?}");
         std::thread::scope(|scope| {
             for (index, direction) in DIRECTIONS.iter().take(3).enumerate() {
                 let (writers, judges, profile) = (&writers, &judges, &profile);

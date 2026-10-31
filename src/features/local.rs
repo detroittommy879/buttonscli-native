@@ -14,7 +14,8 @@ static FLAGS: OnceLock<LocalFeatureFlags> = OnceLock::new();
 #[serde(default, deny_unknown_fields)]
 pub struct LocalFeatureFlags {
     pub enable_all: bool,
-    /// Shows Settings → Release picks in optimized builds (debug builds always do).
+    /// Shows Settings → Release picks in optimized builds (debug builds always
+    /// do, and so does `enable_all`).
     pub release_picks: bool,
 }
 
@@ -62,7 +63,9 @@ pub(crate) fn enabled() -> bool {
 }
 
 pub(crate) fn release_picks_enabled() -> bool {
-    FLAGS.get().is_some_and(|flags| flags.release_picks)
+    FLAGS
+        .get()
+        .is_some_and(|flags| flags.release_picks || flags.enable_all)
 }
 
 #[cfg(test)]

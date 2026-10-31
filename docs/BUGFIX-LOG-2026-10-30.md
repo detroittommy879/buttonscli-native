@@ -40,3 +40,14 @@
   build. Live: random idea plus three fresh lanes, all Ready with AI colors and
   new sliders; three live theme generations succeeded. Not checked by eye in
   the full app.
+
+## Random ideas, several at once
+
+- One request asks the Shader model for one idea per version in
+  `<idea1>`...`<ideaN>` tags. It is told ideas become single-pass WGSL, to name
+  the technique, and to keep about half simple. The first idea fills the box;
+  the list is clickable, and "Write one version per idea" runs each idea fresh.
+- Release picks was missing: `feature-flags.json` is read only from
+  `~/.buttonscli-native/`, not next to the exe. `enable_all` now also shows it.
+- Validation: fmt, 350 tests, both clippy runs; live run returned 4 ideas and
+  Ready lanes. Not clicked through in the app.

@@ -969,8 +969,8 @@ enum ShaderAiEvent {
         lane: usize,
         result: Result<crate::shader_ai::Candidate, String>,
     },
-    /// "Random idea" finished.
-    Idea(Result<String, String>),
+    /// "Random ideas" finished.
+    Ideas(Result<Vec<String>, String>),
 }
 
 /// "Create with AI" and "Fix with AI" for shader code.
@@ -997,8 +997,10 @@ struct ShaderAiState {
     fresh: bool,
     /// "AI picks new ones": each version chooses its own c1–c5.
     ai_colors: bool,
-    /// "Random idea" is waiting for the model.
+    /// "Random ideas" is waiting for the model.
     idea_busy: bool,
+    /// The last "Random ideas" list; "One version per idea" writes them all.
+    ideas: Vec<String>,
     lanes: Vec<ShaderLane>,
     generation: u64,
     cancel: Option<Arc<AtomicBool>>,
@@ -1024,6 +1026,7 @@ impl Default for ShaderAiState {
             fresh: true,
             ai_colors: true,
             idea_busy: false,
+            ideas: Vec::new(),
             lanes: Vec::new(),
             generation: 0,
             cancel: None,
@@ -9883,19 +9886,85 @@ impl ButtonsApp {
                             None,
                             self.shader_ai.count,
                             look.clone(),
+                            None,
                         );
                     }
+                    let count = self.shader_ai.count;
                     if self.shader_ai.idea_busy {
                         ui.spinner();
-                        ui.spaced_label("Thinking of an idea…");
+                        ui.spaced_label(if count == 1 {
+                            "Thinking of an idea…".to_owned()
+                        } else {
+                            format!("Thinking of {count} ideas…")
+                        });
                     } else if ui
-                        .spaced_button("🎲 Random idea")
-                        .on_hover_text("Ask your Shader model for a surprise prompt. It replaces the text above.")
+                        .spaced_button(if count == 1 {
+                            "🎲 Random idea".to_owned()
+                        } else {
+                            format!("🎲 {count} random ideas")
+                        })
+                        .on_hover_text("Your Shader model suggests one idea per version, in one request. The first goes in the box above; click another to use it, or write one version per idea.")
                         .clicked()
                     {
                         self.start_random_shader_idea(ui.ctx());
                     }
                 });
+                if !self.shader_ai.ideas.is_empty() {
+                    let mut write_all = false;
+                    let mut clear = false;
+                    ui.spaced_label(
+                        RichText::new("Ideas — click one to put it in the box").strong(),
+                    );
+                    for (index, idea) in self.shader_ai.ideas.iter().enumerate() {
+                        let text = format!("{}. {idea}", index + 1);
+                        let text = if self.shader_ai.prompt == *idea {
+                            RichText::new(text).strong()
+                        } else {
+                            RichText::new(text)
+                        };
+                        if ui
+                            .add(egui::Label::new(text).wrap().sense(egui::Sense::click()))
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .clicked()
+                        {
+                            self.shader_ai.prompt.clone_from(idea);
+                            self.shader_ai.fresh = true;
+                        }
+                    }
+                    wrapping_row(ui, |ui| {
+                        write_all = ui
+                            .add_enabled(
+                                !self.shader_ai.busy,
+                                egui::Button::new(format!(
+                                    "Write one version per idea ({})",
+                                    self.shader_ai.ideas.len()
+                                )),
+                            )
+                            .on_hover_text("Starts fresh: each version gets its own idea instead of the box above.")
+                            .clicked();
+                        clear = ui.spaced_button("Clear ideas").clicked();
+                    });
+                    if write_all {
+                        let current = crate::theme::CustomShader {
+                            name: String::new(),
+                            expression: String::new(),
+                            variables: Vec::new(),
+                            y_up: look.y_up,
+                        };
+                        let ideas = self.shader_ai.ideas.clone();
+                        self.start_shader_ai(
+                            ui.ctx(),
+                            current,
+                            None,
+                            ideas.len(),
+                            look.clone(),
+                            Some(ideas),
+                        );
+                    }
+                    if clear {
+                        self.shader_ai.ideas.clear();
+                    }
+                }
                 let mut notes = vec![
                     if self.shader_ai.fresh || !has_code {
                         "start fresh"
@@ -9952,7 +10021,7 @@ impl ButtonsApp {
                 .id_salt("shader-code")
                 .default_open(compile.is_err())
                 .show(ui, |ui| {
-                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c3 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
+                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c5 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
                     wrapping_row(ui, |ui| {
                         ui.spaced_menu_button("Load example", |ui| {
                             for (label, example) in SHADER_EXAMPLES {
@@ -10006,6 +10075,7 @@ impl ButtonsApp {
                                     Some(error.clone()),
                                     1,
                                     look.clone(),
+                                    None,
                                 );
                             }
                         }
@@ -11129,10 +11199,19 @@ impl ButtonsApp {
         error: Option<String>,
         count: usize,
         look: crate::shader_ai::Look,
+        ideas: Option<Vec<String>>,
     ) {
         if self.shader_ai.busy {
             return;
         }
+        // One version per idea, or every version from the prompt box.
+        let briefs = ideas.filter(|ideas| !ideas.is_empty()).map(|ideas| {
+            ideas
+                .into_iter()
+                .take(crate::shader_ai::MAX_IDEAS)
+                .collect::<Vec<_>>()
+        });
+        let count = briefs.as_ref().map_or(count, Vec::len);
         let writers = self.preferences.provider_settings.chain(AiTask::Shader);
         if writers.is_empty() {
             self.shader_ai.message =
@@ -11165,23 +11244,28 @@ impl ButtonsApp {
                 .map(|judge| format!("{} · {}", judge.name, judge.model))
                 .unwrap_or_else(|| "the same model".into())
         ));
-        self.shader_ai.lanes = crate::shader_ai::DIRECTIONS
-            .iter()
-            .take(count)
-            .map(|(label, _)| ShaderLane {
-                direction: label,
+        const IDEA_LABELS: [&str; crate::shader_ai::MAX_IDEAS] =
+            ["Idea 1", "Idea 2", "Idea 3", "Idea 4", "Idea 5", "Idea 6"];
+        self.shader_ai.lanes = (0..count)
+            .map(|lane| ShaderLane {
+                direction: if briefs.is_some() {
+                    IDEA_LABELS[lane]
+                } else {
+                    crate::shader_ai::DIRECTIONS[lane].0
+                },
                 stage: crate::shader_ai::Stage::Queued,
                 chars: 0,
                 result: None,
             })
             .collect();
-        let brief = self.shader_ai.prompt.clone();
-        for lane in 0..count {
+        let by_idea = briefs.is_some();
+        let briefs = briefs.unwrap_or_else(|| vec![self.shader_ai.prompt.clone(); count]);
+        for (lane, brief) in briefs.into_iter().enumerate() {
             let (writers, judges, profile, brief, current, error, look) = (
                 writers.clone(),
                 judges.clone(),
                 profile.clone(),
-                brief.clone(),
+                brief,
                 current.clone(),
                 error.clone(),
                 look.clone(),
@@ -11205,7 +11289,8 @@ impl ButtonsApp {
                     },
                     &crate::shader_ai::Request {
                         brief: &brief,
-                        direction: (count > 1).then_some(crate::shader_ai::DIRECTIONS[lane]),
+                        direction: (count > 1 && !by_idea)
+                            .then_some(crate::shader_ai::DIRECTIONS[lane]),
                         current: &current,
                         current_error: error.as_deref(),
                         look: &look,
@@ -11297,15 +11382,16 @@ impl ButtonsApp {
                         self.finish_shader_ai();
                     }
                 }
-                ShaderAiEvent::Idea(result) => {
+                ShaderAiEvent::Ideas(result) => {
                     self.shader_ai.idea_busy = false;
                     match result {
-                        Ok(idea) => {
-                            self.shader_ai.prompt = idea;
+                        Ok(ideas) => {
+                            self.shader_ai.prompt.clone_from(&ideas[0]);
                             self.shader_ai.fresh = true;
+                            self.shader_ai.ideas = if ideas.len() > 1 { ideas } else { Vec::new() };
                         }
                         Err(error) => {
-                            self.shader_ai.message = Some(format!("No idea this time: {error}"))
+                            self.shader_ai.message = Some(format!("No ideas this time: {error}"))
                         }
                     }
                 }
@@ -11908,7 +11994,7 @@ impl ButtonsApp {
         self.theme_editor_file_digest = None;
     }
 
-    /// "Random idea": the Shader model writes a surprise prompt into the box.
+    /// "Random ideas": the Shader model suggests one idea per version.
     #[cfg(not(target_arch = "wasm32"))]
     fn start_random_shader_idea(&mut self, ctx: &egui::Context) {
         let writers = self.preferences.provider_settings.chain(AiTask::Shader);
@@ -11918,6 +12004,7 @@ impl ButtonsApp {
             return;
         }
         self.shader_ai.idea_busy = true;
+        let count = self.shader_ai.count;
         let profile = self
             .native_store
             .as_ref()
@@ -11927,7 +12014,7 @@ impl ButtonsApp {
         let sender = self.shader_ai.tx.clone();
         let context = ctx.clone();
         std::thread::spawn(move || {
-            let result = crate::shader_ai::random_idea(
+            let result = crate::shader_ai::random_ideas(
                 &crate::assistant::transport::ReqwestTransport,
                 &writers,
                 &mut |provider| {
@@ -11935,9 +12022,10 @@ impl ButtonsApp {
                     provider_key(&session, &reference, provider.credential_ref.as_deref())
                         .map_err(|_| crate::assistant::client::ClientError::Credential)
                 },
+                count,
                 &AtomicBool::new(false),
             );
-            let _ = sender.send(ShaderAiEvent::Idea(result));
+            let _ = sender.send(ShaderAiEvent::Ideas(result));
             context.request_repaint();
         });
     }
