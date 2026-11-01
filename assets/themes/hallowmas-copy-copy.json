@@ -1,0 +1,164 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "preset": "ink",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.17000000178813934,
+      "version": 1
+    },
+    "simpleNoiseAmount": 9.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 46.0,
+    "staticDensity": 1.0,
+    "staticEnabled": false,
+    "staticIntensity": 63.0,
+    "staticOpacity": 0.3499999940395355
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T17:39:49.743Z",
+    "description": "A festive collision of Halloween and Christmas",
+    "id": "hallowmas-copy-copy",
+    "name": "Hallowmas Copy Copy",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hallowmas-copy-copy",
+    "updatedAt": "2026-10-09T17:39:49.743Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#1a1a1a",
+        "buttonBackground": "#3f2f26",
+        "buttonHover": "#593521",
+        "buttonText": "#ffffff"
+      },
+      "settings": {
+        "background": "#1a1a1a"
+      },
+      "shell": {
+        "accent": "#ff5e00",
+        "accentHover": "#ff7b2e",
+        "background": "#1a1a1a",
+        "backgroundSecondary": "#2a2a2a",
+        "border": "#562c13",
+        "buttonBackground": "#2a2a2a",
+        "paneDivider": {
+          "color": "#529a13",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#989898",
+        "textMain": "#ffffff"
+      },
+      "statusBar": {
+        "background": "#6c3211",
+        "border": "#562c13",
+        "text": "#ffffff",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#0a0a0a",
+        "activeBorder": "#ff5e00",
+        "background": "#1a1a1a",
+        "idleBackground": "#2a2a2a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c1c1c",
+        "blue": "#005eff",
+        "brightBlack": "#333333",
+        "brightBlue": "#428cff",
+        "brightCyan": "#42ffff",
+        "brightGreen": "#42ffb3",
+        "brightMagenta": "#ff42ff",
+        "brightRed": "#ff8c42",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffff42",
+        "cyan": "#00ffff",
+        "green": "#00ff88",
+        "magenta": "#ff00ff",
+        "red": "#ff5e00",
+        "white": "#ffffff",
+        "yellow": "#ffff00"
+      },
+      "background": "#0a0a0a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "iA Writer Mono S Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 500,
+      "fontWeightBold": 700,
+      "foreground": "#ffffff",
+      "gradientAngle": 45.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

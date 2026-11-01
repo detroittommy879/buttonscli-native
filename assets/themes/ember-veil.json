@@ -1,0 +1,191 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let q = p * (0.7 + amount * 0.18);\nlet drift = vec2<f32>(t * 0.035, -t * 0.022);\nlet fog = cloud(q * 1.6 + drift);\nlet ribbons = 0.5 + 0.5 * sin(q.x * 2.4 + fog * 4.0 + t * 0.16);\nlet veil = smoothstep(0.25, 0.85, fog);\nlet orange = mix(c1, vec3<f32>(1.0, 0.34, 0.035), 0.65);\nlet plum = vec3<f32>(0.24, 0.055, 0.32);\nlet base = mix(plum, orange * 0.65, ribbons * 0.7);\nlet haze = mix(base, c2 * 0.65, veil * mist * 0.5);\nlet cells = q * 7.0;\nlet id = floor(cells);\nlet local = fract(cells) - vec2<f32>(0.5);\nlet seed = hash(id);\nlet ember = exp(-dot(local, local) * 160.0) * smoothstep(0.92, 1.0, seed);\nlet flicker = 0.65 + 0.35 * sin(t * 0.7 + seed * 30.0);\nlet color = clamp(haze + mix(orange, c3, 0.18) * ember * flicker * 0.55, vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Ember Veil",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 3.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "mist",
+            "value": 0.44999998807907104
+          }
+        ]
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 1.899999976158142,
+      "strength": 0.3499999940395355,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:39:21.329Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "ember-veil",
+    "name": "Ember Veil",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ember-veil",
+    "updatedAt": "2026-10-30T16:39:21.329Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#1a0705",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

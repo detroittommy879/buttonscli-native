@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Cozy autumn Thanksgiving palette with copper leaves, pumpkin and gold accents, cranberry and forest green, on a dark warm base for long coding sessions.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Cozy autumn and Thanksgiving: turkey/fall colors, copper leaves, pumpkin, warm gold, cranberry and forest green. Dark, warm and comfortable for long coding sessions.",
+      "model": "anthropic/claude-haiku-5.5",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417658-V9P8FpIKy7tPSfceEtIY",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-haiku-harvest-hearth",
+    "name": "AI Haiku - Harvest Hearth",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-autumn-haiku",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e0b15a",
+        "background": "#1f1915",
+        "buttonBackground": "#322820",
+        "buttonHover": "#5f2331",
+        "buttonText": "#f7efe4"
+      },
+      "settings": {
+        "background": "#1f1915"
+      },
+      "shell": {
+        "accent": "#7a2e3a",
+        "accentHover": "#5f2331",
+        "background": "#14100d",
+        "backgroundSecondary": "#1f1915",
+        "border": "#5a4636",
+        "buttonBackground": "#322820",
+        "paneDivider": {
+          "color": "#b8733a",
+          "thickness": 2
+        },
+        "textDim": "#cdbda9",
+        "textMain": "#f7efe4"
+      },
+      "statusBar": {
+        "background": "#1f1915",
+        "border": "#5a4636",
+        "text": "#e3d6c4",
+        "warning": "#f0c060"
+      },
+      "tabs": {
+        "activeBackground": "#14100d",
+        "activeBorder": "#c8843f",
+        "background": "#1f1915",
+        "idleBackground": "#2a211b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c1714",
+        "blue": "#6f9bc4",
+        "brightBlack": "#8a7a6a",
+        "brightBlue": "#9dbde0",
+        "brightCyan": "#a6d6cc",
+        "brightGreen": "#b3d195",
+        "brightMagenta": "#dca0b8",
+        "brightRed": "#f08a7e",
+        "brightWhite": "#fff8ee",
+        "brightYellow": "#f5cf7d",
+        "cyan": "#7fb8ae",
+        "green": "#8fb573",
+        "magenta": "#c77d9a",
+        "red": "#e0645a",
+        "white": "#d9cbb8",
+        "yellow": "#e0b15a"
+      },
+      "background": "#100c0a",
+      "foreground": "#f3e9da",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

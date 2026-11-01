@@ -1,0 +1,162 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 100.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60.0,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 85.0,
+    "simpleNoiseMinBrightness": 21.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 85.0,
+    "staticBrightness": 58.0,
+    "staticDensity": 61.0,
+    "staticEnabled": false,
+    "staticIntensity": 75.0,
+    "staticOpacity": 0.15000000596046448
+  },
+  "metadata": {
+    "createdAt": "2026-11-01T00:50:31.262Z",
+    "description": "A lurid, high-contrast dark mode inspired by Italian horror lighting. Standard ANSI roles are swapped for clashing, hyper-saturated neon hues against profound black.",
+    "id": "giallo-neon-lite-background-blues-v1",
+    "name": "Giallo Neon, lite background blues v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:giallo-neon-lite-background-blues-v1",
+    "updatedAt": "2026-11-01T01:26:18.604Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#000305",
+        "background": "#252526",
+        "buttonBackground": "#413e3e",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#101b2b"
+      },
+      "shell": {
+        "accent": "#3f8efc",
+        "accentHover": "#62a2fd",
+        "background": "#0a0b0f",
+        "backgroundSecondary": "#101b2b",
+        "border": "#162843",
+        "buttonBackground": "#101b2b",
+        "paneDivider": {
+          "color": "#3f8efc",
+          "thickness": 2.0
+        },
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#101b2b",
+        "border": "#101b2b",
+        "text": "#858585",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#0a0b0f",
+        "activeBorder": "#3f8efc",
+        "background": "#101b2b",
+        "idleBackground": "#101b2b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#270e27",
+        "blue": "#ff4500",
+        "brightBlack": "#4d004d",
+        "brightBlue": "#ff8c00",
+        "brightCyan": "#ba55d3",
+        "brightGreen": "#e0ffff",
+        "brightMagenta": "#ffd700",
+        "brightRed": "#ff69b4",
+        "brightWhite": "#afeeee",
+        "brightYellow": "#adff2f",
+        "cyan": "#9400d3",
+        "green": "#00ffff",
+        "magenta": "#ffff00",
+        "red": "#ff00ff",
+        "white": "#00ced1",
+        "yellow": "#7fff00"
+      },
+      "background": "#07080b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#ffffff",
+      "gradientAngle": 180.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#07080b",
+        "#101d32",
+        "#0c1018",
+        "#07080b"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

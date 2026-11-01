@@ -1,0 +1,183 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": true,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.029999999329447743,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 4.0,
+    "staticOpacity": 0.18000000715255737
+  },
+  "metadata": {
+    "createdAt": "2026-10-12T16:44:49.719Z",
+    "description": "playful clown palette with deep blues and greys",
+    "id": "festival-clown-v2",
+    "name": "festival-clown v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:festival-clown-v2",
+    "updatedAt": "2026-10-12T16:44:49.719Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#1a1a2a",
+        "buttonBackground": "#3f2e3c",
+        "buttonHover": "#59323e",
+        "buttonText": "#e0e0e0"
+      },
+      "settings": {
+        "background": "#1a1a2a"
+      },
+      "shell": {
+        "accent": "#ff4d4d",
+        "accentHover": "#f96767",
+        "background": "#1a1a2a",
+        "backgroundSecondary": "#2a2a3a",
+        "border": "#562733",
+        "buttonBackground": "#2a2a3a",
+        "paneDivider": {
+          "color": "#f00bef",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#86868d",
+        "textMain": "#e0e0e0"
+      },
+      "statusBar": {
+        "background": "#6c2c37",
+        "border": "#562733",
+        "text": "#e0e0e0",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#0a0a1a",
+        "activeBorder": "#ff4d4d",
+        "background": "#1a1a2a",
+        "idleBackground": "#2a2a3a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1a1a",
+        "blue": "#4d8cff",
+        "brightBlack": "#2a2a2a",
+        "brightBlue": "#6eafff",
+        "brightCyan": "#6effff",
+        "brightGreen": "#6effa3",
+        "brightMagenta": "#ff6eff",
+        "brightRed": "#ff6e6e",
+        "brightWhite": "#f0f0f0",
+        "brightYellow": "#ffe76e",
+        "cyan": "#4dffff",
+        "green": "#4dff8c",
+        "magenta": "#ff4dff",
+        "red": "#ff4d4d",
+        "white": "#e0e0e0",
+        "yellow": "#ffd74d"
+      },
+      "background": "#0a0a1a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Daddy Time Mono Bundled",
+      "fontSize": 10.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#e0e0e0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a0a1a",
+        "#1a1a2a",
+        "#0a0a1a",
+        "#0a0a1a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 10.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

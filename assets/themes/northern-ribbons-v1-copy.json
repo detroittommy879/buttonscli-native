@@ -1,0 +1,175 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": null,
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 90.0,
+    "staticBrightness": 86.0,
+    "staticDensity": 0.8500000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.3400000035762787
+  },
+  "metadata": {
+    "createdAt": "2026-10-17T00:00:04.006Z",
+    "description": "Its own shader code: rainbow aurora ribbons with a brightness slider you can tune in Shaders. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "id": "northern-ribbons-v1-copy",
+    "name": "Northern Ribbons v1 Copy",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:northern-ribbons-v1-copy",
+    "updatedAt": "2026-11-01T00:21:05.669Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff8ad8",
+        "background": "#0b2233",
+        "buttonBackground": "#164260",
+        "buttonHover": "#8a7dff",
+        "buttonText": "#e6fbff"
+      },
+      "settings": {
+        "background": "#0b2233"
+      },
+      "shell": {
+        "accent": "#5cffc8",
+        "accentHover": "#ff8ad8",
+        "background": "#071825",
+        "backgroundSecondary": "#0b2233",
+        "border": "#8a7dff",
+        "buttonBackground": "#103047",
+        "paneDivider": {
+          "color": "#5cffc8",
+          "thickness": 2.0
+        },
+        "textDim": "#8fc7d9",
+        "textMain": "#e6fbff"
+      },
+      "statusBar": {
+        "background": "#1b6b7d",
+        "border": "#8a7dff",
+        "text": "#e6fbff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#071825",
+        "activeBorder": "#5cffc8",
+        "background": "#0b2233",
+        "idleBackground": "#103047"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#24414f",
+        "blue": "#62b6ff",
+        "brightBlack": "#4f7385",
+        "brightBlue": "#95ceff",
+        "brightCyan": "#94f5ff",
+        "brightGreen": "#93ffdb",
+        "brightMagenta": "#dcb3ff",
+        "brightRed": "#ff9cb2",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffeca8",
+        "cyan": "#5ef0ff",
+        "green": "#5cffc8",
+        "magenta": "#c58bff",
+        "red": "#ff6f8f",
+        "white": "#e2f8ff",
+        "yellow": "#ffe27a"
+      },
+      "background": "#04101a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#e6fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#04101a",
+        "#0b3a3f",
+        "#25124a",
+        "#04101a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.4000000059604645
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

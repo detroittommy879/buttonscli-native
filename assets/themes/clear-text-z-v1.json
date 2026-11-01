@@ -1,0 +1,262 @@
+{
+  "effects": {
+    "glow": null,
+    "hsyncDebugPanel": null,
+    "hsyncEnabled": null,
+    "hsyncShiftRange": null,
+    "hsyncSpeed": null,
+    "hsyncUseGpu": null,
+    "hsyncWavePeriod": null,
+    "masterDisabled": true,
+    "noise": null,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "preset": "ink",
+      "scale": 3.4000000953674316,
+      "speed": 2.0,
+      "strength": 0.6499999761581421,
+      "version": 1
+    },
+    "shaderLabEnabled": null,
+    "shaderLabFragmentShader": null,
+    "shaderLabPreset": null,
+    "shaderLabPreviewScope": null,
+    "shaderLabStrength": null,
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0,
+    "tvNoiseAmount": null,
+    "tvNoiseEnabled": null,
+    "vignette": null
+  },
+  "metadata": {
+    "createdAt": "2026-10-12T16:51:09.465Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "clear-text-z-v1",
+    "name": "clear-text-z v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:clear-text-z-v1",
+    "updatedAt": "2026-10-12T16:51:09.465Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "assistant": null,
+      "controls": null,
+      "layout": null,
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#120f19",
+        "buttonBackground": "#221c2e",
+        "buttonHover": "#2c243b",
+        "buttonText": "#e6e0ea"
+      },
+      "settings": {
+        "background": "#14111d"
+      },
+      "shell": {
+        "accent": "#7f981b",
+        "accentHover": "#d4f51d",
+        "assistant": null,
+        "background": "#0d0a12",
+        "backgroundSecondary": "#15101a",
+        "border": "#3d1445",
+        "borderColor": null,
+        "buttonBackground": "#17131e",
+        "chrome": null,
+        "controls": null,
+        "foreground": null,
+        "layout": null,
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "panel": null,
+        "presetDock": null,
+        "settings": null,
+        "shadow": null,
+        "shadowColor": null,
+        "statusBar": null,
+        "tabs": null,
+        "textDim": "#95869e",
+        "textMain": "#e6e0ea"
+      },
+      "statusBar": {
+        "background": "#15101a",
+        "border": "#281b36",
+        "text": "#cecad3",
+        "warning": "#a08a3a"
+      },
+      "tabs": {
+        "activeBackground": "#0d0a12",
+        "activeBorder": "#ff007f",
+        "background": "#100d16",
+        "idleBackground": "#17131e"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "0": null,
+        "1": null,
+        "10": null,
+        "11": null,
+        "12": null,
+        "13": null,
+        "14": null,
+        "15": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": null,
+        "7": null,
+        "8": null,
+        "9": null,
+        "ansiBlack": null,
+        "ansiBlue": null,
+        "ansiBrightBlack": null,
+        "ansiBrightBlue": null,
+        "ansiBrightCyan": null,
+        "ansiBrightGreen": null,
+        "ansiBrightMagenta": null,
+        "ansiBrightRed": null,
+        "ansiBrightWhite": null,
+        "ansiBrightYellow": null,
+        "ansiCyan": null,
+        "ansiGreen": null,
+        "ansiMagenta": null,
+        "ansiRed": null,
+        "ansiWhite": null,
+        "ansiYellow": null,
+        "black": "#1f1828",
+        "blue": "#00ccff",
+        "brightBlack": "#554664",
+        "brightBlue": "#4ddbff",
+        "brightCyan": "#4dffdb",
+        "brightGreen": "#75ff4d",
+        "brightMagenta": "#ff4dff",
+        "brightRed": "#ff4d9e",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffdb4d",
+        "cyan": "#00ffcc",
+        "green": "#00ff2a",
+        "magenta": "#ff00ff",
+        "red": "#ff007f",
+        "white": "#e6e0ea",
+        "yellow": "#ffcc00"
+      },
+      "background": "#0b0810",
+      "cursor": null,
+      "cursorAccent": null,
+      "cursorBlink": null,
+      "drawBoldTextInBrightColors": false,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 200,
+      "fontWeightBold": 200,
+      "foreground": "#d1cbd6",
+      "googleFont": null,
+      "gradient": null,
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColorC": null,
+      "gradientColorD": null,
+      "gradientColors": [],
+      "gradientDirection": null,
+      "gradientEnd": null,
+      "gradientRadialPosition": "center",
+      "gradientRadialShape": null,
+      "gradientSpeed": null,
+      "gradientStart": null,
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "selectionBackground": null,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 700,
+        "letterSpacing": 2.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

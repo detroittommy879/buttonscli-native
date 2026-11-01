@@ -1,0 +1,162 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:37:52.654Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "crazy-red-2-v1",
+    "name": "crazy-red-2 v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:crazy-red-2-v1",
+    "updatedAt": "2026-10-30T16:37:52.654Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#1a0705",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

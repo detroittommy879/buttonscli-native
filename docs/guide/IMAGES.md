@@ -30,6 +30,7 @@ sentence for someone who can't see it.
 | `random-ideas.png` | ai-shaders | Ideas list with **Write one version per idea (4)** |
 | `generate-tab.png` | ai-themes | Generate tab mid-run with the progress line |
 | `chatgpt-signin.png` | ai-setup | AI providers with a connected ChatGPT plan |
+| `status-shader-menu.png` | shaders | The status bar's ✦ Shader menu open |
 
 Short animated clips (GIF/WebM, a few seconds) would suit the hero, the shader
 page and Create with AI best. Shaders move, and a still image undersells them.

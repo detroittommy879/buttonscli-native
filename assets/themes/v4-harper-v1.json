@@ -1,0 +1,193 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": null,
+      "preset": "nebula",
+      "scale": 4.0,
+      "speed": 1.850000023841858,
+      "strength": 0.6499999761581421,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-12T16:53:14.166Z",
+    "description": "Gogh dark import from Harper",
+    "id": "v4-harper-v1",
+    "name": "v4-Harper v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:v4-harper-v1",
+    "updatedAt": "2026-11-01T00:05:23.874Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#489e48",
+        "background": "#010101",
+        "buttonBackground": "#010101",
+        "buttonHover": "#0e1d0e",
+        "buttonText": "#a8a49d"
+      },
+      "settings": {
+        "background": "#010101"
+      },
+      "shell": {
+        "accent": "#489e48",
+        "accentHover": "#489e48",
+        "background": "#010101",
+        "backgroundSecondary": "#010101",
+        "border": "#152d15",
+        "buttonBackground": "#010101",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#62605b",
+        "textMain": "#a8a49d"
+      },
+      "statusBar": {
+        "background": "#0f200f",
+        "border": "#152d15",
+        "text": "#a8a49d",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#010101",
+        "activeBorder": "#489e48",
+        "background": "#010101",
+        "idleBackground": "#010101"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#010101",
+        "blue": "#489E48",
+        "brightBlack": "#726E6A",
+        "brightBlue": "#489E48",
+        "brightCyan": "#F5BFD7",
+        "brightGreen": "#7FB5E1",
+        "brightMagenta": "#B296C6",
+        "brightRed": "#F8B63F",
+        "brightWhite": "#FEFBEA",
+        "brightYellow": "#D6DA25",
+        "cyan": "#F5BFD7",
+        "green": "#7FB5E1",
+        "magenta": "#B296C6",
+        "red": "#F8B63F",
+        "white": "#A8A49D",
+        "yellow": "#D6DA25"
+      },
+      "background": "#010101",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#A8A49D",
+      "gradientAngle": 181.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#010101",
+        "#010101",
+        "#0e1d0e",
+        "#112611"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

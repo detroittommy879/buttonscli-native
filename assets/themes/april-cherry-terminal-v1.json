@@ -1,0 +1,174 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#7d2f4c",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 3.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": null,
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 38.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 66.0,
+    "staticAmplitude": 13.0,
+    "staticBrightness": 33.0,
+    "staticDensity": 0.12999999523162842,
+    "staticEnabled": false,
+    "staticIntensity": 10.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:36:19.974Z",
+    "description": "Burgundy night theme with cherry pink and electric teal contrast.",
+    "id": "april-cherry-terminal-v1",
+    "name": "April Cherry Terminal v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:april-cherry-terminal-v1",
+    "updatedAt": "2026-10-30T16:36:19.974Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e889b1",
+        "background": "#210f18",
+        "buttonBackground": "#381828",
+        "buttonHover": "#441d31",
+        "buttonText": "#ffe5ee"
+      },
+      "settings": {
+        "background": "#221019"
+      },
+      "shell": {
+        "accent": "#ff5d8f",
+        "accentHover": "#ff7ba6",
+        "background": "#180c12",
+        "backgroundSecondary": "#23111a",
+        "border": "#6a2741",
+        "buttonBackground": "#27131d",
+        "paneDivider": {
+          "color": "#ff5d8f",
+          "thickness": 2.0
+        },
+        "textDim": "#c28a9c",
+        "textMain": "#ffe5ee"
+      },
+      "statusBar": {
+        "background": "#3a1430",
+        "border": "#6e2b55",
+        "text": "#fff3fb",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#1a0d14",
+        "activeBorder": "#ff6b71",
+        "background": "#1d0f16",
+        "idleBackground": "#27131d"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#24141b",
+        "blue": "#6d88c9",
+        "brightBlack": "#654350",
+        "brightBlue": "#8aa3e4",
+        "brightCyan": "#76ddd5",
+        "brightGreen": "#9bc98a",
+        "brightMagenta": "#d293df",
+        "brightRed": "#f07b90",
+        "brightWhite": "#fff7fb",
+        "brightYellow": "#ecc87e",
+        "cyan": "#58c0bc",
+        "green": "#82b070",
+        "magenta": "#b578c4",
+        "red": "#dc5f72",
+        "white": "#e7cad4",
+        "yellow": "#d3af67"
+      },
+      "background": "#170b11",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "monof55 Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#ffd9e8",
+      "gradientAngle": 144.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#241019",
+        "#3a1624",
+        "#4d1d2d",
+        "#1d3841"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "repeating-linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 17.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 17.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

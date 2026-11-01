@@ -269,33 +269,38 @@ impl ButtonsApp {
     }
 
     /// File menu: apply a saved bundle.
-    pub(super) fn theme_bundle_menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let mut names: Vec<String> = self
+    /// A menu of saved (★) and built-in (◆) bundles, titled `label`.
+    pub(super) fn theme_bundle_menu(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        label: &str,
+    ) {
+        let mut names: Vec<(String, &str)> = self
             .preferences
             .theme_bundles
             .iter()
-            .map(|bundle| bundle.name.clone())
+            .map(|bundle| (bundle.name.clone(), "★"))
             .collect();
         for bundle in crate::library::bundles() {
-            if !names.contains(&bundle.name) {
-                names.push(bundle.name.clone());
+            if !names.iter().any(|(name, _)| *name == bundle.name) {
+                names.push((bundle.name.clone(), "◆"));
             }
         }
         if names.is_empty() {
             return;
         }
         let mut apply = None;
-        ui.spaced_menu_button(
-            crate::i18n::literal(&self.locale, "Apply theme bundle"),
-            |ui| {
-                for name in names {
-                    if ui.spaced_button(name.as_str()).clicked() {
-                        apply = Some(name);
-                        ui.close_menu();
-                    }
+        ui.spaced_menu_button(crate::i18n::literal(&self.locale, label), |ui| {
+            for (name, mark) in names {
+                if ui.spaced_button(format!("{mark} {name}")).clicked() {
+                    apply = Some(name);
+                    ui.close_menu();
                 }
-            },
-        );
+            }
+        })
+        .response
+        .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals.");
         if let Some(name) = apply {
             self.notice = self.apply_theme_bundle(ctx, &name);
             ui.close_menu();
@@ -377,24 +382,36 @@ impl ButtonsApp {
                 });
             });
         }
-        for bundle in crate::library::bundles() {
-            if self
-                .preferences
-                .theme_bundles
-                .iter()
-                .any(|own| own.name == bundle.name)
-            {
-                continue;
-            }
-            ui.push_id(("built-in-bundle", bundle.name.as_str()), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spaced_label(RichText::new(format!("◆ {}", bundle.name)).strong())
-                        .on_hover_text("Comes with ButtonsCLI.");
-                    if ui.spaced_button("Apply").clicked() {
-                        apply = Some(bundle.name.clone());
+        // Built-ins the user has no bundle of the same name for, folded away
+        // so they don't push the theme list down.
+        let built_in: Vec<&ThemeBundle> = crate::library::bundles()
+            .iter()
+            .filter(|bundle| {
+                !self
+                    .preferences
+                    .theme_bundles
+                    .iter()
+                    .any(|own| own.name == bundle.name)
+            })
+            .collect();
+        if !built_in.is_empty() {
+            egui::CollapsingHeader::new(format!("◆ Built-in bundles ({})", built_in.len()))
+                .id_salt("built-in-bundles")
+                .show(ui, |ui| {
+                    for bundle in built_in {
+                        ui.push_id(("built-in-bundle", bundle.name.as_str()), |ui| {
+                            ui.horizontal(|ui| {
+                                ui.spaced_label(
+                                    RichText::new(format!("◆ {}", bundle.name)).strong(),
+                                )
+                                .on_hover_text("Comes with ButtonsCLI.");
+                                if ui.spaced_button("Apply").clicked() {
+                                    apply = Some(bundle.name.clone());
+                                }
+                            });
+                        });
                     }
                 });
-            });
         }
         if let Some(index) = delete {
             let removed = self.preferences.theme_bundles.remove(index);

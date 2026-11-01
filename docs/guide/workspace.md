@@ -40,7 +40,7 @@ collapse and auto-hide.
 
 | On… | You get |
 | --- | --- |
-| A pane | Favorite themes, Random theme, Use global theme, copy, select all, clear screen, rename, auto-tile, close |
+| A pane | Favorite themes, Random theme, Use global theme, copy, select all, clear screen, rename, auto-tile, close, and a **Shader** section (Strength, background color, use a shader) |
 | A tab | Rename, move left/right, auto-tile, close |
 | A button | Run, edit, delete |
 

@@ -1,0 +1,178 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.32499998807907104
+  },
+  "metadata": {
+    "createdAt": "2026-10-11T21:49:54.268Z",
+    "description": "Gogh dark import from Tempus Future by Protesilaos Stavrou (https://protesilaos.com)",
+    "id": "v4-tempus-future-v1",
+    "name": "v4-Tempus Future v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:v4-tempus-future-v1",
+    "updatedAt": "2026-10-11T21:49:54.268Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#4ab2d7",
+        "background": "#080916",
+        "buttonBackground": "#080917",
+        "buttonHover": "#14273a",
+        "buttonText": "#b4abac"
+      },
+      "settings": {
+        "background": "#080916"
+      },
+      "shell": {
+        "accent": "#4ab2d7",
+        "accentHover": "#8ba7ea",
+        "background": "#090a18",
+        "backgroundSecondary": "#080916",
+        "border": "#1b394d",
+        "buttonBackground": "#080917",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#6c676e",
+        "textMain": "#b4abac"
+      },
+      "statusBar": {
+        "background": "#162c3e",
+        "border": "#1b394d",
+        "text": "#b4abac",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090a18",
+        "activeBorder": "#4ab2d7",
+        "background": "#080916",
+        "idleBackground": "#080917"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#090a18",
+        "blue": "#4ab2d7",
+        "brightBlack": "#2b1329",
+        "brightBlue": "#8ba7ea",
+        "brightCyan": "#2cbab6",
+        "brightGreen": "#60ba80",
+        "brightMagenta": "#e08bd6",
+        "brightRed": "#f78e2f",
+        "brightWhite": "#b4abac",
+        "brightYellow": "#de9b1d",
+        "cyan": "#2ab7bb",
+        "green": "#6aba39",
+        "magenta": "#e58f84",
+        "red": "#ff7e8f",
+        "white": "#a7a2c4",
+        "yellow": "#bfa51a"
+      },
+      "background": "#090a18",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#b4abac",
+      "gradientAngle": 141.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -261,6 +261,7 @@ pub(crate) struct Preferences {
     pub(crate) settings_layout: SettingsLayout,
     pub(crate) keyboard: KeyboardPreferences,
     pub(crate) row_banding_brightness: u8,
+    /// Frames per second for shaders and other animated effects, all panes.
     pub(crate) animation_fps: u32,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
@@ -326,7 +327,7 @@ impl Default for Preferences {
             settings_layout: SettingsLayout::default(),
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
-            animation_fps: 30,
+            animation_fps: 60,
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -373,6 +374,8 @@ impl Default for Preferences {
 }
 
 /// Most shaders the Pattern picker keeps.
+/// Highest "Animation FPS limit" (shaders and effects, app-wide).
+pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 pub(crate) const MAX_SAVED_SHADERS: usize = 64;
 /// Most pane slots a theme bundle or the saved pane looks remember.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
@@ -571,7 +574,7 @@ impl Preferences {
             *height = height.clamp(100.0, 1000.0);
         }
         self.row_banding_brightness = self.row_banding_brightness.min(64);
-        self.animation_fps = self.animation_fps.clamp(1, 60);
+        self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
         let mut seen = std::collections::HashSet::new();
         self.favorite_theme_ids
             .retain(|id| !id.is_empty() && seen.insert(id.clone()));
@@ -927,7 +930,7 @@ mod tests {
     fn settings_layout_keyboard_and_band_brightness_persist_and_migrate() {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert_eq!(prefs.row_banding_brightness, 0);
-        assert_eq!(prefs.animation_fps, 30);
+        assert_eq!(prefs.animation_fps, 60);
         assert!(prefs.keyboard.bracketed_paste);
         prefs.settings_layout.size = [1200.0, 900.0];
         prefs.settings_layout.position = Some([-900.0, 120.0]);

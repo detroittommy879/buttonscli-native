@@ -1,0 +1,226 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#315880",
+        "#68afc6",
+        "#c0dfee"
+      ],
+      "custom": {
+        "expression": "let wind = sin(t * 0.35 + p.y * 1.2) * 0.09;\nlet sky = cloud(p * vec2<f32>(1.4, 2.8) + vec2<f32>(t * 0.035, 0.0));\nlet haze = mix(c1 * vec3<f32>(0.42), c2 * vec3<f32>(0.36), smoothstep(0.15, 0.85, sky));\nlet spacing = 1.15 - amount * 0.065;\nlet drift = vec2<f32>(p.x + wind - t * 0.045, p.y + t * gravity * 0.22);\nlet grid = drift / vec2<f32>(spacing);\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet local = (fract(grid) - vec2<f32>(0.5)) * vec2<f32>(spacing);\nlet angle = seed * 6.2831853 + sin(t * 0.45 + seed * 12.0) * 0.25;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / vec2<f32>(shape_size * (0.34 + seed * 0.22));\nlet radius = length(q);\nlet axis = min(abs(q.x), min(abs(dot(q, vec2<f32>(0.5, 0.8660254))), abs(dot(q, vec2<f32>(-0.5, 0.8660254)))));\nlet arms = (1.0 - smoothstep(0.035, 0.075, axis)) * (1.0 - smoothstep(0.76, 0.96, radius));\nlet ring = exp(-abs(radius - 0.49) * 45.0) * (1.0 - smoothstep(0.12, 0.24, axis));\nlet core = 1.0 - smoothstep(0.07, 0.17, radius);\nlet visibility = smoothstep(0.0, 1.0, amount);\nlet flake = clamp(max(arms, core) + ring * 0.5, 0.0, 1.0) * visibility;\nlet flakeColor = mix(c2, c3, seed) * vec3<f32>(0.74 + 0.18 * seed);\nlet farGrid = (p + vec2<f32>(t * 0.018, t * gravity * 0.12)) * vec2<f32>(6.0);\nlet farCell = floor(farGrid);\nlet farSeed = hash(farCell + vec2<f32>(17.0, 3.0));\nlet farLocal = fract(farGrid) - vec2<f32>(0.2 + farSeed * 0.6);\nlet dust = (1.0 - smoothstep(0.025, 0.09, length(farLocal))) * step(0.66, farSeed) * visibility;\nlet halo = exp(-radius * radius * 3.0) * visibility;\nlet color = mix(haze, flakeColor, flake) + c2 * vec3<f32>(dust * 0.28 + glow * halo * 0.12);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Quiet Winter",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 9.5
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 2.25
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.5299999713897705
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.949999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 5.0,
+      "speed": 2.200000047683716,
+      "strength": 0.18000000715255737,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T23:50:38.127Z",
+    "description": "A classic Halloween palette of deep midnight, glowing pumpkin orange, and warm candlelight.",
+    "id": "quiet-winter",
+    "name": "Quiet Winter",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:quiet-winter",
+    "updatedAt": "2026-10-31T00:31:40.011Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#000305",
+        "background": "#433528",
+        "buttonBackground": "#554e3a",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#0d0906"
+      },
+      "shell": {
+        "accent": "#4b5be7",
+        "accentHover": "#6b79eb",
+        "background": "#0c0e12",
+        "backgroundSecondary": "#14172c",
+        "border": "#332211",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#7f7159",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#080604",
+        "border": "#332211",
+        "text": "#ffffff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#17100a",
+        "activeBorder": "#ff9900",
+        "background": "#080604",
+        "idleBackground": "#2d2d30"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#27201a",
+        "blue": "#4a4a4a",
+        "brightBlack": "#4d3926",
+        "brightBlue": "#6e6e6e",
+        "brightCyan": "#c29970",
+        "brightGreen": "#7acc00",
+        "brightMagenta": "#b34732",
+        "brightRed": "#ff751a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd147",
+        "cyan": "#a37c58",
+        "green": "#5c8a00",
+        "magenta": "#8a3324",
+        "red": "#e65c00",
+        "white": "#f0d8b8",
+        "yellow": "#ffb300"
+      },
+      "background": "#0b0c0e",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f0d8b8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.5,
+        "fontWeight": 400,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

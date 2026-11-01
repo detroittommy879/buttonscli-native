@@ -1,0 +1,206 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let power = clamp(amount / 60.0, 0.0, 1.0);\nlet uv = p * vec2<f32>(2.1) + vec2<f32>(t * 0.035, -t * 0.025);\nlet cell = floor(uv);\nlet seed = hash(cell);\nlet local = fract(uv) - vec2<f32>(0.5);\nlet angle = seed * 6.28318 + t * 0.22 * sin(seed * 19.0);\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle));\nlet bounce = 0.018 * sin(t * 1.8 + seed * 25.0);\nlet radius = 0.26 + bounce;\nlet circle = length(q) - radius;\nlet box = max(abs(q.x), abs(q.y)) - radius * 0.86;\nlet triangle = max(abs(q.x) * 0.866025 + q.y * 0.5, -q.y) - radius * 0.62;\nlet shape = select(select(circle, box, seed > 0.33), triangle, seed > 0.67);\nlet edge = 1.0 - smoothstep(0.006, 0.018, abs(shape));\nlet glow = exp(-abs(shape) * 29.0);\nlet inside = 1.0 - smoothstep(-0.012, 0.0, shape);\nlet eyeA = length(q - vec2<f32>(-0.065, 0.015));\nlet eyeB = length(q - vec2<f32>(0.065, 0.015));\nlet eyes = (1.0 - smoothstep(0.009, 0.019, min(eyeA, eyeB))) * inside;\nlet smileDistance = abs(length(q - vec2<f32>(0.0, 0.015)) - 0.09);\nlet smile = (1.0 - smoothstep(0.004, 0.012, smileDistance)) * (1.0 - smoothstep(-0.035, -0.02, q.y)) * inside;\nlet orbit = abs(length(local) - 0.405);\nlet ticks = pow(max(0.0, cos(atan2(local.y, local.x) * 12.0 + seed * 6.0)), 12.0);\nlet ring = exp(-orbit * 180.0) * ticks * 0.12;\nlet color = mix(palette(seed * 0.83 + 0.04), mix(c1, c2, seed), 0.2);\nlet enabled = smoothstep(seed - 0.12, seed + 0.12, 0.25 + power * 0.75);\nlet base = vec3<f32>(0.007, 0.009, 0.022) + c3 * vec3<f32>(inside * 0.025);\nlet neon = color * vec3<f32>((edge * 0.62 + glow * 0.07 + inside * 0.018 + ring) * enabled);\nlet face = mix(color, vec3<f32>(0.65, 0.85, 1.0), 0.55) * vec3<f32>((eyes + smile) * 0.35 * enabled);\nlet vignette = 1.0 / (1.0 + dot(p, p) * 0.12);\nreturn clamp((base + neon + face) * vec3<f32>(vignette), vec3<f32>(0.0), vec3<f32>(0.78));",
+        "variables": [
+          {
+            "max": 60.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 46.0
+          }
+        ]
+      },
+      "preset": "silk",
+      "scale": 0.800000011920929,
+      "speed": 4.699999809265137,
+      "strength": 1.0,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-29T22:10:22.638Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "pur-v20",
+    "name": "pur v20",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pur-v20",
+    "updatedAt": "2026-10-29T23:02:20.172Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#110821",
+        "#170925",
+        "#140033"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

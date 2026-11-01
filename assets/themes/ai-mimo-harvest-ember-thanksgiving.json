@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Cozy autumn dark palette with copper leaves, pumpkin orange, warm gold, cranberry and forest green for comfortable long coding sessions.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Cozy autumn and Thanksgiving: turkey/fall colors, copper leaves, pumpkin, warm gold, cranberry and forest green. Dark, warm and comfortable for long coding sessions.",
+      "model": "xiaomi/mimo-v2.6-flash",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417670-933tyWJqmTmNzRb1rmlV",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-mimo-harvest-ember-thanksgiving",
+    "name": "AI Mimo - Harvest Ember Thanksgiving",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-autumn-mimo",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#d68a2b",
+        "background": "#1d150f",
+        "buttonBackground": "#33251a",
+        "buttonHover": "#4a3220",
+        "buttonText": "#f7ece0"
+      },
+      "settings": {
+        "background": "#211812"
+      },
+      "shell": {
+        "accent": "#8a5a1e",
+        "accentHover": "#734a19",
+        "background": "#151009",
+        "backgroundSecondary": "#211812",
+        "border": "#5b483a",
+        "buttonBackground": "#33251a",
+        "paneDivider": {
+          "color": "#8a5a1e",
+          "thickness": 2
+        },
+        "textDim": "#c9b79f",
+        "textMain": "#f5e9d7"
+      },
+      "statusBar": {
+        "background": "#1a1f16",
+        "border": "#4d6340",
+        "text": "#d7e4cb",
+        "warning": "#e8b84b"
+      },
+      "tabs": {
+        "activeBackground": "#151009",
+        "activeBorder": "#b5741f",
+        "background": "#211812",
+        "idleBackground": "#2a2017"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a140e",
+        "blue": "#6f93b8",
+        "brightBlack": "#8d7f6d",
+        "brightBlue": "#9ab9d6",
+        "brightCyan": "#a4d4c6",
+        "brightGreen": "#aedb8a",
+        "brightMagenta": "#e79aa4",
+        "brightRed": "#f08461",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f5ca6a",
+        "cyan": "#7fb0a3",
+        "green": "#8ab56a",
+        "magenta": "#c9737f",
+        "red": "#d95b3a",
+        "white": "#e2d7c6",
+        "yellow": "#e2a93f"
+      },
+      "background": "#100c07",
+      "foreground": "#f0e6d6",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

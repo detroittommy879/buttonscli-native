@@ -47,14 +47,20 @@ The **Pattern** picker lists, in order:
 
 Picking a preset sets your code aside; pick **Your code** to get it back.
 
-### Strength, Scale, Speed
+### Strength, Background, Scale, Speed
 
 - **Strength** — how strongly the shader shows. Lower it if text gets hard to
   read; most looks sit between 0.3 and 0.7.
+- **Background** — the terminal background color, right next to Strength:
+  at Strength 0 the shader fades to exactly this color.
 - **Scale** — zoom the pattern in or out.
 - **Animate** and **Speed** — untick Animate for a still picture.
 - **Y up** (custom code only) — on by default. Shader code usually treats "up"
   as up; turn it off if an older shader now looks upside down.
+- **FPS limit (all panes)** — how many times a second shaders and effects
+  change, for every pane at once (1–240, default 60). Lower it to save GPU,
+  for example while recording with OBS. It's a real cap: typing and mouse
+  moves don't make shaders run faster.
 
 ### Colors: c1 to c5
 
@@ -81,6 +87,21 @@ colors and ignore c1–c5.
 Tick **Sliders for this shader** to see and add sliders. A slider is a named
 number the code uses, like `speed` or `fireball_size`. A shader can have up
 to four. AI adds them for you when it writes a shader with sliders on.
+
+## Quick controls without Settings
+
+- **Status bar → ✦ Shader** acts on the focused pane: Strength, Background
+  color, **Use a shader** (your ★ saved list, then ◆ built-ins), and the FPS
+  limit.
+- **Right-click a pane → Shader** has the same controls for that pane.
+- **Status bar → ◆ Bundles** applies a saved (★) or built-in (◆) bundle.
+
+These change only that pane, the same way **Edit for: Pane N** does, and the
+change is saved like any pane edit: as a numbered personal theme when you
+switch panes, close Settings or quit.
+
+<!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
+     Background color, Use a shader list and the FPS limit. -->
 
 ## Your shader list
 

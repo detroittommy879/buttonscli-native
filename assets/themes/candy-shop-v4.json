@@ -1,0 +1,210 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#c20606",
+        "#0a5e00",
+        "#04004c"
+      ],
+      "custom": {
+        "expression": "let x = p.x * (2.0 + amount * 0.55);\nlet pulse = pow(0.5 + 0.5 * sin(t * 3.8), 6.0);\nlet modA = noise(vec2<f32>(x * 0.55 - t * 0.7, t * 0.3));\nlet modB = noise(vec2<f32>(x * 0.8 + 17.0, t * 0.55));\nlet waveA = (0.2 + modA * 0.55 + pulse * 0.12) * sin(x * 10.0 + t * 3.2 + modB * 16.0);\nlet waveB = (0.16 + modB * 0.48) * sin(x * 24.0 - t * 5.0 + modA * 10.0);\nlet waveC = (0.12 + modA * 0.4) * cos(x * 38.0 + t * 6.0);\nlet a = waveA + waveB * 0.32;\nlet b = waveA * 0.62 + waveC * 0.42;\nlet lineA = exp(-abs(p.y - a) * 210.0);\nlet lineB = exp(-abs(p.y - b) * 250.0);\nlet glowA = exp(-abs(p.y - a) * 35.0);\nlet glowB = exp(-abs(p.y - b) * 40.0);\nlet cell = floor(p.x * 42.0);\nlet height = 0.03 + 0.5 * pow(noise(vec2<f32>(cell * 0.41, t * 1.6)), 2.2);\nlet column = 1.0 - smoothstep(0.18, 0.45, abs(fract(p.x * 42.0) - 0.5));\nlet bars = column * (1.0 - smoothstep(height, height + 0.018, abs(p.y)));\nlet cyan = hsv(0.52 + modA * 0.08, 0.95, 1.0);\nlet magenta = hsv(0.88 + modB * 0.08, 0.95, 1.0);\nlet background = mix(c1, c3, 0.5) * vec3<f32>(0.006);\nlet color = background + cyan * vec3<f32>(lineA + glowA * 0.08) + magenta * vec3<f32>(lineB + glowB * 0.07) + mix(cyan, magenta, 0.5) * vec3<f32>(bars * 0.035);\nreturn clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 3.799999952316284
+          }
+        ]
+      },
+      "preset": "candy",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.6499999761581421,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-28T21:16:06.733Z",
+    "description": "Diagonal rainbow candy stripes with bubblegum chrome. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "id": "candy-shop-v4",
+    "name": "Candy Shop v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:candy-shop-v4",
+    "updatedAt": "2026-10-28T21:16:06.733Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffe066",
+        "background": "#1d1c15",
+        "buttonBackground": "#252d60",
+        "buttonHover": "#7af0ff",
+        "buttonText": "#fff3fb"
+      },
+      "settings": {
+        "background": "#2f1530"
+      },
+      "shell": {
+        "accent": "#ff7ac8",
+        "accentHover": "#ffe066",
+        "background": "#220f22",
+        "backgroundSecondary": "#2f1530",
+        "border": "#7af0ff",
+        "buttonBackground": "#211c43",
+        "paneDivider": {
+          "color": "#ff7ac8",
+          "thickness": 2.0
+        },
+        "textDim": "#f0b2da",
+        "textMain": "#fff3fb"
+      },
+      "statusBar": {
+        "background": "#3d1e3e",
+        "border": "#7af0ff",
+        "text": "#fff3fb",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#4f4b2c",
+        "activeBorder": "#070405",
+        "background": "#2f1530",
+        "idleBackground": "#502d05"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#43294a",
+        "blue": "#7ab8ff",
+        "brightBlack": "#7a5884",
+        "brightBlue": "#a9d0ff",
+        "brightCyan": "#a9f6ff",
+        "brightGreen": "#aefbc5",
+        "brightMagenta": "#ffb8f5",
+        "brightRed": "#ff9fc1",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffeb99",
+        "cyan": "#7af0ff",
+        "green": "#7cf7a3",
+        "magenta": "#ff8ff0",
+        "red": "#ff6f9f",
+        "white": "#fff0fa",
+        "yellow": "#ffe066"
+      },
+      "background": "#160a16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#fff3fb",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#160a16",
+        "#4a1546",
+        "#123d4a",
+        "#160a16"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.4000000059604645
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Miami-inspired dark palette with ocean teal, hot pink neon, sunset coral, sand, and tropical green. High-contrast controls for comfortable long-session readability.",
+    "generation": {
+      "attempt": 2,
+      "brief": "Miami, beaches and palm trees: ocean teal, hot pink neon, sunset coral, sand and tropical green. Dark nighttime coastal mood, readable high contrast controls.",
+      "model": "qwen/qwen3.8-omni-flash",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417928-BmDh2xNEzq2CFs7E4WxT",
+      "run": "20261007-defaults-extended"
+    },
+    "id": "ai-qwen-neon-coast-night",
+    "name": "AI Qwen - Neon Coast Night",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-extended-ai-miami-qwen",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff9f6b",
+        "background": "#0d2027",
+        "buttonBackground": "#153a43",
+        "buttonHover": "#007a72",
+        "buttonText": "#f4fbfa"
+      },
+      "settings": {
+        "background": "#0d2027"
+      },
+      "shell": {
+        "accent": "#007a72",
+        "accentHover": "#c2185b",
+        "background": "#071418",
+        "backgroundSecondary": "#0d2027",
+        "border": "#2c6a72",
+        "buttonBackground": "#153a43",
+        "paneDivider": {
+          "color": "#007a72",
+          "thickness": 2
+        },
+        "textDim": "#b6d4d0",
+        "textMain": "#f4fbfa"
+      },
+      "statusBar": {
+        "background": "#0d2027",
+        "border": "#2c6a72",
+        "text": "#cfe7e3",
+        "warning": "#ffd27a"
+      },
+      "tabs": {
+        "activeBackground": "#071418",
+        "activeBorder": "#007a72",
+        "background": "#0d2027",
+        "idleBackground": "#122d35"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#0d1c20",
+        "blue": "#58a6ff",
+        "brightBlack": "#6f8f92",
+        "brightBlue": "#8fc7ff",
+        "brightCyan": "#7ff0e0",
+        "brightGreen": "#6be3a9",
+        "brightMagenta": "#ff7ab8",
+        "brightRed": "#ff8aa0",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe3a3",
+        "cyan": "#2dd4bf",
+        "green": "#35c47f",
+        "magenta": "#ff3d8b",
+        "red": "#ff5d7a",
+        "white": "#d7ece8",
+        "yellow": "#ffd27a"
+      },
+      "background": "#051014",
+      "foreground": "#e9f7f4",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

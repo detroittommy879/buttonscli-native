@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Nighttime Miami coast: deep ocean-teal canvas, hot pink neon controls, sunset coral alerts, sand highlights and tropical palm greens. High-contrast dark theme for long beachside sessions.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Miami, beaches and palm trees: ocean teal, hot pink neon, sunset coral, sand and tropical green. Dark nighttime coastal mood, readable high contrast controls.",
+      "model": "z-ai/glm-5.3-flashx",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417722-JGRpLuBLVDWmOouW32EP",
+      "run": "20261007-defaults-extended"
+    },
+    "id": "ai-glm-miami-neon-tide-2",
+    "name": "AI Glm - Miami Neon Tide",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-extended-ai-miami-glm",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#7fe3d8",
+        "background": "#0d1e26",
+        "buttonBackground": "#16323c",
+        "buttonHover": "#1d4653",
+        "buttonText": "#f2fbf7"
+      },
+      "settings": {
+        "background": "#0d1e26"
+      },
+      "shell": {
+        "accent": "#d81b60",
+        "accentHover": "#b3144f",
+        "background": "#071319",
+        "backgroundSecondary": "#0d1e26",
+        "border": "#3a6b74",
+        "buttonBackground": "#16323c",
+        "paneDivider": {
+          "color": "#d81b60",
+          "thickness": 2
+        },
+        "textDim": "#9fc4c8",
+        "textMain": "#f2fbf7"
+      },
+      "statusBar": {
+        "background": "#0d1e26",
+        "border": "#3a6b74",
+        "text": "#cfe9e6",
+        "warning": "#ffcf7a"
+      },
+      "tabs": {
+        "activeBackground": "#071319",
+        "activeBorder": "#e0568a",
+        "background": "#0d1e26",
+        "idleBackground": "#122a33"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#122830",
+        "blue": "#55a9e8",
+        "brightBlack": "#6f9199",
+        "brightBlue": "#8ecdf5",
+        "brightCyan": "#84f0e6",
+        "brightGreen": "#7fe8a8",
+        "brightMagenta": "#ff8fc0",
+        "brightRed": "#ff9088",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe7b0",
+        "cyan": "#3fd9d0",
+        "green": "#43d17c",
+        "magenta": "#ff5fa2",
+        "red": "#ff6f61",
+        "white": "#e8f4f0",
+        "yellow": "#ffd98e"
+      },
+      "background": "#050e12",
+      "foreground": "#eafaf4",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

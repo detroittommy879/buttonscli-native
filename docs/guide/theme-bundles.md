@@ -25,7 +25,8 @@ every open terminal gets its look back.
 ## Apply one
 
 - **Settings → Themes → Library → Theme bundles → Apply**, or
-- **File → Apply theme bundle** in the menu bar.
+- **File → Apply theme bundle** in the menu bar, or
+- **◆ Bundles** in the status bar.
 
 Bundles are saved by **position**, not by terminal: the look saved for Pane 1
 goes to whatever is in Pane 1 now. If the bundle has more looks than you have
@@ -37,7 +38,9 @@ message says how many.
 ## Built-in bundles
 
 Bundles marked **◆** come with ButtonsCLI. You can apply them but not change
-or delete them — save a copy under a new name instead.
+or delete them — save a copy under a new name instead. In the Library they
+sit folded under **◆ Built-in bundles** so they don't push the theme list
+down.
 
 ## Your looks survive restarts
 

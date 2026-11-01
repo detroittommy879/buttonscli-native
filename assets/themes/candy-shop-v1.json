@@ -1,0 +1,201 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff487b",
+        "#36dcff",
+        "#ffc857"
+      ],
+      "custom": null,
+      "preset": "galaxy",
+      "scale": 2.25,
+      "speed": 1.4500000476837158,
+      "strength": 0.6200000047683716,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-22T04:43:59.364Z",
+    "description": "Diagonal rainbow candy stripes with bubblegum chrome. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "id": "candy-shop-v1",
+    "name": "Candy Shop v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:candy-shop-v1",
+    "updatedAt": "2026-11-01T00:04:07.627Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffe066",
+        "background": "#2f1530",
+        "buttonBackground": "#5a2560",
+        "buttonHover": "#7af0ff",
+        "buttonText": "#fff3fb"
+      },
+      "settings": {
+        "background": "#2f1530"
+      },
+      "shell": {
+        "accent": "#ff7ac8",
+        "accentHover": "#ffe066",
+        "background": "#220f22",
+        "backgroundSecondary": "#2f1530",
+        "border": "#7af0ff",
+        "buttonBackground": "#421c43",
+        "paneDivider": {
+          "color": "#ff7ac8",
+          "thickness": 2.0
+        },
+        "textDim": "#f0b2da",
+        "textMain": "#fff3fb"
+      },
+      "statusBar": {
+        "background": "#042317",
+        "border": "#7af0ff",
+        "text": "#fff3fb",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#220f22",
+        "activeBorder": "#ff7ac8",
+        "background": "#2f1530",
+        "idleBackground": "#421c43"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#43294a",
+        "blue": "#7ab8ff",
+        "brightBlack": "#7a5884",
+        "brightBlue": "#a9d0ff",
+        "brightCyan": "#a9f6ff",
+        "brightGreen": "#aefbc5",
+        "brightMagenta": "#ffb8f5",
+        "brightRed": "#ff9fc1",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffeb99",
+        "cyan": "#7af0ff",
+        "green": "#7cf7a3",
+        "magenta": "#ff8ff0",
+        "red": "#ff6f9f",
+        "white": "#fff0fa",
+        "yellow": "#ffe066"
+      },
+      "background": "#160a16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#fff3fb",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#160a16",
+        "#4a1546",
+        "#123d4a",
+        "#160a16"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.4000000059604645
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

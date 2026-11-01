@@ -1,0 +1,222 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff755d",
+        "#ffd34f",
+        "#42dcd5",
+        "#2388cd",
+        "#f85da6"
+      ],
+      "custom": {
+        "expression": "let horizon = -0.28 + wave_height * sin(p.x * 3.2 + t * 1.3);\nlet sky = mix(c3, c4, 0.35 * smoothstep(-0.3, 1.5, p.y));\nlet sun = 1.0 - smoothstep(0.27, 0.28, length(p - vec2<f32>(-0.78, 0.58)));\nlet sea = mix(c4, c3, 0.3 + 0.4 * pow(0.5 + 0.5 * sin(p.y * 48.0 + sin(p.x * 4.0 + t) * 2.0 + t * 2.0), 9.0));\nlet scene = mix(mix(sky, c2, sun), sea, 1.0 - smoothstep(horizon - 0.015, horizon + 0.015, p.y));\n\nlet q = vec2<f32>((fract((p.x - t * plane_speed) / 3.6 + 0.5) - 0.5) * 3.6, p.y - 0.43 - 0.1 * sin(t * 0.8));\nlet plane = 1.0 - smoothstep(0.95, 1.05, min(length(q / vec2<f32>(0.26, 0.035)), min(abs(q.x + q.y * 0.4) / 0.095 + abs(q.y) / 0.23, abs(q.x + 0.18) / 0.055 + abs(q.y) / 0.1)));\nlet flying = mix(scene, c1, plane);\n\nlet bp = vec2<f32>((fract((p.x - 0.68) / 2.9 + 0.5) - 0.5) * 2.9, p.y + 0.37 - 0.045 * sin(t * 1.8));\nlet br = length(bp) / ball_size;\nlet angle = atan2(bp.y, bp.x) + t * 0.65;\nlet panels = mix(mix(c1, c2, step(0.0, sin(angle * 3.0))), c5, step(0.5, cos(angle * 3.0)));\nlet ball = mix(panels, c3, 0.5 * pow(1.0 - abs(sin(angle * 3.0)), 18.0));\nlet color = mix(flying, ball, 1.0 - smoothstep(0.97, 1.01, br));\nreturn mix(bg, color, strength);",
+        "name": "Carry-On Summer",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.10000000149011612,
+            "name": "plane_speed",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 0.5,
+            "min": 0.15000000596046448,
+            "name": "ball_size",
+            "value": 0.2800000011920929
+          },
+          {
+            "max": 0.15000000596046448,
+            "min": 0.009999999776482582,
+            "name": "wave_height",
+            "value": 0.05999999865889549
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 5.0,
+      "speed": 2.200000047683716,
+      "strength": 0.07000000029802322,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-31T00:52:51.413Z",
+    "description": "A classic Halloween palette of deep midnight, glowing pumpkin orange, and warm candlelight.",
+    "id": "carry-on-summer",
+    "name": "Carry-On Summer",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:carry-on-summer",
+    "updatedAt": "2026-10-31T23:37:04.385Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#000305",
+        "background": "#0e111b",
+        "buttonBackground": "#1f1f30",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#0d0906"
+      },
+      "shell": {
+        "accent": "#4b5be7",
+        "accentHover": "#6b79eb",
+        "background": "#0c0e12",
+        "backgroundSecondary": "#14172c",
+        "border": "#332211",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#7f7159",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#080604",
+        "border": "#332211",
+        "text": "#ffffff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#17100a",
+        "activeBorder": "#ff9900",
+        "background": "#080604",
+        "idleBackground": "#2d2d30"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#27201a",
+        "blue": "#4a4a4a",
+        "brightBlack": "#4d3926",
+        "brightBlue": "#6e6e6e",
+        "brightCyan": "#c29970",
+        "brightGreen": "#7acc00",
+        "brightMagenta": "#b34732",
+        "brightRed": "#ff751a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd147",
+        "cyan": "#a37c58",
+        "green": "#5c8a00",
+        "magenta": "#8a3324",
+        "red": "#e65c00",
+        "white": "#f0d8b8",
+        "yellow": "#ffb300"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f0d8b8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.5,
+        "fontWeight": 400,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

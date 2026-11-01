@@ -64,3 +64,20 @@
 - Gallery: `native_theme_eval_capture` on the 18 Release-picked themes (owned
   profile, synthetic text), resized to 1000 px JPG (1.7 MB total).
 - Release picks themselves (assets/themes, assets/library) left uncommitted.
+
+## 2026-10-31: all personal looks built in, quick shader controls, real FPS cap
+
+- Export: 175 new built-in themes, 19 shaders, 9 bundles from the active profile
+  (read-only, ignored test). 96 unchanged copies of built-ins skipped; name clashes
+  numbered (1990crt-2 etc.); no tracked theme changed; static/noise off in copies.
+  Release picks: ✓ already built in, Pick all / not built in / none, releasePickFrom.
+- FPS: the old limit only set repaint requests, so input/output redraws ran shaders
+  at the monitor rate. animation_clock steps time; limit 1–240, default 60.
+- Shaders tab: Background color next to Strength, FPS slider. Status bar: ✦ Shader
+  (focused pane: strength, background, use a shader, FPS) and ◆ Bundles. Pane menu:
+  Shader section. Inline color picker (a popup button closes context menus).
+- Simple noise hidden and never drawn. Built-in bundles folded in Library.
+- Failed approach: 3 UI tests broke from library/status-bar size (hard-coded click
+  point, fixed theme name, unfolded bundle list); fixed tests to find settled text.
+- Validation: fmt, 351 tests, both clippy runs, release build, gallery recaptured.
+  Not checked by hand: menus in the running app.

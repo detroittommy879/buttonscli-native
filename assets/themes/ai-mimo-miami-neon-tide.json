@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Dark Miami night: ocean teal, hot pink neon, sunset coral, warm sand and palm green with high-contrast, readable controls throughout.",
+    "generation": {
+      "attempt": 2,
+      "brief": "Miami, beaches and palm trees: ocean teal, hot pink neon, sunset coral, sand and tropical green. Dark nighttime coastal mood, readable high contrast controls.",
+      "model": "xiaomi/mimo-v2.6-flash",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417589-5I3McfTfew8ZX5O1cFF8",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-mimo-miami-neon-tide",
+    "name": "AI Mimo - Miami Neon Tide",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-miami-mimo",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff5f9e",
+        "background": "#101e28",
+        "buttonBackground": "#1d3a4a",
+        "buttonHover": "#0f6f7e",
+        "buttonText": "#f2f5f7"
+      },
+      "settings": {
+        "background": "#132632"
+      },
+      "shell": {
+        "accent": "#0f6f7e",
+        "accentHover": "#10808a",
+        "background": "#0a141d",
+        "backgroundSecondary": "#132632",
+        "border": "#3f6070",
+        "buttonBackground": "#1d3a4a",
+        "paneDivider": {
+          "color": "#e0457b",
+          "thickness": 2
+        },
+        "textDim": "#a9bcc7",
+        "textMain": "#f2f5f7"
+      },
+      "statusBar": {
+        "background": "#0e2430",
+        "border": "#3f6070",
+        "text": "#cfe4ea",
+        "warning": "#ffca5f"
+      },
+      "tabs": {
+        "activeBackground": "#0a141d",
+        "activeBorder": "#e0457b",
+        "background": "#132632",
+        "idleBackground": "#1b3140"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101a22",
+        "blue": "#5aa9f7",
+        "brightBlack": "#7f97a4",
+        "brightBlue": "#8ec8ff",
+        "brightCyan": "#7cf0ea",
+        "brightGreen": "#8ae9bc",
+        "brightMagenta": "#ff8fbe",
+        "brightRed": "#ff9aa5",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe08c",
+        "cyan": "#3fd5cf",
+        "green": "#5fd39a",
+        "magenta": "#ff5f9e",
+        "red": "#ff6f7d",
+        "white": "#d7e3ea",
+        "yellow": "#ffc85a"
+      },
+      "background": "#060e14",
+      "foreground": "#eef4f7",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

@@ -24,6 +24,10 @@ whole effect".
 Toggle **Y up** under Style. New and AI shaders expect it on; very old ones
 may need it off.
 
+**My GPU is busy (recording, games).**
+Lower **FPS limit (all panes)** under **✦ Shader** in the status bar, or on
+the Shaders tab. 15–30 is plenty for slow shaders.
+
 **It stopped moving.**
 Check **Animate**, Speed above 0, and that the theme wasn't applied with
 **Calm**.

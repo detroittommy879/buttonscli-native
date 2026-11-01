@@ -1,0 +1,215 @@
+{
+  "effects": {
+    "hsyncDebugPanel": true,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 5,
+    "hsyncSpeed": 6,
+    "hsyncUseGpu": true,
+    "hsyncWavePeriod": 72,
+    "rowBandingColor": "#d2d4d2",
+    "rowBandingEnabled": true,
+    "rowBandingOpacity": 2.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4,
+    "scanlinesStrength": 28,
+    "simpleNoiseAmount": 10,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 120,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 68.0,
+    "staticBrightness": 45.0,
+    "staticDensity": 70.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.3499999940395355,
+    "tvNoiseAmount": 36,
+    "tvNoiseEnabled": false
+  },
+  "metadata": {
+    "createdAt": "2026-10-04T20:18:31.117Z",
+    "description": "",
+    "id": "80s_atari_crt-copyb",
+    "name": "80s_Atari_CRT Copyb",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:80s_atari_crt-copy",
+    "updatedAt": "2026-10-04T20:19:11.616Z"
+  },
+  "theme": {
+    "app": {
+      "assistant": {
+        "background": "#3b4054",
+        "buttonBackground": "#0d0f18",
+        "buttonHover": "#0b2640",
+        "headerBackground": "#3b4054",
+        "itemGap": 8,
+        "padding": 12,
+        "widthAccent": "#008DF8"
+      },
+      "controls": {
+        "buttonPaddingX": 14,
+        "buttonPaddingY": 8,
+        "buttonRadius": 4,
+        "focusRing": "rgba(255, 255, 255, 0.14)",
+        "inputBackground": "#0d0f18",
+        "inputBorder": "#0a3357",
+        "inputRadius": 4
+      },
+      "layout": {
+        "gapScale": 1,
+        "panelDensity": "compact",
+        "shellPadding": 0
+      },
+      "presetDock": {
+        "background": "#3b4054",
+        "buttonBackground": "#0d0f18",
+        "buttonHover": "#0b2640",
+        "headerBackground": "#3b4054",
+        "itemGap": 8,
+        "padding": 10,
+        "widthAccent": "#008DF8"
+      },
+      "settings": {
+        "background": "#3b4054",
+        "buttonBackground": "#0d0f18",
+        "buttonHover": "#0b2640",
+        "headerBackground": "#3b4054",
+        "itemGap": 12,
+        "padding": 16,
+        "widthAccent": "#008DF8"
+      },
+      "shell": {
+        "accent": "#00d9f8",
+        "accentHover": "#0092FF",
+        "background": "#0E1019",
+        "backgroundSecondary": "#3b4054",
+        "border": "#0a3357",
+        "shadowColor": "rgba(0, 0, 0, 0.38)",
+        "textDim": "#e6e6e6",
+        "textMain": "#FFFAF4"
+      },
+      "statusBar": {
+        "accent": "#0092FF",
+        "background": "#0b2946",
+        "border": "#0a3357",
+        "height": 27,
+        "text": "#ffffff"
+      },
+      "tabs": {
+        "activeBackground": "#0E1019",
+        "activeBorder": "#008DF8",
+        "background": "#0d0f17",
+        "gap": 4,
+        "height": 34,
+        "hoverBackground": "#0c1f34",
+        "idleBackground": "#0d0f18",
+        "paddingX": 10,
+        "radius": 5,
+        "textActive": "#FFFAF4",
+        "textIdle": "#9a9898"
+      }
+    },
+    "mode": "system",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#408bc4",
+        "brightBlack": "#000000",
+        "brightBlue": "#0c5288",
+        "brightCyan": "#285753",
+        "brightGreen": "#8ca046",
+        "brightMagenta": "#69439d",
+        "brightRed": "#FF2740",
+        "brightWhite": "#FFFFFF",
+        "brightYellow": "#FFD242",
+        "cyan": "#00b6c7",
+        "green": "#21d714",
+        "magenta": "#6D43A6",
+        "red": "#FF000F",
+        "white": "#FFFFFF",
+        "yellow": "#f5b400"
+      },
+      "background": "#0c0c0d",
+      "cursor": "#c65353",
+      "cursorAccent": "#0E1019",
+      "cursorBlink": true,
+      "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+      "fontSize": 18,
+      "fontWeight": 400,
+      "foreground": "#000000",
+      "googleFont": "",
+      "gradientAngle": 169,
+      "gradientAnimation": false,
+      "gradientColorC": "#405f72",
+      "gradientColorD": "#443e75",
+      "gradientColors": [
+        "#d3d4d6",
+        "#82b588",
+        "#e8e9ea"
+      ],
+      "gradientEnd": "#919191",
+      "gradientStart": "#616161",
+      "gradientType": "linear",
+      "selectionBackground": "#0a3860",
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "'Recursive Sans Lnr St Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Roboto Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "shell": {
+        "fontFamily": "'saxmono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Monoisome Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 18,
+        "fontWeight": 200,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Recursive Sans Csl St Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 16,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 2,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "googleFont": ""
+      }
+    }
+  },
+  "version": 1
+}

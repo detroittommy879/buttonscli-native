@@ -1,0 +1,230 @@
+{
+  "effects": {
+    "hsyncDebugPanel": false,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 18,
+    "hsyncSpeed": 28,
+    "hsyncUseGpu": true,
+    "hsyncWavePeriod": 72,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4,
+    "scanlinesStrength": 28,
+    "simpleNoiseAmount": 7,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 120,
+    "simpleNoiseIdleAmount": 42,
+    "simpleNoiseIdleDelaySeconds": 142,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseResolution": 50,
+    "staticAmplitude": 55,
+    "staticBrightness": 42,
+    "staticDensity": 60,
+    "staticEnabled": false,
+    "staticIntensity": 50,
+    "staticOpacity": 18,
+    "tvNoiseAmount": 36,
+    "tvNoiseEnabled": false
+  },
+  "metadata": {
+    "createdAt": "2026-04-20T15:31:41.532Z",
+    "description": "A lurid, high-contrast dark mode inspired by Italian horror lighting. Standard ANSI roles are swapped for clashing, hyper-saturated neon hues against profound black.",
+    "id": "giallo-neon-nightmare",
+    "name": "Giallo Neon Nightmare",
+    "releasePickFrom": "personal:imported-default-da364bab3a22:giallo_neon_nightmare",
+    "updatedAt": "2026-04-20T15:31:41.532Z"
+  },
+  "theme": {
+    "app": {
+      "assistant": "#0a0a0a",
+      "controls": {
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "buttonRadius": 4,
+        "focusRing": "rgba(0, 122, 204, 0.4)",
+        "inputBackground": "#3c3c3c",
+        "inputBorder": "#3c3c3c",
+        "inputRadius": 4
+      },
+      "layout": {
+        "gapScale": 1,
+        "panelDensity": "default",
+        "shellPadding": 0
+      },
+      "presetDock": {
+        "activeBackground": "#FFFFFF",
+        "activeForeground": "#1E2536",
+        "background": "#252526",
+        "border": "#CDD8EA",
+        "buttonBackground": "#413e3e",
+        "buttonHover": "#c2aeae",
+        "foreground": "#394866",
+        "headerBackground": "#2d2d30",
+        "itemGap": 8,
+        "padding": 10,
+        "widthAccent": "#000305"
+      },
+      "settings": "#0f0f0f",
+      "shell": {
+        "accent": "#3f8efc",
+        "accentHover": "#62a2fd",
+        "background": "#0a0b0f",
+        "backgroundSecondary": "#101b2b",
+        "border": "#162843",
+        "borderColor": "#222222",
+        "foreground": "#ffefc2",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": "#000000",
+      "tabs": "#0a0a0a"
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "0": "#3d3d4b",
+        "1": "#6A0DAD",
+        "10": "#004d67",
+        "11": "#FF7518",
+        "12": "#40416c",
+        "13": "#7f2345",
+        "14": "#71a9ab",
+        "15": "#F5F5F5",
+        "2": "#004E66",
+        "3": "#ea865f",
+        "4": "#41425c",
+        "5": "#830083",
+        "6": "#38495a",
+        "7": "#C0C0C0",
+        "8": "#40415d",
+        "9": "#5f1d9c",
+        "black": "#270e27",
+        "blue": "#ff4500",
+        "brightBlack": "#4d004d",
+        "brightBlue": "#ff8c00",
+        "brightCyan": "#ba55d3",
+        "brightGreen": "#e0ffff",
+        "brightMagenta": "#ffd700",
+        "brightRed": "#ff69b4",
+        "brightWhite": "#afeeee",
+        "brightYellow": "#adff2f",
+        "cyan": "#9400d3",
+        "green": "#00ffff",
+        "magenta": "#ffff00",
+        "red": "#ff00ff",
+        "white": "#00ced1",
+        "yellow": "#7fff00"
+      },
+      "background": "#07080b",
+      "cursor": "#ff00ff",
+      "cursorAccent": "#000000",
+      "cursorBlink": true,
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "foreground": "#ffffff",
+      "googleFont": "",
+      "gradient": {
+        "angle": 180,
+        "colors": [
+          "#110A13",
+          "#1A0F1F",
+          "#25142C"
+        ],
+        "from": "#101319",
+        "stops": [
+          "#1A1F34",
+          "#1B2438",
+          "#14212F"
+        ],
+        "to": "#11141B",
+        "type": "radial"
+      },
+      "gradientAngle": 180,
+      "gradientAnimation": false,
+      "gradientColorC": "#101d32",
+      "gradientColorD": "#0c1018",
+      "gradientColors": [
+        "#07080b",
+        "#101d32",
+        "#0c1018"
+      ],
+      "gradientDirection": "radial",
+      "gradientEnd": "#0c1018",
+      "gradientRadialPosition": "center",
+      "gradientRadialShape": "circle",
+      "gradientSpeed": 4,
+      "gradientStart": "#07080b",
+      "gradientType": "linear",
+      "selectionBackground": "#330033",
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "'Commit Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "fontFamily": "Space Mono, monospace",
+      "fontSize": 14,
+      "fontWeight": "400",
+      "letterSpacing": "-0.2px",
+      "presetDock": {
+        "fontFamily": "'Anonymous Pro', 'Courier New', monospace",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "googleFont": "Anonymous Pro",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 14,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "shell": {
+        "fontFamily": "'cnr Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 16,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'IBM Plex Mono', 'Consolas', monospace",
+        "fontSize": 18,
+        "fontWeight": 300,
+        "googleFont": "IBM Plex Mono",
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "googleFont": ""
+      }
+    }
+  },
+  "version": 1
+}

@@ -32,7 +32,7 @@ Run the same command again to update. Linux needs a few system packages; see
 | **Panes** (middle) | The terminals on screen, arranged as columns, rows or a grid. |
 | **Command dock** | Your buttons. Click one to type its command. |
 | **SSH dock** | Buttons for servers you connect to. |
-| **Status bar** (bottom) | Layout, profile, favorite themes, random theme and Settings. |
+| **Status bar** (bottom) | Favorite themes, random theme, **✦ Shader** and **◆ Bundles** quick menus, profile, layout and Settings. |
 
 Right-click almost anything — a tab, a pane, a button — for its menu.
 

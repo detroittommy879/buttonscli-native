@@ -1,0 +1,232 @@
+{
+  "effects": {
+    "hsyncDebugPanel": false,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 18,
+    "hsyncSpeed": 28,
+    "hsyncUseGpu": true,
+    "hsyncWavePeriod": 72,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4,
+    "scanlinesStrength": 28,
+    "simpleNoiseAmount": 0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 120,
+    "simpleNoiseIdleAmount": 50,
+    "simpleNoiseIdleDelaySeconds": 60,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseResolution": 50,
+    "staticAmplitude": 55,
+    "staticBrightness": 42,
+    "staticDensity": 60,
+    "staticEnabled": false,
+    "staticIntensity": 50,
+    "staticOpacity": 18,
+    "tvNoiseAmount": 36,
+    "tvNoiseEnabled": false
+  },
+  "metadata": {
+    "createdAt": "2026-04-17T19:38:49.178Z",
+    "description": "A dark neutral terminal with crisp rainbow-distributed ANSI accents and restrained UI chrome. Feels colorful without turning the background into a spectacle.",
+    "id": "prism-night",
+    "name": "Prism Night",
+    "releasePickFrom": "personal:imported-default-da364bab3a22:rainbow-gradients-prism-night",
+    "updatedAt": "2026-04-17T19:38:49.178Z"
+  },
+  "theme": {
+    "app": {
+      "assistant": {
+        "accent": "#A06BFF",
+        "background": "#121722",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "foreground": "#E3E8F2",
+        "headerBackground": "#252526",
+        "itemGap": 8,
+        "padding": 12,
+        "widthAccent": "#007acc"
+      },
+      "controls": {
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "buttonRadius": 4,
+        "focusRing": "rgba(0, 122, 204, 0.4)",
+        "inputBackground": "#3c3c3c",
+        "inputBorder": "#3c3c3c",
+        "inputRadius": 4
+      },
+      "layout": {
+        "gapScale": 1,
+        "panelDensity": "default",
+        "shellPadding": 0
+      },
+      "presetDock": {
+        "background": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#2d2d30",
+        "itemGap": 8,
+        "padding": 10,
+        "widthAccent": "#007acc"
+      },
+      "settings": {
+        "accent": "#7A8CFF",
+        "background": "#10141C",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "foreground": "#DDE3EC",
+        "headerBackground": "#2d2d30",
+        "itemGap": 12,
+        "padding": 16,
+        "sectionBackground": "#151A24",
+        "widthAccent": "#007acc"
+      },
+      "shell": {
+        "accent": "#007acc",
+        "accentHover": "#0098ff",
+        "background": "#111319",
+        "backgroundSecondary": "#252526",
+        "border": "#252B36",
+        "foreground": "#E7EAF0",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "accent": "#54C7FF",
+        "background": "#0D1118",
+        "border": "#3c3c3c",
+        "foreground": "#AEB8C7",
+        "height": 24,
+        "text": "#ffffff"
+      },
+      "tabs": {
+        "activeBackground": "#1C2230",
+        "activeBorder": "#007acc",
+        "activeForeground": "#F4F7FB",
+        "background": "#151922",
+        "border": "#2A3140",
+        "foreground": "#C9D1DC",
+        "gap": 4,
+        "height": 36,
+        "hoverBackground": "#202737",
+        "idleBackground": "#2d2d30",
+        "paddingX": 10,
+        "radius": 4,
+        "textActive": "#cccccc",
+        "textIdle": "#858585"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232A36",
+        "blue": "#63A6FF",
+        "brightBlack": "#4A5566",
+        "brightBlue": "#8ABEFF",
+        "brightCyan": "#8BE7E2",
+        "brightGreen": "#A0F0A0",
+        "brightMagenta": "#D9A3FF",
+        "brightRed": "#FF8CA3",
+        "brightWhite": "#F6F8FC",
+        "brightYellow": "#F4D58A",
+        "cyan": "#5DD6D0",
+        "green": "#7EDC82",
+        "magenta": "#C77DFF",
+        "red": "#FF6B88",
+        "white": "#D7DEE8",
+        "yellow": "#E9C46A"
+      },
+      "background": "#101319",
+      "cursor": "#F5F7FB",
+      "cursorAccent": "#000000",
+      "cursorBlink": true,
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "foreground": "#E6EAF1",
+      "googleFont": "",
+      "gradient": {
+        "angle": 180,
+        "from": "#101319",
+        "to": "#11141B"
+      },
+      "gradientAngle": 135,
+      "gradientAnimation": false,
+      "gradientColorC": "#8a2be2",
+      "gradientColorD": "#ff1493",
+      "gradientColors": [],
+      "gradientEnd": "#16213e",
+      "gradientRadialPosition": "center",
+      "gradientRadialShape": "circle",
+      "gradientSpeed": 12,
+      "gradientStart": "#1a1a2e",
+      "gradientType": "linear",
+      "selectionBackground": "#2A3550",
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "'Commit Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "presetDock": {
+        "fontFamily": "'Anonymous Pro', 'Courier New', monospace",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "googleFont": "Anonymous Pro",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 14,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "shell": {
+        "fontFamily": "'cnr Bundled', 'Go Noto Current Bundled', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Daddy Time Mono Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 16,
+        "fontWeight": 300,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'IBM Plex Mono', 'Consolas', monospace",
+        "fontSize": 18,
+        "fontWeight": 300,
+        "googleFont": "IBM Plex Mono",
+        "letterSpacing": 1,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'monof55 Bundled', 'Recursive Mono Csl St Bundled', 'JetBrains Mono Bundled', 'JetBrains Mono', 'Cascadia Mono', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "googleFont": ""
+      }
+    }
+  },
+  "version": 1
+}

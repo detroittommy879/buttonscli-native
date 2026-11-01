@@ -1,0 +1,203 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let scale = 1.2 + amount * 0.32;\nlet clock = t * (0.5 + gravity * 0.85);\nlet pos = p * vec2<f32>(scale) + vec2<f32>(0.0, clock * 0.16);\nlet row = floor(pos.y);\nlet seed = hash(vec2<f32>(row, 7.3));\nlet direction = select(-1.0, 1.0, fract(row * 0.5) > 0.25);\nlet dash = clock * (0.6 + seed) + 1.3 * smoothstep(-0.7, 0.7, sin(clock * 1.7 + seed * 12.0));\nlet x = pos.x + direction * dash + seed * 8.0;\nlet y = fract(pos.y) - 0.5;\nlet pair = floor(x * 0.5);\nlet u = fract(x * 0.5) * 2.0;\nlet slope = select(-0.76, 0.76, fract(row * 0.5) > 0.25);\nlet split = 1.0 + slope * y;\nlet side = step(split, u);\nlet center = mix(split * 0.5, 1.0 + split * 0.5, side);\nlet halfwidth = mix(split * 0.5, 1.0 - split * 0.5, side);\nlet inset = 0.11 - shape_size * 0.13;\nlet edge = min((halfwidth - abs(u - center)) * 0.93, 0.5 - abs(y)) - inset;\nlet body = smoothstep(-0.018, 0.018, edge);\nlet bevel = 1.0 - smoothstep(0.018, 0.085, edge);\nlet id = hash(vec2<f32>(pair * 2.0 + side, row));\nlet paint = mix(c1, c2, 0.15 + 0.75 * id);\nlet shading = 0.72 + 0.28 * (y + 0.5) + 0.12 * sin(id * 18.0 + clock * 2.0);\nlet face = paint * vec3<f32>(shading);\nlet rim = mix(c2, c3, 0.3) * vec3<f32>(bevel * 0.35);\nlet halo = exp(-max(-edge, 0.0) * 18.0) * (1.0 - body) * glow;\nlet ground = c1 * vec3<f32>(0.23) + c2 * vec3<f32>(0.07);\nlet color = mix(ground, face + rim, body) + c1 * vec3<f32>(halo * 0.38);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Trapezoid Stampede2",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 7.300000190734863
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 1.0
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.1899999976158142
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.10000000149011612
+          }
+        ]
+      },
+      "preset": "aurora",
+      "scale": 4.0,
+      "speed": 6.0,
+      "strength": 0.15000000596046448,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 80.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 76.0,
+    "staticOpacity": 0.28999999165534973
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:39:21.329Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "trapezoid-stampede-v2",
+    "name": "Trapezoid Stampede v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:trapezoid-stampede-v2",
+    "updatedAt": "2026-10-30T18:24:55.599Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#1a0705",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

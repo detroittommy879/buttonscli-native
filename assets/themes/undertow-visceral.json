@@ -1,0 +1,230 @@
+{
+  "effects": {
+    "hsyncDebugPanel": false,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 18,
+    "hsyncSpeed": 28,
+    "hsyncUseGpu": true,
+    "hsyncWavePeriod": 72,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4,
+    "scanlinesStrength": 28,
+    "simpleNoiseAmount": 0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 120,
+    "simpleNoiseIdleAmount": 50,
+    "simpleNoiseIdleDelaySeconds": 60,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseResolution": 50,
+    "staticAmplitude": 55,
+    "staticBrightness": 42,
+    "staticDensity": 60,
+    "staticEnabled": false,
+    "staticIntensity": 50,
+    "staticOpacity": 18,
+    "tvNoiseAmount": 36,
+    "tvNoiseEnabled": false
+  },
+  "metadata": {
+    "createdAt": "2026-04-17T22:48:54.817Z",
+    "description": "Raw, visceral low-end tones. Deepest blood-black wash with stark bone-white text, arterial reds, and bruised purples.",
+    "id": "undertow-visceral",
+    "name": "Undertow Visceral",
+    "releasePickFrom": "personal:imported-default-da364bab3a22:tool-undertow-ribcage",
+    "updatedAt": "2026-04-17T22:48:54.817Z"
+  },
+  "theme": {
+    "app": {
+      "assistant": {
+        "background": "#1e1e1e",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#252526",
+        "itemGap": 8,
+        "padding": 12,
+        "widthAccent": "#007acc"
+      },
+      "controls": {
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "buttonRadius": 4,
+        "focusRing": "rgba(0, 122, 204, 0.4)",
+        "inputBackground": "#3c3c3c",
+        "inputBorder": "#3c3c3c",
+        "inputRadius": 4
+      },
+      "layout": {
+        "gapScale": 1,
+        "panelDensity": "default",
+        "shellPadding": 0
+      },
+      "presetDock": {
+        "background": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#2d2d30",
+        "itemGap": 8,
+        "padding": 10,
+        "widthAccent": "#007acc"
+      },
+      "settings": {
+        "background": "#030000",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "foreground": "#f0ecec",
+        "headerBackground": "#2d2d30",
+        "itemGap": 12,
+        "padding": 16,
+        "widthAccent": "#007acc"
+      },
+      "shell": {
+        "accent": "#38c98f",
+        "accentHover": "#5cd3a3",
+        "background": "#0b0e0d",
+        "backgroundSecondary": "#10241d",
+        "border": "#15372a",
+        "borderColor": "#240a0a",
+        "foreground": "#f0ecec",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "accent": "#0098ff",
+        "background": "#007acc",
+        "border": "#3c3c3c",
+        "height": 24,
+        "text": "#ffffff"
+      },
+      "tabs": {
+        "activeBackground": "#1e1e1e",
+        "activeBorder": "#007acc",
+        "activeTabBackground": "#0a0000",
+        "activeTabForeground": "#cc0000",
+        "background": "#050000",
+        "gap": 4,
+        "height": 36,
+        "hoverBackground": "#2a2d2e",
+        "idleBackground": "#2d2d30",
+        "inactiveTabForeground": "#a39b9b",
+        "paddingX": 10,
+        "radius": 4,
+        "textActive": "#cccccc",
+        "textIdle": "#858585"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c1c1c",
+        "blue": "#2472c8",
+        "brightBlack": "#666666",
+        "brightBlue": "#3b8eea",
+        "brightCyan": "#29b8db",
+        "brightGreen": "#23d18b",
+        "brightMagenta": "#d670d6",
+        "brightRed": "#f14c4c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f5f543",
+        "cyan": "#11a8cd",
+        "green": "#0dbc79",
+        "magenta": "#bc3fbc",
+        "red": "#cd3131",
+        "white": "#e5e5e5",
+        "yellow": "#e5e510"
+      },
+      "background": "#090a09",
+      "cursor": "#cc0000",
+      "cursorAccent": "#000000",
+      "cursorBlink": true,
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "foreground": "#e0e0e0",
+      "googleFont": "",
+      "gradientAngle": 90,
+      "gradientAnimation": false,
+      "gradientColorC": "#11291e",
+      "gradientColorD": "#0c1411",
+      "gradientColors": [
+        "#090a09",
+        "#11291e",
+        "#0c1411"
+      ],
+      "gradientEnd": "#0c1411",
+      "gradientRadialPosition": "center",
+      "gradientRadialShape": "circle",
+      "gradientSpeed": 4,
+      "gradientStart": "#090a09",
+      "gradientType": "linear",
+      "selectionBackground": "#301818",
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "fontFamily": "Impact, ui-monospace, sans-serif",
+      "fontWeight": "600",
+      "letterSpacing": "-0.2px",
+      "presetDock": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "shell": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+        "fontSize": 14,
+        "fontWeight": 300,
+        "googleFont": ""
+      }
+    }
+  },
+  "version": 1
+}

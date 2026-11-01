@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Cozy autumn hearth: copper leaves, pumpkin, warm gold, cranberry and forest green over deep espresso brown. A dark, warm and comfortable palette for long coding sessions.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Cozy autumn and Thanksgiving: turkey/fall colors, copper leaves, pumpkin, warm gold, cranberry and forest green. Dark, warm and comfortable for long coding sessions.",
+      "model": "z-ai/glm-5.3-flashx",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417693-icNcj9GULYVyQby8hMej",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-glm-harvest-hearth",
+    "name": "AI Glm - Harvest Hearth",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-autumn-glm",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e8b45c",
+        "background": "#241a12",
+        "buttonBackground": "#3a2a1c",
+        "buttonHover": "#4a3524",
+        "buttonText": "#f7ecd9"
+      },
+      "settings": {
+        "background": "#2a1e15"
+      },
+      "shell": {
+        "accent": "#b05a2a",
+        "accentHover": "#9a4e24",
+        "background": "#1a1310",
+        "backgroundSecondary": "#2a1e15",
+        "border": "#6e4d2f",
+        "buttonBackground": "#3a2a1c",
+        "paneDivider": {
+          "color": "#a8562a",
+          "thickness": 2
+        },
+        "textDim": "#c8ab8a",
+        "textMain": "#f5ead9"
+      },
+      "statusBar": {
+        "background": "#241a12",
+        "border": "#5a4028",
+        "text": "#ecd9bd",
+        "warning": "#f2c14e"
+      },
+      "tabs": {
+        "activeBackground": "#1a1310",
+        "activeBorder": "#d9a441",
+        "background": "#2a1e15",
+        "idleBackground": "#33251a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2a1d14",
+        "blue": "#7e9cc9",
+        "brightBlack": "#9c8873",
+        "brightBlue": "#a9c2e8",
+        "brightCyan": "#9adcc4",
+        "brightGreen": "#a9d183",
+        "brightMagenta": "#eba2c1",
+        "brightRed": "#ef8577",
+        "brightWhite": "#fff8ec",
+        "brightYellow": "#f4c66a",
+        "cyan": "#74c6a9",
+        "green": "#86b05e",
+        "magenta": "#d879a4",
+        "red": "#d94f45",
+        "white": "#f0e2cd",
+        "yellow": "#e3a934"
+      },
+      "background": "#140d08",
+      "foreground": "#f2e6d3",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

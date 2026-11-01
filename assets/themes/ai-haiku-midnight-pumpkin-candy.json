@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Halloween palette with deep midnight purple surfaces, jack-o-lantern orange accents, eerie green highlights and candy-bright ANSI tones. Dark, readable, and flat with no visual effects.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Halloween: midnight purple, jack-o-lantern orange, eerie green, spooky candy. Dark, readable and distinctive without visual effects.",
+      "model": "anthropic/claude-haiku-5.5",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417569-nT8UiOSrfkkLCEmoAa84",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-haiku-midnight-pumpkin-candy",
+    "name": "AI Haiku - Midnight Pumpkin Candy",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-halloween-haiku",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9be38a",
+        "background": "#1e1530",
+        "buttonBackground": "#2b1f45",
+        "buttonHover": "#6b2f8f",
+        "buttonText": "#f7f1ff"
+      },
+      "settings": {
+        "background": "#1e1530"
+      },
+      "shell": {
+        "accent": "#b84a0e",
+        "accentHover": "#9a3c0a",
+        "background": "#120c1c",
+        "backgroundSecondary": "#1e1530",
+        "border": "#5b4a78",
+        "buttonBackground": "#2b1f45",
+        "paneDivider": {
+          "color": "#b84a0e",
+          "thickness": 2
+        },
+        "textDim": "#c3b6dc",
+        "textMain": "#f7f1ff"
+      },
+      "statusBar": {
+        "background": "#1e1530",
+        "border": "#5b4a78",
+        "text": "#d6c8ee",
+        "warning": "#ffb347"
+      },
+      "tabs": {
+        "activeBackground": "#120c1c",
+        "activeBorder": "#ff8c2a",
+        "background": "#1e1530",
+        "idleBackground": "#2a1f42"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1424",
+        "blue": "#7fa8ff",
+        "brightBlack": "#7d6f99",
+        "brightBlue": "#a8c4ff",
+        "brightCyan": "#a6f2ea",
+        "brightGreen": "#b8f59a",
+        "brightMagenta": "#e0b8ff",
+        "brightRed": "#ff9a8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd27a",
+        "cyan": "#6fdcd2",
+        "green": "#8ee36b",
+        "magenta": "#c58cff",
+        "red": "#ff6b5e",
+        "white": "#d9cfe8",
+        "yellow": "#ffb347"
+      },
+      "background": "#0b0812",
+      "foreground": "#ede4f8",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

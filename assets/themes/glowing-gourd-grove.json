@@ -1,0 +1,203 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let density = 0.7 + amount * 0.2;\nlet grid = p * density;\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet sz = 0.35 + shape_size * 0.6;\nlet qq = q / sz;\nlet body = 1.0 - smoothstep(0.42, 0.48, length(qq * vec2<f32>(1.0, 1.12)));\nlet ribs = 0.75 + 0.25 * cos(qq.x * 11.0 + seed * 6.28);\nlet eyeX = 0.26 + hash(cell + vec2<f32>(3.0, 7.0)) * 0.1;\nlet eyeY = 0.08 + hash(cell + vec2<f32>(9.0, 1.0)) * 0.12;\nlet eSz = 0.05 + hash(cell + vec2<f32>(5.0, 2.0)) * 0.06;\nlet eyes = 1.0 - smoothstep(eSz, eSz + 0.05, length(vec2<f32>(abs(qq.x) - eyeX, qq.y - eyeY)));\nlet mW = 0.35 + hash(cell + vec2<f32>(7.0, 4.0)) * 0.1;\nlet mY = 0.22 + hash(cell + vec2<f32>(2.0, 6.0)) * 0.08;\nlet mouth = (1.0 - smoothstep(0.05, 0.1, abs(qq.y + mY + 0.12 * cos(qq.x * 5.0 + seed * 6.28)))) * (1.0 - smoothstep(mW - 0.05, mW, abs(qq.x)));\nlet flameH = 0.3 + glow * 0.25;\nlet fy = (qq.y - 0.55) / flameH;\nlet fx = qq.x + 0.07 * sin(t * gravity * 4.0 + fy * 5.0 + seed * 6.28);\nlet flame = (1.0 - smoothstep(0.1, 0.2, abs(fx) + abs(fy - 0.35) * 0.3)) * step(0.0, fy);\nlet flicker = 0.65 + 0.35 * sin(t * gravity * 9.0 + seed * 6.28);\nlet stem = (1.0 - smoothstep(0.03, 0.06, abs(qq.x))) * (1.0 - smoothstep(0.58, 0.62, qq.y)) * step(0.52, qq.y);\nlet night = mix(bg, vec3<f32>(0.14, 0.04, 0.22), 0.7) + stars(p * 3.0, t) * 0.4 * vec3<f32>(0.9, 0.8, 0.7);\nlet skin = mix(c1, vec3<f32>(1.0, 0.45, 0.05), 0.6) * ribs;\nlet lit = mix(c2, vec3<f32>(1.0, 0.78, 0.15), 0.8);\nlet stemCol = vec3<f32>(0.2, 0.45, 0.08);\nlet color = mix(night, skin, body) + lit * ((eyes + mouth) * body + flame * flicker) + stemCol * stem;\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Glowing Gourd Grove",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 6.300000190734863
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 1.899999976158142
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.3499999940395355
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 1.5
+          }
+        ]
+      },
+      "preset": "crt",
+      "scale": 1.0,
+      "speed": 0.8999999761581421,
+      "strength": 0.3499999940395355,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:37:52.654Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "glowing-gourd-grove",
+    "name": "Glowing Gourd Grove",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:glowing-gourd-grove",
+    "updatedAt": "2026-10-30T17:12:59.883Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#1a0705",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

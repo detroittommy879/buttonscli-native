@@ -1,0 +1,210 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff487b",
+        "#36dcff",
+        "#ffc857"
+      ],
+      "custom": {
+        "expression": "let power = clamp(amount / 10.0, 0.0, 1.0);\nlet uv = p * vec2<f32>(2.0) + vec2<f32>(t * 0.035, -t * 0.025);\nlet cell = floor(uv);\nlet seed = hash(cell);\nlet local = (fract(uv) - vec2<f32>(0.5)) * vec2<f32>(2.0);\nlet angle = t * 0.16 * select(-1.0, 1.0, seed > 0.5) + seed * 6.28318;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle));\nlet bounce = 0.93 + 0.07 * sin(t * 1.4 + seed * 12.0);\nlet v = q / vec2<f32>(bounce);\nlet a = abs(v);\nlet hex = max(a.y, a.x * 0.866025 + a.y * 0.5) - 0.59;\nlet outline = 1.0 - smoothstep(0.007, 0.023, abs(hex));\nlet halo = exp(-abs(hex) * 24.0);\nlet inside = 1.0 - smoothstep(-0.015, 0.005, hex);\nlet spokes = min(abs(v.y), min(abs(v.y * 0.5 + v.x * 0.866025), abs(v.y * 0.5 - v.x * 0.866025)));\nlet ribs = (1.0 - smoothstep(0.005, 0.016, spokes)) * inside;\nlet radius = length(v);\nlet hub = 1.0 - smoothstep(0.04, 0.055, radius);\nlet hubRing = 1.0 - smoothstep(0.006, 0.018, abs(radius - 0.095));\nlet sector = floor((atan2(v.y, v.x) + 3.141593) / 1.047198);\nlet hue = fract(seed * 0.8 + sector / 6.0 + t * 0.015);\nlet candy = mix(hsv(hue, 0.82, 1.0), clamp(c1, vec3<f32>(0.0), vec3<f32>(1.0)), 0.12);\nlet rim = hsv(fract(seed + t * 0.025), 0.63, 1.0);\nlet facet = inside * (0.025 + 0.025 * fract(sector * 0.37 + seed));\nlet brightness = 0.55 + power * 0.35;\nlet lines = rim * vec3<f32>((outline * 0.66 + halo * 0.065 + hubRing * 0.32) * brightness);\nlet panels = candy * vec3<f32>(facet + ribs * 0.28 * brightness);\nlet center = mix(c2, vec3<f32>(0.7, 0.9, 1.0), 0.6) * vec3<f32>(hub * 0.42);\nlet grid = abs(fract(uv) - vec2<f32>(0.5));\nlet peg = exp(-dot(grid, grid) * 800.0);\nlet base = vec3<f32>(0.006, 0.009, 0.02) + c3 * vec3<f32>(0.012 + peg * 0.06);\nlet vignette = 1.0 / (1.0 + dot(p, p) * 0.1);\nreturn clamp((base + lines + panels + center) * vec3<f32>(vignette), vec3<f32>(0.0), vec3<f32>(0.8));",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 7.5
+          }
+        ]
+      },
+      "preset": "silk",
+      "scale": 0.8999999761581421,
+      "speed": 6.0,
+      "strength": 1.0,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-29T22:10:22.638Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "pur-v22",
+    "name": "pur v22",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pur-v22",
+    "updatedAt": "2026-10-29T23:10:44.406Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#110821",
+        "#170925",
+        "#140033"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

@@ -82,7 +82,7 @@ pub(crate) fn paint_noise(
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct FramePlan {
     pub opacity: f32,
     pub animate: bool,

@@ -1,1 +1,350 @@
-[]
+[
+  {
+    "name": "Holidazzled_In_Autumn",
+    "theme_id": "ember-veil",
+    "app_theme_id": "ember-veil",
+    "terminal_theme_id": "ember-veil",
+    "gradient_theme_id": "ember-veil",
+    "effects_theme_id": "ember-veil",
+    "panes": [
+      {
+        "theme_id": "jack-o-disco",
+        "font": null
+      },
+      {
+        "theme_id": "trapezoid-stampede",
+        "font": null
+      },
+      {
+        "theme_id": "coral-hyperspace",
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4
+  },
+  {
+    "name": "geometryflow",
+    "theme_id": "pur-v26",
+    "app_theme_id": "pur-v26",
+    "terminal_theme_id": "pur-v26",
+    "gradient_theme_id": "pur-v26",
+    "effects_theme_id": "pur-v26",
+    "panes": [
+      {
+        "theme_id": null,
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "grumpy-cat-drift",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v27",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "blue-triangle-flow",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4
+  },
+  {
+    "name": "Winter_Snow",
+    "theme_id": "autumn-to-winter-v1",
+    "app_theme_id": "autumn-to-winter-v1",
+    "terminal_theme_id": "autumn-to-winter-v1",
+    "gradient_theme_id": "autumn-to-winter-v1",
+    "effects_theme_id": "autumn-to-winter-v1",
+    "panes": [
+      {
+        "theme_id": "winter-veil",
+        "font": null
+      },
+      {
+        "theme_id": "polar-spark",
+        "font": null
+      },
+      {
+        "theme_id": "quiet-winter",
+        "font": null
+      },
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts-v2",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3
+  },
+  {
+    "name": "Autumn-3-panes",
+    "theme_id": "autumn-gusts-v5",
+    "app_theme_id": "autumn-gusts-v5",
+    "terminal_theme_id": "autumn-gusts-v5",
+    "gradient_theme_id": "autumn-gusts-v5",
+    "effects_theme_id": "autumn-gusts-v5",
+    "panes": [
+      {
+        "theme_id": "autumn-gusts-v1",
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts-v7",
+        "font": null
+      },
+      {
+        "theme_id": "wild-autumn",
+        "font": null
+      },
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts-v2",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3
+  },
+  {
+    "name": "night_tripper",
+    "theme_id": "pur-v10",
+    "app_theme_id": "pur-v10",
+    "terminal_theme_id": "pur-v10",
+    "gradient_theme_id": "pur-v10",
+    "effects_theme_id": "pur-v10",
+    "panes": [
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "pur-v11",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v12",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v14",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v13",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5
+  },
+  {
+    "name": "legotetris",
+    "theme_id": "pur-v10",
+    "app_theme_id": "pur-v10",
+    "terminal_theme_id": "pur-v10",
+    "gradient_theme_id": "pur-v10",
+    "effects_theme_id": "pur-v10",
+    "panes": [
+      {
+        "theme_id": "pur-v16",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v17",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v19",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v15",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v18",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5
+  },
+  {
+    "name": "geometric_shapes_floating_by",
+    "theme_id": "pur-v10",
+    "app_theme_id": "pur-v10",
+    "terminal_theme_id": "pur-v10",
+    "gradient_theme_id": "pur-v10",
+    "effects_theme_id": "pur-v10",
+    "panes": [
+      {
+        "theme_id": "pur-v21",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v17",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v22",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v15",
+        "font": null
+      },
+      {
+        "theme_id": "pur-v20",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5
+  },
+  {
+    "name": "geometryflow2",
+    "theme_id": "pur-v26",
+    "app_theme_id": "pur-v26",
+    "terminal_theme_id": "pur-v26",
+    "gradient_theme_id": "pur-v26",
+    "effects_theme_id": "pur-v26",
+    "panes": [
+      {
+        "theme_id": null,
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "grumpy-cat-drift",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pharaoh-s-tide",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "blue-triangle-flow",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Lnr St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.2
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4
+  },
+  {
+    "name": "Bundle 1",
+    "theme_id": "autumn-to-winter",
+    "app_theme_id": "autumn-to-winter",
+    "terminal_theme_id": "autumn-to-winter",
+    "gradient_theme_id": "autumn-to-winter",
+    "effects_theme_id": "autumn-to-winter",
+    "panes": [
+      {
+        "theme_id": "winter-veil",
+        "font": null
+      },
+      {
+        "theme_id": "polar-spark",
+        "font": null
+      },
+      {
+        "theme_id": "quiet-winter",
+        "font": null
+      },
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts-v2",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3
+  }
+]

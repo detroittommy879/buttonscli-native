@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff542b",
+        "#ffc13d",
+        "#d97a26",
+        "#68324c",
+        "#ffe090"
+      ],
+      "custom": {
+        "expression": "let breeze = wind * (0.32 * t + 0.22 * sin(t * 0.8 + p.y * 1.5));\nlet q = vec2<f32>(p.x - breeze, p.y + t * fall_speed * 0.65) * density;\nlet id = floor(q);\nlet seed = hash(id);\nlet local = fract(q) - vec2<f32>(0.5) - (vec2<f32>(seed, hash(id + vec2<f32>(4.3, 8.1))) - vec2<f32>(0.5)) * 0.28;\nlet angle = seed * 6.283 + t * (0.45 + seed * 0.7) + wind * sin(t + seed * 8.0);\nlet a = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / (leaf_size * 0.38);\nlet shape = abs(a.x) / 0.65 + a.y * a.y;\nlet leaf = 1.0 - smoothstep(0.9, 1.04, shape);\nlet vein = (1.0 - smoothstep(0.025, 0.065, abs(a.x))) * (1.0 - smoothstep(0.78, 1.0, abs(a.y)));\nlet branches = (1.0 - smoothstep(0.025, 0.065, abs(fract(a.y * 3.2 - abs(a.x) * 2.0) - 0.5))) * 0.22;\nlet warm = mix(c1, c2, smoothstep(0.15, 0.85, seed));\nlet face = mix(warm, c3, 0.24 * smoothstep(-0.5, 0.5, a.x));\nlet front = mix(face, c5, clamp(vein * 0.65 + branches, 0.0, 0.75));\n\nlet r = vec2<f32>(p.x - breeze * 0.42 + 3.7, p.y + t * fall_speed * 0.28) * density * 1.5;\nlet rid = floor(r);\nlet rs = hash(rid + vec2<f32>(17.2, 9.1));\nlet rl = fract(r) - vec2<f32>(0.5);\nlet ra = rs * 6.283 - t * 0.38;\nlet b = vec2<f32>(rl.x * cos(ra) - rl.y * sin(ra), rl.x * sin(ra) + rl.y * cos(ra)) / (leaf_size * 0.29);\nlet distant = 1.0 - smoothstep(0.88, 1.08, abs(b.x) / 0.6 + b.y * b.y);\nlet haze = cloud(p * 0.65 + vec2<f32>(-t * 0.035, t * 0.025));\nlet base = mix(c4, c3, haze * 0.4) * vec3<f32>(0.62);\nlet back = mix(base, mix(c3, c2, rs) * vec3<f32>(0.75), distant * 0.85);\nlet color = mix(back, front, leaf);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Wild Autumn",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "wind",
+            "value": 1.3700000047683716
+          },
+          {
+            "max": 2.0,
+            "min": 0.10000000149011612,
+            "name": "fall_speed",
+            "value": 1.399999976158142
+          },
+          {
+            "max": 4.0,
+            "min": 1.0,
+            "name": "density",
+            "value": 2.049999952316284
+          },
+          {
+            "max": 1.100000023841858,
+            "min": 0.30000001192092896,
+            "name": "leaf_size",
+            "value": 0.9399999976158142
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.100000023841858,
+      "speed": 0.800000011920929,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.0,
+    "staticBrightness": 15.0,
+    "staticDensity": 16.0,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.28999999165534973
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T17:32:57.502Z",
+    "description": "A classic Halloween palette of deep midnight, glowing pumpkin orange, and warm candlelight.",
+    "id": "wild-autumn",
+    "name": "Wild Autumn",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:wild-autumn",
+    "updatedAt": "2026-10-31T01:17:13.619Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#000305",
+        "background": "#0d0906",
+        "buttonBackground": "#413e3e",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#0d0906"
+      },
+      "shell": {
+        "accent": "#4b5be7",
+        "accentHover": "#6b79eb",
+        "background": "#0c0e12",
+        "backgroundSecondary": "#14172c",
+        "border": "#332211",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#529a13",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#080604",
+        "border": "#332211",
+        "text": "#ffffff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#17100a",
+        "activeBorder": "#ff9900",
+        "background": "#080604",
+        "idleBackground": "#2d2d30"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#27201a",
+        "blue": "#4a4a4a",
+        "brightBlack": "#4d3926",
+        "brightBlue": "#6e6e6e",
+        "brightCyan": "#c29970",
+        "brightGreen": "#7acc00",
+        "brightMagenta": "#b34732",
+        "brightRed": "#ff751a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd147",
+        "cyan": "#a37c58",
+        "green": "#5c8a00",
+        "magenta": "#8a3324",
+        "red": "#e65c00",
+        "white": "#f0d8b8",
+        "yellow": "#ffb300"
+      },
+      "background": "#0b0c0e",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f0d8b8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": true,
+      "gradientColors": [
+        "#0b0c0e",
+        "#151931",
+        "#0e0f18",
+        "#0b0c0e"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -10,6 +10,8 @@
 
 # Working notes, credentials, release keys, and non-public research belong here.
 /.private/
+# Worktrees made by Claude Code sessions.
+/.claude/worktrees/
 /scripts/__pycache__/
 
 /docs/migration/

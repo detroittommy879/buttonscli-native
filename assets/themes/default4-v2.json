@@ -1,0 +1,185 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "preset": "nebula",
+      "scale": 2.700000047683716,
+      "speed": 2.0,
+      "strength": 0.3499999940395355,
+      "version": 1
+    },
+    "simpleNoiseAmount": 11.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 64.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-11T21:53:02.799Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "default4-v2",
+    "name": "default4 v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:default4-v2",
+    "updatedAt": "2026-10-11T21:53:02.799Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#00182e",
+        "buttonBackground": "#000000",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#00182e"
+      },
+      "shell": {
+        "accent": "#ed69f2",
+        "accentHover": "#7f3681",
+        "background": "#0f0f0f",
+        "backgroundSecondary": "#00182e",
+        "border": "#411b41",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#0bbbf0",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#b9acac",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#0a001a",
+        "border": "#481536",
+        "text": "#c0c0f0",
+        "warning": "#a08a3a"
+      },
+      "tabs": {
+        "activeBackground": "#290000",
+        "activeBorder": "#ff1a1a",
+        "background": "#0a0202",
+        "idleBackground": "#2d2d30"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2c2c3e",
+        "blue": "#00d4ff",
+        "brightBlack": "#555577",
+        "brightBlue": "#66e8ff",
+        "brightCyan": "#66ffff",
+        "brightGreen": "#66ffcc",
+        "brightMagenta": "#ff66ff",
+        "brightRed": "#ff8888",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe066",
+        "cyan": "#00ffff",
+        "green": "#00ff9d",
+        "magenta": "#ff00ff",
+        "red": "#ff4d4d",
+        "white": "#e0e0e0",
+        "yellow": "#ffcc00"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Lnr St Bundled",
+      "fontSize": 12.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#ffffff",
+      "gradientAngle": 45.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "monof56 Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 20.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

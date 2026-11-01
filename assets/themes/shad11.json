@@ -1,0 +1,104 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let m = p + vec2<f32>(sin(t * 0.6) * 0.15, cos(t * 0.5) * 0.12);\nlet q = m * vec2<f32>(1.4, 1.1);\nlet cell = floor(q);\nlet f = fract(q) - vec2<f32>(0.5, 0.5);\nlet h = hash(cell);\nlet h2 = hash(cell + vec2<f32>(7.0, 13.0));\nlet wob = vec2<f32>(sin(t * 1.1 + h * 6.283), cos(t * 0.9 + h2 * 6.283)) * 0.16;\nlet d = length(f - wob);\nlet rad = 0.26 + 0.06 * sin(t * 1.7 + h * 6.283);\nlet core = pow(1.0 - smoothstep(0.0, rad, d), 1.7);\nlet turb = cloud(f * 4.0 + vec2<f32>(t * 0.8, -t * 0.6) + h * 3.0);\nlet fire = core * (0.5 + 0.5 * turb);\nlet tint = mix(c3, palette(h * 0.7 + t * 0.05 + d * 0.4), 0.4 + 0.25 * turb);\nlet glow = exp(-d * 3.2) * 0.55 * (0.75 + 0.25 * sin(t * 4.0 + h * 20.0));\nlet layer1 = tint * fire * 0.75 + c2 * glow * 0.30;\nlet q2 = q * 1.8 + vec2<f32>(3.7, 2.3);\nlet cell2 = floor(q2);\nlet f2 = fract(q2) - vec2<f32>(0.5, 0.5);\nlet h3 = hash(cell2);\nlet wob2 = vec2<f32>(cos(t * 1.3 + h3 * 6.283), sin(t * 1.6 + h3 * 3.0)) * 0.2;\nlet d2 = length(f2 - wob2);\nlet core2 = 1.0 - smoothstep(0.03, 0.16, d2);\nlet layer2 = mix(c3, palette(h3 * 0.5 + t * 0.08 + 0.4), 0.4) * core2 * 0.35 + c3 * exp(-d2 * 5.0) * 0.12;\nlet bgN = cloud(p * 0.6 + vec2<f32>(t * 0.06, t * 0.04));\nlet bg = mix(c1, c2, 0.25 + 0.35 * bgN) * 0.5;\nlet ember = stars(p * 2.5 + vec2<f32>(t * 0.05, 0.0), t * 0.8) * 0.18 * (0.5 + 0.5 * sin(t * 2.0 + p.x * 4.0));\nreturn bg + layer1 + layer2 + palette(0.1 + t * 0.02) * ember;",
+        "variables": []
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "version": 1
+    }
+  },
+  "metadata": {
+    "createdAt": "2026-10-28T16:52:07.510Z",
+    "description": "Dark Halloween palette with midnight purple, jack-o-lantern orange, eerie green and spooky candy accents. Readable throughout UI and terminal for long sessions.",
+    "generation": {
+      "attempt": 2,
+      "brief": "Halloween: midnight purple, jack-o-lantern orange, eerie green, spooky candy. Dark, readable and distinctive without visual effects.",
+      "model": "xiaomi/mimo-v2.6-flash",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417577-dSkPK9kwahE9xc7ckBKI",
+      "run": "20261007-defaults"
+    },
+    "id": "shad11",
+    "name": "shad11",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-halloween-mimo",
+    "updatedAt": "2026-10-28T16:52:30.371Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#8fe36a",
+        "background": "#1e1830",
+        "buttonBackground": "#2f2644",
+        "buttonHover": "#6a2fa8",
+        "buttonText": "#f4edff"
+      },
+      "settings": {
+        "background": "#1e1830"
+      },
+      "shell": {
+        "accent": "#7b3fbf",
+        "accentHover": "#6a2fa8",
+        "background": "#14101e",
+        "backgroundSecondary": "#1e1830",
+        "border": "#5c4d7e",
+        "buttonBackground": "#2f2644",
+        "paneDivider": {
+          "color": "#e0761f",
+          "thickness": 2
+        },
+        "textDim": "#c4b6dd",
+        "textMain": "#f4edff"
+      },
+      "statusBar": {
+        "background": "#1e1830",
+        "border": "#5c4d7e",
+        "text": "#d8cdfa",
+        "warning": "#ffce4d"
+      },
+      "tabs": {
+        "activeBackground": "#14101e",
+        "activeBorder": "#e0761f",
+        "background": "#1e1830",
+        "idleBackground": "#282040"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#18131f",
+        "blue": "#a08bff",
+        "brightBlack": "#7a6b96",
+        "brightBlue": "#c2b2ff",
+        "brightCyan": "#8ff0e5",
+        "brightGreen": "#b6f79b",
+        "brightMagenta": "#ffa8e6",
+        "brightRed": "#ff8b93",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe490",
+        "cyan": "#5fe0d0",
+        "green": "#8fe36a",
+        "magenta": "#ff7ad9",
+        "red": "#ff5f6d",
+        "white": "#dcd3ea",
+        "yellow": "#ffce4d"
+      },
+      "background": "#0d0a14",
+      "foreground": "#efe6ff",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

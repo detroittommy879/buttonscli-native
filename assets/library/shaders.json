@@ -1,1 +1,583 @@
-[]
+[
+  {
+    "name": "Wild Autumn",
+    "expression": "let breeze = wind * (0.32 * t + 0.22 * sin(t * 0.8 + p.y * 1.5));\nlet q = vec2<f32>(p.x - breeze, p.y + t * fall_speed * 0.65) * density;\nlet id = floor(q);\nlet seed = hash(id);\nlet local = fract(q) - vec2<f32>(0.5) - (vec2<f32>(seed, hash(id + vec2<f32>(4.3, 8.1))) - vec2<f32>(0.5)) * 0.28;\nlet angle = seed * 6.283 + t * (0.45 + seed * 0.7) + wind * sin(t + seed * 8.0);\nlet a = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / (leaf_size * 0.38);\nlet shape = abs(a.x) / 0.65 + a.y * a.y;\nlet leaf = 1.0 - smoothstep(0.9, 1.04, shape);\nlet vein = (1.0 - smoothstep(0.025, 0.065, abs(a.x))) * (1.0 - smoothstep(0.78, 1.0, abs(a.y)));\nlet branches = (1.0 - smoothstep(0.025, 0.065, abs(fract(a.y * 3.2 - abs(a.x) * 2.0) - 0.5))) * 0.22;\nlet warm = mix(c1, c2, smoothstep(0.15, 0.85, seed));\nlet face = mix(warm, c3, 0.24 * smoothstep(-0.5, 0.5, a.x));\nlet front = mix(face, c5, clamp(vein * 0.65 + branches, 0.0, 0.75));\n\nlet r = vec2<f32>(p.x - breeze * 0.42 + 3.7, p.y + t * fall_speed * 0.28) * density * 1.5;\nlet rid = floor(r);\nlet rs = hash(rid + vec2<f32>(17.2, 9.1));\nlet rl = fract(r) - vec2<f32>(0.5);\nlet ra = rs * 6.283 - t * 0.38;\nlet b = vec2<f32>(rl.x * cos(ra) - rl.y * sin(ra), rl.x * sin(ra) + rl.y * cos(ra)) / (leaf_size * 0.29);\nlet distant = 1.0 - smoothstep(0.88, 1.08, abs(b.x) / 0.6 + b.y * b.y);\nlet haze = cloud(p * 0.65 + vec2<f32>(-t * 0.035, t * 0.025));\nlet base = mix(c4, c3, haze * 0.4) * vec3<f32>(0.62);\nlet back = mix(base, mix(c3, c2, rs) * vec3<f32>(0.75), distant * 0.85);\nlet color = mix(back, front, leaf);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "wind",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.37
+      },
+      {
+        "name": "fall_speed",
+        "min": 0.1,
+        "max": 2.0,
+        "value": 1.4
+      },
+      {
+        "name": "density",
+        "min": 1.0,
+        "max": 4.0,
+        "value": 2.05
+      },
+      {
+        "name": "leaf_size",
+        "min": 0.3,
+        "max": 1.1,
+        "value": 0.94
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff542b",
+      "#ffc13d",
+      "#d97a26",
+      "#68324c",
+      "#ffe090"
+    ]
+  },
+  {
+    "name": "Prismatic Flex",
+    "expression": "let time = t * motion;\nlet warp = vec2<f32>(\n    sin(p.y * 2.8 + time * 0.9) + 0.4 * cos(p.x * 3.5 - time),\n    cos(p.x * 2.4 - time * 0.8) + 0.4 * sin(p.y * 3.8 + time)\n);\nlet q = (p + warp * (bend * 0.28)) * shape_density;\nlet angle = 0.35 * sin(time * 0.45);\nlet r = vec2<f32>(\n    q.x * cos(angle) - q.y * sin(angle),\n    q.x * sin(angle) + q.y * cos(angle)\n);\nlet drift = r + vec2<f32>(time * 0.15, time * 0.23);\nlet cell = floor(drift);\nlet local = fract(drift) - vec2<f32>(0.5);\nlet seed = hash(cell);\nlet spin = time * (0.35 + seed * 0.45) + seed * 6.28318;\nlet v = vec2<f32>(\n    local.x * cos(spin) - local.y * sin(spin),\n    local.x * sin(spin) + local.y * cos(spin)\n);\nlet square = max(abs(v.x), abs(v.y));\nlet diamond = (abs(v.x) + abs(v.y)) * 0.72;\nlet circle = length(v);\nlet metric = mix(mix(square, diamond, smoothstep(0.15, 0.65, seed)), circle, smoothstep(0.65, 0.95, seed));\nlet radius = 0.29 + 0.055 * sin(time * 1.7 + seed * 9.0);\nlet edge = abs(metric - radius);\nlet outline = 1.0 - smoothstep(0.018, 0.055, edge);\nlet halo = exp(-edge * 15.0) * glow;\nlet fill = 1.0 - smoothstep(radius - 0.025, radius, metric);\nlet hue = 0.5 + 0.5 * sin(r.x * 1.3 + r.y * 1.7 + time * 0.65 + seed * 3.0);\nlet hot = mix(c1, c2, smoothstep(0.05, 0.8, hue));\nlet cool = mix(c5, c3, smoothstep(0.1, 0.9, hue));\nlet ink = mix(hot, cool, 0.5 + 0.5 * sin(seed * 14.0 + time * 0.4));\nlet field = 0.5 + 0.5 * sin(q.x * 2.7 - q.y * 2.1 + time + bend * sin(q.y * 3.0));\nlet base = mix(c5, c1, field) * 0.38;\nlet body = mix(base, ink * 0.72, fill * 0.85);\nlet rim = mix(ink, c4, 0.35 + 0.3 * sin(seed * 12.0 + time));\nlet color = clamp(body + rim * (outline * 0.65 + halo * 0.35), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "bend",
+        "min": 0.0,
+        "max": 1.5,
+        "value": 0.65
+      },
+      {
+        "name": "shape_density",
+        "min": 0.6,
+        "max": 3.0,
+        "value": 1.4
+      },
+      {
+        "name": "motion",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.8
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#762eff",
+      "#ff267f",
+      "#00e5dd",
+      "#ffb52e",
+      "#2449ff"
+    ]
+  },
+  {
+    "name": "Blue Triangle Flow",
+    "expression": "let density = 1.3 + amount * 0.32;\nlet drift = t * gravity * 0.24;\nlet wave = sin(p.y * 2.3 + t * 0.35) * 0.18 + sin(p.x * 1.7 - t * 0.22) * 0.12;\nlet flow = p + vec2<f32>(wave, drift);\nlet grid = flow * vec2<f32>(density);\nlet row = floor(grid.y);\nlet staggered = grid + vec2<f32>(sin(row * 2.4) * 0.28, 0.0);\nlet cell = floor(staggered);\nlet q = fract(staggered) - vec2<f32>(0.5);\nlet seed = hash(cell);\nlet angle = sin(t * 0.32 + seed * 6.283 + row * 0.45) * 0.65 + seed * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.68 + seed * 0.18);\nlet d = max(abs(r.x) * 0.866025 + r.y * 0.5, -r.y) - size * 0.65;\nlet fill = 1.0 - smoothstep(-0.014, 0.012, d);\nlet rim = exp(-abs(d) * 85.0);\nlet halo = exp(-max(d, 0.0) * 17.0) * (1.0 - fill);\nlet bands = 0.5 + 0.5 * sin(d * 110.0 - t * 1.8 + seed * 8.0);\nlet interior = mix(0.32, 0.92, bands) * fill;\nlet contour = pow(0.5 + 0.5 * sin(d * 62.0 - t * 1.1), 14.0) * exp(-max(d, 0.0) * 7.0) * (1.0 - fill);\nlet tide = 0.5 + 0.5 * sin(p.x * 1.9 + p.y * 2.6 + sin(p.y * 3.0 - t * 0.4) + t * 0.23);\nlet blue = mix(vec3<f32>(0.025, 0.17, 0.85), vec3<f32>(0.02, 0.78, 1.0), seed);\nlet neon = mix(blue, vec3<f32>(0.39, 0.16, 1.0), smoothstep(0.7, 1.0, seed) * 0.65);\nlet base = mix(vec3<f32>(0.015, 0.045, 0.19), vec3<f32>(0.035, 0.19, 0.43), tide);\nlet activity = smoothstep(0.0, 0.7, amount);\nlet light = interior * 0.85 + rim * 0.8 + halo * glow * 0.4 + contour * glow * 0.18;\nlet color = clamp(base + neon * vec3<f32>(activity * light), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 6.2
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.4
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.41
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 2.0
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "WaveStacksnTriangles",
+    "expression": "let density = 1.2 + amount * 0.28;\nlet warp = vec2<f32>(sin(p.y * 3.0 + t * 0.7), cos(p.x * 2.6 - t * 0.6)) * vec2<f32>(0.16);\nlet pos = (p + warp) * vec2<f32>(density);\nlet column = floor(pos.x);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet fall = t * gravity * (0.4 + seed * 0.55);\nlet grid = pos + vec2<f32>(0.0, fall + seed * 8.0);\nlet cell = floor(grid);\nlet id = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * (seed - 0.5) * 3.0 + id * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.55 + id * 0.25);\nlet circle = length(r) - size;\nlet square = max(abs(r.x), abs(r.y)) - size * 0.85;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size * 0.8;\nlet triangle = max(abs(r.x) * 0.866 + r.y * 0.5, -r.y) - size * 0.55;\nlet d = select(select(circle, square, id > 0.25), select(diamond, triangle, id > 0.75), id > 0.5);\nlet fill = 1.0 - smoothstep(-0.012, 0.015, d);\nlet outline = exp(-abs(d) * 70.0);\nlet hollow = step(0.48, fract(id * 7.9));\nlet graphic = mix(fill, outline, hollow);\nlet halo = exp(-max(d, 0.0) * 15.0) * (1.0 - fill);\nlet stripe = smoothstep(0.4, 0.6, sin((r.x + r.y) * 65.0 + t * 2.0));\nlet hatch = fill * stripe * hollow * 0.32;\nlet trail = exp(-abs(q.x) * 60.0) * smoothstep(0.0, 0.48, q.y) * 0.17;\nlet source = mix(mix(c1, c2, seed), c3, id);\nlet activity = smoothstep(0.0, 0.6, amount);\nlet paper = 0.14 + 0.06 * noise(p * vec2<f32>(3.0) + vec2<f32>(t * 0.08));\nlet light = paper + activity * (0.8 * graphic + hatch + glow * (halo * 0.19 + trail));\nlet color = clamp(source * vec3<f32>(light), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 10.0
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.7
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.6
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.8
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Mayhem2",
+    "expression": "let density = 1.6 + amount * 0.48;\nlet drift = vec2<f32>(sin(t * 0.43), t * gravity * 0.38);\nlet warp = p + vec2<f32>(sin(p.y * 3.0 + t * gravity), cos(p.x * 2.5 - t)) * vec2<f32>(0.16);\nlet grid = warp * vec2<f32>(density) + drift;\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * gravity * (seed - 0.5) + seed * 6.2832;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.65 + 0.25 * sin(t * 2.0 + seed * 12.0));\nlet box = max(abs(r.x), abs(r.y)) - size;\nlet disk = length(r) - size;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size;\nlet d = select(select(box, disk, seed > 0.33), diamond, seed > 0.67);\nlet fill = 1.0 - smoothstep(-0.015, 0.015, d);\nlet ring = 1.0 - smoothstep(0.014, 0.033, abs(d));\nlet stripe = step(0.5, fract((r.x + r.y) * 9.0 + t * gravity));\nlet checker = step(0.5, fract((cell.x + cell.y) * 0.5));\nlet ink = mix(fill, max(ring, fill * stripe), step(0.45, seed));\nlet graphic = mix(ink, 1.0 - ink, checker);\nlet accent = select(mix(c1, c2, step(0.5, seed)), c3, seed > 0.8);\nlet accentMask = step(0.78, hash(cell + vec2<f32>(19.2, 4.6)));\nlet paper = mix(accent * vec3<f32>(0.025), mix(accent, vec3<f32>(1.0), 0.75), graphic);\nlet colored = mix(accent * vec3<f32>(0.12), accent, graphic);\nlet halo = exp(-abs(d) * 26.0) * glow * 0.22;\nlet color = clamp(mix(paper, colored, accentMask) + accent * vec3<f32>(halo * accentMask), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 1.6
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.2
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.48
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.6
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "pur-hexagon",
+    "expression": "let power = clamp(amount / 10.0, 0.0, 1.0);\nlet uv = p * vec2<f32>(2.0) + vec2<f32>(t * 0.035, -t * 0.025);\nlet cell = floor(uv);\nlet seed = hash(cell);\nlet local = (fract(uv) - vec2<f32>(0.5)) * vec2<f32>(2.0);\nlet angle = t * 0.16 * select(-1.0, 1.0, seed > 0.5) + seed * 6.28318;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle));\nlet bounce = 0.93 + 0.07 * sin(t * 1.4 + seed * 12.0);\nlet v = q / vec2<f32>(bounce);\nlet a = abs(v);\nlet hex = max(a.y, a.x * 0.866025 + a.y * 0.5) - 0.59;\nlet outline = 1.0 - smoothstep(0.007, 0.023, abs(hex));\nlet halo = exp(-abs(hex) * 24.0);\nlet inside = 1.0 - smoothstep(-0.015, 0.005, hex);\nlet spokes = min(abs(v.y), min(abs(v.y * 0.5 + v.x * 0.866025), abs(v.y * 0.5 - v.x * 0.866025)));\nlet ribs = (1.0 - smoothstep(0.005, 0.016, spokes)) * inside;\nlet radius = length(v);\nlet hub = 1.0 - smoothstep(0.04, 0.055, radius);\nlet hubRing = 1.0 - smoothstep(0.006, 0.018, abs(radius - 0.095));\nlet sector = floor((atan2(v.y, v.x) + 3.141593) / 1.047198);\nlet hue = fract(seed * 0.8 + sector / 6.0 + t * 0.015);\nlet candy = mix(hsv(hue, 0.82, 1.0), clamp(c1, vec3<f32>(0.0), vec3<f32>(1.0)), 0.12);\nlet rim = hsv(fract(seed + t * 0.025), 0.63, 1.0);\nlet facet = inside * (0.025 + 0.025 * fract(sector * 0.37 + seed));\nlet brightness = 0.55 + power * 0.35;\nlet lines = rim * vec3<f32>((outline * 0.66 + halo * 0.065 + hubRing * 0.32) * brightness);\nlet panels = candy * vec3<f32>(facet + ribs * 0.28 * brightness);\nlet center = mix(c2, vec3<f32>(0.7, 0.9, 1.0), 0.6) * vec3<f32>(hub * 0.42);\nlet grid = abs(fract(uv) - vec2<f32>(0.5));\nlet peg = exp(-dot(grid, grid) * 800.0);\nlet base = vec3<f32>(0.006, 0.009, 0.02) + c3 * vec3<f32>(0.012 + peg * 0.06);\nlet vignette = 1.0 / (1.0 + dot(p, p) * 0.1);\nreturn clamp((base + lines + panels + center) * vec3<f32>(vignette), vec3<f32>(0.0), vec3<f32>(0.8));",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 2.7
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "AutumnFallingLeaves",
+    "expression": "let wind = sin(t * 0.7 + p.y * 1.8) * 0.18;\nlet sky = cloud(p * vec2<f32>(1.4, 2.8) + vec2<f32>(t * 0.12, 0.0));\nlet haze = mix(c1 * vec3<f32>(0.48), c3 * vec3<f32>(0.85), smoothstep(0.15, 0.85, sky));\nlet spacing = 1.15 - amount * 0.065;\nlet drift = vec2<f32>(p.x + wind - t * 0.22, p.y + t * gravity * 0.32);\nlet grid = drift / vec2<f32>(spacing);\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet local = (fract(grid) - vec2<f32>(0.5)) * vec2<f32>(spacing);\nlet angle = seed * 6.2831853 + sin(t * 1.8 + seed * 12.0) * 0.9;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / vec2<f32>(shape_size * (0.65 + seed * 0.45));\nlet taper = max(0.0, 1.0 - q.y * q.y);\nlet edge = abs(q.x) - taper * (0.42 + 0.09 * cos(q.y * 19.0));\nlet leaf = (1.0 - smoothstep(-0.025, 0.025, edge)) * (1.0 - smoothstep(0.92, 1.02, abs(q.y)));\nlet vein = exp(-abs(q.x) * 65.0) * leaf;\nlet leafColor = mix(mix(c1, c3, smoothstep(0.1, 0.7, seed)), c2, step(0.84, seed));\nlet litLeaf = leafColor * vec3<f32>(0.78 + 0.22 * sin(q.y * 3.0 + seed * 5.0)) + c3 * vec3<f32>(vein * 0.3);\nlet rainCoord = p.x * 28.0 + p.y * 5.0;\nlet rain = pow(0.5 + 0.5 * cos(rainCoord), 28.0) * pow(0.5 + 0.5 * sin(p.y * 20.0 + t * gravity * 9.0 + floor(rainCoord) * 2.7), 12.0);\nlet halo = exp(-max(edge, 0.0) * 12.0) * exp(-max(abs(q.y) - 0.9, 0.0) * 12.0);\nlet color = mix(haze, litLeaf, leaf) + c3 * vec3<f32>(rain * 0.22 + glow * halo * 0.22);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 8.1
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 3.0
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.29
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.2
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Trapezoid Stampede2",
+    "expression": "let scale = 1.2 + amount * 0.32;\nlet clock = t * (0.5 + gravity * 0.85);\nlet pos = p * vec2<f32>(scale) + vec2<f32>(0.0, clock * 0.16);\nlet row = floor(pos.y);\nlet seed = hash(vec2<f32>(row, 7.3));\nlet direction = select(-1.0, 1.0, fract(row * 0.5) > 0.25);\nlet dash = clock * (0.6 + seed) + 1.3 * smoothstep(-0.7, 0.7, sin(clock * 1.7 + seed * 12.0));\nlet x = pos.x + direction * dash + seed * 8.0;\nlet y = fract(pos.y) - 0.5;\nlet pair = floor(x * 0.5);\nlet u = fract(x * 0.5) * 2.0;\nlet slope = select(-0.76, 0.76, fract(row * 0.5) > 0.25);\nlet split = 1.0 + slope * y;\nlet side = step(split, u);\nlet center = mix(split * 0.5, 1.0 + split * 0.5, side);\nlet halfwidth = mix(split * 0.5, 1.0 - split * 0.5, side);\nlet inset = 0.11 - shape_size * 0.13;\nlet edge = min((halfwidth - abs(u - center)) * 0.93, 0.5 - abs(y)) - inset;\nlet body = smoothstep(-0.018, 0.018, edge);\nlet bevel = 1.0 - smoothstep(0.018, 0.085, edge);\nlet id = hash(vec2<f32>(pair * 2.0 + side, row));\nlet paint = mix(c1, c2, 0.15 + 0.75 * id);\nlet shading = 0.72 + 0.28 * (y + 0.5) + 0.12 * sin(id * 18.0 + clock * 2.0);\nlet face = paint * vec3<f32>(shading);\nlet rim = mix(c2, c3, 0.3) * vec3<f32>(bevel * 0.35);\nlet halo = exp(-max(-edge, 0.0) * 18.0) * (1.0 - body) * glow;\nlet ground = c1 * vec3<f32>(0.23) + c2 * vec3<f32>(0.07);\nlet color = mix(ground, face + rim, body) + c1 * vec3<f32>(halo * 0.38);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 7.3
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 1.0
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.19
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.1
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Trapezoid Frenzy",
+    "expression": "let density = (0.8 + amount * 0.13) / (0.45 + shape_size * 2.0);\nlet y = p.y * density + t * gravity * 0.32;\nlet row = floor(y);\nlet clock = t * (0.65 + gravity * 1.3) + hash(vec2<f32>(row, 8.0)) * 7.0;\nlet beat = floor(clock);\nlet dart = smoothstep(0.12, 0.38, fract(clock));\nlet start = hash(vec2<f32>(row, beat)) * 4.0;\nlet finish = hash(vec2<f32>(row, beat + 1.0)) * 4.0;\nlet x = p.x * density * 0.72 + mix(start, finish, dart);\nlet cell = floor(x);\nlet uv = vec2<f32>(fract(x), fract(y));\nlet lean = 0.22 * cos(row * 2.3);\nlet divider = 0.5 + lean * (uv.y * 2.0 - 1.0);\nlet side = step(divider, uv.x);\nlet seam = abs(uv.x - divider) / sqrt(1.0 + 4.0 * lean * lean);\nlet edge = min(min(uv.x, 1.0 - uv.x), min(min(uv.y, 1.0 - uv.y), seam));\nlet tile = smoothstep(0.012, 0.028, edge);\nlet seed = hash(vec2<f32>(cell * 2.0 + side, row));\nlet base = mix(c1, c2, seed);\nlet tint = mix(base, c3, 0.26 * step(0.76, seed));\nlet shading = 0.72 + 0.25 * uv.y + 0.08 * sin(seed * 6.283 + t * 1.4);\nlet rim = exp(-edge * 65.0) * tile;\nlet halo = exp(-edge * 22.0) * glow * 0.12;\nlet grout = mix(bg, c1, 0.2);\nlet color = mix(grout, tint * vec3<f32>(shading), tile)\n  + mix(c2, c3, 0.35) * vec3<f32>(rim * (0.18 + glow * 0.2) + halo);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 9.1
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.4
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.13
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.2
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "generictest",
+    "expression": "let density = 0.7 + amount * 0.24;\nlet column = floor(p.x * density);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet phase = fract(t * gravity * 0.16 + seed);\nlet fall = 4.0 * phase * phase;\nlet grid = vec2<f32>(p.x * density, p.y * density + fall + seed * 5.0);\nlet cell = floor(grid);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * (seed - 0.5) * 1.5 + seed * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.42 + seed * 0.14);\nlet circle = length(r) - size;\nlet square = max(abs(r.x), abs(r.y)) - size * 0.85;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size * 0.85;\nlet triangle = max(abs(r.x) * 0.866 + r.y * 0.5, -r.y) - size * 0.55;\nlet kind = fract(seed * 13.7);\nlet d = select(select(circle, square, kind > 0.25), select(diamond, triangle, kind > 0.75), kind > 0.5);\nlet fill = 1.0 - smoothstep(-0.012, 0.018, d);\nlet edge = exp(-abs(d) * 65.0);\nlet halo = exp(-max(d, 0.0) * 13.0) * (1.0 - fill);\nlet hue = fract(seed + cell.y * 0.117 + t * 0.035);\nlet neon = mix(palette(hue), mix(c1, c2, seed), 0.25);\nlet streak = exp(-abs(q.x) * 55.0) * smoothstep(-0.12, 0.42, q.y) * (0.2 + phase * 0.8);\nlet base = mix(bg, c3 * vec3<f32>(0.22, 0.26, 0.38), 0.6) + mix(c1, c2, 0.5) * vec3<f32>(0.035);\nlet activity = smoothstep(0.0, 0.5, amount);\nlet color = clamp(base + activity * (neon * (fill * 0.78 + halo * glow * 0.48 + streak * glow * 0.24) + mix(neon, c2, 0.35) * edge * 0.45), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 6.3
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 1.9
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.35
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.5
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Happyfaces",
+    "expression": "let density = 0.8 + amount * 0.23;\nlet column = floor(p.x * density);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet clock = t * gravity * 0.42 + seed * 8.0;\nlet fall = floor(clock) + pow(fract(clock), 2.0);\nlet grid = vec2<f32>(p.x * density, p.y * density + fall);\nlet cell = floor(grid);\nlet id = hash(cell + vec2<f32>(2.7, 9.1));\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = sin(clock * 2.4 + id * 14.0) * 0.65 + id * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.65 + 0.2 * sin(clock * 5.0 + id * 20.0));\nlet round = length(r) - size;\nlet box = max(abs(r.x), abs(r.y)) - size * 0.86;\nlet star = length(r) - size * (0.78 + 0.22 * cos(atan2(r.y, r.x) * 5.0));\nlet d = select(select(round, box, id > 0.33), star, id > 0.66);\nlet body = 1.0 - smoothstep(-0.006, 0.008, d);\nlet eye1 = 1.0 - smoothstep(0.018, 0.03, length(r - vec2<f32>(-0.065, 0.035)));\nlet eye2 = 1.0 - smoothstep(0.018, 0.03, length(r - vec2<f32>(0.065, 0.035)));\nlet grin = (1.0 - smoothstep(0.008, 0.018, abs(length(r - vec2<f32>(0.0, 0.025)) - 0.09))) * (1.0 - smoothstep(-0.025, -0.012, r.y));\nlet accent = select(select(c1, c2, id > 0.33), c3, id > 0.66);\nlet paper = mix((c1 + c2 + c3) / 3.0, vec3<f32>(1.0), 0.7);\nlet ink = mix(bg, accent, 0.08);\nlet dots = step(0.83, sin(p.x * 48.0) * sin(p.y * 48.0));\nlet backdrop = mix(ink, paper, 0.08 + dots * 0.12);\nlet halo = exp(-max(d, 0.0) * 16.0) * (1.0 - body) * glow * 0.22;\nlet face = mix(paper, ink, clamp(eye1 + eye2 + grin, 0.0, 1.0));\nlet activity = smoothstep(0.0, 0.8, amount);\nlet color = clamp(mix(backdrop + accent * halo, face, body * activity), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 10.0
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.9
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.23
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.87
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Mayhem1",
+    "expression": "let density = 1.6 + amount * 0.48;\nlet drift = vec2<f32>(sin(t * 0.43), t * gravity * 0.38);\nlet warp = p + vec2<f32>(sin(p.y * 3.0 + t * gravity), cos(p.x * 2.5 - t)) * vec2<f32>(0.16);\nlet grid = warp * vec2<f32>(density) + drift;\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * gravity * (seed - 0.5) + seed * 6.2832;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.65 + 0.25 * sin(t * 2.0 + seed * 12.0));\nlet box = max(abs(r.x), abs(r.y)) - size;\nlet disk = length(r) - size;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size;\nlet d = select(select(box, disk, seed > 0.33), diamond, seed > 0.67);\nlet fill = 1.0 - smoothstep(-0.015, 0.015, d);\nlet ring = 1.0 - smoothstep(0.014, 0.033, abs(d));\nlet stripe = step(0.5, fract((r.x + r.y) * 9.0 + t * gravity));\nlet checker = step(0.5, fract((cell.x + cell.y) * 0.5));\nlet ink = mix(fill, max(ring, fill * stripe), step(0.45, seed));\nlet graphic = mix(ink, 1.0 - ink, checker);\nlet accent = select(mix(c1, c2, step(0.5, seed)), c3, seed > 0.8);\nlet accentMask = step(0.78, hash(cell + vec2<f32>(19.2, 4.6)));\nlet paper = mix(accent * vec3<f32>(0.025), mix(accent, vec3<f32>(1.0), 0.75), graphic);\nlet colored = mix(accent * vec3<f32>(0.12), accent, graphic);\nlet halo = exp(-abs(d) * 26.0) * glow * 0.22;\nlet color = clamp(mix(paper, colored, accentMask) + accent * vec3<f32>(halo * accentMask), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 9.5
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 1.9
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.35
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.5
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "The Creative Flow 1",
+    "expression": "let density = 1.2 + amount * 0.28;\nlet warp = vec2<f32>(sin(p.y * 3.0 + t * 0.7), cos(p.x * 2.6 - t * 0.6)) * vec2<f32>(0.16);\nlet pos = (p + warp) * vec2<f32>(density);\nlet column = floor(pos.x);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet fall = t * gravity * (0.4 + seed * 0.55);\nlet grid = pos + vec2<f32>(0.0, fall + seed * 8.0);\nlet cell = floor(grid);\nlet id = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * (seed - 0.5) * 3.0 + id * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.55 + id * 0.25);\nlet circle = length(r) - size;\nlet square = max(abs(r.x), abs(r.y)) - size * 0.85;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size * 0.8;\nlet triangle = max(abs(r.x) * 0.866 + r.y * 0.5, -r.y) - size * 0.55;\nlet d = select(select(circle, square, id > 0.25), select(diamond, triangle, id > 0.75), id > 0.5);\nlet fill = 1.0 - smoothstep(-0.012, 0.015, d);\nlet outline = exp(-abs(d) * 70.0);\nlet hollow = step(0.48, fract(id * 7.9));\nlet graphic = mix(fill, outline, hollow);\nlet halo = exp(-max(d, 0.0) * 15.0) * (1.0 - fill);\nlet stripe = smoothstep(0.4, 0.6, sin((r.x + r.y) * 65.0 + t * 2.0));\nlet hatch = fill * stripe * hollow * 0.32;\nlet trail = exp(-abs(q.x) * 60.0) * smoothstep(0.0, 0.48, q.y) * 0.17;\nlet source = mix(mix(c1, c2, seed), c3, id);\nlet activity = smoothstep(0.0, 0.6, amount);\nlet paper = 0.14 + 0.06 * noise(p * vec2<f32>(3.0) + vec2<f32>(t * 0.08));\nlet light = paper + activity * (0.8 * graphic + hatch + glow * (halo * 0.19 + trail));\nlet color = clamp(source * vec3<f32>(light), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 9.5
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 1.9
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.35
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.5
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Invisible Conveyor Belt",
+    "expression": "let spacing = 1.4 / (0.7 + amount * 0.23);\nlet column = floor(p.x / spacing + 0.5);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet phase = fract(t * 0.19 * sqrt(gravity) + seed);\nlet fall = 2.4 - 4.8 * phase * phase;\nlet x = p.x - column * spacing;\nlet y = (fract((p.y - fall) / 4.8 + 0.5) - 0.5) * 4.8;\nlet angle = t * (seed - 0.5) * 1.7 + seed * 6.28318;\nlet q = vec2<f32>(cos(angle) * x - sin(angle) * y, sin(angle) * x + cos(angle) * y);\nlet radius = shape_size * (0.7 + 0.5 * seed);\nlet sides = select(3.0, 6.0, seed > 0.35);\nlet sector = 6.28318 / sides;\nlet a = atan2(q.y, q.x) + 3.14159;\nlet polygon = length(q) * cos(floor(a / sector + 0.5) * sector - a) - radius;\nlet square = max(abs(q.x), abs(q.y)) - radius * 0.86;\nlet d = select(polygon, square, seed > 0.72);\nlet fill = 1.0 - smoothstep(-0.012, 0.012, d);\nlet rim = exp(-abs(d) * 80.0);\nlet glow = exp(-max(d, 0.0) * 10.0);\nlet tint = mix(mix(c1, c2, seed), c3, 0.25 * sin(seed * 18.0) + 0.25);\nlet face = tint * (0.63 + 0.26 * clamp(q.y / radius + 0.5, 0.0, 1.0));\nlet backdrop = mix(c1, c3, 0.5 + 0.5 * sin(p.y * 0.6 + t * 0.12)) * 0.24;\nlet color = backdrop + tint * glow * 0.17 + face * fill + mix(c2, vec3<f32>(0.65, 0.87, 1.0), 0.35) * rim * 0.23;\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 10.0
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 3.0
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.17
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Swimming Fish",
+    "expression": "let density = 1.1 + amount * 0.13;\nlet row = floor(p.y * density);\nlet seed = hash(vec2<f32>(row, 8.7));\nlet grid = vec2<f32>(p.x * density - t * (0.22 + gravity * 0.16) * (0.7 + seed * 0.6) + seed * 4.0, p.y * density);\nlet cell = floor(grid);\nlet id = hash(cell + vec2<f32>(3.1, 9.2));\nlet q = fract(grid) - vec2<f32>(0.5, 0.5 + sin(t * (2.0 + gravity) + cell.x * 3.0 + row) * 0.045);\nlet size = shape_size * (0.65 + id * 0.18);\nlet body = (length(q / vec2<f32>(size, size * 0.56)) - 1.0) * size * 0.56;\nlet tail = max(abs(q.y + sin(t * 7.0 + id * 9.0) * 0.025) - (-q.x - size * 0.55) * 0.65, max(-q.x - size * 1.65, q.x + size * 0.7));\nlet d = min(body, tail);\nlet fish = (1.0 - smoothstep(-0.008, 0.012, d)) * smoothstep(0.0, 0.8, amount);\nlet eye = 1.0 - smoothstep(size * 0.085, size * 0.13, length(q - vec2<f32>(size * 0.55, size * 0.15)));\nlet fishColor = mix(mix(c1, c2, id) * vec3<f32>(0.75 + 0.25 * sin(q.x / size * 15.0)), vec3<f32>(0.015, 0.04, 0.09), eye);\nlet water = cloud(p * vec2<f32>(1.4, 2.4) + vec2<f32>(t * 0.08, -t * 0.04));\nlet rays = pow(0.5 + 0.5 * sin(p.x * 4.5 + p.y * 1.3 + water * 5.0 + t * 0.3), 5.0);\nlet sea = mix(vec3<f32>(0.015, 0.13, 0.24), c1 * vec3<f32>(0.32, 0.48, 0.52), water) + c2 * vec3<f32>(rays * 0.18);\nlet halo = exp(-max(d, 0.0) * 18.0) * glow * 0.16 * smoothstep(0.0, 0.8, amount);\nlet color = mix(sea + mix(c2, c3, 0.25) * vec3<f32>(halo), fishColor, fish);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 3.6
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 2.7
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.21
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.6
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Gravity Arcade",
+    "expression": "let density = 0.7 + amount * 0.24;\nlet column = floor(p.x * density);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet phase = fract(t * gravity * 0.16 + seed);\nlet fall = 4.0 * phase * phase;\nlet grid = vec2<f32>(p.x * density, p.y * density + fall + seed * 5.0);\nlet cell = floor(grid);\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = t * (seed - 0.5) * 1.5 + seed * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.42 + seed * 0.14);\nlet circle = length(r) - size;\nlet square = max(abs(r.x), abs(r.y)) - size * 0.85;\nlet diamond = (abs(r.x) + abs(r.y)) * 0.7071 - size * 0.85;\nlet triangle = max(abs(r.x) * 0.866 + r.y * 0.5, -r.y) - size * 0.55;\nlet kind = fract(seed * 13.7);\nlet d = select(select(circle, square, kind > 0.25), select(diamond, triangle, kind > 0.75), kind > 0.5);\nlet fill = 1.0 - smoothstep(-0.012, 0.018, d);\nlet edge = exp(-abs(d) * 65.0);\nlet halo = exp(-max(d, 0.0) * 13.0) * (1.0 - fill);\nlet hue = fract(seed + cell.y * 0.117 + t * 0.035);\nlet neon = mix(palette(hue), mix(c1, c2, seed), 0.25);\nlet streak = exp(-abs(q.x) * 55.0) * smoothstep(-0.12, 0.42, q.y) * (0.2 + phase * 0.8);\nlet base = mix(bg, c3 * vec3<f32>(0.22, 0.26, 0.38), 0.6) + mix(c1, c2, 0.5) * vec3<f32>(0.035);\nlet activity = smoothstep(0.0, 0.5, amount);\nlet color = clamp(base + activity * (neon * (fill * 0.78 + halo * glow * 0.48 + streak * glow * 0.24) + mix(neon, c2, 0.35) * edge * 0.45), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "amount",
+        "min": 0.0,
+        "max": 10.0,
+        "value": 6.3
+      },
+      {
+        "name": "gravity",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 1.9
+      },
+      {
+        "name": "shape_size",
+        "min": 0.1,
+        "max": 0.6,
+        "value": 0.35
+      },
+      {
+        "name": "glow",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.5
+      }
+    ],
+    "y_up": true
+  },
+  {
+    "name": "Aerial Ghost",
+    "expression": "let plane = vec2<f32>(fract(t * 0.075 * flyby_speed) * 6.0 - 3.0, 0.48);\nlet proximity = exp(-plane.x * plane.x * 0.65);\nlet grain = hash(floor(p * vec2<f32>(460.0, 310.0)) + vec2<f32>(floor(t * 29.0)));\nlet bend = sin(p.y * 19.0 - t * 6.0) * 0.045 * proximity;\nlet signal = sin((p.x + bend) * 4.8 + p.y * 2.0 + t * 0.6);\nlet broadcast = mix(mix(c4, c1, smoothstep(-0.65, 0.65, signal)), mix(c2, c3, 0.5), 0.45 * smoothstep(0.1, 0.9, sin(p.x * 3.4 - p.y * 4.5 - t * 0.8)));\nlet ghost = ghost_strength * proximity * smoothstep(0.65, 0.95, sin((p.x + bend + 0.25) * 4.8 + p.y * 2.0 + t * 0.6));\nlet screen = broadcast * vec3<f32>((0.84 + 0.16 * sin(p.y * 430.0)) * (0.85 + (grain - 0.5) * static_amount * 0.7)) + c3 * vec3<f32>(ghost * 0.25);\nlet q = p - plane;\nlet aircraft = 1.0 - smoothstep(0.85, 1.2, min(length(q / vec2<f32>(0.19, 0.018)), abs(q.x + q.y * 0.34) / 0.037 + abs(q.y) / 0.15));\nlet a = p - vec2<f32>(0.78, -0.35);\nlet mast = (1.0 - smoothstep(0.009, 0.02, abs(a.x))) * (1.0 - smoothstep(0.48, 0.5, abs(a.y)));\nlet bars = (1.0 - smoothstep(0.04, 0.12, abs(fract((a.y + 0.02) * 9.0) - 0.5))) * (1.0 - smoothstep(0.12, 0.15, abs(a.x))) * (1.0 - smoothstep(0.3, 0.36, abs(a.y - 0.12)));\nreturn mix(bg, clamp(mix(screen, c4 * vec3<f32>(0.16), max(aircraft, max(mast, bars)) * 0.93), vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "static_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.35
+      },
+      {
+        "name": "ghost_strength",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.7
+      },
+      {
+        "name": "flyby_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 0.7
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#15ddd0",
+      "#ff376e",
+      "#ffbd42",
+      "#3548c9"
+    ]
+  },
+  {
+    "name": "Evening Thunder",
+    "expression": "let drift = p * vec2<f32>(1.3, 1.8) + vec2<f32>(t * 0.045, t * 0.018);\nlet mist = cloud(drift);\nlet clouds = cloud(drift * vec2<f32>(2.1) + vec2<f32>(mist * 1.7, 0.0));\nlet horizon = exp(-abs(p.y + 0.55) * 1.6);\nlet sky = mix(c1, c2, clamp(mist * 0.8 + horizon * 0.25, 0.0, 1.0));\nlet atmosphere = sky * vec3<f32>(0.32 + clouds * 0.48) + c3 * vec3<f32>(horizon * 0.11);\n\nlet beat = t * lightning_rate;\nlet event = floor(beat * 0.5);\nlet seed = hash(vec2<f32>(event, 13.7));\nlet flash = pow(max(sin(beat * 6.28318), 0.0), 28.0);\nlet echo = pow(max(sin(beat * 6.28318 - 0.72), 0.0), 42.0) * 0.45;\nlet pulse = max(flash, echo);\nlet bolt_center = (seed - 0.5) * 2.8;\nlet jag = (noise(vec2<f32>(p.y * 18.0, event * 9.7)) - 0.5) * 0.22;\nlet bolt_x = bolt_center + sin(p.y * 5.5 + seed * 8.0) * 0.12 + jag;\nlet trunk = abs(p.x - bolt_x);\nlet branch_x = bolt_x + (0.28 - p.y) * 0.62;\nlet branch_gate = smoothstep(-0.85, -0.65, p.y) * (1.0 - smoothstep(0.2, 0.3, p.y));\nlet branch = exp(-abs(p.x - branch_x) * 135.0) * branch_gate;\nlet bolt = exp(-trunk * 180.0) + branch * 0.75;\nlet halo = exp(-trunk * 8.0);\nlet illumination = pulse * storm_glow;\nlet storm = atmosphere + c4 * vec3<f32>(illumination * (bolt * 1.35 + halo * 0.32 + clouds * 0.23));\n\nlet rain_uv = vec2<f32>(p.x + p.y * 0.19, p.y) * vec2<f32>(42.0 * rain_density, 5.5);\nlet lane = floor(rain_uv.x);\nlet rain_seed = hash(vec2<f32>(lane, 8.1));\nlet fall = fract(rain_uv.y + t * (2.8 + rain_seed * 2.0) + rain_seed * 12.0);\nlet width = abs(fract(rain_uv.x) - 0.5);\nlet streak = (1.0 - smoothstep(0.018, 0.075, width)) * smoothstep(0.48, 0.95, fall);\nlet rain = streak * (0.22 + rain_seed * 0.48) * step(0.24, rain_seed);\nlet rain_color = mix(c3, c4, rain_seed);\nlet color = storm + rain_color * vec3<f32>(rain * (0.8 + illumination)) + c5 * vec3<f32>(horizon * 0.035);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "rain_density",
+        "min": 0.5,
+        "max": 2.5,
+        "value": 1.2
+      },
+      {
+        "name": "lightning_rate",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 0.7
+      },
+      {
+        "name": "storm_glow",
+        "min": 0.5,
+        "max": 1.8,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#233c87",
+      "#7047b8",
+      "#35a9cf",
+      "#b2e5ff",
+      "#f5c67a"
+    ]
+  },
+  {
+    "name": "Electric Downpour",
+    "expression": "let time = t * storm_speed;\nlet drift = p * vec2<f32>(1.3, 1.8) + vec2<f32>(time * 0.09, time * 0.04);\nlet clouds = cloud(drift + vec2<f32>(cloud(drift), 0.0));\nlet billows = smoothstep(0.25, 0.8, clouds);\nlet sky = mix(c1, c2, billows) * vec3<f32>(0.55 + 0.38 * billows);\nlet horizon = exp(-abs(p.y + 0.65) * 1.6);\nlet atmosphere = mix(sky, c5, 0.17 * horizon);\n\nlet epoch = floor(time * 0.65);\nlet lane = floor((p.x + 1.4) / 2.8);\nlet seed = hash(vec2<f32>(lane, epoch));\nlet local_x = p.x - lane * 2.8;\nlet bolt_x = (seed - 0.5) * 1.6 + 0.14 * sin(p.y * 11.0 + seed * 30.0) + 0.07 * sin(p.y * 29.0 + seed * 17.0);\nlet bolt_distance = abs(local_x - bolt_x);\nlet flash_phase = fract(time * 0.65 + seed * 0.45);\nlet flash = pow(max(0.0, sin(flash_phase * 3.141593)), 18.0);\nlet flicker = 0.68 + 0.32 * sin(time * 63.0 + seed * 19.0);\nlet visibility = smoothstep(-1.3, -0.9, p.y) * (0.14 + flash * flicker);\nlet core = exp(-bolt_distance * 185.0);\nlet halo = exp(-bolt_distance * 14.0) * lightning_glow;\nlet branch_x = bolt_x + max(0.0, 0.35 - p.y) * 0.48 + 0.035 * sin(p.y * 42.0);\nlet branch = exp(-abs(local_x - branch_x) * 155.0) * smoothstep(-0.7, -0.4, p.y) * (1.0 - smoothstep(0.25, 0.4, p.y));\nlet lightning = c4 * vec3<f32>((core + branch * 0.55) * visibility) + c3 * vec3<f32>(halo * visibility * 0.65);\n\nlet rain_uv = vec2<f32>((p.x + p.y * 0.18) * 43.0 * rain_density, p.y * 9.0 + time * 10.0);\nlet rain_cell = floor(rain_uv);\nlet rain_random = hash(rain_cell);\nlet rain_pos = fract(rain_uv);\nlet streak = exp(-abs(rain_pos.x - 0.5) * 48.0) * smoothstep(0.05, 0.25, rain_pos.y) * (1.0 - smoothstep(0.55, 0.95, rain_pos.y));\nlet rain = streak * step(0.43, rain_random) * (0.35 + rain_random * 0.65);\nlet color = atmosphere + lightning + c3 * vec3<f32>(rain * 0.65) + c2 * vec3<f32>(flash * 0.16 * billows);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [
+      {
+        "name": "rain_density",
+        "min": 0.4,
+        "max": 2.5,
+        "value": 1.0
+      },
+      {
+        "name": "lightning_glow",
+        "min": 0.3,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "storm_speed",
+        "min": 0.2,
+        "max": 2.5,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#2444a8",
+      "#7843df",
+      "#47dfff",
+      "#c1b5ff",
+      "#ff4fad"
+    ]
+  }
+]

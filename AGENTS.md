@@ -71,7 +71,16 @@
   hand). `ShaderBackground::theme_colors` keeps the shader's own colors while unused.
   Shader AI prompts must keep the Style notes (`shader_ai::settings_text`).
 - Built-in shaders/bundles: `assets/library/*.json` (`src/library.rs`), filled by
-  Settings → Release picks (`src/app/release_picks.rs`).
+  Settings → Release picks (`src/app/release_picks.rs`). Copied themes carry
+  `metadata.releasePickFrom`; only that marker allows overwriting a file.
+  Whole-profile export: `BUTTONSCLI_EXPORT_ACTIVE_PROFILE=1 cargo test --locked
+  --lib export_active_profile_into_this_checkout -- --ignored` (reads profile only).
+- Shader/effect time goes through `animation_clock` (stepped to the app-wide
+  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Menu/status-bar
+  shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
+  `SIMPLE_NOISE_HIDDEN` hides and disables simple noise for now.
+- UI tests must not hard-code positions or theme names that depend on the
+  built-in catalog/library size or status-bar width; find text in a settled frame.
 
 ## Validation and traps
 

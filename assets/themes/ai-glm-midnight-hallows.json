@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "Midnight purple shell with jack-o-lantern orange accents, eerie slime green and candy pink highlights. Dark, high-contrast and readable for long spooky sessions; no effects.",
+    "generation": {
+      "attempt": 1,
+      "brief": "Halloween: midnight purple, jack-o-lantern orange, eerie green, spooky candy. Dark, readable and distinctive without visual effects.",
+      "model": "z-ai/glm-5.3-flashx",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417722-9c0tYBsvGTdxGo7Ws9sX",
+      "run": "20261007-defaults-extended"
+    },
+    "id": "ai-glm-midnight-hallows",
+    "name": "AI Glm - Midnight Hallows",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-extended-ai-halloween-glm",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9df2b4",
+        "background": "#1f1633",
+        "buttonBackground": "#2d2049",
+        "buttonHover": "#3a2a5e",
+        "buttonText": "#f4eeff"
+      },
+      "settings": {
+        "background": "#1f1633"
+      },
+      "shell": {
+        "accent": "#b8560f",
+        "accentHover": "#9c4a08",
+        "background": "#150f22",
+        "backgroundSecondary": "#1f1633",
+        "border": "#6b5a92",
+        "buttonBackground": "#2d2049",
+        "paneDivider": {
+          "color": "#b8560f",
+          "thickness": 2
+        },
+        "textDim": "#b4a4d6",
+        "textMain": "#f4eeff"
+      },
+      "statusBar": {
+        "background": "#191129",
+        "border": "#6b5a92",
+        "text": "#dccdf5",
+        "warning": "#ffcf6b"
+      },
+      "tabs": {
+        "activeBackground": "#150f22",
+        "activeBorder": "#c96a17",
+        "background": "#1f1633",
+        "idleBackground": "#2a1d46"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#221838",
+        "blue": "#8f9dff",
+        "brightBlack": "#8a7aa8",
+        "brightBlue": "#b6c1ff",
+        "brightCyan": "#8feee2",
+        "brightGreen": "#a8f2b8",
+        "brightMagenta": "#ffa6df",
+        "brightRed": "#ff9b8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd98f",
+        "cyan": "#59d6c9",
+        "green": "#6fdd8b",
+        "magenta": "#ff7ac6",
+        "red": "#ff6e6e",
+        "white": "#e9e2f8",
+        "yellow": "#ffb347"
+      },
+      "background": "#0d0817",
+      "foreground": "#efe9fb",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

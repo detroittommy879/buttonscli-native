@@ -1181,6 +1181,12 @@ enum PaneAction {
     ToggleAutoTile,
     Close,
     ThemeSettings,
+    /// Shader controls in the pane menu and status bar: they edit that pane's
+    /// look the same way "Edit for: Pane N" does.
+    ShaderStrength(f32),
+    PaneBackground(String),
+    UseShader(Box<crate::theme::SavedShader>),
+    ShaderSettings,
     ResetSimulation,
     UndoSimulation,
     CancelSimulation,
@@ -2240,6 +2246,42 @@ impl ButtonsApp {
             PaneAction::ThemeSettings => {
                 self.focused = index;
                 self.settings_tab = SettingsTab::Themes;
+                self.show_settings = true;
+            }
+            PaneAction::ShaderStrength(value) => self.edit_pane_look(index, |document| {
+                if document["effects"]["shaderBackground"].is_object() {
+                    document["effects"]["shaderBackground"]["strength"] = json!(value);
+                }
+            }),
+            PaneAction::PaneBackground(color) => self.edit_pane_look(index, |document| {
+                document["theme"]["terminal"]["background"] = json!(color);
+            }),
+            PaneAction::UseShader(item) => {
+                if !self.preferences.shader_backgrounds_enabled {
+                    self.preferences.shader_backgrounds_enabled = true;
+                    self.persist_native_preferences();
+                }
+                self.edit_pane_look(index, |document| {
+                    let mut shader: crate::theme::ShaderBackground =
+                        serde_json::from_value(document["effects"]["shaderBackground"].clone())
+                            .unwrap_or_default();
+                    shader.custom = Some(item.shader);
+                    if let Some(colors) = item.colors {
+                        shader.colors = Some(colors);
+                        shader.theme_colors = false;
+                    }
+                    if let Ok(value) = serde_json::to_value(shader) {
+                        document["effects"]["shaderBackground"] = value;
+                    }
+                });
+            }
+            PaneAction::ShaderSettings => {
+                if index != self.focused {
+                    self.activate_tab(index);
+                }
+                self.theme_editor_pane_mode = true;
+                self.settings_tab = SettingsTab::Themes;
+                self.theme_settings_tab = ThemeSettingsTab::Shaders;
                 self.show_settings = true;
             }
             PaneAction::ResetSimulation => {
@@ -3334,8 +3376,11 @@ impl ButtonsApp {
             .collect();
         let tree = pane_tree(self.pane_layout, &visible, plan.rows, plan.columns);
         let indicator_colors = self.colors();
+        let (shader_choices, saved_shader_count) = shader_choices(&self.preferences.saved_shaders);
         ui.allocate_rect(rect, egui::Sense::hover());
         let mut render_state = PaneRenderState {
+            shader_choices: &shader_choices,
+            saved_shader_count,
             ratios: &mut self.preferences.pane_split_ratios,
             tabs: &mut self.tabs,
             focused,
@@ -4072,7 +4117,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         self.tab_group_menu(ui, ctx);
                         #[cfg(not(target_arch = "wasm32"))]
-                        self.theme_bundle_menu(ui, ctx);
+                        self.theme_bundle_menu(ui, ctx, "Apply theme bundle");
                         ui.separator();
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
@@ -5116,6 +5161,15 @@ impl ButtonsApp {
                             .map(|theme| (theme.id.clone(), theme.name.clone())).collect();
                         let current = self.preferences.theme_id.clone();
                         let mut action = None;
+                        // Shader controls act on the focused pane.
+                        let focused_pane = self
+                            .tabs
+                            .get(self.focused)
+                            .map(|tab| (tab.id, tab.title.clone(), self.terminal_presentation_for(tab.id)));
+                        let (choices, saved_count) = shader_choices(&self.preferences.saved_shaders);
+                        let mut shader_action = None;
+                        let mut fps = self.preferences.animation_fps;
+                        let mut fps_done = false;
                         ui.horizontal(|ui| {
                             ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
@@ -5124,8 +5178,29 @@ impl ButtonsApp {
                                 .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
+                            ui.spaced_menu_button("✦ Shader", |ui| {
+                                ui.set_max_width(340.0);
+                                if let Some((_, title, theme)) = &focused_pane {
+                                    ui.spaced_strong(format!("{title} · {}", theme.name));
+                                    pane_shader_menu(ui, theme, &choices, saved_count, &mut shader_action);
+                                }
+                                ui.separator();
+                                fps_done = animation_fps_slider(ui, &mut fps);
+                            })
+                            .response
+                            .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
                         });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
+                        if fps != self.preferences.animation_fps {
+                            self.preferences.animation_fps = fps;
+                        }
+                        if fps_done {
+                            self.persist_native_preferences();
+                        }
+                        if let (Some(action), Some((id, _, _))) = (shader_action, &focused_pane) {
+                            self.perform_pane_action(*id, action, ctx);
+                        }
+                        self.theme_bundle_menu(ui, ctx, "◆ Bundles");
                         ui.separator();
                         self.profile_menu(ui, ctx);
                         ui.separator();
@@ -9364,7 +9439,7 @@ impl ButtonsApp {
             serde_json::from_value(document["effects"]["shaderBackground"].clone())
                 .unwrap_or_default();
         let mut chosen: Option<crate::shader_ai::Candidate> = None;
-        let time = ui.input(|i| i.time) as f32;
+        let time = animation_clock(ui.input(|i| i.time), self.preferences.animation_fps);
 
         // 1. Live preview first, so every change below is visible right away.
         settings_section(ui, base, 0, |ui| {
@@ -9622,6 +9697,22 @@ impl ButtonsApp {
                 .text("Strength"),
             )
             .on_hover_text("How strongly the pattern shows behind the text. Create with AI is told to use it, so lower it if text is hard to read.");
+            // Strength 0 shows this color, so it sits right next to Strength.
+            wrapping_row(ui, |ui| {
+                ui.spaced_label("Background");
+                let mut background = document["theme"]["terminal"]["background"]
+                    .as_str()
+                    .and_then(crate::theme::parse_color)
+                    .unwrap_or(Color32::BLACK);
+                if ui
+                    .color_edit_button_srgba(&mut background)
+                    .on_hover_text("The terminal background: what the shader fades to as Strength goes to 0. The same color as the theme's terminal background.")
+                    .changed()
+                {
+                    document["theme"]["terminal"]["background"] =
+                        json!(crate::theme::to_hex(background));
+                }
+            });
             ui.add(
                 egui::Slider::new(&mut shader.scale, crate::theme::ShaderBackground::SCALE)
                     .logarithmic(true)
@@ -9639,6 +9730,9 @@ impl ButtonsApp {
                         .on_hover_text("Positive y is the top of the pane, as most shader code expects. Turn off if this shader looks upside down.");
                 }
             });
+            if animation_fps_slider(ui, &mut self.preferences.animation_fps) {
+                self.persist_native_preferences();
+            }
 
             // Colors: the theme's c1–c5, or this shader's own (kept while the
             // theme's are in use, so switching back restores them).
@@ -10248,7 +10342,7 @@ impl ButtonsApp {
             if shader.animated && shader.speed > 0.0 {
                 ui.ctx()
                     .request_repaint_after(std::time::Duration::from_millis(
-                        1000_u64.div_ceil(self.preferences.animation_fps.clamp(1, 30) as u64),
+                        animation_interval_ms(self.preferences.animation_fps),
                     ));
             }
         }
@@ -10910,7 +11004,7 @@ impl ButtonsApp {
                     "/effects/scanlinesStrength",
                 );
             }
-            if effects_master_switch_available() {
+            if effects_master_switch_available() && !SIMPLE_NOISE_HIDDEN {
                 theme_document_toggle(
                     ui,
                     &locale,
@@ -13355,6 +13449,35 @@ impl ButtonsApp {
         }
     }
 
+    /// Changes one pane's look from a menu. It goes through the same draft as
+    /// Settings → "Edit for: Pane N", so only that pane changes, and the edit
+    /// is saved like any pane edit (as a numbered theme when you switch to
+    /// another pane, close Settings or quit).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn edit_pane_look(&mut self, index: usize, edit: impl FnOnce(&mut Value)) {
+        let Some(tab) = self.tabs.get(index).map(|tab| tab.id) else {
+            return;
+        };
+        if index != self.focused {
+            self.activate_tab(index);
+        }
+        if self.theme_editor_pane != Some(tab) {
+            if let Err(error) = self.autosave_theme_draft() {
+                self.notice = Some(format!("Could not save the current edit first: {error}"));
+                return;
+            }
+            self.discard_theme_editor_session();
+            self.theme_editor_pane = Some(tab);
+        }
+        self.theme_editor_pane_mode = true;
+        self.sync_theme_editor_to_current();
+        let Some(document) = self.theme_editor_document.as_mut() else {
+            return;
+        };
+        edit(document);
+        self.preview_personal_theme_draft();
+    }
+
     /// Starts an unsaved copy of a built-in theme that one pane uses.
     #[cfg(not(target_arch = "wasm32"))]
     fn start_pane_theme_copy(&mut self, id: &str) {
@@ -13500,8 +13623,12 @@ impl ButtonsApp {
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.spaced_label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
         ui.add(
-            egui::Slider::new(&mut self.preferences.animation_fps, 1..=60)
-                .text("Effect animation FPS limit"),
+            egui::Slider::new(
+                &mut self.preferences.animation_fps,
+                1..=crate::settings::MAX_ANIMATION_FPS,
+            )
+            .logarithmic(true)
+            .text("Animation FPS limit (shaders and effects, all panes)"),
         );
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
@@ -15055,10 +15182,44 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
     Color32::GRAY
 }
 
+/// "Simple noise" is hidden for now: its controls are gone and it never
+/// draws, though themes keep their saved values.
 #[cfg(not(target_arch = "wasm32"))]
+const SIMPLE_NOISE_HIDDEN: bool = true;
+
+/// The animation clock, stepped to the FPS limit. Typing, output and mouse
+/// moves redraw more often than the limit; a stepped clock keeps shaders and
+/// effects changing only `fps` times a second however often frames come.
+#[cfg(not(target_arch = "wasm32"))]
+fn animation_clock(time: f64, fps: u32) -> f32 {
+    let step = 1.0 / f64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
+    ((time / step).floor() * step) as f32
+}
+
+/// The app-wide FPS limit slider. True once a change is finished (drag
+/// released or a click), so callers save it once rather than every frame.
+#[cfg(not(target_arch = "wasm32"))]
+fn animation_fps_slider(ui: &mut egui::Ui, fps: &mut u32) -> bool {
+    let response = ui
+        .add(
+            egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
+                .logarithmic(true)
+                .text("FPS limit (all panes)"),
+        )
+        .on_hover_text("How often shaders and effects change, in every pane. Lower it to save GPU, for example while recording.");
+    response.drag_stopped() || (response.changed() && !response.dragged())
+}
+
+/// Milliseconds between animation frames at the FPS limit.
+#[cfg(not(target_arch = "wasm32"))]
+fn animation_interval_ms(fps: u32) -> u64 {
+    1000_u64.div_ceil(u64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS)))
+}
+
 /// The terminal background, then c1–c5: c1–c3 as before (gradient, or accent,
 /// accent hover and muted), then the two most colorful terminal colors that
 /// differ clearly from those.
+#[cfg(not(target_arch = "wasm32"))]
 fn shader_palette(theme: &ThemeDefinition) -> [Color32; 6] {
     let base =
         crate::theme::parse_color(&theme.terminal_colors.background).unwrap_or(Color32::BLACK);
@@ -15139,7 +15300,7 @@ fn terminal_surface(
         font_type: terminal_fonts.0,
         bold_font_type: Some(terminal_fonts.1),
     });
-    let time = ui.input(|input| input.time) as f32;
+    let time = animation_clock(ui.input(|input| input.time), interaction.animation_fps);
     let gradient = theme
         .effects
         .gradient
@@ -15212,9 +15373,9 @@ fn terminal_surface(
     let shader_active = background_callback.is_some();
     if background_callback.is_some() && shader.is_some_and(|s| s.animated && s.speed > 0.0) {
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(
-                1000_u64.div_ceil(interaction.animation_fps.clamp(1, 30) as u64),
-            ));
+            .request_repaint_after(std::time::Duration::from_millis(animation_interval_ms(
+                interaction.animation_fps,
+            )));
     }
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(interaction.focused)
@@ -15406,15 +15567,18 @@ fn paint_terminal_effects(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let noise_plan =
-        crate::plugins::effects::simple_noise::frame_plan(effects, latest_activity_at_ms, now_ms);
+    let noise_plan = if SIMPLE_NOISE_HIDDEN {
+        crate::plugins::effects::simple_noise::FramePlan::default()
+    } else {
+        crate::plugins::effects::simple_noise::frame_plan(effects, latest_activity_at_ms, now_ms)
+    };
     if noise_plan.opacity > 0.0 {
         let fps = if effects.simple_noise_fps == 0 {
             24
         } else {
             effects.simple_noise_fps.clamp(1, 60)
         }
-        .min(animation_fps.clamp(1, 60));
+        .min(animation_fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
         let interval = (1000.0_f32 / fps as f32).round().max(1.0) as u64;
         paint_noise(
             ui,
@@ -15444,7 +15608,7 @@ fn paint_terminal_effects(
     if let Some(delay) = repaint_after_ms {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(
-                delay.max(1000_u64.div_ceil(animation_fps.clamp(1, 60) as u64)),
+                delay.max(animation_interval_ms(animation_fps)),
             ));
     }
 }
@@ -15612,6 +15776,8 @@ struct PaneRenderState<'a> {
     latest_activity_at_ms: u64,
     locale: &'a str,
     favorites: &'a [(String, String)],
+    shader_choices: &'a [crate::theme::SavedShader],
+    saved_shader_count: usize,
     auto_tile: &'a crate::autotile::AutoTile,
     action: &'a mut Option<(u64, PaneAction)>,
     hover_label: &'a crate::settings::PaneHoverLabel,
@@ -15725,6 +15891,21 @@ fn render_pane_tree(
                                     state.auto_tile.includes(tab.id),
                                     &mut action,
                                 );
+                                ui.separator();
+                                egui::CollapsingHeader::new(crate::ui_text::spaced_text(
+                                    ui,
+                                    "Shader".to_owned(),
+                                ))
+                                .id_salt(("pane-shader", tab.id))
+                                .show(ui, |ui| {
+                                    pane_shader_menu(
+                                        ui,
+                                        theme,
+                                        state.shader_choices,
+                                        state.saved_shader_count,
+                                        &mut action,
+                                    );
+                                });
                                 if let Some(simulated) = &tab.simulated {
                                     ui.separator();
                                     ui.spaced_label(crate::i18n::literal(
@@ -16159,6 +16340,88 @@ fn favorite_theme_menu(
         .clicked()
     {
         *action = Some(PaneAction::ThemeSettings);
+        ui.close_menu();
+    }
+}
+
+/// Shaders to switch a pane to: the saved list (★) then built-ins (◆) whose
+/// names are not saved too. The count is how many come from the saved list.
+#[cfg(not(target_arch = "wasm32"))]
+fn shader_choices(saved: &[crate::theme::SavedShader]) -> (Vec<crate::theme::SavedShader>, usize) {
+    let mut choices = saved.to_vec();
+    choices.extend(
+        crate::library::shaders()
+            .iter()
+            .filter(|item| !saved.iter().any(|own| own.shader.name == item.shader.name))
+            .cloned(),
+    );
+    (choices, saved.len())
+}
+
+/// One pane's shader controls: Strength, the background it fades to, and a
+/// shader to switch to. Shared by the pane menu and the status bar.
+#[cfg(not(target_arch = "wasm32"))]
+fn pane_shader_menu(
+    ui: &mut egui::Ui,
+    theme: &ThemeDefinition,
+    choices: &[crate::theme::SavedShader],
+    saved_count: usize,
+    action: &mut Option<PaneAction>,
+) {
+    let shader = theme.effects.shader_background.as_ref();
+    if let Some(shader) = shader {
+        let mut strength = shader.strength;
+        if ui
+            .add(
+                egui::Slider::new(&mut strength, crate::theme::ShaderBackground::STRENGTH)
+                    .text("Strength"),
+            )
+            .changed()
+        {
+            *action = Some(PaneAction::ShaderStrength(strength));
+        }
+    } else {
+        ui.spaced_label(RichText::new("No shader on this pane yet. Pick one below.").weak());
+    }
+    egui::CollapsingHeader::new("Background color")
+        .id_salt("pane-shader-background")
+        .show(ui, |ui| {
+            let mut color = crate::theme::parse_color(&theme.terminal_colors.background)
+                .unwrap_or(Color32::BLACK);
+            if egui::widgets::color_picker::color_picker_color32(
+                ui,
+                &mut color,
+                egui::widgets::color_picker::Alpha::Opaque,
+            ) {
+                *action = Some(PaneAction::PaneBackground(crate::theme::to_hex(color)));
+            }
+        })
+        .header_response
+        .on_hover_text("What the shader fades to as Strength goes to 0.");
+    if !choices.is_empty() {
+        egui::CollapsingHeader::new("Use a shader")
+            .id_salt("pane-shader-choices")
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("pane-shader-choice-list")
+                    .max_height(260.0)
+                    .show(ui, |ui| {
+                        for (number, item) in choices.iter().enumerate() {
+                            let mark = if number < saved_count { "★" } else { "◆" };
+                            let current = shader.and_then(|shader| shader.custom.as_ref())
+                                == Some(&item.shader);
+                            if ui
+                                .selectable_label(current, format!("{mark} {}", item.shader.name))
+                                .clicked()
+                            {
+                                *action = Some(PaneAction::UseShader(Box::new(item.clone())));
+                            }
+                        }
+                    });
+            });
+    }
+    if ui.spaced_button("Shader settings…").clicked() {
+        *action = Some(PaneAction::ShaderSettings);
         ui.close_menu();
     }
 }
@@ -17405,10 +17668,14 @@ mod tests {
                 )
             };
             render(&mut app, vec![]);
+            let settled = render(&mut app, vec![]);
+            // An empty spot: the dock's lower area, or the right end of the
+            // status bar's first row (more buttons wrap onto a second row).
             let pos = if dock {
                 egui::pos2(40.0, 650.0)
             } else {
-                egui::pos2(850.0, 680.0)
+                let first_row = text_position(&settled, "SHELL READY").unwrap().y;
+                egui::pos2(895.0, first_row)
             };
             render(
                 &mut app,
@@ -19806,12 +20073,21 @@ Start-Sleep -Seconds 300
         assert!(text_position(&output, "Native v1").is_some());
         let swatches = output.shapes.iter().filter(|shape| matches!(&shape.shape, egui::Shape::Rect(rect) if rect.rect.size() == Vec2::splat(12.0))).count();
         assert!(swatches >= 7, "compact rows retain palette previews");
-        let name = ThemeCatalog::load().get("aurora").name.clone();
-        let pos = text_position(&output, &name).unwrap();
+        // Any native theme on screen with a name no other theme has.
+        let catalog = ThemeCatalog::load();
+        let unique = |name: &str| catalog.all().iter().filter(|t| t.name == name).count() == 1;
+        let (id, pos) = catalog
+            .all()
+            .iter()
+            .filter(|theme| theme.id != "basic2" && unique(&theme.name))
+            .find_map(|theme| {
+                text_position(&output, &theme.name).map(|pos| (theme.id.clone(), pos))
+            })
+            .expect("a native theme row on screen");
         render(pointer_events(pos, egui::PointerButton::Primary, true));
         render(pointer_events(pos, egui::PointerButton::Primary, false));
-        assert_eq!(app.preferences.app_theme_id, "aurora");
-        assert_eq!(app.preferences.terminal_theme_id, "aurora");
+        assert_eq!(app.preferences.app_theme_id, id);
+        assert_eq!(app.preferences.terminal_theme_id, id);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -22683,7 +22959,52 @@ Start-Sleep -Seconds 300
             "#111111"
         );
         assert_eq!(app.theme_overrides[&second], second_theme);
+
+        // Pane menu and status bar controls edit only that pane, the same way.
+        app.perform_pane_action(first, PaneAction::PaneBackground("#222222".into()), &ctx);
+        assert_eq!(app.theme_editor_pane, Some(first));
+        assert_eq!(
+            app.terminal_presentation_for(first)
+                .terminal_colors
+                .background,
+            "#222222"
+        );
+        let menu_shader = crate::theme::SavedShader {
+            shader: crate::theme::CustomShader {
+                name: "Menu".into(),
+                expression: "c1".into(),
+                ..Default::default()
+            },
+            colors: Some(vec!["#ff0000".into(), "#00ff00".into()]),
+        };
+        app.perform_pane_action(first, PaneAction::UseShader(Box::new(menu_shader)), &ctx);
+        app.perform_pane_action(first, PaneAction::ShaderStrength(0.5), &ctx);
+        let shader = app
+            .terminal_presentation_for(first)
+            .effects
+            .shader_background
+            .unwrap();
+        assert_eq!(shader.custom.unwrap().name, "Menu");
+        assert_eq!(shader.strength, 0.5);
+        assert!(!shader.theme_colors);
+        assert!(app.preferences.shader_backgrounds_enabled);
+        assert_eq!(app.theme_overrides[&second], second_theme);
+        assert_eq!(
+            app.terminal_presentation_for(second)
+                .terminal_colors
+                .background,
+            "#123456"
+        );
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn animation_clock_steps_at_the_fps_limit() {
+        assert!((animation_clock(1.26, 10) - 1.2).abs() < 1e-6);
+        assert_eq!(animation_clock(1.26, 10), animation_clock(1.29, 10));
+        assert_ne!(animation_clock(1.26, 240), animation_clock(1.29, 240));
+        assert_eq!(animation_interval_ms(240), 5);
+        assert_eq!(animation_interval_ms(0), 1000);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

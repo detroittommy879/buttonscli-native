@@ -1,0 +1,88 @@
+{
+  "effects": {
+    "masterDisabled": true
+  },
+  "metadata": {
+    "createdAt": null,
+    "description": "A dark, readable palette inspired by Halloween: deep midnight purple, jack-o'-lantern pumpkin, eerie toxic green, and spooky candy accents, designed for long-session comfort.",
+    "generation": {
+      "attempt": 2,
+      "brief": "Halloween: midnight purple, jack-o-lantern orange, eerie green, spooky candy. Dark, readable and distinctive without visual effects.",
+      "model": "qwen/qwen3.8-omni-flash",
+      "provider": "OpenRouter",
+      "responseId": "gen-1791417687-sXQtu9DcCKpXhydsrra6",
+      "run": "20261007-defaults"
+    },
+    "id": "ai-qwen-halloween-midnight-potion",
+    "name": "AI Qwen - Halloween Midnight Potion",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:20261007-defaults-ai-halloween-qwen",
+    "updatedAt": null
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9a4300",
+        "background": "#1c1230",
+        "buttonBackground": "#2d1b4d",
+        "buttonHover": "#6a4c93",
+        "buttonText": "#f5efff"
+      },
+      "settings": {
+        "background": "#1c1230"
+      },
+      "shell": {
+        "accent": "#9a4300",
+        "accentHover": "#803800",
+        "background": "#120a1f",
+        "backgroundSecondary": "#1c1230",
+        "border": "#6a4c93",
+        "buttonBackground": "#2d1b4d",
+        "paneDivider": {
+          "color": "#9a4300",
+          "thickness": 2
+        },
+        "textDim": "#c5b8e0",
+        "textMain": "#f5efff"
+      },
+      "statusBar": {
+        "background": "#1c1230",
+        "border": "#6a4c93",
+        "text": "#d5c8f0",
+        "warning": "#f1c40f"
+      },
+      "tabs": {
+        "activeBackground": "#120a1f",
+        "activeBorder": "#9a4300",
+        "background": "#1c1230",
+        "idleBackground": "#251840"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1025",
+        "blue": "#9b59b6",
+        "brightBlack": "#6a4c93",
+        "brightBlue": "#bb8fce",
+        "brightCyan": "#48c9b0",
+        "brightGreen": "#58d68d",
+        "brightMagenta": "#f0b27a",
+        "brightRed": "#ff6b6b",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f4d03f",
+        "cyan": "#1abc9c",
+        "green": "#2ecc71",
+        "magenta": "#e67e22",
+        "red": "#e74c3c",
+        "white": "#d5c8f0",
+        "yellow": "#f1c40f"
+      },
+      "background": "#0f081a",
+      "foreground": "#f5efff",
+      "gradientAnimation": false,
+      "useGradient": false
+    }
+  },
+  "version": 1
+}

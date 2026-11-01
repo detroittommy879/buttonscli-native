@@ -1,0 +1,224 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff00ff",
+        "#ff3636",
+        "#63ff57"
+      ],
+      "custom": {
+        "expression": "let density = 1.2 + amount * 0.27;\nlet flow = p * vec2<f32>(density) + vec2<f32>(t * gravity * 0.08, t * gravity * 0.12);\nlet row = floor(flow.y);\nlet grid = flow + vec2<f32>(row * 0.5, 0.0);\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet q = fract(grid) - vec2<f32>(0.5, 0.57);\nlet size = shape_size * (0.8 + seed * 0.15);\nlet u = q / vec2<f32>(size);\nlet d = (max(abs(u.x) * 0.866025 - u.y * 0.5, u.y) - 0.5) * size;\nlet fill = 1.0 - smoothstep(-0.008, 0.008, d);\nlet courses = u.y * 9.0;\nlet course = floor(courses);\nlet mortarY = 1.0 - smoothstep(0.035, 0.095, abs(fract(courses) - 0.5));\nlet mortarX = 1.0 - smoothstep(0.025, 0.07, abs(fract(u.x * 7.0 + course * 0.5) - 0.5));\nlet mortar = max(mortarY, mortarX * 0.75);\nlet face = smoothstep(-0.025, 0.025, u.x + u.y * 0.2);\nlet sandstone = mix(vec3<f32>(1.0, 0.67, 0.20), vec3<f32>(0.72, 0.29, 0.075), face);\nlet grain = noise(p * vec2<f32>(95.0)) * 0.07;\nlet stone = sandstone * vec3<f32>(0.87 + grain - mortar * 0.28);\nlet rim = exp(-abs(d) * 100.0);\nlet halo = exp(-max(d, 0.0) * 18.0) * (1.0 - fill);\nlet tide = sin(p.y * 2.1 + sin(p.x * 1.8 + t * 0.17) * 0.8 - t * gravity * 0.3);\nlet shore = smoothstep(-0.35, 0.5, tide);\nlet ripples = pow(0.5 + 0.5 * sin(p.y * 32.0 + sin(p.x * 6.0 - t * 0.6) * 2.0 + t * gravity), 9.0);\nlet sea = mix(vec3<f32>(0.015, 0.30, 0.40), vec3<f32>(0.035, 0.74, 0.73), ripples * 0.65 + 0.2);\nlet sand = vec3<f32>(0.76, 0.48, 0.20) + vec3<f32>(grain);\nlet base = mix(sea, sand, shore);\nlet presence = smoothstep(0.0, 0.8, amount);\nlet pyramids = mix(base, stone, fill * presence);\nlet color = clamp(pyramids + vec3<f32>(1.0, 0.61, 0.16) * vec3<f32>(presence * (rim * 0.24 + halo * glow * 0.19)), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Pharaoh’s Tide",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 3.799999952316284
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 2.950000047683716
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.3199999928474426
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 1.5
+          }
+        ]
+      },
+      "preset": "silk",
+      "scale": 5.5,
+      "speed": 1.2999999523162842,
+      "strength": 0.7799999713897705,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 0.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.119999997317791
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T18:55:04.836Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "pharaoh-s-tide",
+    "name": "Pharaoh’s Tide",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pharaoh-s-tide",
+    "updatedAt": "2026-10-30T19:09:53.070Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

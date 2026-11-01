@@ -1,0 +1,224 @@
+{
+  "effects": {
+    "hsyncDebugPanel": true,
+    "hsyncEnabled": false,
+    "hsyncShiftRange": 5,
+    "hsyncSpeed": 6,
+    "hsyncUseGpu": true,
+    "hsyncWavePeriod": 72,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4,
+    "scanlinesStrength": 28,
+    "simpleNoiseAmount": 10,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 120,
+    "simpleNoiseIdleAmount": 50,
+    "simpleNoiseIdleDelaySeconds": 60,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6,
+    "simpleNoiseMaxBrightness": 100,
+    "simpleNoiseMinBrightness": 0,
+    "simpleNoiseResolution": 57,
+    "staticAmplitude": 14,
+    "staticBrightness": 38,
+    "staticDensity": 14,
+    "staticEnabled": false,
+    "staticIntensity": 11,
+    "staticOpacity": 8,
+    "tvNoiseAmount": 36,
+    "tvNoiseEnabled": false
+  },
+  "metadata": {
+    "createdAt": "2026-04-17T23:42:48.025Z",
+    "description": "Mimics the very slight gray-blue noise and scanline flicker of a blank CRT tuned to Channel 3 before the computer fully boots.",
+    "id": "channel-3-static",
+    "name": "Channel 3 Static",
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ch3-static",
+    "updatedAt": "2026-04-17T23:42:48.026Z"
+  },
+  "theme": {
+    "app": {
+      "assistant": {
+        "background": "#1e1e1e",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#252526",
+        "itemGap": 8,
+        "padding": 12,
+        "widthAccent": "#007acc"
+      },
+      "controls": {
+        "buttonPaddingX": 16,
+        "buttonPaddingY": 8,
+        "buttonRadius": 4,
+        "focusRing": "rgba(0, 122, 204, 0.4)",
+        "inputBackground": "#3c3c3c",
+        "inputBorder": "#3c3c3c",
+        "inputRadius": 4
+      },
+      "layout": {
+        "gapScale": 1,
+        "panelDensity": "default",
+        "shellPadding": 0
+      },
+      "presetDock": {
+        "background": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#2d2d30",
+        "itemGap": 8,
+        "padding": 10,
+        "widthAccent": "#007acc"
+      },
+      "settings": {
+        "background": "#252526",
+        "buttonBackground": "#3c3c3c",
+        "buttonHover": "#4a4a4a",
+        "headerBackground": "#2d2d30",
+        "itemGap": 12,
+        "padding": 16,
+        "widthAccent": "#007acc"
+      },
+      "shell": {
+        "accent": "#c26df3",
+        "accentHover": "#cd87f5",
+        "background": "#12111a",
+        "backgroundSecondary": "#271c34",
+        "border": "#2d3038",
+        "foreground": "#A8B0C0",
+        "shadowColor": "rgba(0, 0, 0, 0.3)",
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "accent": "#0098ff",
+        "background": "#007acc",
+        "border": "#3c3c3c",
+        "height": 24,
+        "text": "#ffffff"
+      },
+      "tabs": {
+        "activeBackground": "#1e1e1e",
+        "activeBorder": "#007acc",
+        "background": "#252526",
+        "gap": 4,
+        "height": 36,
+        "hoverBackground": "#2a2d2e",
+        "idleBackground": "#2d2d30",
+        "paddingX": 10,
+        "radius": 4,
+        "textActive": "#cccccc",
+        "textIdle": "#858585"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#2472c8",
+        "brightBlack": "#666666",
+        "brightBlue": "#3b8eea",
+        "brightCyan": "#29b8db",
+        "brightGreen": "#23d18b",
+        "brightMagenta": "#d670d6",
+        "brightRed": "#f14c4c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f5f543",
+        "cyan": "#11a8cd",
+        "green": "#0dbc79",
+        "magenta": "#bc3fbc",
+        "red": "#cd3131",
+        "white": "#e5e5e5",
+        "yellow": "#e5e510"
+      },
+      "background": "#121219",
+      "cursor": "#FFFFFF",
+      "cursorAccent": "#000000",
+      "cursorBlink": true,
+      "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+      "fontSize": 14,
+      "fontWeight": 300,
+      "foreground": "#DEE4EA",
+      "googleFont": "",
+      "gradientAngle": 0,
+      "gradientAnimation": false,
+      "gradientColorC": "#2e213c",
+      "gradientColorD": "#191527",
+      "gradientColors": [
+        "#121219",
+        "#2e213c",
+        "#191527"
+      ],
+      "gradientEnd": "#191527",
+      "gradientRadialPosition": "center",
+      "gradientRadialShape": "circle",
+      "gradientSpeed": 4,
+      "gradientStart": "#121219",
+      "gradientType": "repeating-linear",
+      "selectionBackground": "#2c313c",
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "fontFamily": "\"VT323\", monospace",
+      "fontSize": 16,
+      "presetDock": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "settings": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "shell": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "statusBar": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "tabs": {
+        "fontFamily": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "googleFont": "",
+        "letterSpacing": 0,
+        "textTransform": "none"
+      },
+      "terminal": {
+        "fontFamily": "'Recursive Mono Csl St Bundled', 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace",
+        "fontSize": 14,
+        "fontWeight": 300,
+        "googleFont": ""
+      }
+    }
+  },
+  "version": 1
+}
