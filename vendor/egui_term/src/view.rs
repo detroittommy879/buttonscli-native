@@ -387,11 +387,17 @@ impl<'a> TerminalView<'a> {
                     if layout.contains_pointer() || state.is_selecting =>
                 {
                     wheel_scrolled = true;
-                    input_actions.push(process_mouse_wheel(
+                    let scroll = process_mouse_wheel(
                         state,
                         self.font.font_type().size,
                         unit,
                         delta,
+                    );
+                    input_actions.extend(wheel_reports(
+                        scroll,
+                        self.backend.last_content().terminal_mode,
+                        state.current_mouse_position_on_grid,
+                        modifiers,
                     ));
                     // Scrolling with a stationary pointer must extend the
                     // selection to the newly visible line as well.
@@ -958,13 +964,25 @@ fn clip_background_polygon(
     result
 }
 
-fn paste_payload(text: &str, bracketed: bool) -> Vec<u8> {
+pub(crate) fn paste_payload(text: &str, bracketed: bool) -> Vec<u8> {
+    let text = sanitize_paste(text);
     if bracketed {
-        // Escape cannot be allowed to terminate the application's paste envelope.
-        format!("\x1b[200~{}\x1b[201~", text.replace('\x1b', "")).into_bytes()
+        format!("\x1b[200~{text}\x1b[201~").into_bytes()
     } else {
         text.replace("\r\n", "\n").replace('\n', "\r").into_bytes()
     }
+}
+
+/// Strip C0 controls except Tab/LF/CR, DEL and C1 controls (par-term's rule).
+/// Pasted text must never carry escape sequences: an ESC could end the
+/// bracketed-paste envelope, and a stray one can switch terminal modes.
+fn sanitize_paste(text: &str) -> String {
+    text.chars()
+        .filter(|&ch| {
+            matches!(ch, '\t' | '\n' | '\r')
+                || !(ch <= '\u{1f}' || ('\u{7f}'..='\u{9f}').contains(&ch))
+        })
+        .collect()
 }
 
 fn row_banding_shapes(
@@ -1517,6 +1535,47 @@ fn process_mouse_wheel(
     }
 }
 
+/// Programs that enable mouse reporting (Claude Code, Codex, tmux, htop, vim)
+/// expect wheel buttons 64/65, as Alacritty, WezTerm and par-term send.
+/// Scrolling our own view or sending arrow keys instead moves their prompt
+/// history. Shift keeps the local scroll, like Alacritty.
+/// Local scrolling (and alt-screen arrow keys) moves `SCROLL_MULTIPLIER`
+/// lines per wheel line, Alacritty's `scrolling.multiplier` default; mouse
+/// reports stay one per line, as in Alacritty.
+fn wheel_reports(
+    scroll: InputAction,
+    mode: TermMode,
+    point: TerminalGridPoint,
+    modifiers: Modifiers,
+) -> Vec<InputAction> {
+    let InputAction::BackendCall(BackendCommand::Scroll(lines)) = scroll else {
+        return vec![scroll];
+    };
+    if !mode.intersects(TermMode::MOUSE_MODE) || modifiers.shift {
+        return vec![InputAction::BackendCall(BackendCommand::Scroll(
+            lines.saturating_mul(SCROLL_MULTIPLIER),
+        ))];
+    }
+    let button = if lines > 0 {
+        MouseButton::ScrollUp
+    } else {
+        MouseButton::ScrollDown
+    };
+    // Bounded, as par-term does, so a flick cannot flood the program.
+    (0..lines.unsigned_abs().min(10))
+        .map(|_| {
+            InputAction::BackendCall(BackendCommand::MouseReport(
+                button.clone(),
+                modifiers,
+                point,
+                true,
+            ))
+        })
+        .collect()
+}
+
+const SCROLL_MULTIPLIER: i32 = 3;
+
 fn selection_edge_scroll(rect: Rect, pointer: Pos2, cell_height: f32) -> i32 {
     let edge = cell_height.clamp(8.0, 24.0);
     if pointer.y < rect.top() + edge {
@@ -1753,6 +1812,52 @@ mod background_gradient_tests {
     }
 
     #[test]
+    fn wheel_reports_buttons_to_mouse_programs_and_shift_scrolls_locally() {
+        let point = TerminalGridPoint::default();
+        let reports = |lines, mode, modifiers| {
+            wheel_reports(
+                InputAction::BackendCall(BackendCommand::Scroll(lines)),
+                mode,
+                point,
+                modifiers,
+            )
+            .into_iter()
+            .map(|action| match action {
+                InputAction::BackendCall(BackendCommand::MouseReport(
+                    MouseButton::ScrollUp,
+                    ..,
+                )) => "up",
+                InputAction::BackendCall(BackendCommand::MouseReport(
+                    MouseButton::ScrollDown,
+                    ..,
+                )) => "down",
+                InputAction::BackendCall(BackendCommand::Scroll(_)) => "scroll",
+                _ => "other",
+            })
+            .collect::<Vec<_>>()
+        };
+        let mouse = TermMode::MOUSE_REPORT_CLICK | TermMode::SGR_MOUSE;
+        assert_eq!(reports(3, mouse, Modifiers::NONE), ["up", "up", "up"]);
+        assert_eq!(reports(-1, mouse, Modifiers::NONE), ["down"]);
+        assert_eq!(reports(3, mouse, Modifiers::SHIFT), ["scroll"]);
+        assert_eq!(
+            reports(3, TermMode::ALT_SCREEN, Modifiers::NONE),
+            ["scroll"]
+        );
+        assert_eq!(reports(-40, mouse, Modifiers::NONE).len(), 10);
+        assert!(matches!(
+            wheel_reports(
+                InputAction::BackendCall(BackendCommand::Scroll(-2)),
+                TermMode::empty(),
+                point,
+                Modifiers::NONE,
+            )
+            .as_slice(),
+            [InputAction::BackendCall(BackendCommand::Scroll(-6))]
+        ));
+    }
+
+    #[test]
     fn paste_wraps_requested_mode_and_normalizes_shell_line_endings() {
         assert_eq!(
             paste_payload("one\ntwo", true),
@@ -1763,6 +1868,8 @@ mod background_gradient_tests {
             paste_payload("a\x1b[201~b", true),
             b"\x1b[200~a[201~b\x1b[201~"
         );
+        // C0 (but Tab), DEL and C1 controls are stripped in both modes.
+        assert_eq!(paste_payload("a\x07\tb\x7f\u{9b}c", false), b"a\tbc");
     }
 
     #[test]

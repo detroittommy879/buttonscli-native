@@ -263,6 +263,9 @@ pub(crate) struct Preferences {
     pub(crate) row_banding_brightness: u8,
     /// Frames per second for shaders and other animated effects, all panes.
     pub(crate) animation_fps: u32,
+    /// Fewer frames while the window is in the background or minimized
+    /// (Settings → Debug). On by default.
+    pub(crate) power_saving: bool,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -328,6 +331,7 @@ impl Default for Preferences {
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
             animation_fps: 60,
+            power_saving: true,
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),

@@ -520,6 +520,9 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
+    /// A right-click Paste waiting for egui's clipboard read: (PTY id, frames left).
+    #[cfg(not(target_arch = "wasm32"))]
+    pending_menu_paste: Option<(u64, u8)>,
     #[cfg(not(target_arch = "wasm32"))]
     native_store: Option<NativeStore>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -686,6 +689,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     release_picks: release_picks::ReleasePicks,
     #[cfg(not(target_arch = "wasm32"))]
+    power: power::PowerStatus,
+    #[cfg(not(target_arch = "wasm32"))]
     bundle_message: Option<String>,
     /// Last Left command each terminal ran, saved as its startup command in a tab group.
     #[cfg(not(target_arch = "wasm32"))]
@@ -755,6 +760,8 @@ enum SettingsTab {
     Import,
     #[cfg(not(target_arch = "wasm32"))]
     ReleasePicks,
+    #[cfg(not(target_arch = "wasm32"))]
+    Debug,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1175,6 +1182,10 @@ enum PaneAction {
     UseGlobal,
     ToggleFavorite(String),
     Copy,
+    /// Paste the clipboard into this pane (the right-click menu item).
+    Paste,
+    /// Turn off mouse reporting a program left on (clicks typing `0;12;5M`).
+    ResetMouseMode,
     SelectAll,
     Clear,
     Rename,
@@ -1577,6 +1588,8 @@ impl ButtonsApp {
             command: String::new(),
             notice: None,
             #[cfg(not(target_arch = "wasm32"))]
+            pending_menu_paste: None,
+            #[cfg(not(target_arch = "wasm32"))]
             native_store: None,
             #[cfg(not(target_arch = "wasm32"))]
             native_revision: None,
@@ -1737,6 +1750,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             release_picks: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
+            power: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             bundle_message: None,
             #[cfg(not(target_arch = "wasm32"))]
             tab_launch_commands: std::collections::BTreeMap::new(),
@@ -1800,10 +1815,14 @@ impl ButtonsApp {
         visuals.widgets.inactive.weak_bg_fill = colors.raised;
         visuals.widgets.inactive.fg_stroke.color = colors.text;
         visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, colors.border);
+        // Buttons paint `weak_bg_fill`; setting only `bg_fill` left every
+        // hovered button on egui's stock grey whatever the theme said.
         visuals.widgets.hovered.bg_fill = colors.accent_hover;
-        visuals.widgets.hovered.fg_stroke.color = Color32::WHITE;
+        visuals.widgets.hovered.weak_bg_fill = colors.accent_hover;
+        visuals.widgets.hovered.fg_stroke.color = readable_on(colors.accent_hover);
         visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, colors.accent);
         visuals.widgets.active.bg_fill = colors.accent;
+        visuals.widgets.active.weak_bg_fill = colors.accent;
         visuals.selection.bg_fill = colors.accent.linear_multiply(0.45);
         visuals.selection.stroke = Stroke::new(1.0_f32, colors.accent);
         visuals.hyperlink_color = colors.accent;
@@ -1976,7 +1995,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn set_theme_for_tab(&mut self, index: usize, theme_id: &str) {
-        self.restore_personal_theme_preview();
+        self.settle_pane_draft(self.tabs.get(index).map(|tab| tab.id));
         let Some(tab) = self.tabs.get(index) else {
             return;
         };
@@ -2236,6 +2255,14 @@ impl ButtonsApp {
                     ctx.copy_text(text);
                 }
             }
+            PaneAction::Paste => {
+                // egui reads the platform clipboard after this frame and
+                // delivers it as a Paste event; `deliver_menu_paste` takes it.
+                self.pending_menu_paste = Some((id, 3));
+                ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
+                ctx.request_repaint();
+            }
+            PaneAction::ResetMouseMode => self.tabs[index].backend.reset_mouse_modes(),
             PaneAction::SelectAll => self.tabs[index].backend.select_all(),
             PaneAction::Clear => self.tabs[index].backend.clear_screen(),
             PaneAction::Rename => self.open_tab_rename(index),
@@ -3004,6 +3031,45 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn deliver_menu_paste(&mut self, ctx: &egui::Context) {
+        // Take every pane's notice (count, not `any`, which would stop early).
+        let stale = self
+            .tabs
+            .iter_mut()
+            .map(|tab| tab.backend.take_stale_mouse_notice())
+            .filter(|&taken| taken)
+            .count();
+        if stale > 0 {
+            self.notice = Some("A program left mouse reporting on, so clicks typed codes into the shell. Turned it off for that pane.".to_owned());
+        }
+        let Some((id, frames)) = self.pending_menu_paste.take() else {
+            return;
+        };
+        let text = ctx.input_mut(|input| {
+            let index = input
+                .events
+                .iter()
+                .position(|event| matches!(event, egui::Event::Paste(_)))?;
+            match input.events.remove(index) {
+                egui::Event::Paste(text) => Some(text),
+                _ => None,
+            }
+        });
+        match (text, self.tabs.iter_mut().find(|tab| tab.id == id)) {
+            (Some(text), Some(tab)) => {
+                tab.backend
+                    .paste(&text, self.preferences.keyboard.bracketed_paste);
+            }
+            // The clipboard event arrives a frame later; empty clipboards send none.
+            (None, Some(_)) if frames > 1 => {
+                self.pending_menu_paste = Some((id, frames - 1));
+                ctx.request_repaint();
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn process_terminal_events(&mut self) -> bool {
         // Leave time for keyboard handling even if a program floods events.
         for _ in 0..256 {
@@ -3378,6 +3444,7 @@ impl ButtonsApp {
         let indicator_colors = self.colors();
         let (shader_choices, saved_shader_count) = shader_choices(&self.preferences.saved_shaders);
         ui.allocate_rect(rect, egui::Sense::hover());
+        let animation_fps = self.effective_animation_fps();
         let mut render_state = PaneRenderState {
             shader_choices: &shader_choices,
             saved_shader_count,
@@ -3408,7 +3475,7 @@ impl ButtonsApp {
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
-            animation_fps: self.preferences.animation_fps,
+            animation_fps,
             keyboard_navigation: self.keyboard_navigation,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
@@ -4957,6 +5024,7 @@ impl ButtonsApp {
         ui.visuals_mut().widgets.inactive.bg_fill = colors.dock_button;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = colors.dock_button;
         ui.visuals_mut().widgets.hovered.bg_fill = colors.dock_button_hover;
+        ui.visuals_mut().widgets.hovered.weak_bg_fill = colors.dock_button_hover;
         ui.visuals_mut().widgets.inactive.fg_stroke.color = colors.dock_button_text;
         ui.visuals_mut().widgets.hovered.fg_stroke.color = colors.dock_button_text;
         ui.visuals_mut().override_text_color = Some(colors.dock_button_text);
@@ -5128,7 +5196,7 @@ impl ButtonsApp {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 #[cfg(not(target_arch = "wasm32"))]
                 self.appearance_background_menu(ui, false);
-                wrapping_row(ui, |ui| {
+                centered_wrapping_row(ui, |ui| {
                     #[cfg(not(target_arch = "wasm32"))]
                     let status_label = "SHELL READY";
                     #[cfg(target_arch = "wasm32")]
@@ -5699,6 +5767,10 @@ impl ButtonsApp {
                         "Release picks",
                     );
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                if power::debug_tools_available() {
+                    ui.spaced_selectable_value(&mut self.settings_tab, SettingsTab::Debug, "Debug");
+                }
             });
         });
         ui.separator();
@@ -5772,6 +5844,8 @@ impl ButtonsApp {
                 SettingsTab::Import => self.import_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::ReleasePicks => self.release_picks_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Debug => self.debug_settings(ui),
             });
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_editor_preview(ctx);
@@ -10342,7 +10416,7 @@ impl ButtonsApp {
             if shader.animated && shader.speed > 0.0 {
                 ui.ctx()
                     .request_repaint_after(std::time::Duration::from_millis(
-                        animation_interval_ms(self.preferences.animation_fps),
+                        animation_interval_ms(self.effective_animation_fps()),
                     ));
             }
         }
@@ -13449,6 +13523,22 @@ impl ButtonsApp {
         }
     }
 
+    /// Ends a pane-look edit before another pane's theme changes. A pane draft
+    /// is kept (saved under the next numbered name), as switching panes does;
+    /// restoring the preview instead put the edited pane back on an older look.
+    /// A new theme for the edited pane itself replaces the edit instead.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn settle_pane_draft(&mut self, changing: Option<u64>) {
+        if self.theme_editor_pane.is_none() || self.theme_editor_pane == changing {
+            self.restore_personal_theme_preview();
+            return;
+        }
+        if let Err(error) = self.autosave_theme_draft() {
+            self.notice = Some(format!("Could not save the pane's edit: {error}"));
+        }
+        self.discard_theme_editor_session();
+    }
+
     /// Changes one pane's look from a menu. It goes through the same draft as
     /// Settings → "Edit for: Pane N", so only that pane changes, and the edit
     /// is saved like any pane edit (as a numbered theme when you switch to
@@ -15066,6 +15156,31 @@ pub(crate) fn wrapping_row<R>(
     ui.allocate_ui_with_layout(size, layout, add_contents)
 }
 
+/// A wrapping row centered on one fixed line height, for rows that mix
+/// labels, small buttons and full buttons (the status bar). Top-aligned,
+/// small buttons rode up into the row above once it wrapped (150% scaling).
+/// The height is fixed up front so centering never shifts as the row grows.
+fn centered_wrapping_row<R>(
+    ui: &mut egui::Ui,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let line = ui.text_style_height(&TextStyle::Button) + 2.0 * ui.spacing().button_padding.y;
+    ui.spacing_mut().interact_size.y = ui.spacing().interact_size.y.max(line.ceil());
+    ui.spacing_mut().item_spacing.y = ui.spacing().item_spacing.y.max(6.0);
+    let size = egui::vec2(
+        ui.available_rect_before_wrap()
+            .intersect(ui.clip_rect())
+            .width()
+            .max(0.0),
+        ui.spacing().interact_size.y,
+    );
+    ui.allocate_ui_with_layout(
+        size,
+        Layout::left_to_right(Align::Center).with_main_wrap(true),
+        add_contents,
+    )
+}
+
 fn apply_zone_style(ui: &mut egui::Ui, catalog: &fonts::FontCatalog, zone: &FontZone) {
     crate::ui_text::set_zone_spacing(ui, zone.letter_spacing);
     for (text_style, scale) in [
@@ -15889,6 +16004,7 @@ fn render_pane_tree(
                                     &theme.id,
                                     state.favorites,
                                     state.auto_tile.includes(tab.id),
+                                    tab.backend.scrollback_state().mouse_reporting,
                                     &mut action,
                                 );
                                 ui.separator();
@@ -16427,12 +16543,14 @@ fn pane_shader_menu(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
 fn pane_action_menu(
     ui: &mut egui::Ui,
     locale: &str,
     current: &str,
     favorites: &[(String, String)],
     included: bool,
+    mouse_reporting: bool,
     action: &mut Option<PaneAction>,
 ) {
     egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -16446,6 +16564,7 @@ fn pane_action_menu(
         ("Random theme", PaneAction::RandomTheme),
         ("Use global theme", PaneAction::UseGlobal),
         ("Copy selection", PaneAction::Copy),
+        ("Paste", PaneAction::Paste),
         ("Select all", PaneAction::SelectAll),
         ("Clear screen", PaneAction::Clear),
         ("Rename", PaneAction::Rename),
@@ -16457,6 +16576,15 @@ fn pane_action_menu(
             *action = Some(operation);
             ui.close_menu();
         }
+    }
+    if mouse_reporting
+        && ui
+            .spaced_button(crate::i18n::literal(locale, "Reset mouse mode"))
+            .on_hover_text("A program asked for mouse clicks. If it has exited and clicks type codes like 0;12;5M, this turns that off.")
+            .clicked()
+    {
+        *action = Some(PaneAction::ResetMouseMode);
+        ui.close_menu();
     }
     let mut include = included;
     if ui
@@ -17255,6 +17383,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
+mod power;
+#[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
@@ -17311,6 +17441,10 @@ impl eframe::App for ButtonsApp {
         if self.process_terminal_events() {
             ctx.request_repaint();
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.deliver_menu_paste(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.update_power_status(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -19862,7 +19996,15 @@ Start-Sleep -Seconds 300
                 |ctx| {
                     egui::CentralPanel::default().show(ctx, |ui| {
                         ui.spaced_button("Pane").context_menu(|ui| {
-                            pane_action_menu(ui, "en", "basic2", &favorites, true, &mut action)
+                            pane_action_menu(
+                                ui,
+                                "en",
+                                "basic2",
+                                &favorites,
+                                true,
+                                false,
+                                &mut action,
+                            )
                         });
                     });
                 },
@@ -22860,6 +23002,97 @@ Start-Sleep -Seconds 300
                 .background,
             "#123456"
         );
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn status_bar_shader_changes_on_two_panes_keep_each_panes_latest_pick() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-pane-shaders-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        let (first, second) = (app.tabs[0].id, app.tabs[1].id);
+        // Both panes start on a shared personal theme, as most profiles do.
+        app.sync_theme_editor_to_current();
+        app.save_personal_theme_draft();
+        app.discard_theme_editor_session();
+        assert!(
+            app.preferences.theme_id.starts_with("personal:"),
+            "{}",
+            app.preferences.theme_id
+        );
+        let pick = |app: &mut ButtonsApp, id: u64, name: &str| {
+            let shader = crate::theme::SavedShader {
+                shader: crate::theme::CustomShader {
+                    name: name.to_owned(),
+                    expression: "vec3<f32>(0.1)".to_owned(),
+                    ..Default::default()
+                },
+                colors: None,
+            };
+            app.perform_pane_action(id, PaneAction::UseShader(Box::new(shader)), &ctx);
+        };
+        let shader_of = |app: &ButtonsApp, id: u64| {
+            app.terminal_presentation_for(id)
+                .effects
+                .shader_background
+                .and_then(|shader| shader.custom)
+                .map(|custom| custom.name)
+        };
+        for round in 0..2 {
+            pick(&mut app, first, &format!("A{round}"));
+            pick(&mut app, first, &format!("B{round}"));
+            assert_eq!(
+                shader_of(&app, first).as_deref(),
+                Some(format!("B{round}").as_str())
+            );
+            pick(&mut app, second, &format!("C{round}"));
+            assert_eq!(
+                shader_of(&app, first).as_deref(),
+                Some(format!("B{round}").as_str())
+            );
+            pick(&mut app, second, &format!("D{round}"));
+            assert_eq!(
+                shader_of(&app, first).as_deref(),
+                Some(format!("B{round}").as_str())
+            );
+            assert_eq!(
+                shader_of(&app, second).as_deref(),
+                Some(format!("D{round}").as_str())
+            );
+        }
+        // Coming back to pane 1 edits its own latest look, never an older one.
+        pick(&mut app, first, "E");
+        assert_eq!(shader_of(&app, first).as_deref(), Some("E"));
+        assert_eq!(shader_of(&app, second).as_deref(), Some("D1"));
+        // A theme pick on pane 2 (pane menu, Favorites, Random) keeps pane 1's edit.
+        let other = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| !theme.id.starts_with("preview:") && !theme.id.starts_with("personal:"))
+            .unwrap()
+            .id
+            .clone();
+        app.perform_pane_action(second, PaneAction::Theme(other.clone()), &ctx);
+        assert_eq!(shader_of(&app, first).as_deref(), Some("E"));
+        assert_eq!(app.theme_overrides[&second], other);
         std::fs::remove_dir_all(base).unwrap();
     }
 

@@ -17,6 +17,8 @@ pub struct LocalFeatureFlags {
     /// Shows Settings → Release picks in optimized builds (debug builds always
     /// do, and so does `enable_all`).
     pub release_picks: bool,
+    /// Shows Settings → Debug in optimized builds (debug builds always do).
+    pub debug: bool,
 }
 
 impl LocalFeatureFlags {
@@ -60,6 +62,12 @@ pub(crate) fn initialize(root: &Path) {
 
 pub(crate) fn enabled() -> bool {
     FLAGS.get().is_some_and(|flags| flags.enable_all)
+}
+
+pub(crate) fn debug_enabled() -> bool {
+    FLAGS
+        .get()
+        .is_some_and(|flags| flags.debug || flags.enable_all)
 }
 
 pub(crate) fn release_picks_enabled() -> bool {

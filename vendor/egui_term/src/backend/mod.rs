@@ -20,7 +20,9 @@ use alacritty_terminal::term::{
     test::TermSize,
     viewport_to_point, Term, TermMode,
 };
-use alacritty_terminal::vte::ansi::{Color, CursorStyle};
+use alacritty_terminal::vte::ansi::{
+    Color, CursorStyle, Handler, NamedPrivateMode, PrivateMode,
+};
 use alacritty_terminal::{tty, Grid};
 use egui::Modifiers;
 use settings::BackendSettings;
@@ -34,6 +36,30 @@ use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc};
 
 pub type TerminalMode = TermMode;
+
+/// Shortest time between output-driven repaints, in milliseconds; 0 repaints
+/// at once. The app raises it while its window is in the background or
+/// minimized, so a busy program cannot keep the GPU drawing at full rate.
+static OUTPUT_REPAINT_INTERVAL_MS: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+pub fn set_output_repaint_interval(interval: std::time::Duration) {
+    OUTPUT_REPAINT_INTERVAL_MS.store(
+        interval.as_millis().min(u128::from(u64::MAX)) as u64,
+        Ordering::Relaxed,
+    );
+}
+
+fn request_output_repaint(context: &egui::Context) {
+    match OUTPUT_REPAINT_INTERVAL_MS.load(Ordering::Relaxed) {
+        0 => context.request_repaint(),
+        // egui keeps the earliest deadline, so a flood of output still
+        // draws at most once per interval.
+        ms => {
+            context.request_repaint_after(std::time::Duration::from_millis(ms))
+        },
+    }
+}
 pub type PtyEvent = Event;
 pub type SelectionType = AlacrittySelectionType;
 pub type ByteObserver = Arc<dyn Fn(&[u8]) + Send + Sync + 'static>;
@@ -192,6 +218,10 @@ pub struct TerminalBackend {
     search_query: Option<String>,
     search_matches: Vec<Match>,
     current_search_match: Option<usize>,
+    /// The last SGR click report, e.g. `0;67;23`, and when it was sent. If the
+    /// shell prints it back, mouse reporting is stale (see `sync`).
+    mouse_echo: Option<(String, std::time::Instant)>,
+    stale_mouse_mode_cleared: bool,
 }
 
 impl TerminalBackend {
@@ -286,7 +316,7 @@ impl TerminalBackend {
                             | Event::MouseCursorDirty
                             | Event::CursorBlinkingChange
                     ) {
-                        app_context.request_repaint();
+                        request_output_repaint(&app_context);
                         continue;
                     }
                     if pty_event_proxy_sender.send((id, event.clone())).is_err()
@@ -317,6 +347,8 @@ impl TerminalBackend {
             search_query: None,
             search_matches: Vec::new(),
             current_search_match: None,
+            mouse_echo: None,
+            stale_mouse_mode_cleared: false,
         })
     }
 
@@ -354,6 +386,8 @@ impl TerminalBackend {
             search_query: None,
             search_matches: Vec::new(),
             current_search_match: None,
+            mouse_echo: None,
+            stale_mouse_mode_cleared: false,
         }
     }
 
@@ -435,6 +469,39 @@ impl TerminalBackend {
                 self.process_mouse_report(button, modifiers, point, pressed);
             },
         };
+    }
+
+    /// Paste clipboard text as the user's input. Control characters are
+    /// stripped first (as par-term and kitty do), so clipboard content cannot
+    /// smuggle escape sequences or end the bracketed-paste envelope.
+    pub fn paste(&mut self, text: &str, bracketed_paste: bool) {
+        let bracketed = bracketed_paste
+            && self
+                .last_content
+                .terminal_mode
+                .contains(TermMode::BRACKETED_PASTE);
+        self.process_command(BackendCommand::Write(
+            crate::view::paste_payload(text, bracketed),
+        ));
+    }
+
+    /// Turn off mouse reporting locally. A program that enabled it and then
+    /// exited or lost its connection leaves clicks typing `0;12;5M` into the
+    /// shell; this ends that without touching the shell or other modes.
+    pub fn reset_mouse_modes(&mut self) {
+        let term = self.term.clone();
+        let mut terminal = term.lock();
+        disable_mouse_modes(&mut terminal);
+        self.last_content.terminal_mode = *terminal.mode();
+        self.mouse_echo = None;
+        drop(terminal);
+        self.content_dirty.store(true, Ordering::Release);
+    }
+
+    /// True once after `sync` turned off mouse reporting because the shell
+    /// printed a click report back (the program that asked for it is gone).
+    pub fn take_stale_mouse_notice(&mut self) -> bool {
+        std::mem::take(&mut self.stale_mouse_mode_cleared)
     }
 
     /// Respond to terminal protocol requests without recording a user command,
@@ -651,6 +718,24 @@ impl TerminalBackend {
             );
         self.last_content.search_highlights = search_highlights;
         self.last_content.current_search_highlights = current_search_highlights;
+        // A program that enabled mouse reporting and exited without turning
+        // it off (or whose SSH link dropped) leaves the shell reading click
+        // reports as typed text. If the shell echoes our last report, stop.
+        if let Some((echo, sent)) = self.mouse_echo.take() {
+            let mouse_mode = self
+                .last_content
+                .terminal_mode
+                .intersects(TermMode::MOUSE_MODE);
+            if mouse_mode && cursor_rows_contain(&terminal, &echo) {
+                disable_mouse_modes(&mut terminal);
+                self.last_content.terminal_mode = *terminal.mode();
+                self.stale_mouse_mode_cleared = true;
+            } else if mouse_mode
+                && sent.elapsed() < std::time::Duration::from_secs(2)
+            {
+                self.mouse_echo = Some((echo, sent));
+            }
+        }
         self.last_content()
     }
 
@@ -788,7 +873,7 @@ impl TerminalBackend {
     }
 
     fn process_mouse_report(
-        &self,
+        &mut self,
         button: MouseButton,
         modifiers: Modifiers,
         point: Point,
@@ -823,8 +908,15 @@ impl TerminalBackend {
         }
     }
 
-    fn sgr_mouse_report(&self, point: Point, button: u8, pressed: bool) {
+    fn sgr_mouse_report(&mut self, point: Point, button: u8, pressed: bool) {
         let c = if pressed { 'M' } else { 'm' };
+        // Clicks only: a shell that echoes `0;67;23` back is not reading them.
+        if button & !(4 | 8 | 16) < 3 {
+            self.mouse_echo = Some((
+                format!("{};{};{}", button, point.column + 1, point.line + 1),
+                std::time::Instant::now(),
+            ));
+        }
 
         let msg = format!(
             "\x1b[<{};{};{}{}",
@@ -995,6 +1087,36 @@ impl TerminalBackend {
             .find(|rm| rm.contains(&point));
         x
     }
+}
+
+fn disable_mouse_modes<T: EventListener>(terminal: &mut Term<T>) {
+    for mode in [
+        NamedPrivateMode::ReportMouseClicks,
+        NamedPrivateMode::ReportCellMouseMotion,
+        NamedPrivateMode::ReportAllMouseMotion,
+        NamedPrivateMode::SgrMouse,
+        NamedPrivateMode::Utf8Mouse,
+    ] {
+        terminal.unset_private_mode(PrivateMode::Named(mode));
+    }
+}
+
+/// Whether the cursor row or the row above shows `needle` as plain text.
+fn cursor_rows_contain<T>(terminal: &Term<T>, needle: &str) -> bool {
+    let grid = terminal.grid();
+    let cursor_line = grid.cursor.point.line;
+    let columns = grid.columns();
+    let mut text = String::new();
+    for line in [cursor_line - 1, cursor_line] {
+        if line < Line(0) {
+            continue;
+        }
+        let row = &grid[line];
+        for column in 0..columns {
+            text.push(row[Column(column)].c);
+        }
+    }
+    text.contains(needle)
 }
 
 /// Copied from alacritty/src/display/hint.rs:
@@ -1298,6 +1420,41 @@ mod virtual_backend_tests {
             None,
         );
         assert_eq!(*writes.lock().unwrap(), b"pwd\r");
+    }
+
+    #[test]
+    fn echoed_click_report_turns_off_stale_mouse_reporting() {
+        let mut backend = TerminalBackend::new_virtual(7, Arc::new(|_| {}));
+        backend.process_command(BackendCommand::Resize(
+            Size::new(640.0, 320.0),
+            Size::new(8.0, 16.0),
+        ));
+        backend.feed_virtual_output(b"\x1b[?1000h\x1b[?1006h$ ");
+        backend.sync();
+        assert!(backend.scrollback_state().mouse_reporting);
+        backend.process_command(BackendCommand::MouseReport(
+            MouseButton::LeftButton,
+            Modifiers::NONE,
+            Point::new(Line(1), Column(4)),
+            true,
+        ));
+        // A program that reads reports prints nothing: mode stays on.
+        backend.feed_virtual_output(b"ok");
+        backend.sync();
+        assert!(backend.scrollback_state().mouse_reporting);
+        assert!(!backend.take_stale_mouse_notice());
+        // The shell typing the report back means nobody is reading them.
+        backend.feed_virtual_output(b"0;5;2M");
+        backend.sync();
+        assert!(!backend.scrollback_state().mouse_reporting);
+        assert!(backend.take_stale_mouse_notice());
+        assert!(!backend.take_stale_mouse_notice());
+
+        backend.feed_virtual_output(b"\x1b[?1002h\x1b[?1006h");
+        backend.sync();
+        assert!(backend.scrollback_state().mouse_reporting);
+        backend.reset_mouse_modes();
+        assert!(!backend.scrollback_state().mouse_reporting);
     }
 }
 

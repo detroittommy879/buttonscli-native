@@ -8,8 +8,8 @@ mod view;
 pub use alacritty_terminal::event_loop::SensitiveInput;
 pub use backend::settings::BackendSettings;
 pub use backend::{
-    BackendCommand, ByteObserver, PtyEvent, ScrollbackState, TerminalBackend,
-    TerminalMode,
+    set_output_repaint_interval, BackendCommand, ByteObserver, PtyEvent,
+    ScrollbackState, TerminalBackend, TerminalMode,
 };
 pub use bindings::{Binding, BindingAction, InputKind, KeyboardBinding};
 pub use font::{FontSettings, TerminalFont};
