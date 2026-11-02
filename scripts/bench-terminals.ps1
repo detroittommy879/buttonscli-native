@@ -22,7 +22,7 @@ param(
 #   .\scripts\bench-terminals.ps1
 #   .\scripts\bench-terminals.ps1 -Terminals buttonscli,alacritty -MiB 32 -Runs 5
 #
-# Input latency is not measured here; see docs/BENCHMARKS.md (Typometer).
+# Input latency is not measured here; see docs/dev/BENCHMARKS.md (Typometer).
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot

@@ -8,10 +8,9 @@
 *.log
 *.profraw
 
-# Working notes, credentials, release keys, and non-public research belong here.
+# Working notes, AI work logs and plans (.private/dev-notes/), credentials,
+# release keys and non-public research belong here. Never commit them.
 /.private/
 # Worktrees made by Claude Code sessions.
 /.claude/worktrees/
 /scripts/__pycache__/
-
-/docs/migration/

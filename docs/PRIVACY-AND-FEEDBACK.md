@@ -33,5 +33,4 @@ its production path is currently disabled. Account sign-in and AI provider
 requests are separate flows. Saved account sessions are revalidated at startup
 and periodically; provider requests begin only through their explicit controls.
 
-Feedback is a free feature. See the [receiver contract snapshot](migration/FEEDBACK-CONTRACT.md)
-for the request fields and source revision used by the compatibility tests.
+Feedback is a free feature.

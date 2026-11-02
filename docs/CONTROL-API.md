@@ -6,7 +6,7 @@ and token for each app run. The API serves terminal state and actions from the
 native app's session dispatcher.
 
 The feature is `automationRemoteControl` (Pro). The
-[local JSON override](LOCAL-FEATURE-FLAGS.md) enables it in both debug and release
+[local JSON override](dev/LOCAL-FEATURE-FLAGS.md) enables it in both debug and release
 builds; ordinary release access remains locked. A debug build can also exercise
 it when launched with
 `BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`.

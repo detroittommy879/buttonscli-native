@@ -34,14 +34,13 @@ cargo clippy --all-targets -- -D warnings
 Use focused Rust tests during implementation. For changes under `src/app.rs`,
 launch the desktop build and test keyboard focus, resize, a long scrollback
 buffer, selection, clipboard actions, and clean shutdown. For changes to shared
-UI code, also run the WASM clippy/build gates in `docs/VERIFICATION.md`.
+UI code, also run the WASM clippy gate listed in `AGENTS.md`.
 Record unresolved checks explicitly and keep the pull request draft.
 
 The local CLI regression command is
 `node --test scripts/test-cli.mjs`. Real Windows PTY/control acceptance uses
 `pwsh -NoProfile -File scripts/test-control-live.ps1`. These tests use isolated
-profiles. See [verification](docs/VERIFICATION.md) for platform evidence and
-known lint failures; a local Windows pass does not certify other platforms.
+profiles. A local Windows pass does not certify other platforms.
 
 Keep credentials, runtime descriptors, signing keys, private competitive
 research, customer data, release tokens, compiler output and diagnostic

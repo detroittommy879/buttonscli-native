@@ -1,7 +1,7 @@
 """Comparable OpenRouter palette runs; native capture must pass before installation.
 
 Standard library only. Credentials stay in OPENROUTER_API_KEY, never in artifacts.
-See docs/THEME-EVALS.md. This does not implement multi-tab theme collections.
+This does not implement multi-tab theme collections.
 """
 
 import argparse

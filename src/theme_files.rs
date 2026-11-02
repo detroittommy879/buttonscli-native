@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn theme_prompt_examples_import_through_the_current_loader() {
-        let guide = include_str!("../themeprompts.md").replace("\r\n", "\n");
+        let guide = include_str!("../assets/prompts/themeprompts.md").replace("\r\n", "\n");
         let examples: Vec<_> = guide
             .split("```json\n")
             .skip(1)

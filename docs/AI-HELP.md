@@ -1,7 +1,7 @@
 # AI provider settings
 
 For normal testing with your saved buttons and providers, enable the
-[local JSON feature flag](LOCAL-FEATURE-FLAGS.md) and open the release executable
+[local JSON feature flag](dev/LOCAL-FEATURE-FLAGS.md) and open the release executable
 directly. It uses the normal native active profile; no test launcher is required.
 
 For local testing on Windows, run `pwsh -NoProfile -File scripts/start-ai-help-test.ps1`.

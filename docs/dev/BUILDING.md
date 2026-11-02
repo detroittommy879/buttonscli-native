@@ -20,7 +20,7 @@ owns the window/GPU surface; Alacritty selects the operating-system PTY backend.
 Windows has local build and real interaction checks. GitHub CI covers Linux
 and the browser target; macOS runtime acceptance remains open.
 
-Follow the [README](../README.md#get-started) to install the stable `main` branch
+Follow the [README](../../README.md#get-started) to install the stable `main` branch
 or build the optimized desktop executable. No Node runtime is needed for the
 desktop app; the optional CLI/MCP helpers use Node.
 

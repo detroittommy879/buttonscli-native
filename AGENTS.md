@@ -3,8 +3,15 @@
 - Keep replies and work logs short. Default new web surfaces to dark mode.
 - Check `git status --short --branch`, fetch origin, and inspect existing commits/PRs
   before editing. Preserve unrelated work. Make focused local commits.
-- Log changes, failed approaches and validation in `docs/BUGFIX-LOG-YYYY-MM-DD.md`.
-  **Update this file when a new project-specific trap or useful shortcut is found.**
+- Log changes, failed approaches and validation in
+  `.private/dev-notes/logs/BUGFIX-LOG-YYYY-MM-DD.md` (gitignored, local only).
+  Read recent logs there first, if present, before retrying a fix.
+- **Update this file when a new project-specific trap or useful shortcut is found**:
+  anything an agent would otherwise rediscover (locations, state rules, commands).
+- `docs/` is for users; `docs/dev/` for contributors (build, architecture, flags).
+  Plans, audits, reviews and AI work logs go in `.private/dev-notes/`, never `docs/`.
+- Files mix CRLF and LF. Preserve each file's endings: the Edit tool does; Python
+  edits need `io.open(..., newline='')`, or matches fail/endings change.
 
 ## Where things live
 
@@ -14,6 +21,12 @@
   `vendor/alacritty_terminal`: patched PTY/parser. These forks contain required fixes.
 - `src/settings.rs`: persisted preferences/defaults/normalization; `src/storage/`: atomic
   profile storage and optional legacy import. Browser builds use a scripted demo.
+- `src/app.rs` is ~23k lines: grep for the function, never read it whole. New
+  self-contained features go in `src/app/<name>.rs` (`impl ButtonsApp`, `use super::*`).
+- Debug-only UI (Settings → Debug, `src/app/power.rs`) is gated by
+  `power::debug_tools_available()`: debug builds, or `"debug": true` /
+  `"enable_all": true` in `~/.buttonscli-native/feature-flags.json`. Put new
+  diagnostics and test toggles there instead of inventing another gate.
 
 ## Pane and input rules
 
@@ -51,10 +64,18 @@
   popup and IME state on focus loss, including loss/regain batched in one frame.
 - PTY replies/focus reports bypass user-input capture and scrolling. Invalidate the
   cached grid snapshot for every local grid/selection/search mutation.
+- Mouse mode (`TermMode::MOUSE_MODE`): wheel sends buttons 64/65 (`wheel_reports`),
+  Shift scrolls locally, like Alacritty. Only alt screen without mouse mode sends
+  arrow keys. `sync` turns mouse reporting off if the shell echoes our last click
+  report (stale mode from an exited/disconnected TUI); the pane menu has
+  "Reset mouse mode". Pastes are sanitized (`sanitize_paste`, par-term's rule).
+- Menu Paste sends `ViewportCommand::RequestPaste`; `deliver_menu_paste` takes the
+  next frame's `Event::Paste` for that PTY ID before widgets see it.
 
 ## Themes and profiles
 
 - `build.rs` embeds every `assets/themes/*.json`; **rebuild after asset edits**.
+  The AI theme guide is `assets/prompts/themeprompts.md` (`include_str!`).
   `assets/generated/legacy-code-themes.json` supplies the generated legacy catalog.
 - Runtime personal themes: `~/.buttonscli-native/profiles/<profile>/themes/`.
   Native settings stay in `~/.buttonscli-native/`; `~/.buttonscli/` is read-only import input.
@@ -76,8 +97,15 @@
   Whole-profile export: `BUTTONSCLI_EXPORT_ACTIVE_PROFILE=1 cargo test --locked
   --lib export_active_profile_into_this_checkout -- --ignored` (reads profile only).
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
-  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Menu/status-bar
+  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Use
+  `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
+  or minimized (`power_saving`); output repaints are capped via
+  `egui_term::set_output_repaint_interval`. Menu/status-bar
   shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
+  Changing another pane's theme must call `settle_pane_draft` (autosave), never a
+  bare `restore_personal_theme_preview`, or the edited pane reverts.
+- egui buttons paint `weak_bg_fill`: theme hover/active colors must set both
+  `bg_fill` and `weak_bg_fill`, or hover stays egui's stock grey.
   `SIMPLE_NOISE_HIDDEN` hides and disables simple noise for now.
 - UI tests must not hard-code positions or theme names that depend on the
   built-in catalog/library size or status-bar width; find text in a settled frame.
@@ -94,7 +122,8 @@ cargo build --locked --release --bin buttonscli
 
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
 - Use `wrapping_row` for button rows: egui's centered `horizontal_wrapped` can make
-  successive controls descend with larger fonts. Favorites allocate the name/star
+  successive controls descend with larger fonts. Rows mixing labels, small and full
+  buttons (status bar) use `centered_wrapping_row` (fixed line height, centered). Favorites allocate the name/star
   together before wrapping; `push_id` alone does not keep a pair together.
 - CI uses newer stable Rust than some local installs. Write explicit `f32` literals
   for `Stroke::new` widths; Rust 1.97 rejects float fallback under strict Clippy.
@@ -108,11 +137,15 @@ cargo build --locked --release --bin buttonscli
   -- --include-ignored --test-threads=1` (uses owned Windows shells).
 - `scripts/native-smoke.ps1 -SkipBuild -Release` checks isolated startup, not interactive
   acceptance. Do not rebuild a running test executable; Windows locks it.
+- Quick visual check: run `target/debug/buttonscli.exe` with `USERPROFILE`/`HOME` set
+  to a scratch folder (isolated profile), then capture it with Win32 `PrintWindow`
+  after `SetProcessDPIAware` (otherwise 150% scaling crops it). Computer-use cannot
+  target the uninstalled exe. Stop only that debug process afterwards.
 - Existing incremental-cache/PDB-collision warnings are nonfatal. Fix actual errors;
   do not delete broad caches. `--lib` avoids the test binary/library output collision.
-- Release AI Help/control has access gates; see `docs/LOCAL-FEATURE-FLAGS.md` for isolated
+- Release AI Help/control has access gates; see `docs/dev/LOCAL-FEATURE-FLAGS.md` for isolated
   testing. Keep keys in OS credentials; AI Help executes only reviewed commands.
 - Cargo Git installation can retain local vendor patches; crates.io publication cannot
-  use path-only dependencies. See `cargo-how-to.md`. Do not replace forks with upstream
+  use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.

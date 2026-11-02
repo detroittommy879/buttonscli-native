@@ -49,7 +49,7 @@ strict GPU frame budget, and no old-GPU performance guarantee is made.
 The `shaderBackgrounds` feature is active/free. `ShaderLab` and `VibeCodeShaders`
 retain their existing planned/access states. Before accepting AI-written WGSL,
 implement the restricted validator, helper preview and recovery from
-[Astra's plan](AI-THEME-AND-SHADER-PLAN.md). Native shader compilation has real
+the shader plan. Native shader compilation has real
 driver/compiler exposure; use the checked APIs documented for the
 [pinned wgpu 24 device](https://docs.rs/wgpu/24.0.5/wgpu/struct.Device.html).
 

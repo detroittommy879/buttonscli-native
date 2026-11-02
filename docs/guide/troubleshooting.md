@@ -63,4 +63,4 @@ Find it in the Library.
 
 **A feature from these docs is missing in my build.**
 Some AI features need the local feature flag in release builds; see
-[Local feature flags](../LOCAL-FEATURE-FLAGS.md).
+[Local feature flags](../dev/LOCAL-FEATURE-FLAGS.md).

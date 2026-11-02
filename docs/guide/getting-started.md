@@ -19,7 +19,7 @@ buttonscli
 ```
 
 Run the same command again to update. Linux needs a few system packages; see
-[Building](../BUILDING.md).
+[Building](../dev/BUILDING.md).
 
 ## The window
 

@@ -14,6 +14,9 @@ Restart after editing it. Set `enable_all` to `false` or delete the file to
 restore ordinary access. Missing, invalid or oversized files do not grant access;
 invalid files produce a startup log warning. The size limit is 16 KiB.
 
+`"debug": true` only adds Settings → Debug (power saving toggle and frame
+readout) to an optimized build; debug builds always show it.
+
 This explicit local flag overrides catalog rollout, account/Pro requirements,
 internal feature restrictions and runtime kill switches. AI Help, AI theme
 generation, Quick Secrets, local CLI/MCP control and the existing unfinished
@@ -40,4 +43,4 @@ across, use **Settings → Import from original ButtonsCLI** and review its prev
 
 Open **Settings → AI providers** to select your real provider and saved key,
 then **Help → AI Help** to chat. Provider setup and key handling are described in
-[AI Help](AI-HELP.md). Provider settings display when the local override is active.
+[AI Help](../AI-HELP.md). Provider settings display when the local override is active.

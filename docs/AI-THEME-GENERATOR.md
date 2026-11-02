@@ -17,7 +17,7 @@ Theme** in that editor to keep it. New generated themes use a collision-safe
 filename and never replace a saved theme. You can cancel the preview or discard
 the candidate without writing it.
 
-This is a Pro feature. The [local JSON override](LOCAL-FEATURE-FLAGS.md) enables
+This is a Pro feature. The [local JSON override](dev/LOCAL-FEATURE-FLAGS.md) enables
 it in both debug and release builds. Without that flag, release access remains
 locked. Debug builds can also exercise it with
 `BUTTONSCLI_NATIVE_DEV_THEME_GENERATOR=1`; that override does not work in

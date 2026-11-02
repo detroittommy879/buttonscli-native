@@ -1,7 +1,7 @@
 # Cargo installation
 
 Use current stable Rust, Git and your platform's native build tools
-([build dependencies](docs/BUILDING.md)).
+([build dependencies](BUILDING.md)).
 
 ## Install from Git
 

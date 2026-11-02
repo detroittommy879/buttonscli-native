@@ -38,8 +38,8 @@ release or a claim that every legacy/AI feature is finished.
   signed downloadable releases, hosted access, automatic updates and rollback
   are unfinished. Linux/macOS interaction and long-duration soak coverage remain.
 
-See [README readiness](README.md#current-status), [limitations](docs/LIMITATIONS.md)
-and the dated [verification record](docs/VERIFICATION.md) for evidence and scope.
+See [README readiness](README.md#current-status) and [limitations](docs/LIMITATIONS.md)
+for scope.
 
 ## Earlier native rebuild
 

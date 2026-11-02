@@ -9,7 +9,7 @@ not a backlog disguised as release notes.
   startup, real PTY/control-CLI checks, explicit pane/input/clipboard/selection
   probes and the creator's daily use. AI Help has partial GUI review using a
   loopback provider. Broader DPI, performance, screen-reader and platform
-  acceptance remain open; see [the verification record](VERIFICATION.md).
+  acceptance remain open.
 - Windows validation is local; GitHub CI covers Linux and the browser target.
   macOS still needs native CI and manual interaction tests.
 - The current browser package compiles and renders the shared UI. Local checks
@@ -78,17 +78,14 @@ not a backlog disguised as release notes.
   available. Mistral backend palette generation passed on 2026-10-02; full GUI
   and broader provider checks remain open.
   Glow math belongs to Shader Lab presets rather than a standalone effect.
-  HSync needs an offscreen renderer path; see
-  [`migration/HSYNC-DECISION.md`](migration/HSYNC-DECISION.md). The remaining
-  effect audit is in [`migration/OPTIONAL-EFFECTS-DECISION.md`](migration/OPTIONAL-EFFECTS-DECISION.md).
+  HSync needs an offscreen renderer path.
   Other original fields remain in the embedded JSON migration assets. The
   original TV-noise fields are configuration-only in the inspected source tree;
   no runtime renderer was found, so the native app leaves them unsupported.
 - Shader Lab is not implemented in the native renderer. Imported themes that
   request a legacy GLSL effect keep that setting and show a warning in Themes
   settings, but the shader does not run. Native shader editing needs an
-  offscreen per-pane rendering path and a separately validated WGSL pipeline;
-  see [`migration/SHADER-LAB-DECISION.md`](migration/SHADER-LAB-DECISION.md).
+  offscreen per-pane rendering path and a separately validated WGSL pipeline.
 - The 20 bundled font families work offline. Native Settings also discovers
   local system fonts and imports profile-local `.ttf` / `.otf` files. Online
   Google Font downloads are deferred; online-only names in imported themes
@@ -121,7 +118,7 @@ not a backlog disguised as release notes.
 - AI Help has editable providers, a separate-window source path, streaming,
   bounded optional terminal context and reviewed suggestions. It is Pro-gated;
   ordinary release access stays locked, but the explicit
-  [local JSON override](LOCAL-FEATURE-FLAGS.md) enables release testing. The
+  [local JSON override](dev/LOCAL-FEATURE-FLAGS.md) enables release testing. The
   `BUTTONSCLI_NATIVE_DEV_AI_HELP=1` override works only in debug builds. No
   complete real-provider GUI interaction is certified. Separate AI Help viewport
   controls currently expose a placeholder Windows UI Automation tree; main

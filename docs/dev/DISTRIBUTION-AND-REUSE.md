@@ -1,6 +1,6 @@
 # Easy installs and reusing the look in other apps
 
-October 15 2026. Companion to [RELEASE-AND-MESSAGES-PLAN.md](RELEASE-AND-MESSAGES-PLAN.md).
+October 15 2026. Companion to the release plan.
 
 ## Installing without compiling Rust
 
@@ -17,7 +17,7 @@ channel is then a small manifest pointing at those files.
 | **winget** | `winget install ButtonsCLI.ButtonsCLI` | A YAML manifest PR to `microsoft/winget-pkgs` per release | Free; can be automated in CI with `wingetcreate` or `komac`. Unsigned binaries are accepted but may get SmartScreen warnings. |
 | **Scoop** | `scoop bucket add buttonscli https://github.com/...` then `scoop install buttonscli` | A JSON manifest in your own bucket repo | Great fit for a portable zip; `checkver`/`autoupdate` fields update it automatically. |
 | **mise** | `mise use -g github:detroittommy879/buttonscli-native` | Nothing, if release asset names include OS and arch | mise's GitHub backend picks the right asset itself. |
-| **cargo-binstall** | `cargo binstall buttonscli` | A `[package.metadata.binstall]` block | Downloads the release zip; for Rust users. Needs a crates.io entry, which the vendored forks currently block (see `cargo-how-to.md`). |
+| **cargo-binstall** | `cargo binstall buttonscli` | A `[package.metadata.binstall]` block | Downloads the release zip; for Rust users. Needs a crates.io entry, which the vendored forks currently block (see `CARGO-INSTALL.md`). |
 | **Homebrew** | `brew install detroittommy879/tap/buttonscli` | A tap repo with a formula (Linux) or cask (macOS) | Standard on macOS. |
 | **One-line script** | `irm https://buttonscli.com/install.ps1 \| iex` / `curl -fsSL https://buttonscli.com/install.sh \| sh` | Two short scripts | Same style as wuu73.org/vibe; easy to add to that menu. Have the script verify the SHA-256 from the release. |
 | **Microsoft Store** | Store app or `winget install --source msstore` | MSIX package | See the release plan. |

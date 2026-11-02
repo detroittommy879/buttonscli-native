@@ -19,5 +19,4 @@ project's Ubuntu installer. Running any installer can download or install the
 tools listed in its preview.
 
 This feature is free and registered as `coolStuffInstallers` in the central
-feature catalog. See [`PROGRESS.md`](PROGRESS.md) for implementation and manual
-acceptance status.
+feature catalog.

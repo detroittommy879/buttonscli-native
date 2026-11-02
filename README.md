@@ -98,7 +98,7 @@ examples from that workspace.</sub>
 ## Get started
 
 Install **current stable Rust**, Git and your platform's
-[build prerequisites](docs/BUILDING.md). Install the recommended `main` version:
+[build prerequisites](docs/dev/BUILDING.md). Install the recommended `main` version:
 
 ```sh
 cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli
@@ -107,7 +107,7 @@ buttonscli
 
 Repeat the install command to update. This builds the optimized desktop app
 with its patched terminal dependencies and embedded themes/fonts. See
-[Cargo installation](cargo-how-to.md) for details. To build from a checkout:
+[Cargo installation](docs/dev/CARGO-INSTALL.md) for details. To build from a checkout:
 
 ```sh
 git clone --branch main https://github.com/detroittommy879/buttonscli-native.git
@@ -124,12 +124,12 @@ cargo build --release --locked --bin buttonscli
 Run `target/release/buttonscli.exe` on Windows, or
 `./target/release/buttonscli` on Linux/macOS. The first build compiles the Rust
 dependencies. The desktop app does not need Node; Node is used by the optional
-CLI/MCP helpers. See [building notes](docs/BUILDING.md) for Linux packages and
+CLI/MCP helpers. See [building notes](docs/dev/BUILDING.md) for Linux packages and
 the separate browser demo. Distribution is currently from source: downloadable
 desktop releases, signing and automatic updates are still unfinished.
 
 To test gated features with your normal saved setup, use the
-[local JSON feature flag](docs/LOCAL-FEATURE-FLAGS.md) and launch the executable
+[local JSON feature flag](docs/dev/LOCAL-FEATURE-FLAGS.md) and launch the executable
 directly. This enables AI Help and other implemented gates in release builds.
 
 **Open three PowerShell tabs and run a command in the first:**
@@ -166,13 +166,13 @@ test pass rates or reliability measurements. Updated October 28, 2026.
 | **Themes, fonts and Settings** | **Complete for the core Windows workflow** | Per-tab appearance, favorites, personal JSON import/export, scoped preview/save, font tracking and detached Settings. Advanced theme collections and persistent tab assignment rules are proposals. |
 | **AI Help** | **Working preview, roughly 70% ready** | Streaming, provider settings, optional context and reviewed actions work in fixture tests; real Mistral backend checks also passed. Broader real-provider GUI, accessibility and hosted access acceptance remain. |
 | **CLI / MCP agent control** | **Working preview, roughly 70% ready** | Authenticated local API, live Windows CLI checks and 14-tool fake-API coverage. Full live tool/client coverage, GUI handoff and Linux/macOS acceptance remain. |
-| **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to six versions in parallel, a judge model checks or fixes each one, and every result is compiled before you see it. Full appearance generation with fonts and effects in one go is still [planned](docs/AI-THEME-AND-SHADER-PLAN.md). |
+| **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to six versions in parallel, a judge model checks or fixes each one, and every result is compiled before you see it. Full appearance generation with fonts and effects in one go is still planned. |
 | **Effects / shaders** | **Native shaders work; legacy shaders don't** | Gradients, scanlines, noise, row banding, analog static, 34 shader presets and custom WGSL shaders render natively. Old GLSL shaders from the original app, its Shader Lab and HSync warp do not run. |
 | **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
-| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are [planned](docs/RELEASE-AND-MESSAGES-PLAN.md) but not done; old feedback/runtime-config services are disabled. |
+| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are planned but not done; old feedback/runtime-config services are disabled. |
 
 AI Help, AI theme generation and CLI/MCP control require an explicit
-[local feature flag](docs/LOCAL-FEATURE-FLAGS.md) for release testing. The core
+[local feature flag](docs/dev/LOCAL-FEATURE-FLAGS.md) for release testing. The core
 terminal workspace does not need these features enabled. Agent Mode is a
 separate unfinished prototype.
 
@@ -210,8 +210,7 @@ limits are in [Native agent control](docs/CONTROL-API.md).
 Live shells are **not restored after an app restart**. Settings, presets,
 personal themes, favorites and saved tab groups persist; running shells and
 session-only theme choices do not.
-For detailed boundaries, see [Current limitations](docs/LIMITATIONS.md) and the
-[Verification record](docs/VERIFICATION.md).
+For detailed boundaries, see [Current limitations](docs/LIMITATIONS.md).
 
 ## Documentation
 
@@ -223,8 +222,8 @@ backgrounds, AI shaders and themes, and setup, with a [theme gallery](docs/guide
 | [Native guide](docs/NATIVE-GUIDE.md) | [Personal themes](docs/PERSONAL-THEMES.md) · [Fonts](docs/FONTS.md) |
 | [Workspace controls](docs/WORKSPACE-CONTROLS.md) | [Settings preview](docs/SETTINGS-PREVIEW.md) · [Window appearance](docs/WINDOW-APPEARANCE.md) |
 | [Shell profiles](docs/SHELL-PROFILES.md) · [Startup](docs/STARTUP.md) | [AI Help](docs/AI-HELP.md) · [Control API / CLI / MCP](docs/CONTROL-API.md) |
-| [Shortcuts](docs/SHORTCUTS.md) · [Terminal search](docs/TERMINAL-SEARCH.md) | [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) |
-| [Limitations](docs/LIMITATIONS.md) | [Verification](docs/VERIFICATION.md) · [Progress log](docs/PROGRESS.md) |
+| [Shortcuts](docs/SHORTCUTS.md) · [Terminal search](docs/TERMINAL-SEARCH.md) | [Architecture](docs/dev/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md) |
+| [Limitations](docs/LIMITATIONS.md) | [Building](docs/dev/BUILDING.md) · [Developer docs](docs/dev/) |
 
 The separate WebAssembly demo uses a scripted terminal and cannot access a
 visitor's local shell. The desktop build is the main app.
