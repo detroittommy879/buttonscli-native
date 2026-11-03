@@ -1,0 +1,329 @@
+---
+// Replaces Starlight's theme <select> with an Appearance panel:
+// mode (dark/light/auto), look and accent. State lives in ThemeProvider.astro.
+import { Icon } from '@astrojs/starlight/components';
+import { ACCENTS, LOOKS, ui } from '../../guide.config.mjs';
+
+const { lang } = Astro.locals.starlightRoute;
+const t = Astro.locals.t;
+// Rendered twice (header and mobile menu), so radio names need a unique prefix.
+const uid = `ap-${Math.random().toString(36).slice(2, 8)}`;
+const modes = [
+	{ id: 'dark', label: t('themeSelect.dark'), icon: 'moon' },
+	{ id: 'light', label: t('themeSelect.light'), icon: 'sun' },
+	{ id: 'auto', label: t('themeSelect.auto'), icon: 'laptop' },
+] as const;
+---
+
+<buttons-appearance>
+	<details class="appearance">
+		<summary title={ui(lang, 'appearance')}>
+			<svg class="palette" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+				<path
+					fill="currentColor"
+					d="M12 3a9 9 0 0 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.9.8-1.6 1.7-1.6h2A4.3 4.3 0 0 0 21 11.3C21 6.7 17 3 12 3Zm-5 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"
+				></path>
+			</svg>
+			<span class="summary-label">{ui(lang, 'appearance')}</span>
+		</summary>
+		<div class="panel">
+			<fieldset>
+				<legend>{ui(lang, 'mode')}</legend>
+				<div class="modes">
+					{
+						modes.map((m) => (
+							<label class="mode">
+								<input type="radio" name={`${uid}-mode`} value={m.id} data-key="mode" />
+								<Icon name={m.icon} size="1rem" />
+								<span>{m.label}</span>
+							</label>
+						))
+					}
+				</div>
+			</fieldset>
+			<fieldset>
+				<legend>{ui(lang, 'look')}</legend>
+				<div class="looks">
+					{
+						LOOKS.map((l) => (
+							<label class="look">
+								<input type="radio" name={`${uid}-look`} value={l.id} data-key="look" />
+								<span class="look-preview" data-preview={l.id} aria-hidden="true">
+									<span class="look-aa">Aa</span>
+									<span class="look-bar" />
+								</span>
+								<span class="look-name">{l.label}</span>
+							</label>
+						))
+					}
+				</div>
+			</fieldset>
+			<fieldset>
+				<legend>{ui(lang, 'accent')}</legend>
+				<div class="accents">
+					{
+						ACCENTS.map((a) => (
+							<label class="accent" title={a.id === 'auto' ? ui(lang, 'auto') : a.id}>
+								<input type="radio" name={`${uid}-accent`} value={a.id} data-key="accent" />
+								<span
+									class="swatch"
+									data-auto={a.hue === null ? '' : undefined}
+									style={a.hue === null ? undefined : `--hue: ${a.hue}`}
+								/>
+								<span class="sr-only">{a.id === 'auto' ? ui(lang, 'auto') : a.id}</span>
+							</label>
+						))
+					}
+				</div>
+			</fieldset>
+		</div>
+	</details>
+</buttons-appearance>
+
+<script>
+	declare global {
+		interface Window {
+			ButtonsAppearance: {
+				state: Record<'mode' | 'look' | 'accent', string>;
+				set(key: string, value: string): void;
+			};
+		}
+	}
+
+	class ButtonsAppearanceElement extends HTMLElement {
+		connectedCallback() {
+			this.addEventListener('change', (e) => {
+				const input = e.target;
+				if (input instanceof HTMLInputElement && input.dataset.key) {
+					window.ButtonsAppearance.set(input.dataset.key, input.value);
+				}
+			});
+			const details = this.querySelector('details');
+			// Close on outside click or Escape.
+			document.addEventListener('click', (e) => {
+				if (details?.open && !this.contains(e.target as Node)) details.open = false;
+			});
+			this.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape' && details?.open) {
+					details.open = false;
+					details.querySelector('summary')?.focus();
+				}
+			});
+			this.sync();
+		}
+
+		sync() {
+			const state = window.ButtonsAppearance?.state;
+			if (!state) return;
+			this.querySelectorAll<HTMLInputElement>('input[data-key]').forEach((input) => {
+				input.checked = state[input.dataset.key as keyof typeof state] === input.value;
+			});
+		}
+	}
+	customElements.define('buttons-appearance', ButtonsAppearanceElement);
+</script>
+
+<style>
+	buttons-appearance {
+		position: relative;
+		display: block;
+	}
+	summary {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.55rem;
+		border-radius: 0.5rem;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+		list-style: none;
+		font-size: var(--sl-text-sm);
+	}
+	summary::-webkit-details-marker {
+		display: none;
+	}
+	summary:hover,
+	details[open] summary {
+		color: var(--sl-color-white);
+		background: var(--sl-color-gray-6);
+	}
+	.summary-label {
+		display: none;
+	}
+	.panel {
+		position: absolute;
+		inset-inline-end: 0;
+		top: calc(100% + 0.5rem);
+		z-index: calc(var(--sl-z-index-navbar) + 1);
+		width: 18.5rem;
+		display: grid;
+		gap: 0.9rem;
+		padding: 1rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.75rem;
+		background: var(--sl-color-bg-nav);
+		box-shadow: var(--sl-shadow-lg);
+	}
+	fieldset {
+		border: 0;
+		margin: 0;
+		padding: 0;
+		min-width: 0;
+	}
+	legend {
+		padding: 0;
+		margin-bottom: 0.45rem;
+		font-size: var(--sl-text-2xs);
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--sl-color-gray-3);
+	}
+	input[type='radio'] {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+	.modes {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.25rem;
+		padding: 0.2rem;
+		border-radius: 0.6rem;
+		background: var(--sl-color-gray-6);
+	}
+	.mode {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3rem;
+		padding: 0.35rem 0.25rem;
+		border-radius: 0.45rem;
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+	}
+	.mode:has(input:checked) {
+		background: var(--sl-color-black);
+		color: var(--sl-color-white);
+		box-shadow: var(--sl-shadow-sm);
+	}
+	.looks {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.5rem;
+	}
+	.look {
+		display: grid;
+		gap: 0.3rem;
+		padding: 0.35rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.6rem;
+		cursor: pointer;
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-2);
+	}
+	.look:has(input:checked) {
+		border-color: var(--sl-color-accent);
+		color: var(--sl-color-white);
+		box-shadow: 0 0 0 1px var(--sl-color-accent);
+	}
+	.look-name {
+		padding-inline: 0.2rem;
+	}
+	.look-preview {
+		display: flex;
+		align-items: end;
+		justify-content: space-between;
+		height: 3rem;
+		padding: 0.45rem 0.55rem;
+		border-radius: 0.4rem;
+	}
+	.look-aa {
+		font-size: 1.2rem;
+		line-height: 1;
+	}
+	.look-bar {
+		width: 1.6rem;
+		height: 0.3rem;
+		border-radius: 1rem;
+	}
+	.look-preview[data-preview='classic'] {
+		background: #11151d;
+		color: #e6edf3;
+		font-family: 'Inter Variable', sans-serif;
+	}
+	.look-preview[data-preview='classic'] .look-bar {
+		background: #38bdf8;
+	}
+	.look-preview[data-preview='neon'] {
+		background: radial-gradient(circle at 20% 0%, #1d2a5a, #080b16 70%);
+		color: #5eead4;
+		font-family: 'Outfit Variable', sans-serif;
+		font-weight: 700;
+		text-shadow: 0 0 10px rgb(94 234 212 / 0.6);
+	}
+	.look-preview[data-preview='neon'] .look-bar {
+		background: linear-gradient(90deg, #2dd4bf, #a78bfa, #fb7185);
+	}
+	.look-preview[data-preview='paper'] {
+		background: #f6f1e7;
+		color: #2b2620;
+		font-family: 'Source Serif 4 Variable', serif;
+	}
+	.look-preview[data-preview='paper'] .look-bar {
+		background: #b4532a;
+	}
+	.look-preview[data-preview='terminal'] {
+		background: #050805;
+		color: #5df28b;
+		font-family: 'IBM Plex Mono', monospace;
+	}
+	.look-preview[data-preview='terminal'] .look-bar {
+		background: #5df28b;
+		width: 0.6rem;
+		height: 1rem;
+		border-radius: 0;
+	}
+	.accents {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+	}
+	.accent {
+		cursor: pointer;
+	}
+	.swatch {
+		display: block;
+		width: 1.6rem;
+		height: 1.6rem;
+		border-radius: 50%;
+		background: hsl(var(--hue) 80% 58%);
+		border: 2px solid transparent;
+		outline: 2px solid transparent;
+		outline-offset: 1px;
+	}
+	.swatch[data-auto] {
+		background: conic-gradient(#2dd4bf, #a78bfa, #f472b6, #fbbf24, #4ade80, #2dd4bf);
+	}
+	.accent:has(input:checked) .swatch {
+		border-color: var(--sl-color-black);
+		outline-color: var(--sl-color-white);
+	}
+	label:has(input:focus-visible) {
+		outline: 2px solid var(--sl-color-accent);
+		outline-offset: 2px;
+	}
+	/* In the mobile menu the panel sits in the page instead of floating. */
+	@media (max-width: 49.99em) {
+		.summary-label {
+			display: inline;
+		}
+		.panel {
+			position: static;
+			width: auto;
+			margin-top: 0.5rem;
+			box-shadow: none;
+		}
+	}
+</style>

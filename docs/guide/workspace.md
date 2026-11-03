@@ -40,12 +40,23 @@ collapse and auto-hide.
 
 | On… | You get |
 | --- | --- |
-| A pane | Favorite themes, Random theme, Use global theme, copy, select all, clear screen, rename, auto-tile, close, and a **Shader** section (Strength, background color, use a shader) |
+| A pane | Favorite themes, Random theme, Use global theme, copy, **Paste**, select all, clear screen, rename, **Reset mouse mode** (only while a program uses the mouse), auto-tile, close, and a **Shader** section (Strength, background color, use a shader) |
 | A tab | Rename, move left/right, auto-tile, close |
 | A button | Run, edit, delete |
 
 Pane actions apply to the pane you right-clicked, even if another one has
 keyboard focus.
+
+## Mouse and scrolling
+
+- The wheel scrolls the pane's history, three lines per notch.
+- When a program asks for the mouse (tmux, Vim with `mouse=a`, Claude Code,
+  Codex), the wheel and clicks go to that program instead. Hold **Shift** to
+  scroll or select locally anyway, as in Alacritty.
+- Full-screen programs that don't use the mouse (`less`, `man`) get arrow
+  keys from the wheel, so they scroll too.
+- Pasted text has control characters removed, so a paste can't run hidden
+  commands. Line breaks and tabs are kept.
 
 ## Settings while you work
 

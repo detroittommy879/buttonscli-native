@@ -1,0 +1,101 @@
+---
+// Checklist of every <!-- IMAGE: … --> spot in the guide, per language.
+// Not in the sidebar; open /screenshots/ directly.
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import data from '../generated/shots.json';
+
+type Shot = (typeof data.shots)[number];
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const byFile = new Map<string, Shot[]>();
+for (const shot of data.shots) {
+	byFile.set(shot.file, [...(byFile.get(shot.file) ?? []), shot]);
+}
+const rows = [...byFile.entries()].map(([file, shots]) => {
+	const english = shots.find((s) => s.lang === 'en') ?? shots[0];
+	return { file, english, byLang: new Map(shots.map((s) => [s.lang, s])) };
+});
+const missing = rows.filter((r) => r.english.status === 'missing').length;
+const symbol = { done: '✓', english: 'en', missing: '—' } as const;
+const status = { done: 'Has its own image', english: 'Uses the English image', missing: 'No image yet' } as const;
+---
+
+<StarlightPage frontmatter={{ title: 'Screenshot checklist', description: 'Every screenshot spot in the guide.', pagefind: false }}>
+	<p>
+		{rows.length} spots, {missing} still without an image. Save English images as
+		<code>docs/guide/images/&lt;file&gt;</code> and translated ones as
+		<code>docs/guide/images/&lt;lang&gt;/&lt;file&gt;</code>; the page picks them up on the next build
+		(or right away in <code>npm run dev</code>). Placeholders are written as
+		<code>&lt;!-- IMAGE: file.png — what to show | zoom: what to crop to --&gt;</code>.
+	</p>
+	<p>
+		Columns per language: <b>✓</b> own image, <b>en</b> falls back to the English image, <b>—</b> nothing yet.
+		Languages without a translated page are left blank.
+	</p>
+	<div class="shots-table">
+		<table>
+			<thead>
+				<tr>
+					<th>File</th>
+					<th>What to show</th>
+					{data.languages.map((lang) => <th>{lang}</th>)}
+				</tr>
+			</thead>
+			<tbody>
+				{
+					rows.map((row) => (
+						<tr>
+							<td>
+								<code>{row.file}</code>
+								<br />
+								<a href={`${base}${row.english.url}#:~:text=${encodeURIComponent(row.file)}`}>{row.english.page}</a>
+							</td>
+							<td>
+								{row.english.desc}
+								{Object.entries(row.english.hints).map(([k, v]) => (
+									<div class="hint">
+										<b>{k}:</b> {v}
+									</div>
+								))}
+							</td>
+							{data.languages.map((lang) => {
+								const shot = row.byLang.get(lang);
+								return (
+									<td class:list={['state', shot?.status]} title={shot ? status[shot.status as keyof typeof status] : ''}>
+										{shot ? symbol[shot.status as keyof typeof symbol] : ''}
+									</td>
+								);
+							})}
+						</tr>
+					))
+				}
+			</tbody>
+		</table>
+	</div>
+</StarlightPage>
+
+<style>
+	.shots-table {
+		overflow-x: auto;
+	}
+	td {
+		vertical-align: top;
+		font-size: var(--sl-text-sm);
+	}
+	.hint {
+		margin-top: 0.3rem;
+		color: var(--sl-color-gray-3);
+	}
+	.state {
+		text-align: center;
+		font-weight: 600;
+	}
+	.state.done {
+		color: var(--sl-color-green);
+	}
+	.state.english {
+		color: var(--sl-color-orange);
+	}
+	.state.missing {
+		color: var(--sl-color-red);
+	}
+</style>

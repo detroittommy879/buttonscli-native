@@ -37,6 +37,17 @@ Read the line number, or click **Fix with AI**. Common causes: `2` instead of
 `2.0`, mixing `vec3` and `f32`, or using `if`/loops (see
 [the rules](shader-code.md#rules)).
 
+## Terminal
+
+**Clicking types codes like `0;67;23M`.**
+A program turned on mouse reporting and exited without turning it off.
+ButtonsCLI usually notices and fixes it itself; if not, right-click the pane
+→ **Reset mouse mode**.
+
+**The wheel doesn't scroll in tmux, Vim or an AI agent.**
+That program has the mouse and decides what the wheel does. Hold **Shift**
+while scrolling to scroll the pane's own history.
+
 ## AI
 
 **"Choose a shader model in AI models first."**

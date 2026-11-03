@@ -1,0 +1,102 @@
+/* Content details shared by every look. */
+
+.sl-markdown-content img {
+	border-radius: var(--radius);
+	border: 1px solid var(--sl-color-hairline-light);
+}
+
+.sl-markdown-content table {
+	display: table;
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid var(--sl-color-hairline-light);
+	border-radius: var(--radius);
+	overflow: hidden;
+}
+.sl-markdown-content :is(th, td) {
+	border: 0;
+	border-bottom: 1px solid var(--sl-color-hairline-light);
+}
+.sl-markdown-content tr:last-child td {
+	border-bottom: 0;
+}
+.sl-markdown-content th {
+	background: var(--sl-color-gray-6);
+}
+
+/* "Screenshot wanted" boxes from <!-- IMAGE: … --> comments. */
+figure.shot-wanted {
+	margin-block: 1.5rem;
+}
+.shot-frame {
+	display: grid;
+	gap: 0.4rem;
+	justify-items: start;
+	padding: 1.25rem 1.4rem;
+	aspect-ratio: 16 / 7;
+	align-content: center;
+	border: 2px dashed hsl(var(--accent-h) 60% 55% / 0.55);
+	border-radius: var(--radius);
+	background:
+		repeating-linear-gradient(-45deg, transparent 0 14px, hsl(var(--accent-h) 60% 55% / 0.05) 14px 28px),
+		var(--sl-color-gray-6);
+}
+.shot-frame > * {
+	margin: 0 !important;
+}
+.shot-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.15rem 0.6rem;
+	border-radius: 999px;
+	font-size: var(--sl-text-2xs);
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--sl-color-accent-low);
+	background: var(--sl-color-accent-high);
+}
+.shot-badge::before {
+	content: '';
+	width: 0.85rem;
+	height: 0.85rem;
+	background: currentColor;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 4 7.2 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.2L15 4H9Zm3 4.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z'/%3E%3C/svg%3E")
+		center / contain no-repeat;
+}
+.shot-file {
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-white);
+}
+.shot-desc {
+	color: var(--sl-color-gray-2);
+	font-size: var(--sl-text-sm);
+	line-height: 1.5;
+	max-width: 40rem;
+}
+.shot-hints {
+	list-style: none;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	font-size: var(--sl-text-xs);
+}
+.shot-hints li {
+	margin: 0 !important;
+	padding: 0.1rem 0.5rem;
+	border: 1px solid var(--sl-color-hairline-light);
+	border-radius: 0.4rem;
+	color: var(--sl-color-gray-2);
+}
+.shot-hints b {
+	color: var(--sl-color-accent-high);
+	font-weight: 600;
+}
+@media (max-width: 40rem) {
+	.shot-frame {
+		aspect-ratio: auto;
+	}
+}

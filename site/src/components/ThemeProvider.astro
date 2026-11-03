@@ -1,0 +1,52 @@
+---
+// Replaces Starlight's ThemeProvider: sets mode (dark/light/auto), look and
+// accent on <html> before first paint. Starlight's own default is "auto";
+// this site defaults to dark (DOCS_DEFAULT_MODE) and keeps "auto" as a choice.
+import { ACCENTS, DEFAULT_LOOK, DEFAULT_MODE, LOOKS, sectionFor } from '../../guide.config.mjs';
+
+const { id, locale } = Astro.locals.starlightRoute;
+const slug = locale && id.startsWith(locale) ? id.slice(locale.length).replace(/^\//, '') : id;
+const section = sectionFor(slug);
+const looks = LOOKS.map((l) => l.id);
+const accents = ACCENTS.map((a) => a.id);
+---
+
+<script is:inline define:vars={{ looks, accents, section, defaultMode: DEFAULT_MODE, defaultLook: DEFAULT_LOOK }}>
+	window.ButtonsAppearance = (() => {
+		const keys = { mode: 'starlight-theme', look: 'buttonscli-docs-look', accent: 'buttonscli-docs-accent' };
+		const allowed = { mode: ['dark', 'light', 'auto'], look: looks, accent: accents };
+		const fallback = { mode: defaultMode, look: defaultLook, accent: 'auto' };
+		const read = (key) => {
+			let value = null;
+			try {
+				value = localStorage.getItem(keys[key]);
+			} catch {}
+			return allowed[key].includes(value) ? value : fallback[key];
+		};
+		const state = { mode: read('mode'), look: read('look'), accent: read('accent') };
+		const light = matchMedia('(prefers-color-scheme: light)');
+		const root = document.documentElement;
+
+		function apply() {
+			root.dataset.theme = state.mode === 'auto' ? (light.matches ? 'light' : 'dark') : state.mode;
+			root.dataset.look = state.look;
+			root.dataset.accent = state.accent;
+			document.querySelectorAll('buttons-appearance').forEach((el) => el.sync?.());
+		}
+		light.addEventListener('change', () => state.mode === 'auto' && apply());
+		root.dataset.section = section;
+		apply();
+
+		return {
+			state,
+			set(key, value) {
+				if (!allowed[key].includes(value)) return;
+				state[key] = value;
+				try {
+					localStorage.setItem(keys[key], value);
+				} catch {}
+				apply();
+			},
+		};
+	})();
+</script>

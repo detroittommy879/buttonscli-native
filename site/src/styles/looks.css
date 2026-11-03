@@ -1,0 +1,266 @@
+/*
+ * Looks: complete visual styles switched at runtime with data-look on <html>.
+ * Each look sets fonts, a gray scale for dark and light mode, and its default
+ * accent hue. data-accent overrides the hue; Neon colors each section when the
+ * accent is "auto" (data-section comes from guide.config.mjs).
+ *
+ * To add a look: add it to LOOKS in guide.config.mjs, copy one block below,
+ * and add a preview in ThemeSelect.astro.
+ */
+
+/* ---------- Shared: accent from hue ---------- */
+
+:root {
+	--look-accent-h: 196;
+	--accent-s: 85%;
+	--accent-h: var(--look-accent-h);
+	--heading-font: var(--__sl-font);
+	--heading-weight: 650;
+	--heading-tracking: -0.015em;
+	--radius: 0.6rem;
+}
+:root[data-accent='cyan'] { --accent-h: 190; }
+:root[data-accent='violet'] { --accent-h: 262; }
+:root[data-accent='green'] { --accent-h: 150; }
+:root[data-accent='amber'] { --accent-h: 40; }
+:root[data-accent='rose'] { --accent-h: 345; }
+:root[data-accent='blue'] { --accent-h: 222; }
+
+:root {
+	--sl-color-accent-low: hsl(var(--accent-h) 45% 16%);
+	--sl-color-accent: hsl(var(--accent-h) var(--accent-s) 56%);
+	--sl-color-accent-high: hsl(var(--accent-h) var(--accent-s) 80%);
+}
+:root[data-theme='light'] {
+	--sl-color-accent-low: hsl(var(--accent-h) var(--accent-s) 92%);
+	--sl-color-accent: hsl(var(--accent-h) var(--accent-s) 40%);
+	--sl-color-accent-high: hsl(var(--accent-h) var(--accent-s) 25%);
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5),
+h1#_top,
+.hero h1 {
+	font-family: var(--heading-font);
+	font-weight: var(--heading-weight);
+	letter-spacing: var(--heading-tracking);
+}
+
+/* ---------- Classic: clean, Inter + JetBrains Mono ---------- */
+
+:root,
+:root[data-look='classic'] {
+	--sl-font: 'Inter Variable';
+	--sl-font-mono: 'JetBrains Mono Variable';
+	--sl-color-white: #f5f7fa;
+	--sl-color-gray-1: #e6edf3;
+	--sl-color-gray-2: #c5cfdb;
+	--sl-color-gray-3: #8c99aa;
+	--sl-color-gray-4: #576375;
+	--sl-color-gray-5: #2c3441;
+	--sl-color-gray-6: #19202a;
+	--sl-color-black: #0d1117;
+	--sl-color-bg-nav: #0f141b;
+	--sl-color-bg-sidebar: #0f141b;
+	--sl-color-hairline: #1d2530;
+}
+:root[data-theme='light'],
+:root[data-look='classic'][data-theme='light'] {
+	--sl-color-white: #0f172a;
+	--sl-color-gray-1: #1e293b;
+	--sl-color-gray-2: #334155;
+	--sl-color-gray-3: #4b5a6e;
+	--sl-color-gray-4: #94a3b8;
+	--sl-color-gray-5: #cfd8e3;
+	--sl-color-gray-6: #eef2f6;
+	--sl-color-gray-7: #f6f8fa;
+	--sl-color-black: #ffffff;
+	--sl-color-bg-nav: #ffffff;
+	--sl-color-bg-sidebar: #fafbfc;
+	--sl-color-hairline: #e3e8ef;
+}
+
+/* ---------- Neon: glowing panes, a color per section ---------- */
+
+:root[data-look='neon'] {
+	--sl-font: 'Inter Variable';
+	--sl-font-mono: 'JetBrains Mono Variable';
+	--heading-font: 'Outfit Variable', var(--__sl-font);
+	--heading-weight: 750;
+	--heading-tracking: -0.02em;
+	--look-accent-h: 172;
+	--accent-s: 90%;
+	--radius: 0.75rem;
+	--sl-color-white: #f4f6ff;
+	--sl-color-gray-1: #e3e8fa;
+	--sl-color-gray-2: #bcc5e0;
+	--sl-color-gray-3: #8590b4;
+	--sl-color-gray-4: #4f5878;
+	--sl-color-gray-5: #283052;
+	--sl-color-gray-6: #141a33;
+	--sl-color-black: #080b17;
+	--sl-color-bg-nav: rgb(9 12 26 / 0.82);
+	--sl-color-bg-sidebar: #0a0e1f;
+	--sl-color-hairline: #1b2242;
+	--sl-color-hairline-light: #2a3360;
+}
+:root[data-look='neon'][data-theme='light'] {
+	--sl-color-white: #0c1030;
+	--sl-color-gray-1: #1b2148;
+	--sl-color-gray-2: #343c66;
+	--sl-color-gray-3: #535b86;
+	--sl-color-gray-4: #8d94b8;
+	--sl-color-gray-5: #cdd2ea;
+	--sl-color-gray-6: #edf0fb;
+	--sl-color-gray-7: #f5f6fd;
+	--sl-color-black: #fbfbff;
+	--sl-color-bg-nav: rgb(251 251 255 / 0.85);
+	--sl-color-bg-sidebar: #f6f7fe;
+	--sl-color-hairline: #e3e6f6;
+	--sl-color-hairline-light: #d2d7ef;
+}
+:root[data-look='neon'][data-accent='auto'][data-section='start'] { --accent-h: 152; }
+:root[data-look='neon'][data-accent='auto'][data-section='workspace'] { --accent-h: 188; }
+:root[data-look='neon'][data-accent='auto'][data-section='themes'] { --accent-h: 262; }
+:root[data-look='neon'][data-accent='auto'][data-section='shaders'] { --accent-h: 322; }
+:root[data-look='neon'][data-accent='auto'][data-section='ai'] { --accent-h: 42; }
+:root[data-look='neon'][data-accent='auto'][data-section='reference'] { --accent-h: 352; }
+
+:root[data-look='neon'] body {
+	background:
+		radial-gradient(60rem 30rem at 85% -10%, hsl(var(--accent-h) 90% 50% / 0.12), transparent 70%),
+		radial-gradient(50rem 30rem at -10% 10%, hsl(262 90% 60% / 0.1), transparent 70%),
+		var(--sl-color-black);
+	background-attachment: fixed;
+}
+:root[data-look='neon'] header.header {
+	backdrop-filter: blur(12px);
+}
+:root[data-look='neon'] h1#_top,
+:root[data-look='neon'] .hero h1 {
+	background: linear-gradient(100deg, var(--sl-color-white) 30%, var(--sl-color-accent-high));
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+:root[data-look='neon'] .sl-markdown-content h2 {
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--sl-color-hairline-light);
+}
+:root[data-look='neon'] .sl-markdown-content :is(.expressive-code .frame, table, figure.shot-wanted .shot-frame) {
+	box-shadow: 0 0 0 1px hsl(var(--accent-h) 90% 60% / 0.25), 0 0 24px hsl(var(--accent-h) 90% 55% / 0.12);
+	border-radius: var(--radius);
+}
+:root[data-look='neon'] .sl-markdown-content .expressive-code .frame {
+	border-inline-start: 3px solid var(--sl-color-accent);
+}
+:root[data-look='neon'] .sidebar-content a[aria-current='page'] {
+	background: hsl(var(--accent-h) 90% 55% / 0.16);
+	color: var(--sl-color-accent-high);
+	box-shadow: inset 3px 0 0 var(--sl-color-accent);
+}
+:root[data-look='neon'] .sl-markdown-content img {
+	box-shadow: 0 0 0 1px hsl(var(--accent-h) 90% 60% / 0.35), 0 10px 40px hsl(var(--accent-h) 90% 40% / 0.2);
+}
+
+/* ---------- Paper: editorial serif, warm ---------- */
+
+:root[data-look='paper'] {
+	--sl-font: 'Source Serif 4 Variable', Georgia;
+	--sl-font-mono: 'JetBrains Mono Variable';
+	--heading-weight: 600;
+	--heading-tracking: -0.01em;
+	--look-accent-h: 18;
+	--accent-s: 62%;
+	--sl-text-body: 1.0625rem;
+	--sl-line-height: 1.8;
+	--radius: 0.3rem;
+	--sl-color-white: #f8f1e6;
+	--sl-color-gray-1: #ece2d3;
+	--sl-color-gray-2: #d0c4b3;
+	--sl-color-gray-3: #a29583;
+	--sl-color-gray-4: #6c6254;
+	--sl-color-gray-5: #3b342c;
+	--sl-color-gray-6: #26211c;
+	--sl-color-black: #1a1714;
+	--sl-color-bg-nav: #1d1a16;
+	--sl-color-bg-sidebar: #1d1a16;
+	--sl-color-hairline: #2e2822;
+}
+:root[data-look='paper'][data-theme='light'] {
+	--sl-color-white: #1f1a14;
+	--sl-color-gray-1: #2b2620;
+	--sl-color-gray-2: #463e34;
+	--sl-color-gray-3: #6a5f51;
+	--sl-color-gray-4: #a59885;
+	--sl-color-gray-5: #ddd3c2;
+	--sl-color-gray-6: #f0e9dc;
+	--sl-color-gray-7: #f6f0e5;
+	--sl-color-black: #fbf8f1;
+	--sl-color-bg-nav: #fbf8f1;
+	--sl-color-bg-sidebar: #f6f1e6;
+	--sl-color-hairline: #e6ddcc;
+}
+/* Navigation stays in a sans face; only reading text is serif. */
+:root[data-look='paper'] :is(header, .sidebar-content, .right-sidebar, .pagination-links, starlight-tabs) {
+	font-family: 'Inter Variable', var(--sl-font-system);
+}
+:root[data-look='paper'] .sl-markdown-content a {
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+}
+
+/* ---------- Terminal: monospace, phosphor ---------- */
+
+:root[data-look='terminal'] {
+	--sl-font: 'IBM Plex Mono';
+	--sl-font-mono: 'IBM Plex Mono';
+	--heading-weight: 600;
+	--heading-tracking: 0;
+	--look-accent-h: 140;
+	--accent-s: 78%;
+	--sl-text-body: 0.95rem;
+	--radius: 0;
+	--sl-color-white: #e9ffee;
+	--sl-color-gray-1: #c9f2d3;
+	--sl-color-gray-2: #a3d6ae;
+	--sl-color-gray-3: #6f9c79;
+	--sl-color-gray-4: #456b4e;
+	--sl-color-gray-5: #1f3324;
+	--sl-color-gray-6: #0f1a12;
+	--sl-color-black: #060a07;
+	--sl-color-bg-nav: #070c08;
+	--sl-color-bg-sidebar: #070c08;
+	--sl-color-hairline: #15241a;
+}
+:root[data-look='terminal'][data-theme='light'] {
+	--sl-color-white: #10180f;
+	--sl-color-gray-1: #1d2a1d;
+	--sl-color-gray-2: #2f402f;
+	--sl-color-gray-3: #4d604c;
+	--sl-color-gray-4: #8c9a87;
+	--sl-color-gray-5: #d4d8c6;
+	--sl-color-gray-6: #ece9db;
+	--sl-color-gray-7: #f2efe3;
+	--sl-color-black: #f6f3e8;
+	--sl-color-bg-nav: #f6f3e8;
+	--sl-color-bg-sidebar: #f0ecdf;
+	--sl-color-hairline: #e0dccb;
+}
+:root[data-look='terminal'] .sl-markdown-content h2::before {
+	content: '## ';
+	color: var(--sl-color-accent);
+}
+:root[data-look='terminal'] .sl-markdown-content h3::before {
+	content: '### ';
+	color: var(--sl-color-accent);
+}
+:root[data-look='terminal'] h1#_top::before {
+	content: '> ';
+	color: var(--sl-color-accent);
+}
+:root[data-look='terminal'] .sidebar-content a[aria-current='page']::before {
+	content: '> ';
+}
+:root[data-look='terminal'] :is(.sl-markdown-content img, .expressive-code .frame, .shot-frame) {
+	border-radius: 0;
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+# Generated from docs/guide by integrations/sync-docs.mjs
+src/content/docs/
+src/content/images/
+src/generated/
+public/_guide/

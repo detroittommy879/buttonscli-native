@@ -9,9 +9,14 @@
 - **Update this file when a new project-specific trap or useful shortcut is found**:
   anything an agent would otherwise rediscover (locations, state rules, commands).
 - `docs/` is for users; `docs/dev/` for contributors (build, architecture, flags).
+  The docs site (`site/`, Astro + Starlight, `site/README.md`) is generated from
+  `docs/guide/`: edit there, never `site/src/content/docs/`. Translations go in
+  `docs/guide/i18n/<locale>/`, screenshots in `docs/guide/images[/<locale>]/`;
+  check with `npm run build` in `site/`.
   Plans, audits, reviews and AI work logs go in `.private/dev-notes/`, never `docs/`.
 - Files mix CRLF and LF. Preserve each file's endings: the Edit tool does; Python
-  edits need `io.open(..., newline='')`, or matches fail/endings change.
+  edits need `io.open(..., newline='')`, or matches fail/endings change. Use raw
+  strings for regex text in Python edits: `"\b"` writes a backspace byte.
 
 ## Where things live
 

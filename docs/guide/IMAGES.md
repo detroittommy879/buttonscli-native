@@ -3,13 +3,29 @@
 Spots in the guide that need a picture are marked in the Markdown source as
 
 ```html
-<!-- IMAGE: file-name.png — what it should show -->
+<!-- IMAGE: file-name.png — what it should show | zoom: crop to the Colors row | alt: Alt text -->
 ```
 
-Find them all with `grep -rn "IMAGE:" docs/guide`. When you add an image, put it
-in `docs/guide/images/`, replace the comment with
-`![Describe what it shows](images/file-name.png)`, and write the alt text as a
-sentence for someone who can't see it.
+The `| key: value` parts are optional hints. `zoom` says what to crop or
+magnify; `alt` is the alt text used once the image exists (otherwise the
+description is used). Any other key (`bundle`, `size`…) is shown on the
+placeholder too.
+
+On the docs site (`site/`, see its README) each comment shows as a
+**Screenshot wanted** box until the file exists. Then:
+
+1. Save the image as `docs/guide/images/file-name.png`. The site shows it in
+   place of the comment; no Markdown edit needed.
+2. For GitHub readers, add `![Alt text](images/file-name.png)` right under the
+   comment. The site doesn't show it twice, and keeping the comment keeps the
+   spot on the checklist.
+3. Translated screenshots go in `docs/guide/images/<lang>/file-name.png`
+   (`es`, `de`, `ja`, `pt-BR`…, the app's locale codes). Translated pages use
+   them when present and the English image otherwise.
+
+`/screenshots/` on the site (`npm run dev` in `site/`) lists every spot with
+its status per language. `grep -rn "IMAGE:" docs/guide` finds them too. Write
+alt text as a sentence for someone who can't see the picture.
 
 ## Shot list
 
@@ -65,3 +81,9 @@ Release picks. Shader preset thumbnails come from `render_shader_gallery`
 Settings page from the shot list in turn and screenshots it into
 `docs/guide/images/ui/`. Then every UI image can be refreshed with one command
 whenever the interface changes.
+
+The same probe can make translated screenshots: set the app language
+(`localization.manual_locale`) per run and write into
+`docs/guide/images/<lang>/`. Note that many newer labels (Shaders, Library,
+Create with AI…) have no translations in `src/i18n/` yet, so those screens
+still show English until the catalog catches up.
