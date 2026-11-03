@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pane-focus-lantern-pink",
+    "name": "Night Signals / Pink",
+    "nativeThemeVersion": 1,
+    "description": "Soft vertical light columns, colored like a city at night. Pink pane; stable hue, dark background, gentle contrast."
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#090c12",
+        "backgroundSecondary": "#161315",
+        "buttonBackground": "#161315",
+        "border": "#45353f",
+        "textMain": "#e5eaf2",
+        "textDim": "#a4afbf",
+        "accent": "#e39fc6",
+        "accentHover": "#e6b3d0",
+        "paneDivider": {
+          "color": "#e39fc6",
+          "thickness": 2.0
+        }
+      },
+      "tabs": {
+        "background": "#090c12",
+        "idleBackground": "#161315",
+        "activeBackground": "#45353f",
+        "activeBorder": "#e39fc6"
+      },
+      "presetDock": {
+        "background": "#161315",
+        "buttonBackground": "#161315",
+        "buttonHover": "#45353f",
+        "buttonText": "#e5eaf2",
+        "accent": "#e39fc6"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#45353f",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      }
+    },
+    "terminal": {
+      "background": "#0b090a",
+      "foreground": "#e5eaf2",
+      "ansiColors": {
+        "black": "#586174",
+        "red": "#ed919b",
+        "green": "#a3d6a0",
+        "yellow": "#e8ce8a",
+        "blue": "#95b9f1",
+        "magenta": "#ceb0ec",
+        "cyan": "#94d6d9",
+        "white": "#dce3ed",
+        "brightBlack": "#99a3b6",
+        "brightRed": "#ffb0b9",
+        "brightGreen": "#c1ebbc",
+        "brightYellow": "#f5e2ac",
+        "brightBlue": "#bad2ff",
+        "brightMagenta": "#e0c7ff",
+        "brightCyan": "#b6eceb",
+        "brightWhite": "#f6f8fc"
+      },
+      "useGradient": true,
+      "gradientType": "linear",
+      "gradientAngle": 135.0,
+      "gradientColors": [
+        "#030408",
+        "#130e11",
+        "#382832",
+        "#2e2129"
+      ],
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "rowBandingEnabled": false,
+    "simpleNoiseEnabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.9,
+      "speed": 0.22,
+      "scale": 1.0,
+      "animated": true,
+      "colors": [
+        "#030408",
+        "#130e11",
+        "#382832",
+        "#2e2129",
+        "#46323d"
+      ],
+      "theme_colors": false,
+      "custom": {
+        "name": "Pane Focus / Signal Columns",
+        "expression": "let sway = sin(p.y * 0.6 + t * 0.08) * 0.12;\nlet beam = pow(0.5 + 0.5 * cos(p.x * spacing + sway), 4.0);\nlet falloff = clamp(0.6 - p.y * 0.22, 0.15, 0.9);\nlet base = mix(c1, c2, falloff);\nlet light = mix(c3, c4, clamp(p.y * 0.25 + 0.5, 0.0, 1.0));\nreturn mix(bg, mix(base, light, 0.25 + beam * depth * 0.6) + c5 * beam * 0.04, strength);",
+        "y_up": true,
+        "variables": [
+          {
+            "name": "spacing",
+            "min": 1.0,
+            "max": 6.0,
+            "value": 2.8
+          },
+          {
+            "name": "depth",
+            "min": 0.2,
+            "max": 1.0,
+            "value": 0.85
+          }
+        ]
+      }
+    }
+  }
+}

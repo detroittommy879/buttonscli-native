@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pane-focus-orbit-arctic",
+    "name": "Orbital Rooms / Arctic",
+    "nativeThemeVersion": 1,
+    "description": "Large, dim orbital arcs with stable pane hues. Arctic pane; stable hue, dark background, gentle contrast."
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#090c12",
+        "backgroundSecondary": "#121515",
+        "buttonBackground": "#121515",
+        "border": "#314141",
+        "textMain": "#e5eaf2",
+        "textDim": "#a4afbf",
+        "accent": "#8ed1cf",
+        "accentHover": "#a6d9d7",
+        "paneDivider": {
+          "color": "#8ed1cf",
+          "thickness": 2.0
+        }
+      },
+      "tabs": {
+        "background": "#090c12",
+        "idleBackground": "#121515",
+        "activeBackground": "#314141",
+        "activeBorder": "#8ed1cf"
+      },
+      "presetDock": {
+        "background": "#121515",
+        "buttonBackground": "#121515",
+        "buttonHover": "#314141",
+        "buttonText": "#e5eaf2",
+        "accent": "#8ed1cf"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#314141",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      }
+    },
+    "terminal": {
+      "background": "#080a0a",
+      "foreground": "#e5eaf2",
+      "ansiColors": {
+        "black": "#586174",
+        "red": "#ed919b",
+        "green": "#a3d6a0",
+        "yellow": "#e8ce8a",
+        "blue": "#95b9f1",
+        "magenta": "#ceb0ec",
+        "cyan": "#94d6d9",
+        "white": "#dce3ed",
+        "brightBlack": "#99a3b6",
+        "brightRed": "#ffb0b9",
+        "brightGreen": "#c1ebbc",
+        "brightYellow": "#f5e2ac",
+        "brightBlue": "#bad2ff",
+        "brightMagenta": "#e0c7ff",
+        "brightCyan": "#b6eceb",
+        "brightWhite": "#f6f8fc"
+      },
+      "useGradient": true,
+      "gradientType": "linear",
+      "gradientAngle": 135.0,
+      "gradientColors": [
+        "#030408",
+        "#0d1212",
+        "#243434",
+        "#1e2b2a"
+      ],
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "rowBandingEnabled": false,
+    "simpleNoiseEnabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.9,
+      "speed": 0.22,
+      "scale": 1.0,
+      "animated": true,
+      "colors": [
+        "#030408",
+        "#0d1212",
+        "#243434",
+        "#1e2b2a",
+        "#2d4140"
+      ],
+      "theme_colors": false,
+      "custom": {
+        "name": "Pane Focus / Orbital Halo",
+        "expression": "let center = vec2<f32>(0.65 + sin(t * 0.08) * 0.08, -0.45);\nlet radius = length((p - center) * vec2<f32>(0.7, 1.0));\nlet arc = exp(-abs(radius - orbit) * 3.0);\nlet wash = exp(-radius * 0.8);\nlet base = mix(c1, c2, wash);\nlet halo = mix(c3, c4, clamp(radius * 0.3, 0.0, 1.0));\nreturn mix(bg, mix(base, halo, 0.25 + arc * depth * 0.55) + c5 * arc * 0.04, strength);",
+        "y_up": true,
+        "variables": [
+          {
+            "name": "orbit",
+            "min": 0.2,
+            "max": 1.8,
+            "value": 0.8
+          },
+          {
+            "name": "depth",
+            "min": 0.2,
+            "max": 1.0,
+            "value": 0.85
+          }
+        ]
+      }
+    }
+  }
+}

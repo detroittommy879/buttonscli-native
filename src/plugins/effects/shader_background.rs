@@ -334,7 +334,6 @@ mod tests {
         time: f32,
         knob: f32,
     ) -> Vec<u8> {
-        use wgpu::util::DeviceExt;
         // geometry, settings, base, c1–c3, knobs, c4, c5 (the real uniform order).
         let mut values: [f32; 36] = [
             0.0, 0.0, 64.0, 32.0, time, 0.6, 1.0, preset, 0.02, 0.03, 0.05, 1.0, 0.1, 0.7, 0.5,
@@ -342,6 +341,20 @@ mod tests {
             0.3, 0.9, 0.4, 1.0,
         ];
         values[24] = knob;
+        render_sample_with_values(device, queue, resources, values)
+    }
+
+    fn render_sample_with_values(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        resources: &Resources,
+        values: [f32; 36],
+    ) -> Vec<u8> {
+        use wgpu::util::DeviceExt;
+        let width = values[2] as u32;
+        let height = values[3] as u32;
+        // Test samples use widths divisible by 64, so no readback padding.
+        assert_eq!(width % 64, 0);
         let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
         let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("test background"),
@@ -359,8 +372,8 @@ mod tests {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: wgpu::Extent3d {
-                width: 64,
-                height: 32,
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -373,7 +386,7 @@ mod tests {
         let view = texture.create_view(&Default::default());
         let readback = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: 8192,
+            size: u64::from(width * height * 4),
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -408,13 +421,13 @@ mod tests {
                 buffer: &readback,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
-                    bytes_per_row: Some(256),
-                    rows_per_image: Some(32),
+                    bytes_per_row: Some(width * 4),
+                    rows_per_image: Some(height),
                 },
             },
             wgpu::Extent3d {
-                width: 64,
-                height: 32,
+                width,
+                height,
                 depth_or_array_layers: 1,
             },
         );
@@ -433,6 +446,126 @@ mod tests {
         let output = readback.slice(..).get_mapped_range().to_vec();
         readback.unmap();
         output
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires a graphics adapter; optional BUTTONSCLI_PANE_FOCUS_PREVIEW_DIR"]
+    fn pane_focus_shaders_render_on_native_adapter() {
+        let directory =
+            std::env::var_os("BUTTONSCLI_PANE_FOCUS_PREVIEW_DIR").map(std::path::PathBuf::from);
+        if let Some(directory) = &directory {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+                .expect("native graphics adapter");
+            let (device, queue) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+                .unwrap();
+            device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let catalog = crate::theme::ThemeCatalog::load();
+            let mut count = 0;
+            for theme in catalog
+                .all()
+                .iter()
+                .filter(|t| t.id.starts_with("pane-focus-"))
+            {
+                count += 1;
+                let shader = theme.effects.shader_background.as_ref().unwrap();
+                let custom = shader.custom.as_ref().unwrap();
+                let source = custom_source(custom).unwrap();
+                let mut resources = Resources::new(&device, wgpu::TextureFormat::Rgba8Unorm);
+                resources.pipeline = pipeline(
+                    &device,
+                    wgpu::TextureFormat::Rgba8Unorm,
+                    &resources.layout,
+                    &source,
+                );
+                let mut values = [0.0_f32; 36];
+                values[2] = 320.0;
+                values[3] = 160.0;
+                values[5] = shader.strength;
+                values[6] = shader.scale;
+                let colors = shader.colors.as_ref().unwrap();
+                for (offset, color) in [8, 12, 16, 20, 28, 32]
+                    .into_iter()
+                    .zip(std::iter::once(&theme.terminal_colors.background).chain(colors.iter()))
+                {
+                    let rgba = crate::theme::parse_color(color).unwrap().to_array();
+                    for channel in 0..4 {
+                        values[offset + channel] = f32::from(rgba[channel]) / 255.0;
+                    }
+                }
+                for (index, variable) in custom.variables.iter().enumerate() {
+                    values[24 + index] = variable.value;
+                }
+                let still = render_sample_with_values(&device, &queue, &resources, values);
+                assert!(
+                    still.chunks_exact(4).any(|pixel| pixel != &still[..4]),
+                    "{} is flat",
+                    theme.id
+                );
+                if let Some(directory) = &directory {
+                    image::save_buffer(
+                        directory.join(format!("{}.png", theme.id)),
+                        &still,
+                        320,
+                        160,
+                        image::ColorType::Rgba8,
+                    )
+                    .unwrap();
+                }
+                let luminance = |rgb: &[u8]| -> f32 {
+                    rgb.iter()
+                        .zip([0.2126, 0.7152, 0.0722])
+                        .map(|(byte, weight)| {
+                            let c = f32::from(*byte) / 255.0;
+                            weight
+                                * if c <= 0.04045 {
+                                    c / 12.92
+                                } else {
+                                    ((c + 0.055) / 1.055).powf(2.4)
+                                }
+                        })
+                        .sum()
+                };
+                let foreground =
+                    crate::theme::parse_color(&theme.terminal_colors.foreground).unwrap();
+                let foreground_luma = luminance(&foreground.to_array()[..3]);
+                for seconds in [0.0, 19.0, 83.0] {
+                    values[4] = if shader.animated {
+                        seconds * shader.speed
+                    } else {
+                        0.0
+                    };
+                    let pixels = render_sample_with_values(&device, &queue, &resources, values);
+                    for pixel in pixels.chunks_exact(4) {
+                        assert_eq!(pixel[3], 255);
+                        let contrast = (foreground_luma + 0.05) / (luminance(&pixel[..3]) + 0.05);
+                        assert!(contrast >= 7.0, "{} text contrast {contrast}", theme.id);
+                    }
+                    if seconds > 0.0 && shader.animated {
+                        assert_ne!(pixels, still, "{} should animate", theme.id);
+                    } else {
+                        assert_eq!(pixels, still, "{} should stay still", theme.id);
+                    }
+                }
+            }
+            assert_eq!(count, 64);
+            assert!(
+                device.pop_error_scope().await.is_none(),
+                "Pane Focus GPU validation"
+            );
+        });
     }
 
     /// Writes `<preset>.png` (480x270, strength 0.65) for docs and the website.

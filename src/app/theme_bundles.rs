@@ -449,6 +449,62 @@ mod tests {
     }
 
     #[test]
+    fn pane_focus_bundles_assign_all_eight_looks_across_new_tabs_and_restart() {
+        let bundles: Vec<_> = crate::library::bundles()
+            .iter()
+            .filter(|bundle| bundle.name.starts_with("Pane Focus / "))
+            .collect();
+        assert_eq!(bundles.len(), 8);
+        for bundle in bundles {
+            let (ctx, mut app) = app_with_tabs(1);
+            let summary = app.apply_theme_bundle(&ctx, &bundle.name).unwrap();
+            assert!(summary.contains("7 more pane looks"), "{summary}");
+            let expected: Vec<_> = bundle
+                .panes
+                .iter()
+                .map(|pane| pane.theme_id.clone().unwrap())
+                .collect();
+            assert_eq!(
+                expected
+                    .iter()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len(),
+                8
+            );
+            // Reopen after only the first look was used. All seven queued looks
+            // must survive, then be consumed exactly once by newly opened tabs.
+            let saved = app.preferences_to_save();
+            let mut restarted = ButtonsApp::empty(saved);
+            restarted
+                .open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            restarted.restore_pane_looks();
+            for _ in 1..8 {
+                restarted.open_tab_with_profile(
+                    ctx.clone(),
+                    crate::assistant::virtual_terminal::PROFILE_ID,
+                );
+                // Normally called by the app update after a tab is opened.
+                restarted.apply_pending_pane_looks();
+            }
+            for (index, theme) in expected.iter().enumerate() {
+                assert_eq!(
+                    restarted.theme_overrides.get(&restarted.tabs[index].id),
+                    Some(theme)
+                );
+                let definition = restarted.themes.get(theme);
+                assert!(definition.effects.gradient.is_some());
+                assert!(definition.effects.shader_background.is_some());
+            }
+            assert!(restarted.pending_pane_looks.is_none());
+            restarted
+                .open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+            assert!(!restarted
+                .theme_overrides
+                .contains_key(&restarted.tabs[8].id));
+        }
+    }
+
+    #[test]
     fn bundle_applies_by_slot_and_keeps_extra_slots_for_new_terminals() {
         let (ctx, mut app) = app_with_tabs(3);
         app.set_pane_layout(PaneLayout::Columns, &ctx);

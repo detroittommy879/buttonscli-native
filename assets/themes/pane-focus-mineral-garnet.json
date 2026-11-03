@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pane-focus-mineral-garnet",
+    "name": "Mineral Rooms / Garnet",
+    "nativeThemeVersion": 1,
+    "description": "Still faceted planes, one gemstone per pane. Garnet pane; stable hue, dark background, gentle contrast."
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#090c12",
+        "backgroundSecondary": "#151012",
+        "buttonBackground": "#151012",
+        "border": "#402a30",
+        "textMain": "#e5eaf2",
+        "textDim": "#a4afbf",
+        "accent": "#cc7289",
+        "accentHover": "#d592a3",
+        "paneDivider": {
+          "color": "#cc7289",
+          "thickness": 2.0
+        }
+      },
+      "tabs": {
+        "background": "#090c12",
+        "idleBackground": "#151012",
+        "activeBackground": "#402a30",
+        "activeBorder": "#cc7289"
+      },
+      "presetDock": {
+        "background": "#151012",
+        "buttonBackground": "#151012",
+        "buttonHover": "#402a30",
+        "buttonText": "#e5eaf2",
+        "accent": "#cc7289"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#402a30",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      }
+    },
+    "terminal": {
+      "background": "#0a0708",
+      "foreground": "#e5eaf2",
+      "ansiColors": {
+        "black": "#586174",
+        "red": "#ed919b",
+        "green": "#a3d6a0",
+        "yellow": "#e8ce8a",
+        "blue": "#95b9f1",
+        "magenta": "#ceb0ec",
+        "cyan": "#94d6d9",
+        "white": "#dce3ed",
+        "brightBlack": "#99a3b6",
+        "brightRed": "#ffb0b9",
+        "brightGreen": "#c1ebbc",
+        "brightYellow": "#f5e2ac",
+        "brightBlue": "#bad2ff",
+        "brightMagenta": "#e0c7ff",
+        "brightCyan": "#b6eceb",
+        "brightWhite": "#f6f8fc"
+      },
+      "useGradient": true,
+      "gradientType": "linear",
+      "gradientAngle": 135.0,
+      "gradientColors": [
+        "#030408",
+        "#110b0c",
+        "#331d23",
+        "#2a191d"
+      ],
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "rowBandingEnabled": false,
+    "simpleNoiseEnabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.9,
+      "speed": 0.0,
+      "scale": 1.0,
+      "animated": false,
+      "colors": [
+        "#030408",
+        "#110b0c",
+        "#331d23",
+        "#2a191d",
+        "#3f242b"
+      ],
+      "theme_colors": false,
+      "custom": {
+        "name": "Pane Focus / Quiet Facets",
+        "expression": "let q = p * facets;\nlet a = clamp(q.x * 0.23 + q.y * 0.31 + 0.5, 0.0, 1.0);\nlet b = clamp(-q.x * 0.31 + q.y * 0.16 + 0.45, 0.0, 1.0);\nlet plane = abs(a - b);\nlet stone = mix(c2, c3, a);\nlet cut = mix(stone, c4, b * 0.35);\nreturn mix(bg, mix(c1, cut, 0.35 + depth * plane * 0.6) + c5 * plane * 0.06, strength);",
+        "y_up": true,
+        "variables": [
+          {
+            "name": "facets",
+            "min": 0.5,
+            "max": 3.0,
+            "value": 1.3
+          },
+          {
+            "name": "depth",
+            "min": 0.2,
+            "max": 1.0,
+            "value": 0.85
+          }
+        ]
+      }
+    }
+  }
+}

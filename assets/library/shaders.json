@@ -579,5 +579,213 @@
       "#c1b5ff",
       "#ff4fad"
     ]
+  },
+  {
+    "name": "Pane Focus / Ink Ramp",
+    "expression": "let x = clamp(p.x * 0.35 + 0.5, 0.0, 1.0);\nlet y = clamp(p.y * 0.5 + 0.5, 0.0, 1.0);\nlet ramp = smoothstep(0.0, 1.0, mix(x, y, tilt));\nlet low = mix(c1, c2, ramp);\nlet high = mix(c3, c4, y * 0.25);\nlet color = mix(low, high, ramp * depth);\nreturn mix(bg, mix(color, c5, ramp * ramp * 0.08), strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "tilt",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.25
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#14080a",
+      "#3b161a",
+      "#301316",
+      "#491b20"
+    ]
+  },
+  {
+    "name": "Pane Focus / Corner Lantern",
+    "expression": "let center = vec2<f32>(0.75, -0.62);\nlet light = exp(-length(p - center) * spread);\nlet floorlight = smoothstep(-0.8, 0.9, -p.y) * 0.25;\nlet base = mix(c1, c2, 0.4 + floorlight);\nlet glow = mix(c3, c4, clamp(p.x * 0.2 + 0.5, 0.0, 1.0));\nreturn mix(bg, mix(base, glow, light * depth) + c5 * light * 0.06, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "spread",
+        "min": 0.3,
+        "max": 3.0,
+        "value": 0.85
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#130e0a",
+      "#39271b",
+      "#2e2017",
+      "#463021"
+    ]
+  },
+  {
+    "name": "Pane Focus / Velvet Fold",
+    "expression": "let bend = sin(p.y * 1.7 + t * 0.12) * 0.18;\nlet fold = 0.5 + 0.5 * sin(p.x * folds + bend + t * 0.08);\nlet haze = smoothstep(0.1, 1.0, clamp(p.y * 0.4 + 0.5, 0.0, 1.0));\nlet base = mix(c1, c2, 0.45 + haze * 0.3);\nlet silk = mix(c3, c4, haze * 0.4);\nreturn mix(bg, mix(base, silk, fold * depth) + c5 * fold * fold * 0.04, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "folds",
+        "min": 0.5,
+        "max": 6.0,
+        "value": 2.2
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#110b0d",
+      "#321e25",
+      "#29191f",
+      "#3e252e"
+    ]
+  },
+  {
+    "name": "Pane Focus / Low Tide",
+    "expression": "let horizon = p.y + sin(p.x * 1.4 + t * 0.12) * 0.13;\nlet tide = 0.5 + 0.5 * sin(horizon * bands - t * 0.18);\nlet deep = mix(c1, c2, clamp(0.5 - p.y * 0.3, 0.0, 1.0));\nlet water = mix(c3, c4, tide * 0.3);\nlet foam = pow(tide, 5.0) * 0.06;\nreturn mix(bg, mix(deep, water, 0.3 + tide * depth * 0.5) + c5 * foam, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "bands",
+        "min": 1.0,
+        "max": 8.0,
+        "value": 3.4
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#130d0c",
+      "#392421",
+      "#2e1e1c",
+      "#462c29"
+    ]
+  },
+  {
+    "name": "Pane Focus / Quiet Facets",
+    "expression": "let q = p * facets;\nlet a = clamp(q.x * 0.23 + q.y * 0.31 + 0.5, 0.0, 1.0);\nlet b = clamp(-q.x * 0.31 + q.y * 0.16 + 0.45, 0.0, 1.0);\nlet plane = abs(a - b);\nlet stone = mix(c2, c3, a);\nlet cut = mix(stone, c4, b * 0.35);\nreturn mix(bg, mix(c1, cut, 0.35 + depth * plane * 0.6) + c5 * plane * 0.06, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "facets",
+        "min": 0.5,
+        "max": 3.0,
+        "value": 1.3
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#110b0c",
+      "#331d23",
+      "#2a191d",
+      "#3f242b"
+    ]
+  },
+  {
+    "name": "Pane Focus / Canopy Haze",
+    "expression": "let drift = vec2<f32>(t * 0.025, -t * 0.018);\nlet haze = noise(p * softness + drift);\nlet light = noise(p * softness * 0.6 - drift + vec2<f32>(7.0, 3.0));\nlet ground = mix(c1, c2, 0.35 + haze * 0.45);\nlet canopy = mix(c3, c4, light * 0.4);\nreturn mix(bg, mix(ground, canopy, haze * depth) + c5 * light * 0.035, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "softness",
+        "min": 0.3,
+        "max": 3.0,
+        "value": 1.1
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#0d100b",
+      "#262f1e",
+      "#1f2719",
+      "#2f3b25"
+    ]
+  },
+  {
+    "name": "Pane Focus / Signal Columns",
+    "expression": "let sway = sin(p.y * 0.6 + t * 0.08) * 0.12;\nlet beam = pow(0.5 + 0.5 * cos(p.x * spacing + sway), 4.0);\nlet falloff = clamp(0.6 - p.y * 0.22, 0.15, 0.9);\nlet base = mix(c1, c2, falloff);\nlet light = mix(c3, c4, clamp(p.y * 0.25 + 0.5, 0.0, 1.0));\nreturn mix(bg, mix(base, light, 0.25 + beam * depth * 0.6) + c5 * beam * 0.04, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "spacing",
+        "min": 1.0,
+        "max": 6.0,
+        "value": 2.8
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#140b0c",
+      "#3b2022",
+      "#301b1d",
+      "#49282a"
+    ]
+  },
+  {
+    "name": "Pane Focus / Orbital Halo",
+    "expression": "let center = vec2<f32>(0.65 + sin(t * 0.08) * 0.08, -0.45);\nlet radius = length((p - center) * vec2<f32>(0.7, 1.0));\nlet arc = exp(-abs(radius - orbit) * 3.0);\nlet wash = exp(-radius * 0.8);\nlet base = mix(c1, c2, wash);\nlet halo = mix(c3, c4, clamp(radius * 0.3, 0.0, 1.0));\nreturn mix(bg, mix(base, halo, 0.25 + arc * depth * 0.55) + c5 * arc * 0.04, strength);",
+    "y_up": true,
+    "variables": [
+      {
+        "name": "orbit",
+        "min": 0.2,
+        "max": 1.8,
+        "value": 0.8
+      },
+      {
+        "name": "depth",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.85
+      }
+    ],
+    "colors": [
+      "#030408",
+      "#130f0c",
+      "#392c24",
+      "#2f241e",
+      "#47362c"
+    ]
   }
 ]

@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pane-focus-spectrum-leaf",
+    "name": "Spectrum Steps / Leaf",
+    "nativeThemeVersion": 1,
+    "description": "Black-to-color gradients in rainbow order. Leaf pane; stable hue, dark background, gentle contrast."
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#090c12",
+        "backgroundSecondary": "#111511",
+        "buttonBackground": "#111511",
+        "border": "#2c3f2c",
+        "textMain": "#e5eaf2",
+        "textDim": "#a4afbf",
+        "accent": "#77c87a",
+        "accentHover": "#95d298",
+        "paneDivider": {
+          "color": "#77c87a",
+          "thickness": 2.0
+        }
+      },
+      "tabs": {
+        "background": "#090c12",
+        "idleBackground": "#111511",
+        "activeBackground": "#2c3f2c",
+        "activeBorder": "#77c87a"
+      },
+      "presetDock": {
+        "background": "#111511",
+        "buttonBackground": "#111511",
+        "buttonHover": "#2c3f2c",
+        "buttonText": "#e5eaf2",
+        "accent": "#77c87a"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#2c3f2c",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      }
+    },
+    "terminal": {
+      "background": "#070a07",
+      "foreground": "#e5eaf2",
+      "ansiColors": {
+        "black": "#586174",
+        "red": "#ed919b",
+        "green": "#a3d6a0",
+        "yellow": "#e8ce8a",
+        "blue": "#95b9f1",
+        "magenta": "#ceb0ec",
+        "cyan": "#94d6d9",
+        "white": "#dce3ed",
+        "brightBlack": "#99a3b6",
+        "brightRed": "#ffb0b9",
+        "brightGreen": "#c1ebbc",
+        "brightYellow": "#f5e2ac",
+        "brightBlue": "#bad2ff",
+        "brightMagenta": "#e0c7ff",
+        "brightCyan": "#b6eceb",
+        "brightWhite": "#f6f8fc"
+      },
+      "useGradient": true,
+      "gradientType": "linear",
+      "gradientAngle": 135.0,
+      "gradientColors": [
+        "#030408",
+        "#0b110b",
+        "#1f321f",
+        "#1a291a"
+      ],
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "rowBandingEnabled": false,
+    "simpleNoiseEnabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.9,
+      "speed": 0.0,
+      "scale": 1.0,
+      "animated": false,
+      "colors": [
+        "#030408",
+        "#0b110b",
+        "#1f321f",
+        "#1a291a",
+        "#263e27"
+      ],
+      "theme_colors": false,
+      "custom": {
+        "name": "Pane Focus / Ink Ramp",
+        "expression": "let x = clamp(p.x * 0.35 + 0.5, 0.0, 1.0);\nlet y = clamp(p.y * 0.5 + 0.5, 0.0, 1.0);\nlet ramp = smoothstep(0.0, 1.0, mix(x, y, tilt));\nlet low = mix(c1, c2, ramp);\nlet high = mix(c3, c4, y * 0.25);\nlet color = mix(low, high, ramp * depth);\nreturn mix(bg, mix(color, c5, ramp * ramp * 0.08), strength);",
+        "y_up": true,
+        "variables": [
+          {
+            "name": "tilt",
+            "min": 0.0,
+            "max": 1.0,
+            "value": 0.25
+          },
+          {
+            "name": "depth",
+            "min": 0.2,
+            "max": 1.0,
+            "value": 0.85
+          }
+        ]
+      }
+    }
+  }
+}

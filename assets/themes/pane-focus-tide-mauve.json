@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "metadata": {
+    "id": "pane-focus-tide-mauve",
+    "name": "Tidal Beacons / Mauve",
+    "nativeThemeVersion": 1,
+    "description": "Broad, gentle tides with a fixed color identity. Mauve pane; stable hue, dark background, gentle contrast."
+  },
+  "theme": {
+    "mode": "dark",
+    "app": {
+      "shell": {
+        "background": "#090c12",
+        "backgroundSecondary": "#151316",
+        "buttonBackground": "#151316",
+        "border": "#3d3542",
+        "textMain": "#e5eaf2",
+        "textDim": "#a4afbf",
+        "accent": "#c19dd5",
+        "accentHover": "#cdb2dc",
+        "paneDivider": {
+          "color": "#c19dd5",
+          "thickness": 2.0
+        }
+      },
+      "tabs": {
+        "background": "#090c12",
+        "idleBackground": "#151316",
+        "activeBackground": "#3d3542",
+        "activeBorder": "#c19dd5"
+      },
+      "presetDock": {
+        "background": "#151316",
+        "buttonBackground": "#151316",
+        "buttonHover": "#3d3542",
+        "buttonText": "#e5eaf2",
+        "accent": "#c19dd5"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#3d3542",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      }
+    },
+    "terminal": {
+      "background": "#0a080a",
+      "foreground": "#e5eaf2",
+      "ansiColors": {
+        "black": "#586174",
+        "red": "#ed919b",
+        "green": "#a3d6a0",
+        "yellow": "#e8ce8a",
+        "blue": "#95b9f1",
+        "magenta": "#ceb0ec",
+        "cyan": "#94d6d9",
+        "white": "#dce3ed",
+        "brightBlack": "#99a3b6",
+        "brightRed": "#ffb0b9",
+        "brightGreen": "#c1ebbc",
+        "brightYellow": "#f5e2ac",
+        "brightBlue": "#bad2ff",
+        "brightMagenta": "#e0c7ff",
+        "brightCyan": "#b6eceb",
+        "brightWhite": "#f6f8fc"
+      },
+      "useGradient": true,
+      "gradientType": "linear",
+      "gradientAngle": 135.0,
+      "gradientColors": [
+        "#030408",
+        "#100e12",
+        "#302835",
+        "#28212b"
+      ],
+      "gradientAnimation": false
+    }
+  },
+  "effects": {
+    "masterDisabled": false,
+    "staticEnabled": false,
+    "scanlinesEnabled": false,
+    "rowBandingEnabled": false,
+    "simpleNoiseEnabled": false,
+    "shaderBackground": {
+      "version": 1,
+      "preset": "aurora",
+      "strength": 0.9,
+      "speed": 0.22,
+      "scale": 1.0,
+      "animated": true,
+      "colors": [
+        "#030408",
+        "#100e12",
+        "#302835",
+        "#28212b",
+        "#3c3142"
+      ],
+      "theme_colors": false,
+      "custom": {
+        "name": "Pane Focus / Low Tide",
+        "expression": "let horizon = p.y + sin(p.x * 1.4 + t * 0.12) * 0.13;\nlet tide = 0.5 + 0.5 * sin(horizon * bands - t * 0.18);\nlet deep = mix(c1, c2, clamp(0.5 - p.y * 0.3, 0.0, 1.0));\nlet water = mix(c3, c4, tide * 0.3);\nlet foam = pow(tide, 5.0) * 0.06;\nreturn mix(bg, mix(deep, water, 0.3 + tide * depth * 0.5) + c5 * foam, strength);",
+        "y_up": true,
+        "variables": [
+          {
+            "name": "bands",
+            "min": 1.0,
+            "max": 8.0,
+            "value": 3.4
+          },
+          {
+            "name": "depth",
+            "min": 0.2,
+            "max": 1.0,
+            "value": 0.85
+          }
+        ]
+      }
+    }
+  }
+}

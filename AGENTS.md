@@ -79,6 +79,11 @@
 
 ## Themes and profiles
 
+- Theme/shader/bundle authoring: `docs/dev/AUTHORING-THEME-BUNDLES.md`.
+  Pane Focus assets regenerate with `python scripts/generate-pane-focus-library.py`.
+  Bundles queue at most eight looks (no cycling); applying one preserves the
+  global shader-enable/Calm/font settings. Include static gradient fallbacks.
+
 - `build.rs` embeds every `assets/themes/*.json`; **rebuild after asset edits**.
   The AI theme guide is `assets/prompts/themeprompts.md` (`include_str!`).
   `assets/generated/legacy-code-themes.json` supplies the generated legacy catalog.
