@@ -24,9 +24,7 @@ pub mod fonts;
 pub mod i18n;
 #[cfg(not(target_arch = "wasm32"))]
 mod layout;
-#[cfg(not(target_arch = "wasm32"))]
 mod library;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod plugins;
 #[cfg(not(target_arch = "wasm32"))]
 mod scrollbar;
@@ -49,6 +47,8 @@ mod theme_files;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_generation;
 mod ui_text;
+#[cfg(any(target_arch = "wasm32", test))]
+mod web_showcase;
 mod window_opacity;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -90,9 +90,35 @@ mod web {
                 .start(
                     canvas,
                     eframe::WebOptions::default(),
-                    Box::new(|cc| Ok(Box::new(crate::app::ButtonsApp::new(cc)))),
+                    Box::new(|cc| {
+                        if let Some(render) = &cc.wgpu_render_state {
+                            crate::plugins::effects::shader_background::register(
+                                &cc.egui_ctx,
+                                render.target_format,
+                            );
+                        }
+                        Ok(Box::new(crate::app::ButtonsApp::new(cc)))
+                    }),
                 )
                 .await
+        }
+
+        pub fn configure_showcase(&self, config: &str, library: &str) -> Result<(), JsValue> {
+            self.runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .showcase
+                .configure(config, library)
+                .map_err(|e| JsValue::from_str(&e))
+        }
+
+        pub fn showcase_status(&self) -> Result<String, JsValue> {
+            Ok(self
+                .runner
+                .app_mut::<crate::app::ButtonsApp>()
+                .ok_or_else(|| JsValue::from_str("Preview is starting."))?
+                .showcase
+                .status())
         }
 
         pub fn skip_onboarding(&self) -> Result<(), JsValue> {
@@ -108,7 +134,11 @@ mod web {
                 .runner
                 .app_mut::<crate::app::ButtonsApp>()
                 .ok_or_else(|| JsValue::from_str("The preview is still starting."))?;
-            app.open_browser_settings();
+            if app.showcase.config.showcase {
+                app.showcase.page = "Themes".into();
+            } else {
+                app.open_browser_settings();
+            }
             Ok(())
         }
 

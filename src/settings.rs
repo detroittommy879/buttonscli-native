@@ -389,7 +389,6 @@ pub(crate) const MAX_PANE_LOOKS: usize = 8;
 #[serde(default)]
 pub(crate) struct PaneLook {
     pub(crate) theme_id: Option<String>,
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) font: Option<crate::fonts::PaneFont>,
 }
 

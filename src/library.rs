@@ -31,6 +31,22 @@ fn parse<T: serde::de::DeserializeOwned>(json: &str, what: &str) -> Vec<T> {
 #[cfg(test)]
 mod tests {
     #[test]
+    #[ignore = "requires owned web export; set BUTTONSCLI_WEB_LIBRARY_EXPORT"]
+    fn exported_personal_web_shaders_compile() {
+        let path = std::env::var_os("BUTTONSCLI_WEB_LIBRARY_EXPORT").expect("owned export path");
+        let data: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let shaders: Vec<crate::theme::SavedShader> =
+            serde_json::from_value(data["shaders"].clone()).unwrap();
+        assert!(!shaders.is_empty());
+        for item in &shaders {
+            crate::plugins::effects::shader_expression::program(&item.shader)
+                .unwrap_or_else(|error| panic!("{}: {error}", item.shader.name));
+        }
+        println!("Validated {} exported personal shaders", shaders.len());
+    }
+
+    #[test]
     fn built_in_library_parses_and_every_shader_compiles() {
         // A syntactically valid JSON document can still fail typed deserialization.
         // Do not let the runtime's empty-list fallback hide broken shipped assets.

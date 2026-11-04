@@ -1,6 +1,7 @@
 //! A color expression, or a short body of `let` lines ending in `return`.
 //! No loops, branches, `var`, helper functions or resources.
 use crate::theme::CustomShader;
+#[cfg(not(target_arch = "wasm32"))]
 use eframe::wgpu::naga;
 
 pub(crate) const MAX_SOURCE_BYTES: usize = crate::theme::MAX_CUSTOM_SHADER_BYTES;

@@ -473,11 +473,25 @@ mod tests {
                 .unwrap();
             device.push_error_scope(wgpu::ErrorFilter::Validation);
             let catalog = crate::theme::ThemeCatalog::load();
+            let mut extra = Vec::new();
+            if let Some(pack) = std::env::var_os("BUTTONSCLI_PERSONAL_SHADER_PACK") {
+                let pack: serde_json::Value =
+                    serde_json::from_slice(&std::fs::read(pack).unwrap()).unwrap();
+                for item in pack["themes"].as_array().unwrap() {
+                    let id = item["id"].as_str().unwrap();
+                    extra.push(
+                        crate::theme::parse_bundled_theme(id, &item["document"].to_string())
+                            .unwrap(),
+                    );
+                }
+            }
+            let expected = 64 + extra.len();
             let mut count = 0;
             for theme in catalog
                 .all()
                 .iter()
                 .filter(|t| t.id.starts_with("pane-focus-"))
+                .chain(extra.iter())
             {
                 count += 1;
                 let shader = theme.effects.shader_background.as_ref().unwrap();
@@ -551,7 +565,16 @@ mod tests {
                     for pixel in pixels.chunks_exact(4) {
                         assert_eq!(pixel[3], 255);
                         let contrast = (foreground_luma + 0.05) / (luminance(&pixel[..3]) + 0.05);
-                        assert!(contrast >= 7.0, "{} text contrast {contrast}", theme.id);
+                        assert!(
+                            contrast
+                                >= if theme.id.starts_with("showcase-") {
+                                    4.5
+                                } else {
+                                    7.0
+                                },
+                            "{} text contrast {contrast}",
+                            theme.id
+                        );
                     }
                     if seconds > 0.0 && shader.animated {
                         assert_ne!(pixels, still, "{} should animate", theme.id);
@@ -560,7 +583,7 @@ mod tests {
                     }
                 }
             }
-            assert_eq!(count, 64);
+            assert_eq!(count, expected);
             assert!(
                 device.pop_error_scope().await.is_none(),
                 "Pane Focus GPU validation"

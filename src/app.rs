@@ -735,6 +735,8 @@ pub struct ButtonsApp {
     browser_theme_documents: Vec<serde_json::Value>,
     #[cfg(target_arch = "wasm32")]
     browser_ctx: egui::Context,
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) showcase: crate::web_showcase::Showcase,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -1795,6 +1797,8 @@ impl ButtonsApp {
             browser_theme_documents: Vec::new(),
             #[cfg(target_arch = "wasm32")]
             browser_ctx: egui::Context::default(),
+            #[cfg(target_arch = "wasm32")]
+            showcase: Default::default(),
         }
     }
 
@@ -15334,8 +15338,7 @@ fn animation_interval_ms(fps: u32) -> u64 {
 /// The terminal background, then c1–c5: c1–c3 as before (gradient, or accent,
 /// accent hover and muted), then the two most colorful terminal colors that
 /// differ clearly from those.
-#[cfg(not(target_arch = "wasm32"))]
-fn shader_palette(theme: &ThemeDefinition) -> [Color32; 6] {
+pub(crate) fn shader_palette(theme: &ThemeDefinition) -> [Color32; 6] {
     let base =
         crate::theme::parse_color(&theme.terminal_colors.background).unwrap_or(Color32::BLACK);
     let colors = theme.effects.gradient.unwrap_or([
@@ -17403,6 +17406,11 @@ impl eframe::App for ButtonsApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        #[cfg(target_arch = "wasm32")]
+        if self.showcase.config.showcase {
+            self.showcase.update(ctx);
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
         self.ensure_appearance_baseline();
         #[cfg(target_arch = "wasm32")]
@@ -17578,7 +17586,7 @@ impl eframe::App for ButtonsApp {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {}
+    fn on_exit(&mut self) {}
 
     #[cfg(target_arch = "wasm32")]
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {

@@ -77,7 +77,9 @@ keyring = { version = "=3.6.3", default-features = false, features = ["sync-secr
 keyring = { version = "=3.6.3", default-features = false, features = ["apple-native"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-eframe = { version = "0.31.1", default-features = false, features = ["glow"] }
+naga = { version = "24.0.0", features = ["wgsl-in"] }
+egui-wgpu = { version = "0.31.1", default-features = false, features = ["fragile-send-sync-non-atomic-wasm"] }
+eframe = { version = "0.31.1", default-features = false, features = ["wgpu"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Document", "Element", "HtmlCanvasElement", "Window"] }

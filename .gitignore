@@ -14,3 +14,7 @@
 # Worktrees made by Claude Code sessions.
 /.claude/worktrees/
 /scripts/__pycache__/
+
+# Local browser export contains personal theme metadata; opt in when hosting.
+/web/showcase-library.json
+/.taste-skill/

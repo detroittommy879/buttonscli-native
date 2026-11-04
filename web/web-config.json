@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "showcase": true,
+  "themes": true,
+  "bundles": true,
+  "shaders": true,
+  "editing": true,
+  "ai_generation": true,
+  "ai_help": true,
+  "animation_fps": 30
+}

@@ -716,7 +716,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
 }
 
 /// Parses a theme file the way `assets/themes/` files are loaded.
-#[cfg(test)]
+#[cfg(any(test, target_arch = "wasm32"))]
 pub(crate) fn parse_bundled_theme(file_id: &str, json: &str) -> Result<ThemeDefinition, String> {
     parse_legacy_theme(file_id, json).map_err(|error| error.to_string())
 }

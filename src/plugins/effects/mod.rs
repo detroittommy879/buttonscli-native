@@ -1,11 +1,11 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod analog_static;
-pub mod row_banding;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod row_banding;
 pub(crate) mod shader_background;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod simple_noise;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod shader_expression;
 
 /// Drops the least recently used entry once `map` holds `limit` entries.
@@ -14,7 +14,6 @@ pub(crate) mod shader_expression;
 /// number is per viewport, so a busy main window made detached Settings
 /// entries look stale: its previews evicted each other mid-frame and drew the
 /// preset pipeline instead of their own code.
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn make_room<K: Clone + Eq + std::hash::Hash, V>(
     map: &mut std::collections::HashMap<K, V>,
     limit: usize,

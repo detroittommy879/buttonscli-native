@@ -120,6 +120,17 @@
 - UI tests must not hard-code positions or theme names that depend on the
   built-in catalog/library size or status-bar width; find text in a settled frame.
 
+- Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
+  WASM uses WGPU/WebGPU and the shared shader renderer. Eframe 0.31 needs
+  a direct `egui-wgpu` fragile-send-sync feature and direct Naga for WGSL checks. Config visibility changes
+  need a reload only; Rust changes need `scripts/build-web.ps1` to refresh pkg/ and
+  its build receipt. `web/showcase-library.json` is an optional gitignored personal
+  library export. Never publish native.json or provider settings as web assets.
+- Profile packs: `scripts/generate-showcase-bundles.py` +
+  `scripts/install-showcase-profile.py`; close the app before merging native.json,
+  or its in-memory preferences can overwrite additions. Personal theme references
+  must be `personal:<profile>:<filename-stem>`, not just metadata.id.
+
 ## Validation and traps
 
 ```text

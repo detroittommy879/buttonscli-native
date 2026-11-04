@@ -42,7 +42,7 @@ body.embed button { padding: 3px 8px; }
 <main id="stage">
 <canvas id="buttonscli_canvas" aria-label="Interactive ButtonsCLI preview"></canvas>
 <div id="loading">Starting ButtonsCLI…</div>
-<div id="fallback" role="alert"><strong>The preview could not start.</strong><p id="failure-detail"></p><p>Serve the complete web folder over HTTP(S), with WebGL enabled in your browser.</p><button id="retry">Try again</button></div>
+<div id="fallback" role="alert"><strong>The preview could not start.</strong><p id="failure-detail"></p><p>Serve the complete web folder over HTTP(S), in a browser with WebGPU enabled. Localhost or HTTPS is required.</p><button id="retry">Try again</button></div>
 </main>
 <script type="module">
 if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
@@ -51,6 +51,13 @@ const file = document.getElementById("theme-file");
 const settings = document.getElementById("settings");
 document.getElementById("retry").addEventListener("click", () => location.reload());
 try {
+  const configResponse = await fetch("./web-config.json", { cache: "no-store" });
+  if (!configResponse.ok) throw new Error("Could not load web-config.json");
+  const webConfig = await configResponse.json();
+  if (webConfig.enabled === false) {
+    document.getElementById("loading").textContent = "Browser preview disabled in web-config.json.";
+    status.textContent = "Preview disabled";
+  } else {
   let version = "";
   try {
     const response = await fetch("./build-info.json", { cache: "no-store" });
@@ -66,13 +73,23 @@ try {
   await init({ module_or_path: new URL(`./pkg/buttonscli_bg.wasm${suffix}`, import.meta.url) });
   const app = new WebHandle();
   await app.start(document.getElementById("buttonscli_canvas"));
+  const libraryResponse = await fetch("./showcase-library.json", { cache: "no-store" });
+  if (!libraryResponse.ok && libraryResponse.status !== 404) throw new Error("Could not load showcase-library.json");
+  const library = libraryResponse.ok ? await libraryResponse.json() : {};
+  app.configure_showcase(JSON.stringify(webConfig), JSON.stringify(library));
   window.buttonscli = app;
   // Demo visitors get their browser language without a first-run dialog.
   try { app.skip_onboarding(); } catch { /* still starting */ }
   document.getElementById("loading").remove();
   settings.disabled = file.disabled = false;
-  const { connectSimulator } = await import(`./simulator.js${suffix}`);
-  await connectSimulator(app, status);
+  if (webConfig.showcase !== false) {
+    for (const id of ["prompt-settings", "offline-mode", "ai-mode", "desktop-prompts"]) document.getElementById(id).hidden = true;
+    document.querySelector(".file-button").hidden = true;
+    status.textContent = "Live GPU shaders · static terminal samples";
+  } else {
+    const { connectSimulator } = await import(`./simulator.js${suffix}`);
+    await connectSimulator(app, status);
+  }
   settings.addEventListener("click", () => {
     try { app.open_settings(); } catch (error) { status.textContent = String(error); }
   });
@@ -87,8 +104,9 @@ try {
       status.textContent = `Could not load theme: ${error}`;
     } finally { file.value = ""; }
   });
+  }
 } catch (error) {
-  document.getElementById("loading").remove();
+  document.getElementById("loading")?.remove();
   document.getElementById("buttonscli_canvas").style.display = "none";
   document.getElementById("fallback").style.display = "block";
   document.getElementById("failure-detail").textContent = String(error);
