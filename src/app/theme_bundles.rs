@@ -454,7 +454,7 @@ mod tests {
             .iter()
             .filter(|bundle| bundle.name.starts_with("Pane Focus / "))
             .collect();
-        assert_eq!(bundles.len(), 8);
+        assert_eq!(bundles.len(), 1);
         for bundle in bundles {
             let (ctx, mut app) = app_with_tabs(1);
             let summary = app.apply_theme_bundle(&ctx, &bundle.name).unwrap();

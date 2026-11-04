@@ -120,6 +120,8 @@
 - UI tests must not hard-code positions or theme names that depend on the
   built-in catalog/library size or status-bar width; find text in a settled frame.
 
+- **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
+  `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
   WASM uses WGPU/WebGPU and the shared shader renderer. Eframe 0.31 needs
   a direct `egui-wgpu` fragile-send-sync feature and direct Naga for WGSL checks. Config visibility changes

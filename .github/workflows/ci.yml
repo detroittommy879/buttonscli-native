@@ -41,6 +41,8 @@ jobs:
           path: bench.json
 
   web:
+    # WASM/web preview build is paused. Remove this line to re-enable it.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -485,7 +485,7 @@ mod tests {
                     );
                 }
             }
-            let expected = 64 + extra.len();
+            let expected = 8 + extra.len();
             let mut count = 0;
             for theme in catalog
                 .all()

@@ -14,9 +14,9 @@ pending-slot behavior live in `src/app/theme_bundles.rs`.
   **flattened** `SavedShader`, not a `{ "shader": ... }` object.
 - `assets/library/bundles.json`: array of bundles referencing theme IDs.
   `src/library.rs` embeds both library files. There is no separate registration.
-- `scripts/generate-pane-focus-library.py`: reproducible example producing eight
-  bundles, eight shaders and 64 themes. Run `python scripts/generate-pane-focus-library.py`.
-  It replaces only its named library entries and theme files; unrelated entries
+- `scripts/generate-pane-focus-library.py`: reproducible example producing the
+  Spectrum Steps bundle, its shader and eight themes. Run `python scripts/generate-pane-focus-library.py`.
+  It replaces every `Pane Focus /` library entry and theme files; unrelated entries
   are preserved. Edit its palettes/bodies first when revising this collection.
 
 ## Theme document
@@ -101,7 +101,7 @@ against the library. Update both copies when changing a pattern.
   `bold_weight`, and `draw_bold_bright`. Use bundled family names for portability.
 - Applying a bundle selects theme sources; it does not import a theme's
   `nativeAppearance`, change the shader-enable switch, clear Calm, or change
-  global fonts/FPS. Test with shaders both on and off. The Pane Focus sets
+  global fonts/FPS. Test with shaders both on and off. The Pane Focus bundle
   intentionally preserve these global preferences.
 - Missing themes are skipped. Personal bundles win over built-ins with the
   same name. Saved bundles hold **references**, not copies of theme files.
