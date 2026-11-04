@@ -107,7 +107,11 @@ jobs:
           mkdir dmg
           cp -R "$app" dmg/
           ln -s /Applications dmg/Applications
-          hdiutil create -volname ButtonsCLI -srcfolder dmg -format UDZO "ButtonsCLI-$version-macos-universal.dmg"
+          # hdiutil underestimates -srcfolder size for large binaries
+          # ("No space left on device"); give it explicit headroom.
+          size_mb=$(( $(du -sm dmg | cut -f1) * 2 + 20 ))
+          hdiutil create -volname ButtonsCLI -srcfolder dmg -fs HFS+ \
+            -size "${size_mb}m" -format UDZO "ButtonsCLI-$version-macos-universal.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos
