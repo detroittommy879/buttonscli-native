@@ -141,6 +141,7 @@ impl ButtonsApp {
                 .collect(),
             layout: layout_name(self.pane_layout).into(),
             visible_panes: self.visible_panes.len(),
+            row_banding_brightness: Some(self.preferences.row_banding_brightness),
         }
     }
 
@@ -208,6 +209,10 @@ impl ButtonsApp {
             } else {
                 skipped += 1;
             }
+        }
+        self.preferences.normalize_theme_sources();
+        if let Some(brightness) = bundle.row_banding_brightness {
+            self.preferences.row_banding_brightness = brightness.min(64);
         }
         self.preferences.normalize_theme_sources();
         if self.tabs.len() > 1 {
@@ -582,5 +587,25 @@ mod tests {
         );
         assert_eq!(app.preferences.terminal_theme_id, terminal);
         assert!(app.theme_overrides.is_empty());
+    }
+    #[test]
+    fn bundles_keep_row_banding_and_old_bundles_leave_it_alone() {
+        let (ctx, mut app) = app_with_tabs(1);
+        app.preferences.row_banding_brightness = 7;
+        app.save_theme_bundle("banded").unwrap();
+        let saved = app.preferences_to_save();
+        let json = serde_json::to_value(&saved.theme_bundles).unwrap();
+        assert_eq!(json[0]["row_banding_brightness"], 7);
+        app.preferences.row_banding_brightness = 0;
+        app.apply_theme_bundle(&ctx, "banded").unwrap();
+        assert_eq!(app.preferences.row_banding_brightness, 7);
+
+        app.preferences.theme_bundles.push(ThemeBundle {
+            name: "legacy".into(),
+            ..ThemeBundle::default()
+        });
+        app.preferences.row_banding_brightness = 3;
+        app.apply_theme_bundle(&ctx, "legacy").unwrap();
+        assert_eq!(app.preferences.row_banding_brightness, 3);
     }
 }

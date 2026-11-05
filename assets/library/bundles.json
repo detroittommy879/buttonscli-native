@@ -390,5 +390,91 @@
     ],
     "layout": "grid",
     "visible_panes": 4
+  },
+  {
+    "name": "summer-storm-winter-autumn",
+    "theme_id": "autumn-to-winter-v1",
+    "app_theme_id": "autumn-to-winter-v1",
+    "terminal_theme_id": "autumn-to-winter-v1",
+    "gradient_theme_id": "autumn-to-winter-v1",
+    "effects_theme_id": "autumn-to-winter-v1",
+    "panes": [
+      {
+        "theme_id": "solar-splash",
+        "font": null
+      },
+      {
+        "theme_id": "autumn-to-winter-v2",
+        "font": null
+      },
+      {
+        "theme_id": "winter-veil-v4",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 12.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "autumn-to-winter-v3",
+        "font": null
+      },
+      {
+        "theme_id": "ai-qwen-miami-night-coast-v1",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5
+  },
+  {
+    "name": "rowbanding-8",
+    "theme_id": "pane-focus-spectrum-ruby",
+    "app_theme_id": "pane-focus-spectrum-ruby",
+    "terminal_theme_id": "pane-focus-spectrum-ruby",
+    "gradient_theme_id": "pane-focus-spectrum-ruby",
+    "effects_theme_id": "pane-focus-spectrum-ruby",
+    "panes": [
+      {
+        "theme_id": "pane-focus-spectrum-ruby",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-orange",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-gold",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-leaf",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-cyan",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-blue",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-violet",
+        "font": null
+      },
+      {
+        "theme_id": "row-banding-8",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 8,
+    "row_banding_brightness": 8
   }
 ]

@@ -106,6 +106,11 @@
   `metadata.releasePickFrom`; only that marker allows overwriting a file.
   Whole-profile export: `BUTTONSCLI_EXPORT_ACTIVE_PROFILE=1 cargo test --locked
   --lib export_active_profile_into_this_checkout -- --ignored` (reads profile only).
+  Add `BUTTONSCLI_EXPORT_BUNDLES="a,b"` to copy only those bundles and their themes.
+  Bundles carry `row_banding_brightness` (absent = keep current).
+- Terminal shader/gradient time is `motion_time` (real time × `motion_speed`,
+  summed per frame so speed changes never jump); speed 0 holds the frame and
+  stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
   `animation_fps`, 1–240); repaint requests alone don't cap FPS. Use
   `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
@@ -160,6 +165,9 @@ cargo build --locked --release --bin buttonscli
   -- --include-ignored --test-threads=1` (uses owned Windows shells).
 - `scripts/native-smoke.ps1 -SkipBuild -Release` checks isolated startup, not interactive
   acceptance. Do not rebuild a running test executable; Windows locks it.
+- Real-mouse checks: Win32 `SendInput`/`mouse_event` drags against the isolated
+  debug exe, then `Get-Clipboard`. Screenshot first: a miss on the dock looks
+  like a failed copy.
 - Quick visual check: run `target/debug/buttonscli.exe` with `USERPROFILE`/`HOME` set
   to a scratch folder (isolated profile), then capture it with Win32 `PrintWindow`
   after `SetProcessDPIAware` (otherwise 150% scaling crops it). Computer-use cannot

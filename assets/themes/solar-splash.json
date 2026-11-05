@@ -1,0 +1,186 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff532b",
+        "#ffb829",
+        "#ffe05a",
+        "#00cdbb",
+        "#087dca"
+      ],
+      "custom": {
+        "expression": "let q = p + vec2<f32>(0.0, 0.12);\nlet swell = 0.11 * sin(q.x * 3.8 + t * 0.9) + 0.05 * sin(q.x * 8.0 - t * 1.3);\nlet horizon = -0.12 + swell;\nlet sky = mix(c1, c2, smoothstep(-0.1, 1.2, q.y));\nlet sunPos = q - vec2<f32>(0.35 + 0.07 * sin(t * 0.23), 0.49);\nlet radius = length(sunPos);\nlet angle = atan2(sunPos.y, sunPos.x);\nlet rays = pow(0.5 + 0.5 * sin(angle * 14.0 + t * 0.65), 4.0);\nlet halo = exp(-radius * 2.3) * (0.22 + 0.42 * rays);\nlet sunshine = mix(sky, c3, clamp(halo + 1.0 - smoothstep(0.24, 0.265, radius), 0.0, 1.0));\nlet depth = max(horizon - q.y, 0.0);\nlet ripple = sin(q.y * 23.0 + sin(q.x * 4.0 - t) * 1.9 + t * 2.3);\nlet water = mix(c5, c4, 0.44 + 0.34 * sin(q.x * 2.3 + q.y * 3.7 + t * 0.7));\nlet glints = smoothstep(0.76, 0.99, ripple) * exp(-depth * 0.65);\nlet reflection = exp(-pow((q.x - 0.35 + 0.1 * sin(q.y * 19.0 + t)) / (0.17 + depth * 0.25), 2.0));\nlet sea = mix(water, c3, clamp(glints * (0.19 + 0.7 * reflection), 0.0, 0.86));\nlet shore = 1.0 - smoothstep(0.015, 0.055, abs(q.y - horizon));\nlet scene = mix(sea, sunshine, smoothstep(horizon - 0.015, horizon + 0.015, q.y));\nlet color = mix(scene, c3, shore * 0.65);\nreturn mix(bg, color, strength);",
+        "name": "Solar Splash",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 4.0,
+      "speed": 6.0,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 80.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 76.0,
+    "staticOpacity": 0.28999999165534973
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:39:21.329Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "solar-splash",
+    "name": "Solar Splash",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:solar-splash",
+    "updatedAt": "2026-11-04T03:07:25.311Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

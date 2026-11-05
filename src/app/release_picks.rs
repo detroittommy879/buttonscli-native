@@ -694,6 +694,28 @@ mod tests {
             .iter()
             .map(|bundle| bundle.name.clone())
             .collect();
+        // BUTTONSCLI_EXPORT_BUNDLES="a,b" copies only those bundles and the
+        // personal themes they use.
+        if let Ok(names) = std::env::var("BUTTONSCLI_EXPORT_BUNDLES") {
+            let names: BTreeSet<String> = names
+                .split(',')
+                .map(|name| name.trim().to_owned())
+                .filter(|name| !name.is_empty())
+                .collect();
+            app.release_picks
+                .bundles
+                .retain(|name| names.contains(name));
+            assert_eq!(app.release_picks.bundles, names, "unknown bundle name");
+            let used: BTreeSet<String> = app
+                .preferences
+                .theme_bundles
+                .iter()
+                .filter(|bundle| names.contains(&bundle.name))
+                .flat_map(|bundle| bundle_theme_ids(bundle).into_iter().cloned())
+                .collect();
+            app.release_picks.themes.retain(|id| used.contains(id));
+            app.release_picks.shaders.clear();
+        }
         let summary = app
             .export_release_picks(Path::new(env!("CARGO_MANIFEST_DIR")))
             .unwrap();

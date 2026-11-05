@@ -24,7 +24,7 @@ A single color expression also works, e.g. `mix(c1, c2, 0.5 + 0.5 * sin(p.x + t)
 | Name | Type | What it is |
 | --- | --- | --- |
 | `p` | `vec2<f32>` | Position in the pane, centered, scaled by **Scale**. With **Y up** on, `p.y` grows upward. |
-| `t` | `f32` | Time in seconds, scaled by **Speed**. Frozen when Animate is off or Calm is on. |
+| `t` | `f32` | Time in seconds, scaled by **Speed** and the status bar's **Motion**. Frozen when Animate is off, Calm is on or Motion is 0%. |
 | `strength` | `f32` | The Strength slider, 0 to 1. |
 | `bg` | `vec3<f32>` | The terminal's background color. |
 | `c1` … `c5` | `vec3<f32>` | The five colors from the Colors row. |

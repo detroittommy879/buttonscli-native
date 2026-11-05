@@ -278,6 +278,9 @@ pub(crate) struct Preferences {
     pub(crate) theme_browser_collection: crate::theme_browser::ThemeCollection,
     pub(crate) pane_hover_label: PaneHoverLabel,
     pub(crate) calm_mode: bool,
+    /// Multiplies every pane's shader and gradient motion: 0 stops it,
+    /// 1 is each theme's own speed, 2 doubles it.
+    pub(crate) motion_speed: f32,
     pub(crate) effects_focused_pane_only: bool,
     pub(crate) typography: Typography,
     pub(crate) show_sidebar: bool,
@@ -344,6 +347,7 @@ impl Default for Preferences {
             theme_browser_collection: Default::default(),
             pane_hover_label: PaneHoverLabel::default(),
             calm_mode: false,
+            motion_speed: 1.0,
             effects_focused_pane_only: false,
             typography: Typography::default(),
             show_sidebar: true,
@@ -351,7 +355,7 @@ impl Default for Preferences {
             show_action_buttons: false,
             pane_colors_distinct: true,
             dock_width: 176.0,
-            dock_compact: false,
+            dock_compact: true,
             dock_auto_hide: false,
             dock_auto_hide_ms: 4_000,
             dock_opacity: 0.35,
@@ -376,6 +380,9 @@ impl Default for Preferences {
         }
     }
 }
+
+/// Highest global motion speed (200%).
+pub(crate) const MAX_MOTION_SPEED: f32 = 2.0;
 
 /// Most shaders the Pattern picker keeps.
 /// Highest "Animation FPS limit" (shaders and effects, app-wide).
@@ -408,6 +415,10 @@ pub(crate) struct ThemeBundle {
     /// "single", "columns", "rows" or "grid"; empty keeps the current layout.
     pub(crate) layout: String,
     pub(crate) visible_panes: usize,
+    /// Row banding (± brightness) saved with the bundle; `None` (older
+    /// bundles) keeps the current value.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) row_banding_brightness: Option<u8>,
 }
 
 /// Named sets of open terminals that can be reopened later.
@@ -493,7 +504,7 @@ impl Default for KeyboardPreferences {
     fn default() -> Self {
         Self {
             ctrl_c_copies_selection: true,
-            copy_on_selection: false,
+            copy_on_selection: true,
             bracketed_paste: true,
             option_as_meta: false,
         }
@@ -578,6 +589,11 @@ impl Preferences {
         }
         self.row_banding_brightness = self.row_banding_brightness.min(64);
         self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
+        self.motion_speed = if self.motion_speed.is_finite() {
+            self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
+        } else {
+            1.0
+        };
         let mut seen = std::collections::HashSet::new();
         self.favorite_theme_ids
             .retain(|id| !id.is_empty() && seen.insert(id.clone()));

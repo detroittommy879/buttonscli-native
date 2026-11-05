@@ -54,7 +54,8 @@ shared theme; the colors do not cycle.
 
 Its matching reusable shader, **Pane Focus / Ink Ramp**, is in
 **Shaders → Pattern → ◆ Built-in shaders**. The bundle uses your shared font
-and size and preserves your global shader and Calm settings. Turn on
+and size and preserves your global shader and Calm settings. Bundles you save
+also keep your **Row banding** value and restore it when applied. Turn on
 **Shader backgrounds on (GPU)** to see the pattern; with shaders off, each
 pane keeps its color through a static black-to-color gradient.
 

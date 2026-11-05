@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — 0.2.0 (branch feat/v0.2-defaults-motion-copy)
+
+- New installs: the first-run dialog also asks for a look (Minimal, Moderate,
+  Showoff). Compact command dock and copy-on-selection are on by default.
+- Status bar: **Motion N%** scales every pane's shader and gradient motion
+  (0–200%; 0% holds the frame and stops redrawing). **◐ Look** replaces the
+  Calm button and holds the look presets, Calm effects and the GPU shader switch.
+- Theme bundles now save and restore Row banding. New built-in bundles:
+  summer-storm-winter-autumn and rowbanding-8.
+
 ## 2026-10-07 — Stable Windows daily-use checkpoint
 
 The recommended source branch is `main`. The core terminal workspace is ready

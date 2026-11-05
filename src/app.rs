@@ -536,6 +536,12 @@ pub struct ButtonsApp {
     last_saved_preferences: Vec<u8>,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     settings_autosave_at: f64,
+    /// Shader/gradient time: real seconds scaled by `motion_speed`, summed
+    /// frame by frame so a speed change never jumps the animation.
+    #[cfg(not(target_arch = "wasm32"))]
+    motion_time: f64,
+    #[cfg(not(target_arch = "wasm32"))]
+    motion_clock_at: Option<f64>,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1602,6 +1608,10 @@ impl ButtonsApp {
             last_saved_preferences: Vec::new(),
             settings_autosave_at: 0.0,
             #[cfg(not(target_arch = "wasm32"))]
+            motion_time: 0.0,
+            #[cfg(not(target_arch = "wasm32"))]
+            motion_clock_at: None,
+            #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_busy: false,
@@ -1889,6 +1899,17 @@ impl ButtonsApp {
             colors.status_background = color;
         }
         colors
+    }
+
+    /// Adds the real time since the last frame, times `motion_speed`.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn advance_motion_clock(&mut self, now: f64) {
+        if let Some(last) = self.motion_clock_at {
+            let elapsed = (now - last).clamp(0.0, 1.0);
+            self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
+            self.motion_time %= 3600.0 * 24.0;
+        }
+        self.motion_clock_at = Some(now);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -3480,6 +3501,7 @@ impl ButtonsApp {
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps,
+            motion: (self.motion_time, self.preferences.motion_speed),
             keyboard_navigation: self.keyboard_navigation,
         };
         render_pane_tree(ui, &tree, rect, &mut render_state);
@@ -5380,22 +5402,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         {
                             let controls_enabled = workspace_controls_available();
-                            let calm_label = crate::i18n::text(&self.locale,
-                                crate::i18n::MessageKey::CalmMode,
-                                &[],
-                            );
-                            let calm = if controls_enabled {
-                                ui.spaced_selectable_label(self.preferences.calm_mode, calm_label)
-                            } else {
-                                ui.spaced_label(calm_label)
-                            }
-                                .on_hover_text(crate::i18n::text(&self.locale,
-                                    crate::i18n::MessageKey::CalmModeHelp,
-                                    &[],
-                                ));
-                            if controls_enabled && calm.clicked() {
-                                self.preferences.calm_mode = !self.preferences.calm_mode;
-                            }
+                            self.motion_status_controls(ui, ctx, controls_enabled);
                             let zoom_in = ui
                                 .add_enabled(controls_enabled, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+")))
                                 .on_hover_text(crate::i18n::text(&self.locale,
@@ -5973,6 +5980,11 @@ impl ButtonsApp {
         let mut mode = self.preferences.localization.mode;
         let mut locale = self.preferences.localization.manual_locale.clone();
         let mut confirmed = false;
+        #[cfg(not(target_arch = "wasm32"))]
+        let look_id = egui::Id::new("first-run-look");
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut first_run_look: looks::LookPreset =
+            ctx.data(|data| data.get_temp(look_id)).unwrap_or_default();
         egui::Modal::new(egui::Id::new("localization-first-run"))
             .show(ctx, |ui| {
                 ui.set_max_width(440.0);
@@ -6002,14 +6014,30 @@ impl ButtonsApp {
                 if mode == LocalizationMode::Manual {
                     locale_selector(ui, "onboarding-locale-selector", &mut locale);
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.spaced_heading(crate::i18n::literal(&self.locale, "Choose a look"));
+                    ui.spaced_label(crate::i18n::literal(
+                        &self.locale,
+                        "How much color and motion would you like? You can change this any time from Look in the status bar.",
+                    ));
+                    looks::look_slider(ui, &mut first_run_look);
+                    ui.spaced_small(crate::i18n::literal(&self.locale, first_run_look.description()));
+                }
                 ui.add_space(8.0);
                 confirmed = ui.spaced_button(crate::i18n::literal(&self.locale, "Continue")).clicked();
             });
         self.preferences.localization.mode = mode;
         self.preferences.localization.manual_locale = locale;
+        #[cfg(not(target_arch = "wasm32"))]
+        ctx.data_mut(|data| data.insert_temp(look_id, first_run_look));
         if confirmed {
             self.preferences.localization.first_run_language_confirmed = true;
             self.show_localization_onboarding = false;
+            #[cfg(not(target_arch = "wasm32"))]
+            self.apply_look_preset(ctx, first_run_look);
         }
         self.refresh_locale();
     }
@@ -15398,6 +15426,8 @@ struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    /// The motion clock and the global speed; speed 0 holds every frame.
+    motion: (f64, f32),
     focused: bool,
     enabled: bool,
     advanced_effects: bool,
@@ -15418,7 +15448,9 @@ fn terminal_surface(
         font_type: terminal_fonts.0,
         bold_font_type: Some(terminal_fonts.1),
     });
-    let time = animation_clock(ui.input(|input| input.time), interaction.animation_fps);
+    let (motion_time, motion_speed) = interaction.motion;
+    let moving = motion_speed > 0.0;
+    let time = animation_clock(motion_time, interaction.animation_fps);
     let gradient = theme
         .effects
         .gradient
@@ -15489,7 +15521,10 @@ fn terminal_surface(
         )
     });
     let shader_active = background_callback.is_some();
-    if background_callback.is_some() && shader.is_some_and(|s| s.animated && s.speed > 0.0) {
+    if moving
+        && background_callback.is_some()
+        && shader.is_some_and(|s| s.animated && s.speed > 0.0)
+    {
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(animation_interval_ms(
                 interaction.animation_fps,
@@ -15546,7 +15581,7 @@ fn terminal_surface(
             time,
             interaction.advanced_effects,
             interaction.animation_fps,
-            shader_active,
+            shader_active || !moving,
         ),
         &mut tab.effect_textures,
     );
@@ -15640,7 +15675,8 @@ fn paint_terminal_effects(
 ) {
     use crate::plugins::effects::simple_noise::{paint_noise, NoiseFrame};
     let effects = &theme.effects;
-    let (time, advanced, animation_fps, shader_active) = rendering;
+    // The last flag: a shader covers the gradient, or motion is at 0%.
+    let (time, advanced, animation_fps, gradient_still) = rendering;
     if effects.master_disabled {
         *textures = Default::default();
         return;
@@ -15716,7 +15752,7 @@ fn paint_terminal_effects(
     let mut repaint_after_ms = if static_active {
         Some(34)
     } else {
-        crate::dock::effects_need_repaint(effects.gradient_animation && !shader_active, 0.0)
+        crate::dock::effects_need_repaint(effects.gradient_animation && !gradient_still, 0.0)
             .then_some(80)
     };
     if let Some(noise_delay) = noise_plan.repaint_after_ms {
@@ -15877,6 +15913,7 @@ struct PaneRenderState<'a> {
     keyboard: &'a crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    motion: (f64, f32),
     right_click_copies_selection: bool,
     advanced_effects: bool,
     shader_backgrounds_enabled: bool,
@@ -15936,6 +15973,7 @@ fn render_pane_tree(
                     keyboard: state.keyboard.clone(),
                     row_brightness: state.row_brightness,
                     animation_fps: state.animation_fps,
+                    motion: state.motion,
                     focused: state.focused == *index
                         && !state.modal_open
                         && !state.keyboard_navigation,
@@ -17386,6 +17424,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
+mod looks;
+#[cfg(not(target_arch = "wasm32"))]
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
@@ -17413,6 +17453,8 @@ impl eframe::App for ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         self.ensure_appearance_baseline();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.advance_motion_clock(ctx.input(|input| input.time));
         #[cfg(target_arch = "wasm32")]
         let _ = frame;
         self.refresh_locale();
@@ -20929,13 +20971,17 @@ Start-Sleep -Seconds 300
                 pointer_events(start, egui::PointerButton::Primary, true),
             );
             render(app, &ctx, vec![egui::Event::PointerMoved(end)]);
-            render(
+            let released = render(
                 app,
                 &ctx,
                 pointer_events(end, egui::PointerButton::Primary, false),
             );
             assert_eq!(app.focused, index);
             let selected = app.tabs[index].backend.selectable_content();
+            assert!(
+                released.platform_output.commands.iter().any(|command| matches!(command, egui::OutputCommand::CopyText(text) if text == &selected)),
+                "copy on selection puts pane {index}'s selection on the clipboard"
+            );
             for (other, tab) in app.tabs.iter().enumerate() {
                 if other != index {
                     assert_eq!(

@@ -29,8 +29,8 @@ Lower **FPS limit (all panes)** under **✦ Shader** in the status bar, or on
 the Shaders tab. 15–30 is plenty for slow shaders.
 
 **It stopped moving.**
-Check **Animate**, Speed above 0, and that the theme wasn't applied with
-**Calm**.
+Check **Animate**, Speed above 0, **Motion** in the status bar above 0%, and
+that **Calm effects** (under **◐ Look**) is off.
 
 **The code shows an error.**
 Read the line number, or click **Fix with AI**. Common causes: `2` instead of
