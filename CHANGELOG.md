@@ -9,6 +9,10 @@
   Calm button and holds the look presets, Calm effects and the GPU shader switch.
 - Theme bundles now save and restore Row banding. New built-in bundles:
   summer-storm-winter-autumn and rowbanding-8.
+- Agent control without Node: the new `buttonsclictl` console helper (and
+  `buttonscli ctl` / `buttonscli mcp`) replaces the Node CLI and MCP server,
+  which remain as a legacy option. The MCP server adds tool annotations and
+  reports the app version. **Agent Inst.** says whether Node is installed.
 
 ## 2026-10-07 — Stable Windows daily-use checkpoint
 

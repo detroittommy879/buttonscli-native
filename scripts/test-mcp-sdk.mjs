@@ -31,6 +31,12 @@ const api = createServer(async (request, response) => {
 });
 
 const helperPath = fileURLToPath(new URL("./buttonscli-mcp.mjs", import.meta.url));
+// --server <exe> tests the Rust helper (`<exe> mcp`) instead of the Node one.
+const serverArg = process.argv.indexOf("--server");
+const serverPath = serverArg === -1 ? null : process.argv[serverArg + 1];
+if (serverArg !== -1 && !serverPath) {
+  throw new Error("--server requires the path to buttonsclictl.");
+}
 const descriptorArg = process.argv.indexOf("--descriptor");
 const externalDescriptorPath = descriptorArg === -1 ? null : process.argv[descriptorArg + 1];
 if (descriptorArg !== -1 && !externalDescriptorPath) {
@@ -89,8 +95,8 @@ try {
   const stdioModule = await import(pathToFileURL(resolveFromSdk.resolve("@modelcontextprotocol/client/stdio")).href);
   client = new clientModule.Client({ name: "buttonscli-native-acceptance", version: "1.0.0" });
   await client.connect(new stdioModule.StdioClientTransport({
-    command: process.execPath,
-    args: [helperPath],
+    command: serverPath ?? process.execPath,
+    args: serverPath ? ["mcp"] : [helperPath],
     env: { ...process.env, BUTTONSCLI_CONTROL_INFO_PATH: descriptorPath },
   }));
 
@@ -116,7 +122,12 @@ try {
     ]);
   }
 
-  process.stdout.write(`Official MCP TypeScript client connected to ${externalDescriptorPath ? "the live native app" : "the fake API"}, listed 14 tools, and called status/tabs successfully.\n`);
+  if (serverPath) {
+    const run = listed.tools.find((tool) => tool.name === "run");
+    assert.equal(run.annotations?.destructiveHint, true);
+    assert.equal(listed.tools.find((tool) => tool.name === "read").annotations?.readOnlyHint, true);
+  }
+  process.stdout.write(`Official MCP TypeScript client (${serverPath ? "Rust" : "Node"} server) connected to ${externalDescriptorPath ? "the live native app" : "the fake API"}, listed 14 tools, and called status/tabs successfully.\n`);
 } finally {
   if (client) await client.close().catch(() => {});
   if (apiListening) await new Promise((resolve) => api.close(resolve));

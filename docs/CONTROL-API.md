@@ -14,16 +14,63 @@ it when launched with
 ## Copy the exact instance handoff
 
 With the feature enabled, click **Agent Inst.** in the status bar. The app
-copies instructions containing the exact connection-file path, the native CLI
-helper path, and an example MCP server entry. The connection file
+copies instructions containing the exact connection-file path, the control
+helper command, and an example MCP server entry. The connection file
 contains the temporary token; the copied instructions do not contain the
 token.
+
+## The `buttonsclictl` helper (no Node needed)
+
+`buttonsclictl` is a small console program that ships next to the app
+(`buttonsclictl.exe` on Windows; `cargo install` installs it too). It needs no
+runtime: no Node.js, Python or .NET.
+
+```text
+buttonsclictl --help
+buttonsclictl status
+buttonsclictl run --tab active "git status"
+buttonsclictl mcp        # stdio MCP server for AI agents
+```
+
+The app itself accepts the same commands as `buttonscli ctl <command>` and
+`buttonscli mcp`, for installs that ship only one file. On Windows the release
+app is a GUI program, so those print only into pipes (which is how agents and
+MCP clients run them), not into an interactive console; use `buttonsclictl`
+there. **Agent Inst.** names `buttonsclictl` when it sits next to the app, and
+otherwise `buttonscli ctl`.
+
+MCP entry:
+
+```json
+{
+  "mcpServers": {
+    "buttonscli-native": {
+      "command": "C:/Program Files/ButtonsCLI/buttonsclictl.exe",
+      "args": ["mcp"],
+      "env": { "BUTTONSCLI_CONTROL_INFO_PATH": "C:/Users/you/.buttonscli-native/control" }
+    }
+  }
+}
+```
+
+The Rust server offers the same 14 tools as the Node one, adds MCP tool
+annotations (`readOnlyHint` for status/tabs/read/waits/presets,
+`destructiveHint` for send/run/key/preset_run), reports the app version, and
+negotiates protocol `2025-06-18` (also `2025-03-26` and `2024-11-05`). Tool
+calls run concurrently, so a long `run` does not block other requests.
 
 Native files live under `~/.buttonscli-native/`:
 
 - `control/<instance-id>.json` is the current connection descriptor.
-- `helpers/buttonsclictl-<source-hash>.mjs` is the matching Node helper.
-- `helpers/buttonscli-mcp-<source-hash>.mjs` is the optional stdio MCP server.
+- `helpers/buttonsclictl-<source-hash>.mjs` is the legacy Node helper.
+- `helpers/buttonscli-mcp-<source-hash>.mjs` is the legacy Node MCP server.
+
+### Legacy Node helpers
+
+The Node helpers still install and still work, for now; **Agent Inst.** lists
+them last and says whether Node was found on `PATH`. They will be removed in a
+later release. The rest of this page describes behavior that both helpers
+share.
 
 The helper is a native adaptation of the read-only reference copy at original
 revision `032c9f21a17f17e48974f57259b1ad4a6506b858` (source SHA-256
@@ -42,15 +89,15 @@ file. Normal shutdown removes only the descriptor owned by that instance and
 rotates the token on the next run. A crash may leave a stale file; the helper
 checks live status and ignores it.
 
-Node is needed only when using an optional helper, not for the desktop app.
-The helper supports the original commands: `status`, `tabs`, `create-tab`,
+Node is needed only for the legacy helpers, not for the desktop app or
+`buttonsclictl`. Both helpers support the original commands: `status`, `tabs`, `create-tab`,
 `rename-tab`, `open-layout`, `read`, `wait-for-text`, `wait-for-quiet`, `send`,
 `run`, `key`, `presets`, and `preset-run`.
 
 ## Optional MCP server
 
-The copied `mcpServers` JSON example starts a local Node stdio server and
-points it at the native `control/` directory. Adapt its placement to your MCP
+The copied `mcpServers` JSON example starts `buttonsclictl mcp` (or the
+legacy Node server) and points it at the native `control/` directory. Adapt its placement to your MCP
 client's configuration format. For each tool call, it checks descriptors and
 connects only if exactly one native instance is live. If multiple instances
 are live, set `BUTTONSCLI_CONTROL_INFO_PATH` to the exact descriptor file in

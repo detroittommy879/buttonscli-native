@@ -375,18 +375,20 @@ impl ControlServer {
 
     pub(crate) fn agent_instructions(&self) -> String {
         let info_path = self.info_path.to_string_lossy();
-        let helper_path = self.helper_path.to_string_lossy();
-        let mcp_helper_path = self.mcp_helper_path.to_string_lossy();
         let control_dir = self
             .info_path
             .parent()
             .map(|path| path.to_string_lossy().into_owned())
             .unwrap_or_default();
+        let (program, prefix) = ctl_command();
+        let program = program.to_string_lossy().into_owned();
+        let mut mcp_args = prefix.clone();
+        mcp_args.push("mcp");
         let mcp_config = json!({
             "mcpServers": {
                 "buttonscli-native": {
-                    "command": "node",
-                    "args": [mcp_helper_path.as_ref()],
+                    "command": program,
+                    "args": mcp_args,
                     "env": {
                         "BUTTONSCLI_CONTROL_INFO_PATH": control_dir,
                     }
@@ -395,14 +397,67 @@ impl ControlServer {
         });
         let mcp_config =
             serde_json::to_string_pretty(&mcp_config).unwrap_or_else(|_| "{}".to_owned());
+        let invoke = |command: &str| {
+            let mut words = vec!["&".to_owned(), powershell_literal(&program)];
+            words.extend(prefix.iter().map(|word| (*word).to_owned()));
+            words.push(command.to_owned());
+            words.join(" ")
+        };
+        let helper_path = self.helper_path.to_string_lossy();
+        let legacy_mcp = json!({
+            "mcpServers": {
+                "buttonscli-native": {
+                    "command": "node",
+                    "args": [self.mcp_helper_path.to_string_lossy()],
+                    "env": { "BUTTONSCLI_CONTROL_INFO_PATH": control_dir },
+                }
+            }
+        });
+        let legacy_mcp =
+            serde_json::to_string_pretty(&legacy_mcp).unwrap_or_else(|_| "{}".to_owned());
+        let node_note = if find_on_path("node").is_some() {
+            "Node.js was found on PATH."
+        } else {
+            "Node.js was NOT found on PATH, so these will not run until it is installed. Use the commands above instead."
+        };
         format!(
-            "Use the native ButtonsCLI instance selected by this exact connection file. The file contains a temporary local token; read it through the helper and never copy or print its contents.\n\nPowerShell:\n$env:BUTTONSCLI_CONTROL_INFO_PATH = {}\nnode {} status --json\nnode {} tabs --json\n\nFor other commands, use the same environment variable and helper path. This native instance supports status, tabs, read, send, key, run, create, rename, layout, and presets. Input modes are raw, bracketed, and paced slow-typed. Grid columns respect the current window's minimum pane sizes and may be reduced when space is limited.\n\nOptional MCP setup (stdio): add this example entry to an MCP client that accepts the mcpServers JSON format. Clients can use different config formats. The entry probes this native control directory and connects only when exactly one instance is live. If multiple instances are running, set BUTTONSCLI_CONTROL_INFO_PATH to the exact descriptor file. The client process receives local control access while connected.\n{}\n",
-            powershell_literal(&info_path),
-            powershell_literal(&helper_path),
-            powershell_literal(&helper_path),
-            mcp_config,
+            "Use the native ButtonsCLI instance selected by this exact connection file. The file contains a temporary local token; read it through the helper and never copy or print its contents.\n\nPowerShell:\n$env:BUTTONSCLI_CONTROL_INFO_PATH = {info}\n{status}\n{tabs}\n{help}\n\nFor other commands, use the same environment variable and helper. This native instance supports status, tabs, read, wait-for-text, wait-for-quiet, send, key, run, create-tab, rename-tab, open-layout, presets and preset-run. Input modes are raw, bracketed, and paced slow-typed. Grid columns respect the current window's minimum pane sizes and may be reduced when space is limited.\n\nOptional MCP setup (stdio): add this example entry to an MCP client that accepts the mcpServers JSON format. Clients can use different config formats. The entry probes this native control directory and connects only when exactly one instance is live. If multiple instances are running, set BUTTONSCLI_CONTROL_INFO_PATH to the exact descriptor file. The client process receives local control access while connected.\n{mcp}\n\nLegacy Node.js helpers (optional, will be removed in a later release). {node_note}\nnode {node_helper} status --json\n{legacy_mcp}\n",
+            info = powershell_literal(&info_path),
+            status = invoke("status --json"),
+            tabs = invoke("tabs --json"),
+            help = invoke("--help"),
+            mcp = mcp_config,
+            node_helper = powershell_literal(&helper_path),
         )
     }
+}
+
+/// The Rust control helper: `buttonsclictl` next to the app, else the app
+/// itself with a `ctl` argument (the release Windows app prints only into
+/// pipes, which is what agents and MCP clients use).
+fn ctl_command() -> (PathBuf, Vec<&'static str>) {
+    let app = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("buttonscli"));
+    let sibling = app.with_file_name(crate::ctl::CTL_BINARY);
+    if sibling.is_file() {
+        (sibling, Vec::new())
+    } else {
+        (app, vec!["ctl"])
+    }
+}
+
+/// First `name` (plus Windows executable extensions) found in PATH.
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    let extensions: &[&str] = if cfg!(windows) {
+        &[".exe", ".cmd", ".bat", ""]
+    } else {
+        &[""]
+    };
+    std::env::split_paths(&std::env::var_os("PATH")?).find_map(|dir| {
+        extensions
+            .iter()
+            .map(|extension| dir.join(format!("{name}{extension}")))
+            .find(|candidate| candidate.is_file())
+    })
 }
 
 fn install_cli_helper(native_root: &Path) -> Result<PathBuf, String> {

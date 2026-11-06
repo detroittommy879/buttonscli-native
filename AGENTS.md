@@ -174,6 +174,13 @@ cargo build --locked --release --bin buttonscli
   target the uninstalled exe. Stop only that debug process afterwards.
 - Existing incremental-cache/PDB-collision warnings are nonfatal. Fix actual errors;
   do not delete broad caches. `--lib` avoids the test binary/library output collision.
+- Agent control client: `src/ctl/` (lib `buttonscli::ctl`), shipped as the console
+  bin `buttonsclictl` (`ctl`/`mcp`) and as `buttonscli ctl|mcp`. The release app is a
+  Windows GUI exe, so it only prints into pipes. Keep `scripts/*.mjs` (legacy Node)
+  behavior in sync until they are removed; `node scripts/test-mcp-sdk.mjs --server
+  target/debug/buttonsclictl.exe [--descriptor <live file>]` runs the official MCP
+  client against the Rust server. Send integer JSON (`client::number`): the API
+  rejects `120.0`.
 - Release AI Help/control has access gates; see `docs/dev/LOCAL-FEATURE-FLAGS.md` for isolated
   testing. Keep keys in OS credentials; AI Help executes only reviewed commands.
 - Cargo Git installation can retain local vendor patches; crates.io publication cannot

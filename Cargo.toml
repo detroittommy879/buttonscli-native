@@ -17,6 +17,11 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [[bin]]
+name = "buttonsclictl"
+path = "src/bin/buttonsclictl.rs"
+required-features = ["desktop"]
+
+[[bin]]
 name = "native-release"
 path = "src/bin/native-release.rs"
 required-features = ["release-tools"]

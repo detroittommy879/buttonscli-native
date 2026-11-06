@@ -3,6 +3,15 @@
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     use buttonscli::startup::StartupRequest;
+    // `buttonscli ctl <command>` / `buttonscli mcp`: the agent control helper,
+    // for installs that ship only this file. On Windows prefer
+    // `buttonsclictl.exe`: this GUI build prints only into pipes, not consoles.
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        Some("ctl") => std::process::exit(buttonscli::ctl::main(&args[1..])),
+        Some("mcp") => std::process::exit(buttonscli::ctl::main(&args)),
+        _ => {}
+    }
     let startup = match StartupRequest::parse(std::env::args().skip(1)) {
         Ok(StartupRequest::Launch(options)) => options,
         Ok(StartupRequest::Help) => {

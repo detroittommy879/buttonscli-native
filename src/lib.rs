@@ -11,6 +11,8 @@ mod control;
 #[cfg(not(target_arch = "wasm32"))]
 mod cool_stuff;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod ctl;
+#[cfg(not(target_arch = "wasm32"))]
 mod display;
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]

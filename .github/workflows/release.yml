@@ -23,14 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release --locked --bin buttonscli
+      - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl
       - name: Zip the exe
         shell: pwsh
         run: |
           $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages.Where({ $_.name -eq 'buttonscli' }).version
           $dir = "buttonscli-$version-windows-x64"
           New-Item -ItemType Directory $dir | Out-Null
-          Copy-Item target/release/buttonscli.exe, README.md, LICENSE-MIT, LICENSE-APACHE, THIRD_PARTY.md $dir
+          Copy-Item target/release/buttonscli.exe, target/release/buttonsclictl.exe, README.md, LICENSE-MIT, LICENSE-APACHE, THIRD_PARTY.md $dir
           Compress-Archive -Path $dir -DestinationPath "$dir.zip"
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev pkg-config
-      - run: cargo build --release --locked --bin buttonscli
+      - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl
       - name: Make the tarball and AppImage
         env:
           # appimagetool is itself an AppImage; runners have no FUSE.
@@ -56,11 +56,11 @@ jobs:
           version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "buttonscli") | .version')
           dir="buttonscli-$version-linux-x86_64"
           mkdir "$dir"
-          cp target/release/buttonscli README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md "$dir"/
+          cp target/release/buttonscli target/release/buttonsclictl README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md "$dir"/
           tar czf "$dir.tar.gz" "$dir"
 
           mkdir -p AppDir/usr/bin
-          cp target/release/buttonscli AppDir/usr/bin/
+          cp target/release/buttonscli target/release/buttonsclictl AppDir/usr/bin/
           cp packaging/buttonscli.desktop AppDir/
           cp packaging/icon.png AppDir/buttonscli.png
           ln -s usr/bin/buttonscli AppDir/AppRun
@@ -81,8 +81,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
-      - run: cargo build --release --locked --bin buttonscli --target aarch64-apple-darwin
-      - run: cargo build --release --locked --bin buttonscli --target x86_64-apple-darwin
+      - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl --target aarch64-apple-darwin
+      - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl --target x86_64-apple-darwin
       - name: Make the universal .app and .dmg
         run: |
           version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "buttonscli") | .version')
@@ -91,6 +91,7 @@ jobs:
           lipo -create -output "$app/Contents/MacOS/buttonscli" \
             target/aarch64-apple-darwin/release/buttonscli \
             target/x86_64-apple-darwin/release/buttonscli
+          lipo -create -output "$app/Contents/MacOS/buttonsclictl"             target/aarch64-apple-darwin/release/buttonsclictl             target/x86_64-apple-darwin/release/buttonsclictl
           sed "s/@VERSION@/$version/g" packaging/Info.plist > "$app/Contents/Info.plist"
 
           mkdir icon.iconset
