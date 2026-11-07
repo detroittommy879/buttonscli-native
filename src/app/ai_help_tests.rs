@@ -346,7 +346,7 @@ fn ai_help_terminal_picker_and_snapshot_checkbox_prepare_the_selected_terminal()
     let _ = frame(&ctx, &mut state, &view, click(pos, false), size, &commands);
     // Popup contents settle on the following pass (including headless Linux).
     let output = frame(&ctx, &mut state, &view, vec![], size, &commands);
-    let label = "term1 · AI simulation · Linux / Bash · #41";
+    let label = "term1 · SIMULATED · AI simulation · Linux / Bash · #41";
     let pos = text_rect(&output, label)
         .expect("terminal picker lists stable IDs and shells")
         .center();

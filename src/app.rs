@@ -5207,6 +5207,11 @@ impl ButtonsApp {
     }
 
     fn status_bar(&mut self, ctx: &egui::Context) {
+        // Minimize/restore can report a transient 0/1-point surface. Do not
+        // persist a many-row toolbar measurement for that unusable width.
+        if ctx.screen_rect().width() < 160.0 || ctx.screen_rect().height() < 96.0 {
+            return;
+        }
         let colors = self.colors();
         let terminal_size = self.preferences.typography.terminal.size;
         #[cfg(not(target_arch = "wasm32"))]
@@ -5229,7 +5234,23 @@ impl ButtonsApp {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 #[cfg(not(target_arch = "wasm32"))]
                 self.appearance_background_menu(ui, false);
-                centered_wrapping_row(ui, |ui| {
+                let line = ui.text_style_height(&TextStyle::Button) + 2.0 * ui.spacing().button_padding.y;
+                let labels = [crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[]), crate::i18n::literal(&self.locale, "Settings")];
+                let pinned_width: f32 = labels.iter().map(|label| {
+                    crate::ui_text::spaced_text(ui, label.clone()).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, TextStyle::Button).size().x
+                        + 2.0 * ui.spacing().button_padding.x + ui.spacing().item_spacing.x
+                }).sum();
+                ui.horizontal(|ui| {
+                let width = (ui.available_width() - pinned_width - 8.0).max(40.0);
+                ui.allocate_ui_with_layout(Vec2::new(width, line), Layout::top_down(Align::Min), |ui| {
+                ui.set_width(width);
+                ui.style_mut().always_scroll_the_only_direction = true;
+                egui::ScrollArea::horizontal()
+                    .id_salt("status-controls-horizontal")
+                    .max_height(line)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                centered_status_row(ui, |ui| {
                     #[cfg(not(target_arch = "wasm32"))]
                     let status_label = "SHELL READY";
                     #[cfg(target_arch = "wasm32")]
@@ -5271,7 +5292,7 @@ impl ButtonsApp {
                         let mut shader_action = None;
                         let mut fps = self.preferences.animation_fps;
                         let mut fps_done = false;
-                        ui.horizontal(|ui| {
+                        // Keep each control in the outer wrapping row.
                             ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
@@ -5290,7 +5311,6 @@ impl ButtonsApp {
                             })
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
-                        });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
                         if fps != self.preferences.animation_fps {
                             self.preferences.animation_fps = fps;
@@ -5397,16 +5417,6 @@ impl ButtonsApp {
                             }
                         }
                         #[cfg(not(target_arch = "wasm32"))]
-                        if ui.spaced_small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
-                            self.open_ai_help();
-                        }
-                        if ui.add(crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Settings"))
-                            .small().selected(self.show_settings))
-                            .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
-                            .clicked() {
-                            self.open_settings(ctx);
-                        }
-                        #[cfg(not(target_arch = "wasm32"))]
                         {
                             let controls_enabled = workspace_controls_available();
                             self.motion_status_controls(ui, ctx, controls_enabled);
@@ -5445,6 +5455,20 @@ impl ButtonsApp {
                                 self.zoom_focused_terminal(crate::dock::ZoomAction::Reset);
                             }
                         }
+                });
+                });
+                });
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if ui.spaced_small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
+                            self.open_ai_help();
+                        }
+                        if ui.add(crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Settings"))
+                            .small().selected(self.show_settings))
+                            .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
+                            .clicked() {
+                            self.open_settings(ctx);
+                        }
+
                 });
             });
     }
@@ -14368,11 +14392,11 @@ pub(crate) fn wrapping_row<R>(
     ui.allocate_ui_with_layout(size, layout, add_contents)
 }
 
-/// A wrapping row centered on one fixed line height, for rows that mix
+/// A single status row centered on one fixed line height, for rows that mix
 /// labels, small buttons and full buttons (the status bar). Top-aligned,
 /// small buttons rode up into the row above once it wrapped (150% scaling).
 /// The height is fixed up front so centering never shifts as the row grows.
-fn centered_wrapping_row<R>(
+fn centered_status_row<R>(
     ui: &mut egui::Ui,
     add_contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
@@ -14388,7 +14412,7 @@ fn centered_wrapping_row<R>(
     );
     ui.allocate_ui_with_layout(
         size,
-        Layout::left_to_right(Align::Center).with_main_wrap(true),
+        Layout::left_to_right(Align::Center).with_main_wrap(false),
         add_contents,
     )
 }
@@ -16611,6 +16635,8 @@ mod looks;
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]

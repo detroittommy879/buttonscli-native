@@ -49,6 +49,19 @@ impl AiHelpWindowState {
 }
 
 impl ChatView {
+    fn terminal_label(terminal: &ChatTerminal) -> String {
+        format!(
+            "{} · {} · {} · #{}",
+            terminal.title,
+            if terminal.simulated {
+                "SIMULATED"
+            } else {
+                "Real shell"
+            },
+            terminal.shell,
+            terminal.id
+        )
+    }
     fn selected(&self, state: &AiHelpWindowState) -> Option<&ChatTerminal> {
         let id = state.selected_target.as_ref()?.0;
         self.terminals.iter().find(|t| t.id == id && !t.exited)
@@ -132,10 +145,10 @@ impl ChatView {
                 let selected = previous.as_ref().map_or_else(
                     || "Chat only".to_owned(),
                     |(id, title)| {
-                        self.terminals.iter().find(|t| t.id == *id).map_or_else(
-                            || format!("{title} · closed"),
-                            |t| format!("{} · {} · #{}", t.title, t.shell, t.id),
-                        )
+                        self.terminals
+                            .iter()
+                            .find(|t| t.id == *id)
+                            .map_or_else(|| format!("{title} · closed"), Self::terminal_label)
                     },
                 );
                 let mut next = previous.clone();
@@ -149,10 +162,7 @@ impl ChatView {
                             ui.selectable_value(
                                 &mut next,
                                 Some((terminal.id, terminal.title.clone())),
-                                format!(
-                                    "{} · {} · #{}",
-                                    terminal.title, terminal.shell, terminal.id
-                                ),
+                                Self::terminal_label(terminal),
                             );
                         }
                     });
@@ -236,6 +246,7 @@ impl ChatView {
                         .changed()
                 {
                     state.include_context = state.agent_mode;
+                    state.reviewed_actions.clear();
                     state.invalidate_context();
                     if state.include_context {
                         if let Some(command) = state.preview_request() {
@@ -941,10 +952,34 @@ impl ButtonsApp {
                             && target.is_some_and(|id| {
                                 self.tabs
                                     .iter()
+                                    .any(|t| t.id == id && t.backend.columns() < 24)
+                            })
+                        {
+                            state.error = Some("Widen the selected terminal to at least 24 columns before starting Agent Mode.".into());
+                            continue;
+                        }
+                        if state.agent_mode
+                            && target.is_some_and(|id| {
+                                self.tabs
+                                    .iter()
                                     .any(|t| t.id == id && t.simulated.is_some())
                             })
                         {
                             state.error = Some("Turn off Agent Mode to chat about this simulation. Simulation execution is not available yet.".into());
+                            continue;
+                        }
+                        if state.agent_mode
+                            && target.is_some_and(|id| {
+                                self.tabs.iter().any(|t| {
+                                    t.id == id
+                                        && t.backend
+                                            .last_content()
+                                            .terminal_mode
+                                            .contains(egui_term::TerminalMode::ALT_SCREEN)
+                                })
+                            })
+                        {
+                            state.error = Some("Return to an idle shell prompt before starting Agent Mode; a full-screen terminal application is active.".into());
                             continue;
                         }
                         if state.error.is_some()
@@ -1021,6 +1056,7 @@ impl ButtonsApp {
                     let request_question = question.clone();
                     let request_locale = locale.clone();
                     let mut agent_host = crate::assistant::agent::TerminalHost {
+                        detected_shell: None,
                         target: target.unwrap_or(0),
                         snapshot: Arc::clone(&self.control_snapshot),
                         dispatcher: self.session_dispatcher.clone(),

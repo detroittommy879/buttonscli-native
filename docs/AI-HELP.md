@@ -97,6 +97,14 @@ in debug and release builds. Without that override, it requires both
 build. Its terminal execution is
 not part of ordinary AI Help, and its live provider/GUI acceptance is pending.
 
+Agent Mode checks the current interpreter with an echo-only probe before sending
+task commands. This also works after entering SSH/WSL or another supported shell;
+the launch-shell name is not used to choose command syntax. Use an idle real
+terminal at least 24 columns wide, outside full-screen applications. Each command
+waits for a completion marker and a UI update before the next step. Unknown shells,
+other input, cancellation or missing completion/update stop the task. A command
+already sent may still be running; inspect its terminal before trying again.
+
 Ordinary AI Help uses the active free `aiHelp` feature with your own provider. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. Agent Mode and other unfinished features retain their separate rollout gates. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
 
 An isolated Windows debug-build GUI pass confirmed the separate AI Help window, local model discovery, streamed fake-provider response, review-first command display, and explicit **Insert + Enter** delivery to a test terminal. This is partial M4 evidence; a later 2026-09-30 Windows pass also exercised context preview/transmission, cancellation, retry and window close/reopen using a loopback provider. Native theme selection and stable streaming control placement were repaired. Target switching, broader focus/DPI checks and cross-platform acceptance remain open. No real provider was contacted. Linux and macOS are not certified.

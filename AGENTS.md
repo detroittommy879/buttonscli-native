@@ -151,7 +151,7 @@ cargo build --locked --release --bin buttonscli
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
 - Use `wrapping_row` for button rows: egui's centered `horizontal_wrapped` can make
   successive controls descend with larger fonts. Rows mixing labels, small and full
-  buttons (status bar) use `centered_wrapping_row` (fixed line height, centered). Favorites allocate the name/star
+  buttons use fixed line heights. The status bar uses `centered_status_row` with horizontal overflow and pinned AI Help/Settings. Favorites allocate the name/star
   together before wrapping; `push_id` alone does not keep a pair together.
 - `ComboBox::width` is a minimum. Long selected labels can expand a wrapping row
   even with `truncate()`; use a nonwrapping label/picker row with the remaining width.
@@ -193,3 +193,11 @@ cargo build --locked --release --bin buttonscli
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
+- Agent Mode must probe the current interpreter: `SessionInfo.shell` describes
+  the launcher and can be wrong after SSH/WSL. See `src/assistant/agent.rs` and
+  `agent_pty_tests.rs`. Keep framing short enough for 24-column panes; ConPTY
+  can use cursor positioning instead of CRLF. Wait for completion and a root UI
+  pass before the next action; never fall back to the launch-shell dialect.
+- Status sizing: ignore unusable minimize/restore surface sizes; keep a single
+  horizontally scrollable control row. `status_bar_tests.rs` covers cached heights, narrow
+  windows, 1px transitions and fonts; `native_status_bar_resize_probe` captures QA.
