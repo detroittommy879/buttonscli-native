@@ -1,8 +1,9 @@
 # AI provider settings
 
-For normal testing with your saved buttons and providers, enable the
-[local JSON feature flag](dev/LOCAL-FEATURE-FLAGS.md) and open the release executable
-directly. It uses the normal native active profile; no test launcher is required.
+Ordinary AI Help works with your configured provider in native debug and release
+builds, without a Pro grant or local feature override. Open the release executable
+directly to use your normal native active profile. Agent Mode remains a separately
+gated prototype; [local feature flags](dev/LOCAL-FEATURE-FLAGS.md) are for testing it.
 
 For local testing on Windows, run `pwsh -NoProfile -File scripts/start-ai-help-test.ps1`.
 This builds and opens an isolated debug workspace with a loopback fake provider
@@ -74,14 +75,20 @@ context-review, suggestion-quality and platform acceptance work.
 
 Open **AI Help** in the status bar or **Help → AI Help** for a separate conversation window. The window can open while requests are locked, with an access explanation and a link to provider settings. With access available, enter a question and send it to the active provider. Answer text streams into the window without showing the response envelope, and recent successful turns stay available there until the app closes. If a request fails, **Retry last request** repeats it. Closing the AI Help window keeps the conversation and any in-flight request; closing the app cancels the request.
 
-Terminal context is optional and off by default. Turn on **Include a terminal output snapshot**, preview it, and review the terminal title, shell and text before sending. The preview comes from the terminal's current screen and scrollback grid, not a raw command transcript. It is limited to 200,000 characters. The app masks the configured API key and a few obvious secret patterns, but redaction is best effort; review the exact preview before sending it to your provider.
+The **Terminal** picker defaults to the active terminal each time you open AI Help. Choose another terminal or **Chat only** for the next question. Switching terminals starts fresh model context while earlier messages remain visible. The selected shell type and real/simulated status go with the question; **Chat only** sends neither. Terminal output is optional and off by default. Turn on **Include terminal output** to prepare a snapshot automatically, expand **Snapshot ready** to review it, and use **Refresh snapshot** when needed. The preview comes from the terminal's current screen and scrollback grid, not a raw command transcript. It is limited to 200,000 characters. The app masks the configured API key and a few obvious secret patterns, but redaction is best effort; review the exact preview before sending it to your provider.
 
-AI Help can suggest up to two commands or supported terminal keys. Suggestions are inert until you choose **Insert**, **Insert + Enter**, or **Send reviewed key**. Each action targets the terminal selected when AI Help opened or the terminal shown in the context preview. The app checks that target again before sending. There is no automatic execution, file access, clipboard collection, or background terminal watcher. Large requests are limited to 1 MiB.
+AI Help can suggest up to two commands or supported terminal keys. Suggestions are inert until you choose **Insert**, **Insert + Enter**, or **Send reviewed key**. Each action stays bound to the terminal selected for that request, even after you switch the picker or reopen AI Help. The app checks that target again before sending. There is no automatic execution, file access, clipboard collection, or background terminal watcher. Large requests are limited to 1 MiB.
 
-Reopening AI Help while a request or reviewed suggestions exist preserves their
-original target even if you have focused another terminal. A closed target is
-rejected. Previewing a new terminal and sending a new question explicitly binds
-that new request to its previewed target.
+Reopening AI Help defaults the next question to your active terminal. In-flight
+requests and existing suggestions retain their original target. A closed target
+is rejected, never replaced with another terminal. Selecting a new terminal
+invalidates the previous snapshot; stale preview workers cannot restore it.
+
+Messages have separate user/assistant backgrounds, selectable text, headings,
+lists, emphasis and literal code blocks with **Copy code**. Remote images, HTML
+and custom styling tags are not interpreted. **Send** explains why it is disabled;
+**Ctrl/Cmd+Enter** sends when ready. Ordinary chat works about simulated terminals;
+Agent Mode execution in simulations is not yet available.
 
 The draft migration branch preserves an unfinished Agent Mode prototype outside
 the core migration scope. The local `enable_all` JSON override makes it available
@@ -90,6 +97,6 @@ in debug and release builds. Without that override, it requires both
 build. Its terminal execution is
 not part of ordinary AI Help, and its live provider/GUI acceptance is pending.
 
-AI provider requests are part of the Pro `aiHelp` feature. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. Without the local JSON override, AI Help's release rollout remains closed. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
+Ordinary AI Help uses the active free `aiHelp` feature with your own provider. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. Agent Mode and other unfinished features retain their separate rollout gates. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
 
 An isolated Windows debug-build GUI pass confirmed the separate AI Help window, local model discovery, streamed fake-provider response, review-first command display, and explicit **Insert + Enter** delivery to a test terminal. This is partial M4 evidence; a later 2026-09-30 Windows pass also exercised context preview/transmission, cancellation, retry and window close/reopen using a loopback provider. Native theme selection and stable streaming control placement were repaired. Target switching, broader focus/DPI checks and cross-platform acceptance remain open. No real provider was contacted. Linux and macOS are not certified.

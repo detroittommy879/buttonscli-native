@@ -153,6 +153,8 @@ cargo build --locked --release --bin buttonscli
   successive controls descend with larger fonts. Rows mixing labels, small and full
   buttons (status bar) use `centered_wrapping_row` (fixed line height, centered). Favorites allocate the name/star
   together before wrapping; `push_id` alone does not keep a pair together.
+- `ComboBox::width` is a minimum. Long selected labels can expand a wrapping row
+  even with `truncate()`; use a nonwrapping label/picker row with the remaining width.
 - CI uses newer stable Rust than some local installs. Write explicit `f32` literals
   for `Stroke::new` widths; Rust 1.97 rejects float fallback under strict Clippy.
 - Explicit Windows probes: `cargo test --locked --lib <name> -- --ignored --test-threads=1`.
@@ -181,8 +183,12 @@ cargo build --locked --release --bin buttonscli
   target/debug/buttonsclictl.exe [--descriptor <live file>]` runs the official MCP
   client against the Rust server. Send integer JSON (`client::number`): the API
   rejects `120.0`.
-- Release AI Help/control has access gates; see `docs/dev/LOCAL-FEATURE-FLAGS.md` for isolated
-  testing. Keep keys in OS credentials; AI Help executes only reviewed commands.
+- Ordinary AI Help is active with your own provider; Agent Mode/control still have access gates.
+  Chat UI/routing: `src/app/ai_help.rs`; tests: `src/app/ai_help_tests.rs`.
+  `selected_target` is for the next question; `target` pins existing suggestions. Never
+  fall back to the focused tab for queued requests, previews or delivery. Preview workers
+  must match `context_generation` before publishing. Keep keys in OS credentials.
+  See `docs/dev/LOCAL-FEATURE-FLAGS.md` for gated-feature testing.
 - Cargo Git installation can retain local vendor patches; crates.io publication cannot
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.

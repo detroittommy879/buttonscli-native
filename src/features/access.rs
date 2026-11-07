@@ -165,7 +165,7 @@ mod tests {
             assert!(decision.available, "{}", key.as_str());
             assert_eq!(decision.reason, AccessReason::LocalOverride);
         }
-        assert!(!resolve(FeatureKey::AiHelp, &RuntimeAccess::default(), &None, 100).available);
+        assert!(!resolve(FeatureKey::AiAgent, &RuntimeAccess::default(), &None, 100).available);
     }
 
     #[test]
@@ -201,19 +201,19 @@ mod tests {
             active_features: Vec::new(),
         });
         assert_eq!(
-            resolve(FeatureKey::AiHelp, &runtime, &grant, 100).reason,
+            resolve(FeatureKey::AiAgent, &runtime, &grant, 100).reason,
             AccessReason::Unreleased
         );
-        runtime.development_overrides.insert(FeatureKey::AiHelp);
+        runtime.development_overrides.insert(FeatureKey::AiAgent);
         assert_eq!(
-            resolve(FeatureKey::AiHelp, &runtime, &None, 100).reason,
+            resolve(FeatureKey::AiAgent, &runtime, &None, 100).reason,
             AccessReason::DevelopmentOverride
         );
         runtime.development_overrides.clear();
-        runtime.killed.insert(FeatureKey::AiHelp);
-        runtime.development_overrides.insert(FeatureKey::AiHelp);
+        runtime.killed.insert(FeatureKey::AiAgent);
+        runtime.development_overrides.insert(FeatureKey::AiAgent);
         assert_eq!(
-            resolve(FeatureKey::AiHelp, &runtime, &grant, 100).reason,
+            resolve(FeatureKey::AiAgent, &runtime, &grant, 100).reason,
             AccessReason::KillSwitch
         );
     }
@@ -227,7 +227,7 @@ mod tests {
         let feature = FeatureDefinition {
             enabled: true,
             rollout: Rollout::Active,
-            ..FeatureKey::AiHelp.definition()
+            ..FeatureKey::AiAgent.definition()
         };
         let grant = |plan, expires_at_unix| {
             Some(Entitlement {
@@ -261,13 +261,13 @@ mod tests {
         let feature = FeatureDefinition {
             enabled: true,
             rollout: Rollout::Active,
-            ..FeatureKey::AiHelp.definition()
+            ..FeatureKey::AiAgent.definition()
         };
         let grant = Some(Entitlement {
             plan: Plan::Free,
             source: GrantSource::Server,
             expires_at_unix: 110,
-            active_features: vec![FeatureKey::AiHelp],
+            active_features: vec![FeatureKey::AiAgent],
         });
         assert_eq!(
             resolve_feature(feature, &runtime, &grant, 100).reason,

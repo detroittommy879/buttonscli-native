@@ -49,7 +49,7 @@ try {
     $startInfo.Environment['LOCALAPPDATA'] = $local
     $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_ACCOUNT'] = '1'
     $startInfo.Environment['BUTTONSCLI_NATIVE_DISABLE_REMOTE_CONFIG'] = '1'
-    $startInfo.Environment['BUTTONSCLI_NATIVE_DEV_AI_HELP'] = '1'
+    $startInfo.Environment['BUTTONSCLI_NATIVE_DEV_AI_HELP'] = '0'
     $startInfo.Environment['BUTTONSCLI_NATIVE_DEV_AI_AGENT'] = '0'
     $startInfo.Environment['BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL'] = '0'
     Write-Output "Opening an isolated debug workspace. Open AI Help and send any question; provider models also include slow, retry, quota, and malformed fixtures. Test profile: $fixtureHome"
