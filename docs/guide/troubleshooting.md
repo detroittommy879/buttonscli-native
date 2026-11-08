@@ -72,6 +72,19 @@ code on purpose.
 They were saved as a numbered personal theme (for example *Ember Veil 2*).
 Find it in the Library.
 
+**A message at the top of the terminals disappeared before I read it.**
+Messages fade after 5 seconds. Hover **SHELL READY** in the status bar to see
+the last one, or change the time in **Settings → Workspace** (0 keeps them
+until you click ×).
+
+## Logs and crash reports
+
+ButtonsCLI keeps a log of the current and previous launch, and a crash report
+for each crash, in `~/.buttonscli-native/logs` (**Help → About ButtonsCLI →
+Open logs folder**). They stay on your computer; attach them to a bug report
+if you like. Set `RUST_LOG=buttonscli=debug` before starting the app for more
+detail.
+
 **A feature from these docs is missing in my build.**
 Some AI features need the local feature flag in release builds; see
 [Local feature flags](../dev/LOCAL-FEATURE-FLAGS.md).

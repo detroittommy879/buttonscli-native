@@ -60,6 +60,8 @@ mod window_opacity;
 pub mod terminal;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub mod diagnostics;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod storage;
 
 #[cfg(target_arch = "wasm32")]

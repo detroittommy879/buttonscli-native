@@ -263,6 +263,9 @@ pub(crate) struct Preferences {
     pub(crate) row_banding_brightness: u8,
     /// Frames per second for shaders and other animated effects, all panes.
     pub(crate) animation_fps: u32,
+    /// Seconds a workspace message stays before fading; 0 keeps it until
+    /// dismissed or replaced.
+    pub(crate) notice_seconds: u32,
     /// Fewer frames while the window is in the background or minimized
     /// (Settings → Debug). On by default.
     pub(crate) power_saving: bool,
@@ -334,6 +337,7 @@ impl Default for Preferences {
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
             animation_fps: 60,
+            notice_seconds: 5,
             power_saving: true,
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
@@ -387,6 +391,8 @@ pub(crate) const MAX_MOTION_SPEED: f32 = 2.0;
 /// Most shaders the Pattern picker keeps.
 /// Highest "Animation FPS limit" (shaders and effects, app-wide).
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
+/// Longest workspace message timeout offered in Settings.
+pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
 pub(crate) const MAX_SAVED_SHADERS: usize = 64;
 /// Most pane slots a theme bundle or the saved pane looks remember.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
@@ -589,6 +595,7 @@ impl Preferences {
         }
         self.row_banding_brightness = self.row_banding_brightness.min(64);
         self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
+        self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

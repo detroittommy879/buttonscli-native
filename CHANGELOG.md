@@ -7,6 +7,15 @@
   (`docs/dev/RELEASING.md`); other builds show `1.0.0+<commit>`.
 - The status bar wraps onto more rows again when controls do not fit, and no
   longer grows huge after minimize/restore (capped at 40% of the window).
+- Workspace messages float over the terminals (no pane resize) and fade after
+  5 seconds (Settings → Workspace; 0 keeps them). Hover **SHELL READY** for the
+  last message.
+- Local logs and crash reports in `~/.buttonscli-native/logs` (About → Open
+  logs folder). Nothing is uploaded.
+- **Sign in with ChatGPT (recommended)** is offered first in AI providers and
+  from AI Help when no provider is set up.
+- Applying a theme bundle and editing Row banding in the status bar now save
+  right away.
 
 - New installs: the first-run dialog also asks for a look (Minimal, Moderate,
   Showoff). Compact command dock and copy-on-selection are on by default.

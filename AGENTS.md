@@ -193,6 +193,9 @@ cargo build --locked --release --bin buttonscli
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
+- `self.notice` messages render as a fading overlay (`src/app/notices.rs`,
+  `notice_seconds`), never a layout row: rows above terminals resize every PTY.
+  Logs/crash reports: `src/diagnostics.rs` (`~/.buttonscli-native/logs`, local only).
 - Versions: `Cargo.toml` holds MAJOR.MINOR.0; `release.yml` auto-picks PATCH
   (`scripts/release-version.sh`, `docs/dev/RELEASING.md`). Show `crate::BUILD_VERSION`
   (adds `+commit` outside releases). After editing the version run

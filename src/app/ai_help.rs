@@ -134,6 +134,13 @@ impl ChatView {
             ui.spaced_weak(format!("{} · {}", provider.name, provider.model));
         } else {
             ui.spaced_weak("Connect a provider to start chatting.");
+            if ui
+                .spaced_button("Sign in with ChatGPT")
+                .on_hover_text("Opens AI providers. A ChatGPT plan needs no API key.")
+                .clicked()
+            {
+                queue(AiHelpCommand::OpenSettings);
+            }
         }
         ui.add_space(6.0);
         ui.add_enabled_ui(!state.busy, |ui| {

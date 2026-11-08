@@ -520,6 +520,10 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
+    /// The message `notice_overlay` is timing and when it appeared (egui time).
+    notice_timer: Option<(String, f64)>,
+    /// The most recent message after it faded or was dismissed.
+    last_notice: Option<String>,
     /// A right-click Paste waiting for egui's clipboard read: (PTY id, frames left).
     #[cfg(not(target_arch = "wasm32"))]
     pending_menu_paste: Option<(u64, u8)>,
@@ -1602,6 +1606,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
+            notice_timer: None,
+            last_notice: None,
             #[cfg(not(target_arch = "wasm32"))]
             pending_menu_paste: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -5251,7 +5257,10 @@ impl ButtonsApp {
                     let status_label = "SHELL READY";
                     #[cfg(target_arch = "wasm32")]
                     let status_label = if self.browser_simulator.busy() { "THINKING" } else { "READY" };
-                    ui.spaced_label(RichText::new(status_label).small().color(colors.accent));
+                    let status = ui.spaced_label(RichText::new(status_label).small().color(colors.accent));
+                    if let Some(last) = self.notice.as_ref().or(self.last_notice.as_ref()) {
+                        status.on_hover_text(format!("Last message: {last}"));
+                    }
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -5322,7 +5331,11 @@ impl ButtonsApp {
                         self.profile_menu(ui, ctx);
                         ui.separator();
                         ui.spaced_label("Row banding");
-                        ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
+                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
+                        // Save when a drag ends or a typed value lands, like Motion.
+                        if banding.drag_stopped() || (banding.changed() && !banding.dragged()) {
+                            self.persist_native_preferences();
+                        }
                         ui.separator();
                         ui.spaced_label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
@@ -6511,15 +6524,15 @@ impl ButtonsApp {
         let mut add = None;
         ui.spaced_menu_button("Add connection", |ui| {
             for (name, endpoint, api) in [
+                (
+                    "ChatGPT plan (sign in)",
+                    crate::assistant::chatgpt::RESOURCE,
+                    ProviderApi::Responses,
+                ),
                 ("Custom", "", ProviderApi::Auto),
                 (
                     "OpenAI",
                     "https://api.openai.com/v1",
-                    ProviderApi::Responses,
-                ),
-                (
-                    "ChatGPT plan (sign in)",
-                    crate::assistant::chatgpt::RESOURCE,
                     ProviderApi::Responses,
                 ),
                 (
@@ -6554,6 +6567,20 @@ impl ButtonsApp {
                 }
             }
         });
+        // The easiest start: no API key, just the ChatGPT account the user
+        // already has. Offered up front until a ChatGPT connection exists.
+        if !settings.providers.iter().any(|provider| provider.chatgpt_plan)
+            && ui
+                .spaced_button("Sign in with ChatGPT (recommended)")
+                .on_hover_text("Uses your ChatGPT plan through a browser sign-in. No API key and nothing else to install.")
+                .clicked()
+        {
+            add = Some((
+                "ChatGPT plan (sign in)",
+                crate::assistant::chatgpt::RESOURCE,
+                ProviderApi::Responses,
+            ));
+        }
         if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
                 id: format!("provider-{:032x}", fastrand::u128(..)),
@@ -12968,6 +12995,15 @@ impl ButtonsApp {
             .logarithmic(true)
             .text("Animation FPS limit (shaders and effects, all panes)"),
         );
+        ui.add(
+            egui::Slider::new(
+                &mut self.preferences.notice_seconds,
+                0..=crate::settings::MAX_NOTICE_SECONDS,
+            )
+            .logarithmic(true)
+            .text("Seconds before messages fade (0 = keep until dismissed)"),
+        )
+        .on_hover_text("Workspace messages such as \"Applied theme bundle\" float over the terminals, then fade. The last one stays on the status bar's SHELL READY hover.");
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
@@ -13975,6 +14011,30 @@ impl ButtonsApp {
                     &self.locale,
                     "No webview. No browser runtime. Your shell stays local.",
                 ));
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(folder) = crate::diagnostics::logs_dir() {
+                    ui.add_space(8.0);
+                    ui.spaced_label(format!(
+                        "Logs and crash reports (local only): {}",
+                        folder.display()
+                    ));
+                    if ui
+                        .add_enabled(
+                            folder.exists(),
+                            crate::ui_text::button(ui, "Open logs folder"),
+                        )
+                        .clicked()
+                    {
+                        #[cfg(windows)]
+                        let _ = std::process::Command::new("explorer.exe")
+                            .arg(&folder)
+                            .spawn();
+                        #[cfg(target_os = "linux")]
+                        let _ = std::process::Command::new("xdg-open").arg(&folder).spawn();
+                        #[cfg(target_os = "macos")]
+                        let _ = std::process::Command::new("open").arg(&folder).spawn();
+                    }
+                }
             });
     }
 
@@ -16644,6 +16704,7 @@ mod ai_help;
 mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
+mod notices;
 #[cfg(not(target_arch = "wasm32"))]
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
@@ -16751,6 +16812,7 @@ impl eframe::App for ButtonsApp {
                 .background,
         )
         .unwrap_or(colors.canvas);
+        let mut notice_area = None;
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -16758,10 +16820,7 @@ impl eframe::App for ButtonsApp {
                     .inner_margin(8.0),
             )
             .show(ctx, |ui| {
-                if let Some(notice) = &self.notice {
-                    ui.spaced_colored_label(colors.warning, notice);
-                    ui.add_space(8.0);
-                }
+                notice_area = Some(ui.max_rect());
                 #[cfg(not(target_arch = "wasm32"))]
                 if self.import_offer {
                     ui.horizontal(|ui| {
@@ -16794,6 +16853,11 @@ impl eframe::App for ButtonsApp {
                 #[cfg(target_arch = "wasm32")]
                 self.web_demo(ui);
             });
+        // Messages float over the terminal area: a row above it would resize
+        // every pane (and its shell) each time a message appears or fades.
+        if let Some(area) = notice_area {
+            self.notice_overlay(ctx, area);
+        }
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
