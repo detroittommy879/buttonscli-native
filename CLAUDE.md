@@ -24,4 +24,4 @@ theme/shader generation. Native builds own real PTYs via a patched Alacritty; th
   `shader_ai.rs`, `library.rs`; WGSL effects in `src/plugins/effects/`.
 - AI: `src/assistant/` (providers, `chatgpt.rs`); gating in `src/features/`.
 
-`RUST_LOG` overrides the default `buttonscli=info` filter.
+`RUST_LOG` overrides the default `warn,buttonscli=info` filter (`src/diagnostics.rs`; logs in `~/.buttonscli-native/logs`).

@@ -25,7 +25,18 @@ impl ButtonsApp {
                 now
             }
         };
-        let alpha = match notice_alpha(now - shown, self.preferences.notice_seconds) {
+        // Problems (a failed save, a shell that would not start) stay until
+        // dismissed; only ordinary information fades.
+        #[cfg(not(target_arch = "wasm32"))]
+        let blocked = self.native_save_blocked;
+        #[cfg(target_arch = "wasm32")]
+        let blocked = false;
+        let seconds = if blocked || is_problem(&notice) {
+            0
+        } else {
+            self.preferences.notice_seconds
+        };
+        let alpha = match notice_alpha(now - shown, seconds) {
             NoticeAlpha::Gone => {
                 self.dismiss_notice();
                 return;
@@ -95,6 +106,15 @@ enum NoticeAlpha {
     Kept,
 }
 
+/// Messages that report something going wrong. Matching the wording keeps
+/// the many `self.notice = Some(..)` call sites unchanged.
+fn is_problem(notice: &str) -> bool {
+    let lower = notice.to_lowercase();
+    ["could not", "couldn't", "failed", "not saved", "error"]
+        .iter()
+        .any(|word| lower.contains(word))
+}
+
 fn notice_alpha(elapsed: f64, seconds: u32) -> NoticeAlpha {
     if seconds == 0 {
         return NoticeAlpha::Kept;
@@ -121,6 +141,9 @@ mod tests {
         assert_eq!(notice_alpha(5.5, 5), NoticeAlpha::Fading(0.5));
         assert_eq!(notice_alpha(6.0, 5), NoticeAlpha::Gone);
         assert_eq!(notice_alpha(1000.0, 0), NoticeAlpha::Kept);
+        assert!(is_problem("Native settings could not save: disk full"));
+        assert!(is_problem("Theme changes were not saved: denied"));
+        assert!(!is_problem("Applied theme bundle \"rowbanding-8\"."));
     }
 
     #[test]

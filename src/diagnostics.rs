@@ -1,7 +1,7 @@
 //! Local logs and crash reports, for bug reports. Nothing is uploaded.
 //!
 //! `~/.buttonscli-native/logs/`:
-//! - `buttonscli.log`: this launch's log (`RUST_LOG`, default `buttonscli=info`);
+//! - `buttonscli.log`: this launch's log (`RUST_LOG`, default `warn,buttonscli=info`);
 //!   the previous launch's is kept as `buttonscli.previous.log`.
 //! - `crash-<unix seconds>.txt`: version, OS, panic message, location and
 //!   backtrace. The newest [`KEEP_CRASH_REPORTS`] are kept.
@@ -26,7 +26,7 @@ pub fn init() {
     use tracing_subscriber::fmt::writer::MakeWriterExt;
     let filter = || {
         tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "buttonscli=info".into())
+            .unwrap_or_else(|_| "warn,buttonscli=info".into())
     };
     let file = logs_dir().and_then(|dir| open_log(&dir).ok());
     match file {

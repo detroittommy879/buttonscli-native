@@ -53,21 +53,22 @@ fn build_version() {
     } else {
         git(&["rev-parse", "--short=8", "HEAD"])
     };
-    // Rebuild the version string when the checked-out commit changes.
+    // Rebuild the version string when the checked-out commit changes. Watch
+    // only files that exist: Cargo treats a missing watched path as changed
+    // and would rebuild the whole crate on every run (no packed-refs yet,
+    // loose refs removed by `git gc`).
+    let watch = |path: PathBuf| {
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    };
     if let Some(dir) = git(&["rev-parse", "--git-dir"]) {
-        let dir = PathBuf::from(dir);
-        println!("cargo:rerun-if-changed={}", dir.join("HEAD").display());
-        println!(
-            "cargo:rerun-if-changed={}",
-            dir.join("packed-refs").display()
-        );
+        watch(PathBuf::from(dir).join("HEAD"));
+    }
+    if let Some(common) = git(&["rev-parse", "--git-common-dir"]).map(PathBuf::from) {
+        watch(common.join("packed-refs"));
         if let Some(reference) = git(&["symbolic-ref", "-q", "HEAD"]) {
-            if let Some(common) = git(&["rev-parse", "--git-common-dir"]) {
-                println!(
-                    "cargo:rerun-if-changed={}",
-                    PathBuf::from(common).join(reference).display()
-                );
-            }
+            watch(common.join(reference));
         }
     }
     let full = match commit {
