@@ -19,7 +19,7 @@ fn main() -> eframe::Result {
             return Ok(());
         }
         Ok(StartupRequest::Version) => {
-            println!("ButtonsCLI {}", env!("CARGO_PKG_VERSION"));
+            println!("ButtonsCLI {}", buttonscli::BUILD_VERSION);
             return Ok(());
         }
         Err(error) => {

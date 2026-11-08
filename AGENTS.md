@@ -193,6 +193,10 @@ cargo build --locked --release --bin buttonscli
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
+- Versions: `Cargo.toml` holds MAJOR.MINOR.0; `release.yml` auto-picks PATCH
+  (`scripts/release-version.sh`, `docs/dev/RELEASING.md`). Show `crate::BUILD_VERSION`
+  (adds `+commit` outside releases). After editing the version run
+  `cargo update -w --offline` or `--locked` fails.
 - Agent Mode must probe the current interpreter: `SessionInfo.shell` describes
   the launcher and can be wrong after SSH/WSL. See `src/assistant/agent.rs` and
   `agent_pty_tests.rs`. Keep framing short enough for 24-column panes; ConPTY

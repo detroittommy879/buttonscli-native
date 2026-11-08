@@ -1,3 +1,6 @@
+/// Cargo version, plus `+<commit>` for non-release builds (see build.rs).
+pub const BUILD_VERSION: &str = env!("BUTTONSCLI_BUILD_VERSION");
+
 #[cfg(not(target_arch = "wasm32"))]
 mod account;
 #[cfg(not(target_arch = "wasm32"))]

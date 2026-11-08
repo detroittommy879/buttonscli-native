@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased — 0.2.0 (branch feat/v0.2-defaults-motion-copy)
+## Unreleased — 1.0.0
+
+- Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
+  Release builds now pick the next patch number on their own
+  (`docs/dev/RELEASING.md`); other builds show `1.0.0+<commit>`.
+- The status bar wraps onto more rows again when controls do not fit, and no
+  longer grows huge after minimize/restore (capped at 40% of the window).
 
 - New installs: the first-run dialog also asks for a look (Minimal, Moderate,
   Showoff). Compact command dock and copy-on-selection are on by default.

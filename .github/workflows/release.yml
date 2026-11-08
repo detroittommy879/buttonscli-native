@@ -2,7 +2,12 @@ name: Release builds
 
 # Never runs on merges. Start it from the Actions tab ("Run workflow") or with
 # `gh workflow run release.yml`. Tick "publish" to put the files on a draft
-# GitHub release for `v<Cargo.toml version>`; you publish the draft yourself.
+# GitHub release; you publish the draft yourself.
+#
+# The patch number counts up on its own: Cargo.toml holds MAJOR.MINOR, and
+# scripts/release-version.sh picks the next unused vMAJOR.MINOR.N from tags
+# and releases (never below Cargo.toml's patch). Every job builds with that
+# one number. Bump MINOR/MAJOR in Cargo.toml by hand when it is time.
 on:
   workflow_dispatch:
     inputs:
@@ -18,11 +23,35 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    # Write access only so `gh release list` also sees draft releases.
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(bash scripts/release-version.sh next)
+          echo "Release version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   windows:
+    needs: version
     runs-on: windows-latest
+    env:
+      BUTTONSCLI_RELEASE_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - shell: bash
+        run: bash scripts/release-version.sh apply "${{ needs.version.outputs.version }}"
       - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl
       - name: Zip the exe
         shell: pwsh
@@ -38,11 +67,15 @@ jobs:
           path: buttonscli-*-windows-x64.zip
 
   linux:
+    needs: version
     # The oldest supported Ubuntu runner, so the binary works on older glibc.
     runs-on: ubuntu-22.04
+    env:
+      BUTTONSCLI_RELEASE_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: bash scripts/release-version.sh apply "${{ needs.version.outputs.version }}"
       - name: Install Linux window dependencies
         run: |
           sudo apt-get update
@@ -75,12 +108,16 @@ jobs:
             ButtonsCLI-*-x86_64.AppImage
 
   macos:
+    needs: version
     runs-on: macos-latest
+    env:
+      BUTTONSCLI_RELEASE_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - run: bash scripts/release-version.sh apply "${{ needs.version.outputs.version }}"
       - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl --target aarch64-apple-darwin
       - run: cargo build --release --locked --bin buttonscli --bin buttonsclictl --target x86_64-apple-darwin
       - name: Make the universal .app and .dmg
@@ -120,7 +157,7 @@ jobs:
 
   release:
     if: inputs.publish
-    needs: [windows, linux, macos]
+    needs: [version, windows, linux, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -134,9 +171,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
-          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
-            echo "Tag v$version already exists. Bump the version in Cargo.toml first." >&2
+          version="${{ needs.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null \
+            || gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version was taken while this run was building. Run the workflow again." >&2
             exit 1
           fi
           cd dist

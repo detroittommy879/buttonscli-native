@@ -13965,6 +13965,7 @@ impl ButtonsApp {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.spaced_heading(crate::i18n::literal(&self.locale, "ButtonsCLI Native"));
+                ui.spaced_label(format!("Version {}", crate::BUILD_VERSION));
                 ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "A fast terminal workspace built with Rust, egui, and Alacritty.",

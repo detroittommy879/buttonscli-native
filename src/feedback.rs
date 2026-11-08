@@ -152,7 +152,7 @@ fn submit_feedback_with(
         "category": submission.category.as_str(),
         "message": message,
         "contact": contact,
-        "appVersion": env!("CARGO_PKG_VERSION"),
+        "appVersion": crate::BUILD_VERSION,
         "meta": {
             "os": std::env::consts::OS,
             "locale": submission.locale,
