@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn narrow_status_bar_keeps_ai_help_reachable_by_scrolling() {
+fn narrow_status_bar_wraps_and_keeps_controls_visible() {
     let mut app = ButtonsApp::empty(Preferences::default());
     app.locale = "en".into();
     let ctx = egui::Context::default();
@@ -44,7 +44,26 @@ fn narrow_status_bar_keeps_ai_help_reachable_by_scrolling() {
             _ => false,
         })
     };
-    assert!(visible("AI Help"), "pinned AI Help is inaccessible");
+    let texts = output
+        .shapes
+        .iter()
+        .filter_map(|shape| match &shape.shape {
+            egui::Shape::Text(text) => Some((
+                text.galley.job.text.clone(),
+                shape.shape.visual_bounding_rect(),
+                shape.clip_rect,
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(visible("AI Help"), "AI Help is not visible: {texts:?}");
+    // Rows wrap tightly: controls never drift far below the others (child
+    // scopes in a wrapping row used to push them down and inflate the bar).
+    let height = egui::containers::panel::PanelState::load(&ctx, egui::Id::new("status"))
+        .unwrap()
+        .size()
+        .y;
+    assert!(height < 200.0, "narrow bar is {height}pt tall: {texts:?}");
     assert!(
         visible("◐ Look"),
         "Look is inaccessible: {:?}",
@@ -106,6 +125,8 @@ fn status_bar_recovers_from_stale_height_after_restore_and_resize() {
         recovered <= normal + 2.0,
         "stale height persisted: normal={normal}, restored={recovered}"
     );
+    // Wrapping may add rows, but never more than 40% of the window (plus
+    // frame margins), and a 1px minimize/restore surface is ignored.
     for size in [
         Vec2::new(480.0, 700.0),
         Vec2::new(1.0, 1.0),
@@ -115,11 +136,13 @@ fn status_bar_recovers_from_stale_height_after_restore_and_resize() {
         for _ in 0..3 {
             let height = render(&mut app, size);
             assert!(
-                height <= normal * 3.0 + 4.0,
+                height <= 700.0 * 0.4 + 12.0,
                 "status bar grew to {height} at {size:?}"
             );
         }
     }
+    let narrow = render(&mut app, Vec2::new(480.0, 700.0));
+    assert!(narrow > normal + 2.0, "narrow bar did not wrap: {narrow}");
     let restored = render(&mut app, wide);
     assert!(
         restored <= normal + 2.0,
@@ -131,7 +154,7 @@ fn status_bar_recovers_from_stale_height_after_restore_and_resize() {
     }
     let large = render(&mut app, Vec2::new(480.0, 700.0));
     assert!(
-        large < 100.0,
+        large <= 700.0 * 0.4 + 12.0,
         "large-font controls consumed the window: {large}"
     );
 }
@@ -167,7 +190,7 @@ fn native_status_bar_resize_probe() {
                 egui::containers::panel::PanelState::load(ctx, egui::Id::new("status"))
             {
                 assert!(
-                    state.size().y < 150.0,
+                    state.size().y <= ctx.screen_rect().height() * 0.4 + 12.0,
                     "status bar grew to {}",
                     state.size().y
                 );

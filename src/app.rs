@@ -5234,23 +5234,19 @@ impl ButtonsApp {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 #[cfg(not(target_arch = "wasm32"))]
                 self.appearance_background_menu(ui, false);
-                let line = ui.text_style_height(&TextStyle::Button) + 2.0 * ui.spacing().button_padding.y;
-                let labels = [crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[]), crate::i18n::literal(&self.locale, "Settings")];
-                let pinned_width: f32 = labels.iter().map(|label| {
-                    crate::ui_text::spaced_text(ui, label.clone()).into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, TextStyle::Button).size().x
-                        + 2.0 * ui.spacing().button_padding.x + ui.spacing().item_spacing.x
-                }).sum();
-                ui.horizontal(|ui| {
-                let width = (ui.available_width() - pinned_width - 8.0).max(40.0);
-                ui.allocate_ui_with_layout(Vec2::new(width, line), Layout::top_down(Align::Min), |ui| {
-                ui.set_width(width);
-                ui.style_mut().always_scroll_the_only_direction = true;
-                egui::ScrollArea::horizontal()
-                    .id_salt("status-controls-horizontal")
-                    .max_height(line)
+                // Controls wrap onto extra rows when they do not fit. A very
+                // narrow window could still wrap into many rows, so the bar
+                // never takes more than 40% of the window; the rest scrolls.
+                let max_height = (ctx.screen_rect().height() * 0.4).max(40.0);
+                // The panel starts at last frame's height; a ScrollArea would
+                // stay that size and scroll instead of letting the bar grow.
+                ui.set_max_height(max_height);
+                egui::ScrollArea::vertical()
+                    .id_salt("status-controls")
+                    .max_height(max_height)
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
-                centered_status_row(ui, |ui| {
+                centered_wrapping_row(ui, |ui| {
                     #[cfg(not(target_arch = "wasm32"))]
                     let status_label = "SHELL READY";
                     #[cfg(target_arch = "wasm32")]
@@ -5417,6 +5413,16 @@ impl ButtonsApp {
                             }
                         }
                         #[cfg(not(target_arch = "wasm32"))]
+                        if ui.spaced_small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
+                            self.open_ai_help();
+                        }
+                        if ui.add(crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Settings"))
+                            .small().selected(self.show_settings))
+                            .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
+                            .clicked() {
+                            self.open_settings(ctx);
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
                         {
                             let controls_enabled = workspace_controls_available();
                             self.motion_status_controls(ui, ctx, controls_enabled);
@@ -5457,20 +5463,26 @@ impl ButtonsApp {
                         }
                 });
                 });
-                });
-                        #[cfg(not(target_arch = "wasm32"))]
-                        if ui.spaced_small_button(crate::i18n::text(&self.locale, crate::i18n::MessageKey::AiHelp, &[])).clicked() {
-                            self.open_ai_help();
-                        }
-                        if ui.add(crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Settings"))
-                            .small().selected(self.show_settings))
-                            .on_hover_text(if self.show_settings { "Settings is open. Click to bring it to the front." } else { "Open Settings" })
-                            .clicked() {
-                            self.open_settings(ctx);
-                        }
-
-                });
             });
+        // The panel reuses last frame's height before measuring this one. When
+        // the wrap changes (resize, font, restore), draw again right away so a
+        // stale tall or short bar is never left on screen while idle.
+        let height = egui::containers::panel::PanelState::load(ctx, egui::Id::new("status"))
+            .map(|state| state.size().y);
+        let previous = ctx.data_mut(|data| {
+            let id = egui::Id::new("status-last-height");
+            let previous = data.get_temp::<f32>(id);
+            if let Some(height) = height {
+                data.insert_temp(id, height);
+            }
+            previous
+        });
+        if previous
+            .zip(height)
+            .is_some_and(|(previous, height)| (previous - height).abs() > 0.5)
+        {
+            ctx.request_repaint();
+        }
     }
 
     fn capture_settings_snapshot(&self) -> SettingsSnapshot {
@@ -14392,11 +14404,11 @@ pub(crate) fn wrapping_row<R>(
     ui.allocate_ui_with_layout(size, layout, add_contents)
 }
 
-/// A single status row centered on one fixed line height, for rows that mix
+/// A wrapping row centered on one fixed line height, for rows that mix
 /// labels, small buttons and full buttons (the status bar). Top-aligned,
 /// small buttons rode up into the row above once it wrapped (150% scaling).
 /// The height is fixed up front so centering never shifts as the row grows.
-fn centered_status_row<R>(
+fn centered_wrapping_row<R>(
     ui: &mut egui::Ui,
     add_contents: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
@@ -14412,7 +14424,7 @@ fn centered_status_row<R>(
     );
     ui.allocate_ui_with_layout(
         size,
-        Layout::left_to_right(Align::Center).with_main_wrap(false),
+        Layout::left_to_right(Align::Center).with_main_wrap(true),
         add_contents,
     )
 }
