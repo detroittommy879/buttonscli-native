@@ -7624,12 +7624,35 @@ impl ButtonsApp {
                         Ok(models) => (models, None),
                         Err(error) => (vec![], Some(error)),
                     };
+                    // A ChatGPT connection with no model yet gets a sensible
+                    // default from the live list, never a hard-coded ID.
+                    let mut defaulted = None;
+                    if let Some(current) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|current| current.id == provider.id)
+                    {
+                        if current.chatgpt_plan && current.model.trim().is_empty() {
+                            if let Some(model) = default_chatgpt_model(&models) {
+                                current.model = model.to_owned();
+                                defaulted = Some(model.to_owned());
+                            }
+                        }
+                    }
+                    if defaulted.is_some() {
+                        self.persist_native_preferences();
+                    }
                     if provider.id == self.provider_edit_id {
-                        self.provider_message = Some(
-                            error
-                                .clone()
-                                .unwrap_or_else(|| format!("{} models loaded", models.len())),
-                        );
+                        self.provider_message =
+                            Some(error.clone().unwrap_or_else(|| match &defaulted {
+                                Some(model) => format!(
+                                    "{} models loaded. Using {model} until you choose another.",
+                                    models.len()
+                                ),
+                                None => format!("{} models loaded", models.len()),
+                            }));
                         self.provider_models = models.clone();
                     }
                     self.provider_catalogs.insert(
@@ -16200,6 +16223,39 @@ fn catalog_status(
     }
 }
 
+/// Default for a ChatGPT connection with no model chosen: the second-newest
+/// model in the live list. The newest is often a preview; one step back is
+/// usually the better everyday pick. "Newest" means the highest version number
+/// in the ID (`gpt-6.1-…` > `gpt-6-…`); among equal versions, later in the list
+/// counts as newer. IDs without a number rank last.
+#[cfg(not(target_arch = "wasm32"))]
+fn default_chatgpt_model(models: &[String]) -> Option<&str> {
+    fn version(id: &str) -> Vec<u32> {
+        let start = id.find(|c: char| c.is_ascii_digit());
+        start
+            .map(|start| {
+                id[start..]
+                    .split(|c: char| !c.is_ascii_digit() && c != '.')
+                    .next()
+                    .unwrap_or("")
+                    .split('.')
+                    .filter_map(|part| part.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    let mut ranked: Vec<(Vec<u32>, usize, &str)> = models
+        .iter()
+        .enumerate()
+        .map(|(index, id)| (version(id), index, id.as_str()))
+        .collect();
+    ranked.sort_by(|a, b| (&b.0, b.1).cmp(&(&a.0, a.1)));
+    ranked
+        .get(1)
+        .or_else(|| ranked.first())
+        .map(|(_, _, id)| *id)
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[String]) {
     ui.push_id(id, |ui| {
@@ -17274,6 +17330,34 @@ mod tests {
         std::fs::remove_dir_all(base).unwrap();
     }
     use super::*;
+
+    #[test]
+    fn chatgpt_default_model_is_the_second_newest_in_the_live_list() {
+        let models: Vec<String> = [
+            "gpt-5.6-luna",
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-6-astra",
+            "gpt-6-luna",
+            "gpt-6-sol",
+            "gpt-6.1-sol",
+            "gpt-6.1-terra",
+        ]
+        .map(String::from)
+        .into();
+        assert_eq!(default_chatgpt_model(&models), Some("gpt-6.1-sol"));
+        // Server order does not matter across versions; versions decide.
+        assert_eq!(
+            default_chatgpt_model(&[
+                "gpt-6.1-terra".into(),
+                "gpt-7-luna".into(),
+                "gpt-6-sol".into()
+            ]),
+            Some("gpt-6.1-terra")
+        );
+        assert_eq!(default_chatgpt_model(&["only".into()]), Some("only"));
+        assert_eq!(default_chatgpt_model(&[]), None);
+    }
 
     #[cfg(target_os = "windows")]
     #[test]

@@ -18,7 +18,8 @@ Click **Sign in with ChatGPT (recommended)** (or choose **ChatGPT plan (sign
 in)** under **Add connection**), then **Continue with ChatGPT**. Nothing else
 needs to be installed. Your
 browser opens; sign in and allow ButtonsCLI to use your Plus or Pro plan.
-Back in the app it says *Connected as …*. Requests then count against your
+Back in the app it says *Connected as …*. If you have not picked a model, the
+second-newest one in **Choose model** is filled in; change it any time. Requests then count against your
 ChatGPT plan instead of an API bill.
 
 <!-- IMAGE: chatgpt-signin.png — Providers with a connected ChatGPT plan. -->

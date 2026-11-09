@@ -13,7 +13,8 @@
 - Local logs and crash reports in `~/.buttonscli-native/logs` (About → Open
   logs folder). Nothing is uploaded.
 - **Sign in with ChatGPT (recommended)** is offered first in AI providers and
-  from AI Help when no provider is set up.
+  from AI Help when no provider is set up. A new ChatGPT connection without a
+  model uses the second-newest model from the live list until you pick one.
 - Applying a theme bundle and editing Row banding in the status bar now save
   right away.
 
