@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased — 1.0.0
+## Unreleased
 
 - Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
-  Release builds now pick the next patch number on their own
-  (`docs/dev/RELEASING.md`); other builds show `1.0.0+<commit>`.
+  Releases follow Semantic Versioning and pick their own number from commit
+  messages (`feat:` → minor, fixes → patch, breaking changes ask first; see
+  `docs/dev/RELEASING.md`). Other builds show `1.0.0+<commit>`.
 - The status bar wraps onto more rows again when controls do not fit, and no
   longer grows huge after minimize/restore (capped at 40% of the window).
 - Workspace messages float over the terminals (no pane resize) and fade after

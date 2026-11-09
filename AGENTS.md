@@ -17,6 +17,52 @@
 - Files mix CRLF and LF. Preserve each file's endings: the Edit tool does; Python
   edits need `io.open(..., newline='')`, or matches fail/endings change. Use raw
   strings for regex text in Python edits: `"\b"` writes a backspace byte.
+- This is the only instruction file: `CLAUDE.md` just imports it.
+- Commit subjects use Conventional Commits; release numbers are computed from them.
+  See **Versions and commits** below.
+
+## Big picture
+
+ButtonsCLI Native: a Rust terminal workspace (egui/eframe 0.31 + wgpu) with tiled
+shells, a clickable command dock, per-pane themes/fonts/shader backgrounds, and AI
+theme/shader generation. Native builds own real PTYs via a patched Alacritty; the
+`wasm32` build is a scripted demo (`web/`) and must never open a PTY.
+
+- Entry: `src/main.rs` → eframe; `src/lib.rs` gates most modules to native. Code shared
+  with the web demo (`app`, `settings`, `theme`, `fonts`, `i18n`, `features`,
+  `shortcuts`) must stay wasm-compatible; check with the wasm clippy command.
+- Terminal path: `src/terminal.rs` → `vendor/egui_term` (widget, input, mouse) →
+  `vendor/alacritty_terminal` (PTY, parser, grid). Not a Cargo workspace: run
+  `cargo test -p egui_term --lib` for the widget's own tests.
+- Session dispatcher `src/session/` serves the UI and the loopback control API
+  (`src/control/`, `docs/CONTROL-API.md`).
+- Themes: `theme.rs` (five source IDs), `theme_files.rs`, `theme_generation.rs`,
+  `shader_ai.rs`, `library.rs`; WGSL effects in `src/plugins/effects/`.
+- AI: `src/assistant/` (providers, `chatgpt.rs`); gating in `src/features/`.
+
+## Versions and commits
+
+Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
+
+- Never edit the version in `Cargo.toml` to make a release. The *Release builds*
+  workflow picks it: newest release tag + the bump read from commit subjects since
+  then. `Cargo.toml` only holds a floor (raise it only for a planned jump; then run
+  `cargo update -w --offline`, or `--locked` fails).
+- Subject prefixes decide the bump, so pick them honestly:
+  - `feat:` / `feat(scope):` a new user-visible capability → MINOR (1.4.2 → 1.5.0).
+  - `fix:` bug fix; `perf:`, `refactor:`, `docs:`, `test:`, `ci:`, `chore:`,
+    `assets:` → PATCH (1.4.2 → 1.4.3). Unprefixed subjects also count as PATCH.
+  - Breaking → MAJOR (2.0.0): `feat!:`/`fix!:` or a `BREAKING CHANGE: …` line in
+    the body. The workflow then stops until someone chooses `major`. Breaking means
+    users must act: settings/profile files (`native.json`, profiles, saved tab
+    groups) that no longer load without a migration, theme/bundle JSON that older
+    files no longer satisfy, control API/MCP tool or `buttonsclictl` contracts,
+    removed or renamed CLI flags. Never mark UI moves or new defaults breaking.
+- Add user-visible changes to `CHANGELOG.md` under `## Unreleased`; the number is
+  added when the release is published.
+- `crate::BUILD_VERSION` is what the UI/`--version` show: release builds `1.4.2`;
+  other builds `1.4.2+<commit>` (base: newer of `Cargo.toml` and the newest tag behind
+  HEAD, `build.rs`). Never print `CARGO_PKG_VERSION` to users.
 
 ## Where things live
 
@@ -198,11 +244,11 @@ cargo build --locked --release --bin buttonscli
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
 - `self.notice` messages render as a fading overlay (`src/app/notices.rs`,
   `notice_seconds`), never a layout row: rows above terminals resize every PTY.
-  Logs/crash reports: `src/diagnostics.rs` (`~/.buttonscli-native/logs`, local only).
-- Versions: `Cargo.toml` holds MAJOR.MINOR.0; `release.yml` auto-picks PATCH
-  (`scripts/release-version.sh`, `docs/dev/RELEASING.md`). Show `crate::BUILD_VERSION`
-  (adds `+commit` outside releases). After editing the version run
-  `cargo update -w --offline` or `--locked` fails.
+  Logs/crash reports: `src/diagnostics.rs` (`~/.buttonscli-native/logs`, local only);
+  `RUST_LOG` overrides the default `warn,buttonscli=info` filter.
+- Version logic: `scripts/release-version.sh next [auto|patch|minor|major]` (stdout:
+  the version; stderr: why). Test it in a scratch `git init` copy, never by tagging
+  this repo. Draft releases have no tag yet; it reads their `targetCommitish`.
 - Agent Mode must probe the current interpreter: `SessionInfo.shell` describes
   the launcher and can be wrong after SSH/WSL. See `src/assistant/agent.rs` and
   `agent_pty_tests.rs`. Keep framing short enough for 24-column panes; ConPTY

@@ -31,13 +31,14 @@ fn main() {
     build_version();
 }
 
-/// `BUTTONSCLI_BUILD_VERSION`: the Cargo version, plus `+<short commit>` for
-/// builds that are not release builds, so bug reports name the exact build.
-/// The release workflow sets `BUTTONSCLI_RELEASE_BUILD=1` after writing the
-/// auto-incremented version into Cargo.toml (`scripts/release-version.sh`).
+/// `BUTTONSCLI_BUILD_VERSION`. Release builds: the Cargo version, which the
+/// release workflow sets (`scripts/release-version.sh`) together with
+/// `BUTTONSCLI_RELEASE_BUILD=1`. Other builds: the newer of the Cargo version
+/// and the newest release tag behind this commit, plus `+<short commit>`
+/// (SemVer build metadata), so bug reports name the exact build.
 fn build_version() {
     println!("cargo:rerun-if-env-changed=BUTTONSCLI_RELEASE_BUILD");
-    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    let mut version = env::var("CARGO_PKG_VERSION").unwrap();
     let release = env::var("BUTTONSCLI_RELEASE_BUILD").is_ok_and(|value| value == "1");
     let git = |args: &[&str]| {
         std::process::Command::new("git")
@@ -53,6 +54,25 @@ fn build_version() {
     } else {
         git(&["rev-parse", "--short=8", "HEAD"])
     };
+    if !release {
+        // Cargo.toml stays at its floor while releases count up from tags.
+        // Shallow CI checkouts have no tags: keep the Cargo version.
+        let tagged = git(&[
+            "describe",
+            "--tags",
+            "--abbrev=0",
+            "--match",
+            "v[0-9]*.[0-9]*.[0-9]*",
+            "--exclude",
+            "*-*",
+        ])
+        .and_then(|tag| parse_version(tag.trim_start_matches('v')));
+        if let (Some(tagged), Some(current)) = (tagged, parse_version(&version)) {
+            if tagged > current {
+                version = format!("{}.{}.{}", tagged.0, tagged.1, tagged.2);
+            }
+        }
+    }
     // Rebuild the version string when the checked-out commit changes. Watch
     // only files that exist: Cargo treats a missing watched path as changed
     // and would rebuild the whole crate on every run (no packed-refs yet,
@@ -67,6 +87,7 @@ fn build_version() {
     }
     if let Some(common) = git(&["rev-parse", "--git-common-dir"]).map(PathBuf::from) {
         watch(common.join("packed-refs"));
+        watch(common.join("refs").join("tags"));
         if let Some(reference) = git(&["symbolic-ref", "-q", "HEAD"]) {
             watch(common.join(reference));
         }
@@ -76,4 +97,12 @@ fn build_version() {
         None => version,
     };
     println!("cargo:rustc-env=BUTTONSCLI_BUILD_VERSION={full}");
+}
+
+/// `X.Y.Z` (ignoring any `-pre`/`+build` suffix) as numbers, for comparing.
+fn parse_version(text: &str) -> Option<(u64, u64, u64)> {
+    let core = text.split(['-', '+']).next()?;
+    let mut parts = core.split('.').map(|part| part.parse().ok());
+    let version = (parts.next()??, parts.next()??, parts.next()??);
+    parts.next().is_none().then_some(version)
 }

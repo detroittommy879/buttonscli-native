@@ -4,13 +4,20 @@ name: Release builds
 # `gh workflow run release.yml`. Tick "publish" to put the files on a draft
 # GitHub release; you publish the draft yourself.
 #
-# The patch number counts up on its own: Cargo.toml holds MAJOR.MINOR, and
-# scripts/release-version.sh picks the next unused vMAJOR.MINOR.N from tags
-# and releases (never below Cargo.toml's patch). Every job builds with that
-# one number. Bump MINOR/MAJOR in Cargo.toml by hand when it is time.
+# The version is picked for you (Semantic Versioning, docs/dev/RELEASING.md):
+# scripts/release-version.sh bumps the newest release by the commit messages
+# since it (feat: -> minor, anything else -> patch) or by the "bump" choice.
+# Breaking commits stop the run until you choose. The run summary shows the
+# version and why; a run without "publish" is a dry run. Every job builds with
+# that one number.
 on:
   workflow_dispatch:
     inputs:
+      bump:
+        description: "Version bump. auto: feat commits -> minor, others -> patch; breaking commits stop and ask"
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
       publish:
         description: Attach the files to a draft GitHub release
         type: boolean
@@ -38,7 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(bash scripts/release-version.sh next)
+          version=$(bash scripts/release-version.sh next "${{ inputs.bump }}")
           echo "Release version: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
