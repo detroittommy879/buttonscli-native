@@ -183,6 +183,9 @@ cargo build --locked --release --bin buttonscli
   target/debug/buttonsclictl.exe [--descriptor <live file>]` runs the official MCP
   client against the Rust server. Send integer JSON (`client::number`): the API
   rejects `120.0`.
+- AI shader generation: `src/shader_ai.rs`; workers/editor: `src/app.rs`.
+  Shared admission checks: `src/plugins/effects/shader_expression.rs`; GPU calls:
+  `shader_background.rs`. `scripts/theme-eval.py` evaluates palettes, not shaders.
 - Ordinary AI Help is active with your own provider; Agent Mode/control still have access gates.
   Chat UI/routing: `src/app/ai_help.rs`; tests: `src/app/ai_help_tests.rs`.
   `selected_target` is for the next question; `target` pins existing suggestions. Never
