@@ -176,10 +176,16 @@ impl ButtonsApp {
         ctx: &egui::Context,
         enabled: bool,
     ) {
+        // No `add_enabled_ui` scopes here: a child scope inside the status
+        // bar's wrapping row ignores the wrap and pushes later controls far
+        // down (the bar grew huge). Everything after these controls in the
+        // status row uses the same `enabled` flag, so disabling the row from
+        // here on is equivalent.
+        if !enabled {
+            ui.disable();
+        }
         let mut speed = self.preferences.motion_speed;
-        let done = ui
-            .add_enabled_ui(enabled, |ui| motion_speed_drag(ui, &mut speed))
-            .inner;
+        let done = motion_speed_drag(ui, &mut speed);
         if speed != self.preferences.motion_speed {
             self.preferences.motion_speed = speed;
         }
@@ -194,7 +200,7 @@ impl ButtonsApp {
         };
         let mut chosen = None;
         let mut changed = false;
-        ui.add_enabled_ui(enabled, |ui| {
+        {
             ui.spaced_menu_button(title, |ui| {
                 ui.set_min_width(260.0);
                 ui.spaced_strong("Look");
@@ -232,7 +238,7 @@ impl ButtonsApp {
             .on_hover_text(
                 "Look presets, Calm effects, GPU shaders and motion speed for every pane.",
             );
-        });
+        }
         if let Some(look) = chosen {
             self.apply_look_preset(ctx, look);
         } else if changed {

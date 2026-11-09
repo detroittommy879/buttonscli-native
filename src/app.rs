@@ -520,6 +520,10 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     command: String,
     notice: Option<String>,
+    /// The message `notice_overlay` is timing and when it appeared (egui time).
+    notice_timer: Option<(String, f64)>,
+    /// The most recent message after it faded or was dismissed.
+    last_notice: Option<String>,
     /// A right-click Paste waiting for egui's clipboard read: (PTY id, frames left).
     #[cfg(not(target_arch = "wasm32"))]
     pending_menu_paste: Option<(u64, u8)>,
@@ -1059,7 +1063,10 @@ struct ThemeGenerationEvent {
 
 #[cfg(not(target_arch = "wasm32"))]
 enum AiHelpCommand {
-    PreviewContext,
+    PreviewContext {
+        target_id: u64,
+        generation: u64,
+    },
     Submit(
         String,
         Option<crate::session::context::TerminalContext>,
@@ -1101,6 +1108,10 @@ struct AiHelpWindowState {
     include_context: bool,
     context_preview: Option<crate::session::context::TerminalContext>,
     context_busy: bool,
+    context_generation: u64,
+    selected_target: Option<(u64, String)>,
+    history_target: Option<u64>,
+    message_targets: std::collections::BTreeMap<usize, (u64, String)>,
     target: Option<(u64, String)>,
 }
 
@@ -1595,6 +1606,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             command: String::new(),
             notice: None,
+            notice_timer: None,
+            last_notice: None,
             #[cfg(not(target_arch = "wasm32"))]
             pending_menu_paste: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -5200,6 +5213,11 @@ impl ButtonsApp {
     }
 
     fn status_bar(&mut self, ctx: &egui::Context) {
+        // Minimize/restore can report a transient 0/1-point surface. Do not
+        // persist a many-row toolbar measurement for that unusable width.
+        if ctx.screen_rect().width() < 160.0 || ctx.screen_rect().height() < 96.0 {
+            return;
+        }
         let colors = self.colors();
         let terminal_size = self.preferences.typography.terminal.size;
         #[cfg(not(target_arch = "wasm32"))]
@@ -5222,12 +5240,27 @@ impl ButtonsApp {
                 apply_zone_style(ui, &self.font_catalog, &self.preferences.typography.status_bar);
                 #[cfg(not(target_arch = "wasm32"))]
                 self.appearance_background_menu(ui, false);
+                // Controls wrap onto extra rows when they do not fit. A very
+                // narrow window could still wrap into many rows, so the bar
+                // never takes more than 40% of the window; the rest scrolls.
+                let max_height = (ctx.screen_rect().height() * 0.4).max(40.0);
+                // The panel starts at last frame's height; a ScrollArea would
+                // stay that size and scroll instead of letting the bar grow.
+                ui.set_max_height(max_height);
+                egui::ScrollArea::vertical()
+                    .id_salt("status-controls")
+                    .max_height(max_height)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
                 centered_wrapping_row(ui, |ui| {
                     #[cfg(not(target_arch = "wasm32"))]
                     let status_label = "SHELL READY";
                     #[cfg(target_arch = "wasm32")]
                     let status_label = if self.browser_simulator.busy() { "THINKING" } else { "READY" };
-                    ui.spaced_label(RichText::new(status_label).small().color(colors.accent));
+                    let status = ui.spaced_label(RichText::new(status_label).small().color(colors.accent));
+                    if let Some(last) = self.notice.as_ref().or(self.last_notice.as_ref()) {
+                        status.on_hover_text(format!("Last message: {last}"));
+                    }
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -5264,7 +5297,7 @@ impl ButtonsApp {
                         let mut shader_action = None;
                         let mut fps = self.preferences.animation_fps;
                         let mut fps_done = false;
-                        ui.horizontal(|ui| {
+                        // Keep each control in the outer wrapping row.
                             ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
@@ -5283,7 +5316,6 @@ impl ButtonsApp {
                             })
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
-                        });
                         if let Some(action) = action { self.perform_global_theme_action(action); }
                         if fps != self.preferences.animation_fps {
                             self.preferences.animation_fps = fps;
@@ -5299,7 +5331,11 @@ impl ButtonsApp {
                         self.profile_menu(ui, ctx);
                         ui.separator();
                         ui.spaced_label("Row banding");
-                        ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
+                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
+                        // Save when a drag ends or a typed value lands, like Motion.
+                        if banding.drag_stopped() || (banding.changed() && !banding.dragged()) {
+                            self.persist_native_preferences();
+                        }
                         ui.separator();
                         ui.spaced_label(RichText::new("Panes").small().color(colors.muted));
                         let pane_count = self.visible_panes.len().max(1);
@@ -5439,7 +5475,27 @@ impl ButtonsApp {
                             }
                         }
                 });
+                });
             });
+        // The panel reuses last frame's height before measuring this one. When
+        // the wrap changes (resize, font, restore), draw again right away so a
+        // stale tall or short bar is never left on screen while idle.
+        let height = egui::containers::panel::PanelState::load(ctx, egui::Id::new("status"))
+            .map(|state| state.size().y);
+        let previous = ctx.data_mut(|data| {
+            let id = egui::Id::new("status-last-height");
+            let previous = data.get_temp::<f32>(id);
+            if let Some(height) = height {
+                data.insert_temp(id, height);
+            }
+            previous
+        });
+        if previous
+            .zip(height)
+            .is_some_and(|(previous, height)| (previous - height).abs() > 0.5)
+        {
+            ctx.request_repaint();
+        }
     }
 
     fn capture_settings_snapshot(&self) -> SettingsSnapshot {
@@ -6468,15 +6524,15 @@ impl ButtonsApp {
         let mut add = None;
         ui.spaced_menu_button("Add connection", |ui| {
             for (name, endpoint, api) in [
+                (
+                    "ChatGPT plan (sign in)",
+                    crate::assistant::chatgpt::RESOURCE,
+                    ProviderApi::Responses,
+                ),
                 ("Custom", "", ProviderApi::Auto),
                 (
                     "OpenAI",
                     "https://api.openai.com/v1",
-                    ProviderApi::Responses,
-                ),
-                (
-                    "ChatGPT plan (sign in)",
-                    crate::assistant::chatgpt::RESOURCE,
                     ProviderApi::Responses,
                 ),
                 (
@@ -6511,6 +6567,20 @@ impl ButtonsApp {
                 }
             }
         });
+        // The easiest start: no API key, just the ChatGPT account the user
+        // already has. Offered up front until a ChatGPT connection exists.
+        if !settings.providers.iter().any(|provider| provider.chatgpt_plan)
+            && ui
+                .spaced_button("Sign in with ChatGPT (recommended)")
+                .on_hover_text("Uses your ChatGPT plan through a browser sign-in. No API key and nothing else to install.")
+                .clicked()
+        {
+            add = Some((
+                "ChatGPT plan (sign in)",
+                crate::assistant::chatgpt::RESOURCE,
+                ProviderApi::Responses,
+            ));
+        }
         if let Some((name, endpoint, api)) = add {
             let provider = ProviderProfile {
                 id: format!("provider-{:032x}", fastrand::u128(..)),
@@ -7554,12 +7624,35 @@ impl ButtonsApp {
                         Ok(models) => (models, None),
                         Err(error) => (vec![], Some(error)),
                     };
+                    // A ChatGPT connection with no model yet gets a sensible
+                    // default from the live list, never a hard-coded ID.
+                    let mut defaulted = None;
+                    if let Some(current) = self
+                        .preferences
+                        .provider_settings
+                        .providers
+                        .iter_mut()
+                        .find(|current| current.id == provider.id)
+                    {
+                        if current.chatgpt_plan && current.model.trim().is_empty() {
+                            if let Some(model) = default_chatgpt_model(&models) {
+                                current.model = model.to_owned();
+                                defaulted = Some(model.to_owned());
+                            }
+                        }
+                    }
+                    if defaulted.is_some() {
+                        self.persist_native_preferences();
+                    }
                     if provider.id == self.provider_edit_id {
-                        self.provider_message = Some(
-                            error
-                                .clone()
-                                .unwrap_or_else(|| format!("{} models loaded", models.len())),
-                        );
+                        self.provider_message =
+                            Some(error.clone().unwrap_or_else(|| match &defaulted {
+                                Some(model) => format!(
+                                    "{} models loaded. Using {model} until you choose another.",
+                                    models.len()
+                                ),
+                                None => format!("{} models loaded", models.len()),
+                            }));
                         self.provider_models = models.clone();
                     }
                     self.provider_catalogs.insert(
@@ -8156,833 +8249,6 @@ impl ButtonsApp {
             self.quick_secrets_generation = self.quick_secrets_generation.wrapping_add(1);
             self.quick_secrets_busy = false;
             self.lock_quick_secrets();
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn open_ai_help(&mut self) {
-        if let Ok(mut state) = self.ai_help_state.lock() {
-            state.open = true;
-            // Keep in-flight/completed suggestions bound to the request's target.
-            // A reopened window must never reinterpret them for the focused pane.
-            if !state.busy && state.reviewed_actions.is_empty() {
-                state.target = self
-                    .tabs
-                    .get(self.focused)
-                    .map(|tab| (tab.id, tab.title.clone()));
-            }
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn ai_help_window(&self, ctx: &egui::Context) {
-        let locale = self.locale.clone();
-        let style = ctx.style_of(egui::Theme::Dark);
-        let catalog = self.font_catalog.clone();
-        let assistant_font = self.preferences.typography.assistant.clone();
-        let state_open = self.ai_help_state.lock().is_ok_and(|state| state.open);
-        if !state_open {
-            return;
-        }
-        let state = Arc::clone(&self.ai_help_state);
-        let actions = self.ai_help_tx.clone();
-        let title = crate::i18n::text(&locale, crate::i18n::MessageKey::AiHelp, &[]);
-        ctx.show_viewport_immediate(
-            egui::ViewportId::from_hash_of("buttonscli-ai-help"),
-            egui::ViewportBuilder::default()
-                .with_title(title.clone())
-                .with_inner_size([740.0, 620.0])
-                .with_min_inner_size([560.0, 600.0]),
-            move |child_ctx, class| {
-                child_ctx.set_theme(egui::Theme::Dark);
-                child_ctx.set_style((*style).clone());
-                let Ok(mut state) = state.lock() else {
-                    return;
-                };
-                if child_ctx.input(|input| input.viewport().close_requested()) {
-                    if state.agent_mode {
-                        if let Some(cancel) = &state.cancel {
-                            cancel.store(true, Ordering::Relaxed);
-                        }
-                    }
-                    state.open = false;
-                    child_ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    return;
-                }
-                let queue = |command: AiHelpCommand| {
-                    if actions.send(command).is_ok() {
-                        child_ctx.request_repaint_of(egui::ViewportId::ROOT);
-                    }
-                };
-                let body = |ui: &mut egui::Ui,
-                            state: &mut AiHelpWindowState,
-                            window_height: f32| {
-                    let body_top = ui.cursor().top();
-                    apply_zone_style(ui, &catalog, &assistant_font);
-                    use crate::i18n::{text, MessageKey};
-                    ui.spaced_heading(text(&locale, MessageKey::AiHelp, &[]));
-                    ui.spaced_label(text(&locale, MessageKey::AiHelpDescription, &[]));
-                    if !ai_help_available() {
-                        ui.separator();
-                        ui.spaced_label(text(&locale, MessageKey::AiHelpLockedProvider, &[]));
-                        if ui
-                            .spaced_button(text(&locale, MessageKey::AiHelpProviderSettings, &[]))
-                            .clicked()
-                        {
-                            queue(AiHelpCommand::OpenSettings);
-                        }
-                    }
-                    // Reserve room for the composer, including the optional context preview.
-                    // A long transcript must scroll instead of pushing Send offscreen.
-                    let composer_height = if state.context_preview.is_some() {
-                        410.0
-                    } else if state.include_context {
-                        245.0
-                    } else {
-                        165.0
-                    };
-                    let status_height = if state.error.is_some() {
-                        70.0
-                    } else if state.busy {
-                        35.0
-                    } else if state.status.is_some() {
-                        25.0
-                    } else {
-                        0.0
-                    };
-                    let transcript_height = (window_height
-                        - (ui.cursor().top() - body_top)
-                        - (composer_height
-                            + if ai_agent_available() { 40.0 } else { 0.0 }
-                            + if state.agent_mode { 100.0 } else { 0.0 })
-                            * (assistant_font.size / 14.0).max(1.0)
-                        - status_height)
-                        .max(80.0);
-                    egui::ScrollArea::vertical()
-                        .id_salt("ai-help-conversation")
-                        .max_height(transcript_height)
-                        .auto_shrink([false, false])
-                        .stick_to_bottom(true)
-                        .show(ui, |ui| {
-                            for (assistant, message) in &state.messages {
-                                ui.group(|ui| {
-                                    ui.spaced_label(
-                                        RichText::new(if *assistant {
-                                            text(&locale, MessageKey::AiHelp, &[])
-                                        } else {
-                                            text(&locale, MessageKey::AiHelpYou, &[])
-                                        })
-                                        .strong(),
-                                    );
-                                    ui.spaced_label(message);
-                                });
-                            }
-                            if state.messages.is_empty() {
-                                ui.spaced_label(text(
-                                    &locale,
-                                    MessageKey::AiHelpConversationSession,
-                                    &[],
-                                ));
-                            }
-                            for action in &state.reviewed_actions {
-                                let target_id = state.target.as_ref().map(|target| target.0);
-                                let target_title = state.target.as_ref().map_or_else(
-                                    || text(&locale, MessageKey::AiHelpNoTarget, &[]),
-                                    |target| target.1.clone(),
-                                );
-                                ui.group(|ui| match action {
-                                    crate::assistant::reply::SuggestedAction::Command {
-                                        label,
-                                        description,
-                                        command,
-                                        send_enter,
-                                    } => {
-                                        ui.spaced_strong(text(
-                                            &locale,
-                                            MessageKey::AiHelpReviewCommand,
-                                            &[("label", label)],
-                                        ));
-                                        ui.spaced_label(text(
-                                            &locale,
-                                            MessageKey::AiHelpTarget,
-                                            &[("target", &target_title)],
-                                        ));
-                                        ui.spaced_label(description);
-                                        ui.monospace(command);
-                                        ui.spaced_label(text(
-                                            &locale,
-                                            if *send_enter {
-                                                MessageKey::AiHelpWouldEnter
-                                            } else {
-                                                MessageKey::AiHelpWouldNotEnter
-                                            },
-                                            &[],
-                                        ));
-                                        ui.horizontal(|ui| {
-                                            if ui
-                                                .add_enabled(
-                                                    target_id.is_some(),
-                                                    crate::ui_text::button(
-                                                        ui,
-                                                        text(
-                                                            &locale,
-                                                            MessageKey::AiHelpInsert,
-                                                            &[],
-                                                        ),
-                                                    ),
-                                                )
-                                                .clicked()
-                                            {
-                                                queue(AiHelpCommand::Deliver {
-                                                    target_id,
-                                                    action: action.clone(),
-                                                    press_enter: false,
-                                                });
-                                            }
-                                            if ui
-                                                .add_enabled(
-                                                    target_id.is_some(),
-                                                    crate::ui_text::button(
-                                                        ui,
-                                                        text(
-                                                            &locale,
-                                                            MessageKey::AiHelpInsertEnter,
-                                                            &[],
-                                                        ),
-                                                    ),
-                                                )
-                                                .clicked()
-                                            {
-                                                queue(AiHelpCommand::Deliver {
-                                                    target_id,
-                                                    action: action.clone(),
-                                                    press_enter: true,
-                                                });
-                                            }
-                                        });
-                                    }
-                                    crate::assistant::reply::SuggestedAction::Control {
-                                        label,
-                                        description,
-                                        key,
-                                    } => {
-                                        ui.spaced_strong(text(
-                                            &locale,
-                                            MessageKey::AiHelpReviewControl,
-                                            &[("label", label)],
-                                        ));
-                                        ui.spaced_label(text(
-                                            &locale,
-                                            MessageKey::AiHelpTarget,
-                                            &[("target", &target_title)],
-                                        ));
-                                        ui.spaced_label(description);
-                                        ui.spaced_label(text(
-                                            &locale,
-                                            MessageKey::AiHelpTerminalKey,
-                                            &[("key", &format!("{key:?}"))],
-                                        ));
-                                        if ui
-                                            .add_enabled(
-                                                target_id.is_some(),
-                                                crate::ui_text::button(
-                                                    ui,
-                                                    text(
-                                                        &locale,
-                                                        MessageKey::AiHelpSendReviewedKey,
-                                                        &[],
-                                                    ),
-                                                ),
-                                            )
-                                            .clicked()
-                                        {
-                                            queue(AiHelpCommand::Deliver {
-                                                target_id,
-                                                action: action.clone(),
-                                                press_enter: false,
-                                            });
-                                        }
-                                    }
-                                });
-                            }
-                        });
-                    if let Some(error) = &state.error {
-                        ui.spaced_colored_label(Color32::LIGHT_RED, error);
-                    }
-                    if let Some(status) = &state.status {
-                        ui.spaced_label(RichText::new(status).color(Color32::LIGHT_GREEN));
-                    }
-                    if state.busy {
-                        ui.horizontal(|ui| {
-                            ui.spinner();
-                            ui.spaced_label(text(&locale, MessageKey::AiHelpWaitingProvider, &[]));
-                            if ui
-                                .spaced_button(text(&locale, MessageKey::Cancel, &[]))
-                                .clicked()
-                            {
-                                if let Some(cancel) = &state.cancel {
-                                    cancel.store(true, Ordering::Relaxed);
-                                }
-                            }
-                        });
-                    }
-                    if state.error.is_some() && !state.busy && !state.last_request_agent {
-                        if let Some((question, context, target)) = state.last_request.clone() {
-                            if ui
-                                .spaced_button(text(&locale, MessageKey::AiHelpRetry, &[]))
-                                .clicked()
-                            {
-                                queue(AiHelpCommand::Submit(question, context, target));
-                            }
-                        }
-                    }
-                    ui.separator();
-                    ui.add_enabled_ui(!state.busy && ai_help_available(), |ui| {
-                        if ai_agent_available()
-                            && ui
-                                .add_enabled(
-                                    ai_agent_available(),
-                                    egui::Checkbox::new(
-                                        &mut state.agent_mode,
-                                        text(&locale, MessageKey::AiAgentMode, &[]),
-                                    ),
-                                )
-                                .changed()
-                        {
-                            state.include_context = state.agent_mode;
-                            state.context_preview = None;
-                            state.reviewed_actions.clear();
-                        }
-                        if state.agent_mode {
-                            ui.spaced_small(text(&locale, MessageKey::AiAgentConsent, &[]));
-                        }
-                        let changed = ui
-                            .spaced_checkbox(
-                                &mut state.include_context,
-                                text(&locale, MessageKey::AiHelpIncludeContext, &[]),
-                            )
-                            .changed();
-                        if changed {
-                            state.context_preview = None;
-                        }
-                        if state.include_context {
-                            if ui
-                                .add_enabled(
-                                    !state.context_busy,
-                                    crate::ui_text::button(
-                                        ui,
-                                        text(&locale, MessageKey::AiHelpPreviewContext, &[]),
-                                    ),
-                                )
-                                .clicked()
-                            {
-                                state.context_busy = true;
-                                state.context_preview = None;
-                                queue(AiHelpCommand::PreviewContext);
-                            }
-                            if state.context_busy {
-                                ui.spinner();
-                                ui.spaced_label(text(
-                                    &locale,
-                                    MessageKey::AiHelpPreparingContext,
-                                    &[],
-                                ));
-                            }
-                            if let Some(preview) = &state.context_preview {
-                                ui.spaced_label(text(
-                                    &locale,
-                                    MessageKey::AiHelpIncludedTerminal,
-                                    &[
-                                        ("title", &preview.title),
-                                        ("shell", &preview.shell),
-                                        ("id", &preview.session_id.to_string()),
-                                    ],
-                                ));
-                                egui::ScrollArea::vertical()
-                                    .id_salt("ai-help-context-preview")
-                                    .max_height(150.0)
-                                    .show(ui, |ui| {
-                                        ui.monospace(&preview.output);
-                                    });
-                                ui.spaced_small(text(
-                                    &locale,
-                                    MessageKey::AiHelpContextSentPrivacy,
-                                    &[],
-                                ));
-                            }
-                        }
-                        let question_label =
-                            ui.spaced_label(text(&locale, MessageKey::AiHelpQuestionHint, &[]));
-                        ui.add(
-                            egui::TextEdit::multiline(&mut state.input)
-                                .desired_rows(3)
-                                .hint_text(text(&locale, MessageKey::AiHelpQuestionHint, &[])),
-                        )
-                        .labelled_by(question_label.id);
-                        let context_ready = (!state.include_context && !state.agent_mode)
-                            || state.context_preview.is_some();
-                        if ui
-                            .add_enabled(
-                                context_ready,
-                                crate::ui_text::button(
-                                    ui,
-                                    text(&locale, MessageKey::AiHelpSend, &[]),
-                                ),
-                            )
-                            .clicked()
-                        {
-                            let question = std::mem::take(&mut state.input).trim().to_owned();
-                            if !question.is_empty() {
-                                let context = state
-                                    .include_context
-                                    .then(|| state.context_preview.clone())
-                                    .flatten();
-                                let target = context
-                                    .as_ref()
-                                    .map(|context| context.session_id)
-                                    .or_else(|| state.target.as_ref().map(|target| target.0));
-                                queue(AiHelpCommand::Submit(question, context, target));
-                            }
-                        }
-                    });
-                };
-                match class {
-                    egui::ViewportClass::Embedded => {
-                        egui::Window::new(title.clone()).show(child_ctx, |ui| {
-                            let height =
-                                ui.available_height().min(child_ctx.screen_rect().height());
-                            body(ui, &mut state, height);
-                        });
-                    }
-                    _ => {
-                        egui::CentralPanel::default().show(child_ctx, |ui| {
-                            let height = ui.available_height();
-                            egui::ScrollArea::vertical()
-                                .id_salt("ai-help-body")
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| body(ui, &mut state, height));
-                        });
-                    }
-                }
-            },
-        );
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn process_ai_help_commands(&mut self, ctx: &egui::Context) {
-        let locale = self.locale.clone();
-        let help_viewport = egui::ViewportId::from_hash_of("buttonscli-ai-help");
-        let mut processed_any = false;
-        while let Ok(command) = self.ai_help_rx.try_recv() {
-            processed_any = true;
-            match command {
-                AiHelpCommand::OpenSettings => {
-                    self.show_settings = true;
-                    self.settings_tab = SettingsTab::Providers;
-                }
-                AiHelpCommand::Deliver {
-                    target_id,
-                    action,
-                    press_enter,
-                } => {
-                    if !ai_help_available() {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpRequiresPro,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    }
-                    let Some(target_id) = target_id else {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpNoTarget,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    };
-                    let bytes = match &action {
-                        crate::assistant::reply::SuggestedAction::Command { command, .. } => {
-                            crate::session::input::command_bytes(command, press_enter)
-                        }
-                        crate::assistant::reply::SuggestedAction::Control { key, .. } => {
-                            Ok(crate::session::input::key_bytes(match key {
-                                crate::assistant::reply::ControlKey::CtrlC => {
-                                    crate::session::input::TerminalKey::CtrlC
-                                }
-                                crate::assistant::reply::ControlKey::CtrlD => {
-                                    crate::session::input::TerminalKey::CtrlD
-                                }
-                                crate::assistant::reply::ControlKey::CtrlZ => {
-                                    crate::session::input::TerminalKey::CtrlZ
-                                }
-                                crate::assistant::reply::ControlKey::Enter => {
-                                    crate::session::input::TerminalKey::Enter
-                                }
-                                crate::assistant::reply::ControlKey::Tab => {
-                                    crate::session::input::TerminalKey::Tab
-                                }
-                                crate::assistant::reply::ControlKey::Escape => {
-                                    crate::session::input::TerminalKey::Escape
-                                }
-                                crate::assistant::reply::ControlKey::Up => {
-                                    crate::session::input::TerminalKey::Up
-                                }
-                                crate::assistant::reply::ControlKey::Down => {
-                                    crate::session::input::TerminalKey::Down
-                                }
-                                crate::assistant::reply::ControlKey::Left => {
-                                    crate::session::input::TerminalKey::Left
-                                }
-                                crate::assistant::reply::ControlKey::Right => {
-                                    crate::session::input::TerminalKey::Right
-                                }
-                            })
-                            .to_vec())
-                        }
-                    };
-                    let result = bytes
-                        .map_err(|_| ActionError::InvalidInput)
-                        .and_then(|bytes| {
-                            self.dispatch_ui_action(
-                                Some(Target::Id(target_id)),
-                                Action::Send(bytes),
-                                ctx,
-                            )
-                            .map(|_| ())
-                        });
-                    if let Ok(mut state) = self.ai_help_state.lock() {
-                        match result {
-                            Ok(()) => {
-                                state.error = None;
-                                state.status = Some(crate::i18n::text(
-                                    &locale,
-                                    crate::i18n::MessageKey::AiHelpInputSent,
-                                    &[("id", &target_id.to_string())],
-                                ));
-                            }
-                            Err(error) => {
-                                state.status = None;
-                                state.error = Some(crate::i18n::text(
-                                    &locale,
-                                    crate::i18n::MessageKey::AiHelpDeliveryFailed,
-                                    &[("reason", &error.to_string())],
-                                ));
-                            }
-                        }
-                    }
-                }
-                AiHelpCommand::PreviewContext => {
-                    let Some(tab) = self.tabs.get(self.focused) else {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpContextTerminalMissing,
-                                &[],
-                            ));
-                            state.context_busy = false;
-                        }
-                        continue;
-                    };
-                    let mut snapshot = crate::session::context::TerminalContext {
-                        session_id: tab.id,
-                        title: tab.title.clone(),
-                        shell: tab.shell_name.clone(),
-                        output: tab.backend.plain_text_tail(200_000),
-                    };
-                    if let Ok(mut state) = self.ai_help_state.lock() {
-                        state.context_busy = true;
-                        state.error = None;
-                        state.status = None;
-                    }
-                    let profile = self
-                        .native_store
-                        .as_ref()
-                        .map_or("default", NativeStore::profile_name)
-                        .to_owned();
-                    let provider = self.preferences.provider_settings.for_task(AiTask::Help);
-                    let session = Arc::clone(&self.credential_session);
-                    let shared = Arc::clone(&self.ai_help_state);
-                    let ctx = ctx.clone();
-                    let redaction_locale = locale.clone();
-                    std::thread::spawn(move || {
-                        let redaction_key = provider.map_or(Ok(None), |provider| {
-                            let reference = credentials::reference(&profile, &provider.id);
-                            provider_key(&session, &reference, provider.credential_ref.as_deref())
-                        });
-                        let redaction_key = match redaction_key {
-                            Ok(key) => key,
-                            Err(error) => {
-                                if let Ok(mut state) = shared.lock() {
-                                    state.error = Some(crate::i18n::text(
-                                        &redaction_locale,
-                                        crate::i18n::MessageKey::AiHelpCredentialRedactionFailed,
-                                        &[("reason", &error.to_string())],
-                                    ));
-                                    state.context_busy = false;
-                                }
-                                ctx.request_repaint_of(help_viewport);
-                                return;
-                            }
-                        };
-                        snapshot.output = crate::session::context::redact_obvious_secrets(
-                            &snapshot.output,
-                            redaction_key.as_ref().map(|key| key.as_str()),
-                        );
-                        if let Ok(mut state) = shared.lock() {
-                            state.context_preview = Some(snapshot);
-                            state.context_busy = false;
-                        }
-                        ctx.request_repaint_of(help_viewport);
-                    });
-                }
-                AiHelpCommand::Submit(question, context, target) => {
-                    let target = target.or_else(|| self.tabs.get(self.focused).map(|tab| tab.id));
-                    if !ai_help_available() {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpRequiresPro,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    }
-                    let Some(provider) = self.preferences.provider_settings.for_task(AiTask::Help)
-                    else {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpProviderMissing,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    };
-                    if validate_endpoint(&provider.endpoint).is_err()
-                        || provider.model.trim().is_empty()
-                    {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpEndpointMissing,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    }
-                    if question.chars().count() > 16_384 {
-                        if let Ok(mut state) = self.ai_help_state.lock() {
-                            state.error = Some(crate::i18n::text(
-                                &locale,
-                                crate::i18n::MessageKey::AiHelpQuestionTooLong,
-                                &[],
-                            ));
-                        }
-                        continue;
-                    }
-                    let (cancel, profile_name, history, agent_mode) = {
-                        let Ok(mut state) = self.ai_help_state.lock() else {
-                            continue;
-                        };
-                        if state.busy {
-                            continue;
-                        }
-                        if state.agent_mode && (context.is_none() || target.is_none()) {
-                            state.error = Some(
-                                "Preview the target terminal before starting Agent Mode.".into(),
-                            );
-                            continue;
-                        }
-                        if state.agent_mode && !ai_agent_available() {
-                            state.error =
-                                Some("Agent Mode is not available for this account.".into());
-                            continue;
-                        }
-                        if state.error.is_some()
-                            && !state.last_request_agent
-                            && state.messages.len() >= 2
-                            && state
-                                .messages
-                                .last()
-                                .is_some_and(|(assistant, _)| *assistant)
-                        {
-                            let retained = state.messages.len() - 2;
-                            state.messages.truncate(retained);
-                        }
-                        state.busy = true;
-                        state.last_request_agent = state.agent_mode;
-                        state.error = None;
-                        state.reviewed_actions.clear();
-                        state.last_request = Some((question.clone(), context.clone(), target));
-                        state.target = target.map(|id| {
-                            let title = context
-                                .as_ref()
-                                .filter(|context| context.session_id == id)
-                                .map(|context| context.title.clone())
-                                .or_else(|| {
-                                    self.tabs
-                                        .iter()
-                                        .find(|tab| tab.id == id)
-                                        .map(|tab| tab.title.clone())
-                                })
-                                .unwrap_or_else(|| "closed terminal".into());
-                            (id, title)
-                        });
-                        state.messages.push((false, question.clone()));
-                        state.messages.push((true, String::new()));
-                        let cancel = Arc::new(AtomicBool::new(false));
-                        state.cancel = Some(Arc::clone(&cancel));
-                        (
-                            cancel,
-                            self.native_store
-                                .as_ref()
-                                .map_or("default", NativeStore::profile_name)
-                                .to_owned(),
-                            state.history.clone(),
-                            state.agent_mode,
-                        )
-                    };
-                    let providers = self.preferences.provider_settings.chain(AiTask::Help);
-                    let expected_reference = credentials::reference(&profile_name, &provider.id);
-                    let session = Arc::clone(&self.credential_session);
-                    let state = Arc::clone(&self.ai_help_state);
-                    let ctx = ctx.clone();
-                    let prompt =
-                        crate::session::context::build_user_prompt(&question, context.as_ref());
-                    let system_prompt = crate::session::context::build_system_prompt();
-                    let request_question = question.clone();
-                    let request_locale = locale.clone();
-                    let mut agent_host = crate::assistant::agent::TerminalHost {
-                        target: target.unwrap_or(0),
-                        snapshot: Arc::clone(&self.control_snapshot),
-                        dispatcher: self.session_dispatcher.clone(),
-                        ctx: ctx.clone(),
-                        cancelled: Arc::clone(&cancel),
-                        allowed: ai_agent_available,
-                        expected_input: self
-                            .tabs
-                            .iter()
-                            .find(|tab| Some(tab.id) == target)
-                            .map_or(0, |tab| tab.output.snapshot().input_sequence),
-                    };
-                    std::thread::spawn(move || {
-                        let mut streamed = String::new();
-                        let result = provider_key(
-                            &session,
-                            &expected_reference,
-                            provider.credential_ref.as_deref(),
-                        )
-                        .map_err(|error| error.to_string())
-                        .and_then(|key| {
-                            if agent_mode {
-                                return crate::assistant::agent::run(
-                                    &crate::assistant::transport::ReqwestTransport,
-                                    &provider,
-                                    key,
-                                    &request_question,
-                                    &cancel,
-                                    &mut agent_host,
-                                    &mut |event| {
-                                        if let Ok(mut state) = state.lock() {
-                                            if let Some((true, message)) = state.messages.last_mut()
-                                            {
-                                                message.push_str(event);
-                                                message.push_str("\n\n");
-                                            }
-                                        }
-                                        ctx.request_repaint_of(help_viewport);
-                                    },
-                                );
-                            }
-                            crate::assistant::client::complete_with_fallback(
-                                &crate::assistant::transport::ReqwestTransport,
-                                &providers,
-                                &mut |provider| {
-                                    if let Ok(mut state) = state.lock() {
-                                        state.status =
-                                            Some(format!("{} · {}", provider.name, provider.model));
-                                    }
-                                    ctx.request_repaint_of(help_viewport);
-                                    let reference =
-                                        credentials::reference(&profile_name, &provider.id);
-                                    provider_key(
-                                        &session,
-                                        &reference,
-                                        provider.credential_ref.as_deref(),
-                                    )
-                                    .map_err(|_| crate::assistant::client::ClientError::Credential)
-                                },
-                                (&system_prompt, &prompt),
-                                &history,
-                                &cancel,
-                                &mut |delta| {
-                                    streamed.push_str(delta);
-                                    if let Ok(mut state) = state.lock() {
-                                        if let Some((true, message)) = state.messages.last_mut() {
-                                            *message =
-                                                crate::assistant::reply::streamed_answer(&streamed);
-                                        }
-                                    }
-                                    ctx.request_repaint_of(help_viewport);
-                                },
-                            )
-                            .map_err(|error| error.to_string())
-                        });
-                        if let Ok(mut state) = state.lock() {
-                            state.busy = false;
-                            state.cancel = None;
-                            match result {
-                                Ok(raw) => {
-                                    if agent_mode {
-                                        if let Some((true, message)) = state.messages.last_mut() {
-                                            message.push_str(&raw);
-                                        }
-                                        state.context_preview = None;
-                                        ctx.request_repaint_of(help_viewport);
-                                        return;
-                                    }
-                                    let parsed =
-                                        crate::assistant::reply::parse_assistant_reply(&raw);
-                                    let answer = parsed.answer;
-                                    if let Some((true, message)) = state.messages.last_mut() {
-                                        *message = answer.clone();
-                                    }
-                                    state.reviewed_actions = parsed.actions;
-                                    state.history.push((false, request_question));
-                                    state.history.push((true, answer));
-                                    if state.history.len() > 40 {
-                                        let excess = state.history.len() - 40;
-                                        state.history.drain(..excess);
-                                    }
-                                }
-                                Err(_error) if cancel.load(Ordering::Relaxed) => {
-                                    state.error = Some(crate::i18n::text(
-                                        &request_locale,
-                                        crate::i18n::MessageKey::AiHelpRequestCancelled,
-                                        &[],
-                                    ))
-                                }
-                                Err(error) => {
-                                    state.error = Some(crate::i18n::text(
-                                        &request_locale,
-                                        crate::i18n::MessageKey::AiHelpRequestFailed,
-                                        &[("reason", &error)],
-                                    ))
-                                }
-                            }
-                        }
-                        ctx.request_repaint_of(help_viewport);
-                    });
-                }
-            }
-        }
-        if processed_any {
-            ctx.request_repaint_of(help_viewport);
         }
     }
 
@@ -13752,6 +13018,15 @@ impl ButtonsApp {
             .logarithmic(true)
             .text("Animation FPS limit (shaders and effects, all panes)"),
         );
+        ui.add(
+            egui::Slider::new(
+                &mut self.preferences.notice_seconds,
+                0..=crate::settings::MAX_NOTICE_SECONDS,
+            )
+            .logarithmic(true)
+            .text("Seconds before messages fade (0 = keep until dismissed)"),
+        )
+        .on_hover_text("Workspace messages such as \"Applied theme bundle\" float over the terminals, then fade. The last one stays on the status bar's SHELL READY hover.");
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
@@ -14749,6 +14024,7 @@ impl ButtonsApp {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.spaced_heading(crate::i18n::literal(&self.locale, "ButtonsCLI Native"));
+                ui.spaced_label(format!("Version {}", crate::BUILD_VERSION));
                 ui.spaced_label(crate::i18n::literal(
                     &self.locale,
                     "A fast terminal workspace built with Rust, egui, and Alacritty.",
@@ -14758,6 +14034,30 @@ impl ButtonsApp {
                     &self.locale,
                     "No webview. No browser runtime. Your shell stays local.",
                 ));
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(folder) = crate::diagnostics::logs_dir() {
+                    ui.add_space(8.0);
+                    ui.spaced_label(format!(
+                        "Logs and crash reports (local only): {}",
+                        folder.display()
+                    ));
+                    if ui
+                        .add_enabled(
+                            folder.exists(),
+                            crate::ui_text::button(ui, "Open logs folder"),
+                        )
+                        .clicked()
+                    {
+                        #[cfg(windows)]
+                        let _ = std::process::Command::new("explorer.exe")
+                            .arg(&folder)
+                            .spawn();
+                        #[cfg(target_os = "linux")]
+                        let _ = std::process::Command::new("xdg-open").arg(&folder).spawn();
+                        #[cfg(target_os = "macos")]
+                        let _ = std::process::Command::new("open").arg(&folder).spawn();
+                    }
+                }
             });
     }
 
@@ -16923,6 +16223,39 @@ fn catalog_status(
     }
 }
 
+/// Default for a ChatGPT connection with no model chosen: the second-newest
+/// model in the live list. The newest is often a preview; one step back is
+/// usually the better everyday pick. "Newest" means the highest version number
+/// in the ID (`gpt-6.1-…` > `gpt-6-…`); among equal versions, later in the list
+/// counts as newer. IDs without a number rank last.
+#[cfg(not(target_arch = "wasm32"))]
+fn default_chatgpt_model(models: &[String]) -> Option<&str> {
+    fn version(id: &str) -> Vec<u32> {
+        let start = id.find(|c: char| c.is_ascii_digit());
+        start
+            .map(|start| {
+                id[start..]
+                    .split(|c: char| !c.is_ascii_digit() && c != '.')
+                    .next()
+                    .unwrap_or("")
+                    .split('.')
+                    .filter_map(|part| part.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+    let mut ranked: Vec<(Vec<u32>, usize, &str)> = models
+        .iter()
+        .enumerate()
+        .map(|(index, id)| (version(id), index, id.as_str()))
+        .collect();
+    ranked.sort_by(|a, b| (&b.0, b.1).cmp(&(&a.0, a.1)));
+    ranked
+        .get(1)
+        .or_else(|| ranked.first())
+        .map(|(_, _, id)| *id)
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn model_picker(ui: &mut egui::Ui, id: &str, model: &mut String, models: &[String]) {
     ui.push_id(id, |ui| {
@@ -17420,15 +16753,20 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+mod ai_help;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
+mod notices;
 #[cfg(not(target_arch = "wasm32"))]
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]
@@ -17530,6 +16868,7 @@ impl eframe::App for ButtonsApp {
                 .background,
         )
         .unwrap_or(colors.canvas);
+        let mut notice_area = None;
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
@@ -17537,10 +16876,7 @@ impl eframe::App for ButtonsApp {
                     .inner_margin(8.0),
             )
             .show(ctx, |ui| {
-                if let Some(notice) = &self.notice {
-                    ui.spaced_colored_label(colors.warning, notice);
-                    ui.add_space(8.0);
-                }
+                notice_area = Some(ui.max_rect());
                 #[cfg(not(target_arch = "wasm32"))]
                 if self.import_offer {
                     ui.horizontal(|ui| {
@@ -17573,6 +16909,11 @@ impl eframe::App for ButtonsApp {
                 #[cfg(target_arch = "wasm32")]
                 self.web_demo(ui);
             });
+        // Messages float over the terminal area: a row above it would resize
+        // every pane (and its shell) each time a message appears or fades.
+        if let Some(area) = notice_area {
+            self.notice_overlay(ctx, area);
+        }
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -17989,6 +17330,34 @@ mod tests {
         std::fs::remove_dir_all(base).unwrap();
     }
     use super::*;
+
+    #[test]
+    fn chatgpt_default_model_is_the_second_newest_in_the_live_list() {
+        let models: Vec<String> = [
+            "gpt-5.6-luna",
+            "gpt-5.6-sol",
+            "gpt-5.6-terra",
+            "gpt-6-astra",
+            "gpt-6-luna",
+            "gpt-6-sol",
+            "gpt-6.1-sol",
+            "gpt-6.1-terra",
+        ]
+        .map(String::from)
+        .into();
+        assert_eq!(default_chatgpt_model(&models), Some("gpt-6.1-sol"));
+        // Server order does not matter across versions; versions decide.
+        assert_eq!(
+            default_chatgpt_model(&[
+                "gpt-6.1-terra".into(),
+                "gpt-7-luna".into(),
+                "gpt-6-sol".into()
+            ]),
+            Some("gpt-6.1-terra")
+        );
+        assert_eq!(default_chatgpt_model(&["only".into()]), Some("only"));
+        assert_eq!(default_chatgpt_model(&[]), None);
+    }
 
     #[cfg(target_os = "windows")]
     #[test]
@@ -20559,7 +19928,13 @@ Start-Sleep -Seconds 300
         app.open_ai_help();
         assert_eq!(app.ai_help_state.lock().unwrap().messages, messages);
         assert_eq!(
-            app.ai_help_state.lock().unwrap().target.as_ref().unwrap().0,
+            app.ai_help_state
+                .lock()
+                .unwrap()
+                .selected_target
+                .as_ref()
+                .unwrap()
+                .0,
             second
         );
         app.close_tab(0);

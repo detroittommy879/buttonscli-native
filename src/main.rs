@@ -19,7 +19,7 @@ fn main() -> eframe::Result {
             return Ok(());
         }
         Ok(StartupRequest::Version) => {
-            println!("ButtonsCLI {}", env!("CARGO_PKG_VERSION"));
+            println!("ButtonsCLI {}", buttonscli::BUILD_VERSION);
             return Ok(());
         }
         Err(error) => {
@@ -27,13 +27,8 @@ fn main() -> eframe::Result {
             std::process::exit(2);
         }
     };
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "buttonscli=info".into()),
-        )
-        .compact()
-        .init();
+    // Log file and crash reports in ~/.buttonscli-native/logs (local only).
+    buttonscli::diagnostics::init();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

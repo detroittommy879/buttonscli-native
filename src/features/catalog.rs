@@ -150,7 +150,7 @@ impl FeatureKey {
             K::WindowTransparency => (T::Free, true, R::Active, "appearance"),
             K::ShaderLab => (T::Free, false, R::Planned, "effects"),
             K::ShaderBackgrounds => (T::Free, true, R::Active, "effects"),
-            K::AiHelp => (T::Pro, false, R::Planned, "assistant"),
+            K::AiHelp => (T::Free, true, R::Active, "assistant"),
             K::AiAgent => (T::Pro, false, R::Planned, "assistant"),
             K::AutomationRemoteControl => (T::Pro, false, R::Planned, "automation"),
             K::VibeCodeThemes => (T::Pro, false, R::Planned, "themes"),

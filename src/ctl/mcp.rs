@@ -504,7 +504,7 @@ fn handle(
                     "serverInfo": {
                         "name": "buttonscli-native",
                         "title": "ButtonsCLI",
-                        "version": env!("CARGO_PKG_VERSION"),
+                        "version": crate::BUILD_VERSION,
                     },
                     "instructions": "Tools read and drive terminals in the running ButtonsCLI app. send, run, key and preset_run type into a shell: confirm with the user before running anything destructive.",
                 }),
@@ -651,7 +651,7 @@ mod tests {
         assert_eq!(by_id(1)["result"]["protocolVersion"], "2024-11-05");
         assert_eq!(
             by_id(1)["result"]["serverInfo"]["version"],
-            env!("CARGO_PKG_VERSION")
+            crate::BUILD_VERSION
         );
         let tools = by_id(2)["result"]["tools"].as_array().unwrap();
         assert_eq!(tools.len(), 14);

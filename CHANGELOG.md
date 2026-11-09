@@ -1,6 +1,23 @@
 # Changelog
 
-## Unreleased — 0.2.0 (branch feat/v0.2-defaults-motion-copy)
+## Unreleased
+
+- Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
+  Releases follow Semantic Versioning and pick their own number from commit
+  messages (`feat:` → minor, fixes → patch, breaking changes ask first; see
+  `docs/dev/RELEASING.md`). Other builds show `1.0.0+<commit>`.
+- The status bar wraps onto more rows again when controls do not fit, and no
+  longer grows huge after minimize/restore (capped at 40% of the window).
+- Workspace messages float over the terminals (no pane resize) and fade after
+  5 seconds (Settings → Workspace; 0 keeps them). Hover **SHELL READY** for the
+  last message.
+- Local logs and crash reports in `~/.buttonscli-native/logs` (About → Open
+  logs folder). Nothing is uploaded.
+- **Sign in with ChatGPT (recommended)** is offered first in AI providers and
+  from AI Help when no provider is set up. A new ChatGPT connection without a
+  model uses the second-newest model from the live list until you pick one.
+- Applying a theme bundle and editing Row banding in the status bar now save
+  right away.
 
 - New installs: the first-run dialog also asks for a look (Minimal, Moderate,
   Showoff). Compact command dock and copy-on-selection are on by default.

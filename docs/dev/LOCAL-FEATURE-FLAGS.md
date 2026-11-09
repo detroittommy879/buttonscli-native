@@ -18,11 +18,11 @@ invalid files produce a startup log warning. The size limit is 16 KiB.
 readout) to an optimized build; debug builds always show it.
 
 This explicit local flag overrides catalog rollout, account/Pro requirements,
-internal feature restrictions and runtime kill switches. AI Help, AI theme
-generation, Quick Secrets, local CLI/MCP control and the existing unfinished
+internal feature restrictions and runtime kill switches. AI theme generation,
+Quick Secrets, local CLI/MCP control and the existing unfinished
 Agent Mode prototype become available. It does not implement absent features
 such as Shader Lab or deploy disabled hosted services. Ordinary AI Help still
-requires you to review and choose terminal actions; Agent Mode is a separate
+is available without this flag and requires you to review and choose terminal actions; Agent Mode is a separate
 choice with terminal execution. No requests or agent runs start from this flag
 alone. CLI/MCP retains its loopback binding and instance-token authentication.
 

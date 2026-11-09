@@ -270,6 +270,9 @@ impl ButtonsApp {
                 if skipped == 1 { " was" } else { "s were" }
             ));
         }
+        // Save now (row banding, layout, pane looks): waiting for the periodic
+        // autosave lost the bundle's settings if the app was closed abruptly.
+        self.persist_native_preferences();
         Some(summary)
     }
 
