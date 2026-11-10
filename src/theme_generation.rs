@@ -179,7 +179,17 @@ fn clone_key(key: &Option<Zeroizing<String>>) -> Option<Zeroizing<String>> {
 fn generation_prompt(request: &str, seed: &Value) -> String {
     format!(
         "Create a cohesive color and typography theme from this brief: {request}\n\
-         Keep the palette's current light/dark mode unless the brief clearly asks to change it.\n\
+         {}\
+         Do not return Markdown, comments, effects, or shader code.\n",
+        schema_text(seed)
+    )
+}
+
+/// The JSON a model returns for a theme, and the current palette, as prompt
+/// text. Shared by the theme generator and Create with AI's "Theme + shader".
+pub(crate) fn schema_text(seed: &Value) -> String {
+    format!(
+        "Keep the palette's current light/dark mode unless the brief clearly asks to change it.\n\
          Return this palette schema, plus the typography object described below when fontCatalog is present. Fill every color as #RRGGBB:\n\
          {{\"name\":\"short theme name\",\"description\":\"brief description\",\
          \"palette\":{{\"mode\":\"dark or light\",\"appCanvas\":\"#RRGGBB\",\
@@ -195,13 +205,26 @@ fn generation_prompt(request: &str, seed: &Value) -> String {
          \"brightCyan\":\"#RRGGBB\",\"brightWhite\":\"#RRGGBB\"}},\
          \"gradient\":[\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\"]}}}}\n\
          gradient is four colors for the terminal background gradient and shader colors: first a deep tone close to terminalBackground, then three accent colors that define the theme's character.\n\
-         Do not return Markdown, comments, effects, or shader code.\n\
+         App text needs at least 4.5:1 contrast against appCanvas, and terminal text at least 4.5:1 against terminalBackground.\n\
          When fontCatalog is provided, include a top-level typography object with all seven zones: shell, tabs, presetDock, settings, assistant, statusBar, terminal. Each zone has fontFamily (exact catalog name), fontWeight (one of that family's real weights), fontSize (8 to 32), and letterSpacing (-1 to 4; terminal must be 0). Terminal requires terminal:true in the catalog. Use deliberate family and size contrasts appropriate to the brief; avoid defaulting every zone to the same font. Installed/custom fonts may only be used if listed. No invented fonts.\n\
          Example zone: \"tabs\":{{\"fontFamily\":\"Roboto Bundled\",\"fontWeight\":500,\"fontSize\":18,\"letterSpacing\":0.5}}.\n\
          Font availability is local: themes using installed/custom names fall back on other computers.\n\
-         Current palette for reference:\n{}",
+         Current palette for reference:\n{}\n",
         seed
     )
+}
+
+/// A theme from a reply that may leave out typography (Create with AI's
+/// "Theme + shader"). Fonts are applied, and checked, only when present.
+pub(crate) fn candidate_from_reply(
+    raw: &str,
+    base: &Value,
+    catalog: Option<&Value>,
+) -> Result<ThemeCandidate, String> {
+    let has_typography = extract_json_object(raw)
+        .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        .is_some_and(|patch| patch.get("typography").is_some_and(Value::is_object));
+    candidate_with_fonts(raw, base, catalog.filter(|_| has_typography))
 }
 
 pub(crate) fn candidate_from_response(
@@ -619,7 +642,7 @@ fn luminance(hex: &str) -> Option<f64> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::VecDeque;
     use std::sync::Mutex;
 
@@ -663,7 +686,7 @@ mod tests {
         }
     }
 
-    fn base_document() -> Value {
+    pub(crate) fn base_document() -> Value {
         json!({
             "version": 1,
             "metadata": {"id":"base", "name":"Base", "description":"", "createdAt":null, "updatedAt":null, "future":"preserve"},
@@ -673,7 +696,7 @@ mod tests {
         })
     }
 
-    fn valid_patch() -> Value {
+    pub(crate) fn valid_patch() -> Value {
         let ansi = ANSI_KEYS
             .into_iter()
             .map(|key| {

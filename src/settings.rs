@@ -531,6 +531,9 @@ pub(crate) struct ShaderLab {
     /// Give shader code the previous frame (`prev(uv)`), for trails and
     /// other effects that build up over time.
     pub(crate) feedback: bool,
+    /// Create with AI designs the app and terminal theme together with the
+    /// shader ("Theme + shader").
+    pub(crate) design_theme: bool,
 }
 
 impl ShaderLab {
@@ -546,6 +549,7 @@ impl Default for ShaderLab {
             loops: true,
             cost_limit: Self::DEFAULT_COST_LIMIT,
             feedback: false,
+            design_theme: false,
         }
     }
 }

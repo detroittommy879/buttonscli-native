@@ -27,6 +27,11 @@
 - Create with AI writes up to 12 versions at once (was 6), with six new
   directions (Minimal, Layered, Retro, Dreamy, Cosmic, Graphic), and Random
   ideas can suggest up to 12.
+- Create with AI → Design → **Theme + shader**: each version also designs a
+  matching theme (app and terminal colors, ANSI colors, fonts), so one idea
+  such as "halloween" changes the whole look. Cards preview the theme's text
+  colors; using one loads both into the draft. The AI Theme Generator stays
+  as it was.
 - Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11) for certificate-checking fixes.
 

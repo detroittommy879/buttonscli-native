@@ -159,6 +159,19 @@ pub(crate) struct Candidate {
     pub(crate) colors: Option<Vec<String>>,
     /// Which way p.y pointed when it was written.
     pub(crate) y_up: bool,
+    /// "Theme + shader": the validated theme document (the editor draft with
+    /// the new palette and fonts). `None` when only a shader was asked for, or
+    /// when the theme part failed (the note says why).
+    pub(crate) theme: Option<serde_json::Value>,
+}
+
+/// What "Theme + shader" needs to write and check the theme part.
+pub(crate) struct ThemeRequest<'a> {
+    /// The current palette and the allowed fonts
+    /// (`theme_generation::seed_palette` plus `fontCatalog`).
+    pub(crate) seed: &'a serde_json::Value,
+    /// The editor draft the new palette and fonts are written into.
+    pub(crate) base: &'a serde_json::Value,
 }
 
 /// Looks at a drawn shader and names what is wrong with the picture, if
@@ -179,6 +192,8 @@ pub(crate) struct Request<'a> {
     pub(crate) judge: crate::settings::JudgeMode,
     /// Tell the models that loops and branches are allowed.
     pub(crate) loops: bool,
+    /// Also design the app and terminal theme in the same reply.
+    pub(crate) theme: Option<ThemeRequest<'a>>,
 }
 
 /// The Style settings the code will run with, turned into notes for the models.
@@ -273,6 +288,30 @@ pub(crate) fn generate(
         let added = new_sliders(&reply, &variables);
         variables.extend(added);
     }
+    // Theme first, so the judge and the picture check see its background.
+    let mut theme_note = None;
+    let theme = match &request.theme {
+        Some(theme_request) => {
+            report(Stage::Checking, 0);
+            match theme_part(
+                transport,
+                writers,
+                load_key,
+                &format!("{WRITER}\n\n{rules}"),
+                (&writer_prompt, &reply),
+                theme_request,
+                cancelled,
+                &mut |chars| report(Stage::Fixing, chars),
+            ) {
+                Ok(document) => Some(document),
+                Err(error) => {
+                    theme_note = Some(format!("No theme: {error}"));
+                    None
+                }
+            }
+        }
+        None => None,
+    };
     // The judge reviews the code with the palette it will actually get.
     let colors = request
         .look
@@ -280,6 +319,12 @@ pub(crate) fn generate(
         .then(|| picked_colors(&reply))
         .flatten();
     let mut judge_look = request.look.clone();
+    if let Some(background) = theme
+        .as_ref()
+        .and_then(|document| document["theme"]["terminal"]["background"].as_str())
+    {
+        judge_look.background = background.to_owned();
+    }
     if let Some(colors) = &colors {
         for (target, color) in judge_look.colors.iter_mut().zip(colors) {
             target.clone_from(color);
@@ -440,6 +485,9 @@ pub(crate) fn generate(
         }
     }
     report(Stage::Ready, 0);
+    if let Some(theme_note) = theme_note {
+        note = format!("{note} {theme_note}").trim().to_owned();
+    }
     Ok(Candidate {
         name,
         code,
@@ -449,7 +497,46 @@ pub(crate) fn generate(
         note,
         colors,
         y_up: request.look.y_up,
+        theme,
     })
+}
+
+/// "Theme + shader": the theme in the writer's `<theme>` tag, checked like a
+/// generated theme, with one repair request when it is missing or invalid.
+#[allow(clippy::too_many_arguments)]
+fn theme_part(
+    transport: &dyn HttpTransport,
+    writers: &[ProviderProfile],
+    load_key: &mut KeyLoader<'_>,
+    system: &str,
+    (prompt, reply): (&str, &str),
+    request: &ThemeRequest<'_>,
+    cancelled: &AtomicBool,
+    progress: &mut dyn FnMut(usize),
+) -> Result<serde_json::Value, String> {
+    let catalog = request.seed.get("fontCatalog");
+    let parse = |reply: &str| {
+        // Only the tag: the shader's own braces must not be read as JSON.
+        let text = extract_tag(reply, "theme").ok_or("the reply had no <theme> tag")?;
+        crate::theme_generation::candidate_from_reply(&text, request.base, catalog)
+            .map(|candidate| candidate.document)
+    };
+    let error = match parse(reply) {
+        Ok(document) => return Ok(document),
+        Err(error) => error,
+    };
+    if cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(error);
+    }
+    let history = vec![(false, prompt.to_owned()), (true, reply.to_owned())];
+    let fix = format!(
+        "The theme part was not accepted: {}.\nReply with the corrected theme JSON in <theme></theme> tags.",
+        truncate(&error, 600)
+    );
+    let (fixed, _) = ask(
+        transport, writers, load_key, system, &fix, &history, cancelled, progress,
+    )?;
+    parse(&fixed)
 }
 
 /// The writer's `<colors>`: 2 to 5 valid hex colors, else none.
@@ -751,6 +838,9 @@ fn writer_prompt(request: &Request<'_>) -> String {
     if let Some((label, guidance)) = request.direction {
         prompt.push_str(&format!("<direction>{label}: {guidance}</direction>\n"));
     }
+    if let Some(theme) = &request.theme {
+        prompt.push_str(&theme_text(theme.seed));
+    }
     prompt.push('\n');
     let brief = request.brief.trim();
     prompt.push_str(if brief.is_empty() {
@@ -784,6 +874,14 @@ fn judge_prompt(
         ));
     }
     prompt
+}
+
+/// "Theme + shader": what the writer is asked for besides the shader.
+fn theme_text(seed: &serde_json::Value) -> String {
+    format!(
+        "<theme_request>\nDesign the whole look at once: besides the shader, write a matching app and terminal theme for this request, so the shader, the terminal colors, the app chrome and the fonts belong together. Choose the shader's c1 to c5 from the theme's palette; bg will be the theme's terminalBackground. Put the theme as one JSON object in <theme></theme> tags.\n{}</theme_request>\n",
+        crate::theme_generation::schema_text(seed)
+    )
 }
 
 /// The last `<name>`-style tag's text.
@@ -909,6 +1007,7 @@ mod tests {
                 picture_check: check,
                 judge,
                 loops: false,
+                theme: None,
             },
             &AtomicBool::new(false),
             &mut |stage, _| {
@@ -919,6 +1018,88 @@ mod tests {
         );
         let models = transport.1.into_inner().unwrap();
         (result, models, stages)
+    }
+
+    /// One "Theme + shader" run with the judge off; the writer gives `replies`.
+    fn run_with_theme(replies: Vec<String>) -> (Result<Candidate, String>, Vec<String>) {
+        let replies = replies
+            .into_iter()
+            .map(|reply| &*Box::leak(reply.into_boxed_str()))
+            .collect();
+        let transport = Replies(Mutex::new(replies), Mutex::new(Vec::new()));
+        let base = crate::theme_generation::tests::base_document();
+        let seed = crate::theme_generation::seed_palette(&base);
+        let result = generate(
+            &transport,
+            &[provider("writer")],
+            &[],
+            &mut |_| Ok(None),
+            &Request {
+                brief: "halloween",
+                direction: None,
+                current: &CustomShader::default(),
+                look: &Look::default(),
+                current_error: None,
+                picture_check: None,
+                judge: crate::settings::JudgeMode::Off,
+                loops: true,
+                theme: Some(ThemeRequest {
+                    seed: &seed,
+                    base: &base,
+                }),
+            },
+            &AtomicBool::new(false),
+            &mut |_, _| {},
+        );
+        (result, transport.1.into_inner().unwrap())
+    }
+
+    #[test]
+    fn theme_and_shader_come_back_together_and_a_bad_theme_gets_one_repair() {
+        let theme = crate::theme_generation::tests::valid_patch();
+        // The shader has braces of its own; only the <theme> tag is read as JSON.
+        let shader = "<shader>var g = 0.0;\nfor (var i = 0; i < 2; i++) { g += 0.25; }\nreturn mix(bg, c1 * g, strength);</shader>";
+        let good = format!("<name>Night</name><theme>{theme}</theme>{shader}");
+        let (result, models) = run_with_theme(vec![good.clone()]);
+        let candidate = result.unwrap();
+        let document = candidate.theme.expect("a theme");
+        assert_eq!(document["theme"]["terminal"]["background"], "#090d17");
+        assert_eq!(document["metadata"]["name"], "Nebula");
+        assert!(candidate.code.contains("for (var i"));
+        assert_eq!(models, ["writer"]);
+        // The writer was asked for the theme and given the schema.
+        let prompt = writer_prompt(&Request {
+            brief: "halloween",
+            direction: None,
+            current: &CustomShader::default(),
+            look: &Look::default(),
+            current_error: None,
+            picture_check: None,
+            judge: crate::settings::JudgeMode::Off,
+            loops: true,
+            theme: Some(ThemeRequest {
+                seed: &serde_json::json!({"mode": "dark"}),
+                base: &serde_json::json!({}),
+            }),
+        });
+        assert!(prompt.contains("<theme></theme>") && prompt.contains("terminalBackground"));
+
+        // A theme that fails the checks gets one repair; the shader is kept.
+        let bad = format!("<name>Night</name><theme>{{\"name\":\"x\"}}</theme>{shader}");
+        let repaired = format!("<theme>{theme}</theme>");
+        let (result, models) = run_with_theme(vec![bad.clone(), repaired]);
+        assert!(result.unwrap().theme.is_some());
+        assert_eq!(models, ["writer", "writer"]);
+
+        // Still wrong: the shader is still usable and the note says why.
+        let (result, _) = run_with_theme(vec![bad, "no theme here".into()]);
+        let candidate = result.unwrap();
+        assert!(candidate.theme.is_none());
+        assert!(
+            candidate.note.contains("No theme") && candidate.note.contains("<theme>"),
+            "{}",
+            candidate.note
+        );
     }
 
     #[test]
@@ -939,6 +1120,7 @@ mod tests {
             picture_check: None,
             judge: crate::settings::JudgeMode::Review,
             loops: false,
+            theme: None,
         };
         let prompt = writer_prompt(&request);
         assert!(prompt.contains("c5 = #3ddc84") && prompt.contains("do not add other hues"));
@@ -1288,6 +1470,7 @@ mod tests {
                             picture_check: None,
                             judge: crate::settings::JudgeMode::Review,
                             loops: false,
+                            theme: None,
                         },
                         &AtomicBool::new(false),
                         &mut |stage, _| last = stage,
