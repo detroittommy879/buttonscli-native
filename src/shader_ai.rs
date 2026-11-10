@@ -94,7 +94,7 @@ fn verdict(reply: &str) -> Verdict {
 const MAX_SLIDERS: usize = 4;
 
 /// Creative directions given to parallel lanes, one per lane.
-pub(crate) const DIRECTIONS: [(&str, &str); 6] = [
+pub(crate) const DIRECTIONS: [(&str, &str); 12] = [
     ("Balanced", "A faithful, polished take on the request."),
     (
         "Subtle",
@@ -104,6 +104,21 @@ pub(crate) const DIRECTIONS: [(&str, &str); 6] = [
     ("Playful", "An unexpected, playful interpretation."),
     ("Geometric", "Lean on crisp shapes, grids or symmetry."),
     ("Organic", "Lean on flowing noise, clouds and soft motion."),
+    ("Minimal", "As few elements as possible, placed with care."),
+    (
+        "Layered",
+        "Two or three layers at different depths and speeds.",
+    ),
+    ("Retro", "A retro look: pixels, scanlines, CRT or 80s neon."),
+    (
+        "Dreamy",
+        "Soft focus, gentle glow and slow, floating motion.",
+    ),
+    (
+        "Cosmic",
+        "Space-like depth: stars, nebulae, orbits or warps.",
+    ),
+    ("Graphic", "Flat colors and bold outlines, like a poster."),
 ];
 
 /// Where a lane is in its pipeline, for the progress flowchart.
@@ -509,7 +524,7 @@ const IDEA_STYLES: &[&str] = &[
     "op-art",
 ];
 
-const IDEAS: &str = "You invent ideas for animated backgrounds that sit behind terminal text. Each idea is handed to another model that turns it into one small WGSL fragment shader: a single pass that colors each pixel from its position p, the time t and a few colors. There are no textures, images, text, 3D models, loops or memory of earlier frames, so pitch looks that math can draw: detailed noise and flowing, domain-warped smoke, sharp ridged veins, voronoi cells, signed distance shapes (circles, boxes, lines) that melt together and glow, polar and spiral coordinates, fract()/floor() tiling with a different random value per tile, layers at different depths and speeds, interfering waves, smooth gradients and glow. It can place two to four moving objects by hand, or tile a pattern for many copies.
+const IDEAS: &str = "You invent ideas for animated backgrounds that sit behind terminal text. Each idea is handed to another model that turns it into one small WGSL fragment shader: a single pass that colors each pixel from its position p, the time t and a few colors. There are no textures, images, text or 3D models, and loops run at most 64 times, so pitch looks that math can draw: detailed noise and flowing, domain-warped smoke, sharp ridged veins, voronoi cells, signed distance shapes (circles, boxes, lines) that melt together and glow, polar and spiral coordinates, fract()/floor() tiling with a different random value per tile, layers at different depths and speeds, interfering waves, smooth gradients and glow. It can place a few moving objects by hand, loop over up to 64 of them, or tile a pattern for many copies.
 
 Be smart about it: say which technique or trick makes each idea work, for example \"domain-warped noise for the smoke\" or \"polar coordinates bent by a sine to make petals\". Keep the set varied: about half should be simple and elegant, the rest more ambitious, layering two or three techniques. Make every idea differ from the others in subject, motion and palette.
 

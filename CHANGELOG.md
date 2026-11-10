@@ -24,6 +24,9 @@
   fix compile errors, so a judge model is optional), the picture check, the
   work limit per pixel, and whether shader code may use `var`, `if`/`else` and
   fixed-count `for` loops (now on by default).
+- Create with AI writes up to 12 versions at once (was 6), with six new
+  directions (Minimal, Layered, Retro, Dreamy, Cosmic, Graphic), and Random
+  ideas can suggest up to 12.
 - Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11) for certificate-checking fixes.
 

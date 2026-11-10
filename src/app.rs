@@ -10727,8 +10727,10 @@ impl ButtonsApp {
                 .map(|judge| format!("{} · {}", judge.name, judge.model))
                 .unwrap_or_else(|| "the same model".into())
         ));
-        const IDEA_LABELS: [&str; crate::shader_ai::MAX_IDEAS] =
-            ["Idea 1", "Idea 2", "Idea 3", "Idea 4", "Idea 5", "Idea 6"];
+        const IDEA_LABELS: [&str; crate::shader_ai::MAX_IDEAS] = [
+            "Idea 1", "Idea 2", "Idea 3", "Idea 4", "Idea 5", "Idea 6", "Idea 7", "Idea 8",
+            "Idea 9", "Idea 10", "Idea 11", "Idea 12",
+        ];
         self.shader_ai.lanes = (0..count)
             .map(|lane| ShaderLane {
                 direction: if briefs.is_some() {
