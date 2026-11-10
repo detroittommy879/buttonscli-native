@@ -515,7 +515,8 @@ pub(crate) enum JudgeMode {
     Off,
 }
 
-/// Switches for trying shader generation and shader rules by hand.
+/// Shader generation and shader rule options (Create with AI → Options).
+/// `feedback` is still an experiment and only applies with the debug tools.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct ShaderLab {
@@ -540,9 +541,9 @@ impl ShaderLab {
 impl Default for ShaderLab {
     fn default() -> Self {
         Self {
-            judge: JudgeMode::Review,
+            judge: JudgeMode::FixOnly,
             picture_check: true,
-            loops: false,
+            loops: true,
             cost_limit: Self::DEFAULT_COST_LIMIT,
             feedback: false,
         }

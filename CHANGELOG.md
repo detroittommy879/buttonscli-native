@@ -20,9 +20,10 @@
 - AI model endpoints must use HTTPS unless they are on this computer or your
   local network (`localhost`, `192.168.x.x`, `name.local` and similar), so an
   API key is never sent unprotected over the internet.
-- Settings → Debug has a Shader lab for trying things: when the judge model
-  is asked, the picture check, the work limit per pixel, and looser shader
-  rules with `var`, `if`/`else` and fixed-count `for` loops.
+- Create with AI → Options: when the judge model is asked (default: only to
+  fix compile errors, so a judge model is optional), the picture check, the
+  work limit per pixel, and whether shader code may use `var`, `if`/`else` and
+  fixed-count `for` loops (now on by default).
 - Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11) for certificate-checking fixes.
 

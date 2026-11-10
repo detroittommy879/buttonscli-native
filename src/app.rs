@@ -9255,7 +9255,7 @@ impl ButtonsApp {
         if shader_ai_available() {
             settings_section(ui, base, 2, |ui| {
                 ui.spaced_label(RichText::new("Create with AI").strong());
-                ui.spaced_label("Describe a look. Several versions are written at once by your Shader model and checked or fixed by your Shader judge model (set both in AI models). Click a result to use it.");
+                ui.spaced_label("Describe a look. Several versions are written at once by your Shader model (set in AI models); an optional Shader judge model can fix or review them (see Options). Click a result to use it.");
                 let has_code = shader.custom.as_ref().is_some_and(|c| {
                     !c.expression.trim().is_empty() && c.expression.trim() != "return bg;"
                 });
@@ -9381,6 +9381,9 @@ impl ButtonsApp {
                         self.start_random_shader_idea(ui.ctx());
                     }
                 });
+                egui::CollapsingHeader::new("Options")
+                    .id_salt("shader-ai-options")
+                    .show(ui, |ui| self.shader_options(ui));
                 if !self.shader_ai.ideas.is_empty() {
                     let mut write_all = false;
                     let mut clear = false;
@@ -17070,10 +17073,18 @@ mod tests {
         app.preferences.theme_apply.app = false;
         app.preferences.theme_apply.fonts = false;
         let source_name = app.themes.get(&app.preferences.theme_id).name.clone();
+        // Built-in themes may already use "<name> vN"; the copy takes the next one.
+        let next = |app: &ButtonsApp| {
+            next_theme_version(
+                &source_name,
+                app.themes.all().iter().map(|theme| theme.name.as_str()),
+            )
+        };
+        let expected = next(&app);
         app.save_appearance_copy();
         let first = app.preferences.theme_id.clone();
         let saved = app.themes.personal_document(&first).unwrap();
-        assert_eq!(saved["metadata"]["name"], format!("{source_name} v1"));
+        assert_eq!(saved["metadata"]["name"], expected);
         assert_eq!(saved["theme"]["terminal"]["background"], "#123456");
         assert_eq!(saved["theme"]["typography"]["shell"]["fontSize"], 21.0);
         assert_eq!(saved["futureExtension"]["keep"], true);
@@ -17094,11 +17105,9 @@ mod tests {
         assert!(!app.preferences.theme_apply.app);
         assert!(!app.appearance_is_dirty());
         app.preferences.typography.shell.size = 22.0;
+        let expected = next(&app);
         app.save_appearance_copy();
-        assert_eq!(
-            app.themes.get(&app.preferences.theme_id).name,
-            format!("{source_name} v2")
-        );
+        assert_eq!(app.themes.get(&app.preferences.theme_id).name, expected);
         assert_eq!(
             app.themes
                 .get(&first)
@@ -22584,10 +22593,15 @@ Start-Sleep -Seconds 300
         };
 
         // Editing pane 2, then moving on, saves it under the next number.
+        // Built-in themes may already use "<name> vN"; the save takes the next one.
+        let expected = next_theme_version(
+            &shared_name,
+            app.themes.all().iter().map(|theme| theme.name.as_str()),
+        );
         app.theme_editor_pane = Some(second);
         edit(&mut app, "#123456");
         let saved = app.autosave_theme_draft().unwrap().unwrap();
-        assert_eq!(saved, next_theme_version(&shared_name, std::iter::empty()));
+        assert_eq!(saved, expected);
         app.discard_theme_editor_session();
         let second_theme = app.theme_overrides[&second].clone();
         assert!(second_theme.starts_with("personal:"), "{second_theme}");

@@ -1,5 +1,6 @@
-//! A color expression, or a short body of `let` lines ending in `return`.
-//! No loops, branches, `var`, helper functions or resources.
+//! A color expression, or a short body of `let` lines ending in `return`,
+//! with `var`, `if`/`else` and fixed-count `for` loops unless the Shader
+//! options switch those off. No `while`/`loop`, own functions or resources.
 use crate::theme::CustomShader;
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::wgpu::naga;
@@ -71,8 +72,8 @@ const MAX_NESTED_TRIPS: u32 = 256;
 /// What one pass through a loop body costs before its helper calls.
 const LOOP_STEP_COST: u32 = 2;
 
-/// What custom code may contain. The defaults are what ships; Settings →
-/// Debug can loosen them to try things out.
+/// What custom code may contain. The defaults are what ships; the Shader
+/// options under Create with AI can change them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Rules {
     /// Accept `var`, assignment, `if`/`else` and `for` loops whose count is a
@@ -86,13 +87,13 @@ pub(crate) struct Rules {
 impl Default for Rules {
     fn default() -> Self {
         Self {
-            loops: false,
+            loops: true,
             cost_limit: MAX_COST,
         }
     }
 }
 
-static LOOPS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static LOOPS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 static COST_LIMIT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(MAX_COST);
 
 /// The rules every shader is checked against from now on.
@@ -705,7 +706,12 @@ mod tests {
         };
         let orbs = "var glow = 0.0;\nfor (var i = 0; i < 8; i++) {\n    let k = f32(i);\n    let c = vec2<f32>(0.7 * sin(t * 0.3 + k * 1.7), 0.35 * cos(t * 0.4 + k * 2.3));\n    glow += halo(sd_circle(p - c, 0.03), 0.05);\n}\nif (p.x > 0.0) { glow = glow * 0.5; } else { glow = glow * 1.5; }\nreturn mix(bg, tonemap(c1 * glow), strength);";
         assert!(check(orbs, loose).is_ok(), "{:?}", check(orbs, loose));
-        assert!(check(orbs, Rules::default()).is_err(), "off by default");
+        assert!(check(orbs, Rules::default()).is_ok(), "on by default");
+        let strict = Rules {
+            loops: false,
+            ..loose
+        };
+        assert!(check(orbs, strict).is_err(), "refused when switched off");
         // Old code means the same under the looser rules.
         assert!(check("let r = length(p);\nreturn palette(r - t);", loose).is_ok());
         for (why, code) in [
@@ -780,12 +786,16 @@ mod tests {
     }
 
     #[test]
-    fn short_bodies_with_let_lines_work_but_loops_and_vars_do_not() {
+    fn short_bodies_work_and_strict_rules_refuse_loops_and_vars() {
         let mut custom = CustomShader {
             expression: "let r = length(p);\nlet glow = smoothstep(0.6, 0.0, r);\nreturn mix(c1, palette(r - t * 0.1), glow);".into(),
             ..Default::default()
         };
         assert!(function(&custom).is_ok(), "{:?}", function(&custom));
+        let strict = Rules {
+            loops: false,
+            ..Rules::default()
+        };
         for invalid in [
             "var x = 1.0;\nx = x + 1.0;\nreturn c1 * x;",
             "for (var i = 0; i < 3; i++) {}\nreturn c1;",
@@ -793,7 +803,7 @@ mod tests {
             "let a = c1;",
         ] {
             custom.expression = invalid.into();
-            assert!(function(&custom).is_err(), "{invalid}");
+            assert!(function_with(&custom, strict).is_err(), "{invalid}");
         }
         custom.expression = "c1 * 0.5;".into();
         assert!(

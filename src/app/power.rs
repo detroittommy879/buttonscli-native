@@ -102,17 +102,15 @@ impl ButtonsApp {
         self.power_budget().0
     }
 
-    /// The shader experiments in effect: the saved ones while the debug tools
-    /// are on, otherwise what ships.
+    /// The shader options in effect. Feedback is still an experiment, so it
+    /// only applies while the debug tools are on.
     pub(super) fn shader_lab(&self) -> crate::settings::ShaderLab {
-        if debug_tools_available() {
-            self.preferences.shader_lab.clone()
-        } else {
-            Default::default()
-        }
+        let mut lab = self.preferences.shader_lab.clone();
+        lab.feedback &= debug_tools_available();
+        lab
     }
 
-    /// Hands the lab's shader rules to the checker every shader goes through.
+    /// Hands the shader rules to the checker every shader goes through.
     pub(super) fn apply_shader_lab(&self) {
         let lab = self.shader_lab();
         crate::plugins::effects::shader_expression::set_rules(
@@ -123,16 +121,10 @@ impl ButtonsApp {
         );
     }
 
-    fn shader_lab_settings(&mut self, ui: &mut egui::Ui) {
+    /// Create with AI → Options: how results are checked, and what shader
+    /// code may contain. The rule switches apply to every shader at once.
+    pub(super) fn shader_options(&mut self, ui: &mut egui::Ui) {
         use crate::settings::{JudgeMode, ShaderLab};
-        ui.spaced_heading("Shader lab");
-        ui.spaced_label(
-            RichText::new(
-                "Switches for trying shader generation by hand. They apply to the next Create with AI run; the rule switches apply to every shader at once.",
-            )
-            .small()
-            .color(self.colors().muted),
-        );
         let before = self.preferences.shader_lab.clone();
         let lab = &mut self.preferences.shader_lab;
         ui.horizontal(|ui| {
@@ -147,7 +139,7 @@ impl ButtonsApp {
                     ui.selectable_value(&mut lab.judge, JudgeMode::Review, "Reviews every result")
                         .on_hover_text("One extra request per version. The judge may rewrite code that already works.");
                     ui.selectable_value(&mut lab.judge, JudgeMode::FixOnly, "Only fixes compile errors")
-                        .on_hover_text("No extra request unless the writer's code fails the checks.");
+                        .on_hover_text("No extra request unless the writer's code fails the checks. Without a Shader judge model in AI models, the Shader model does it.");
                     ui.selectable_value(&mut lab.judge, JudgeMode::Off, "Off (writer fixes its own errors)")
                         .on_hover_text("The judge model is never asked.");
                 });
@@ -161,7 +153,7 @@ impl ButtonsApp {
             &mut lab.loops,
             "Allow `var`, `if`/`else` and fixed-count `for` loops in shader code",
         )
-        .on_hover_text("Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Shaders that use this stop compiling when it is switched off.");
+        .on_hover_text("Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Switching this off stops every shader that uses them from drawing, including some built-in ones.");
         ui.horizontal(|ui| {
             ui.spaced_label("Work limit per pixel");
             ui.add(
@@ -183,7 +175,6 @@ impl ButtonsApp {
             self.apply_shader_lab();
             self.persist_native_preferences();
         }
-        ui.separator();
     }
 
     pub(super) fn debug_settings(&mut self, ui: &mut egui::Ui) {
@@ -196,7 +187,6 @@ impl ButtonsApp {
             .color(self.colors().muted),
         );
         ui.separator();
-        self.shader_lab_settings(ui);
         if ui
             .spaced_checkbox(
                 &mut self.preferences.power_saving,
