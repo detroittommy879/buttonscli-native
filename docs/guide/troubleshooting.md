@@ -34,8 +34,10 @@ that **Calm effects** (under **◐ Look**) is off.
 
 **The code shows an error.**
 Read the line number, or click **Fix with AI**. Common causes: `2` instead of
-`2.0`, mixing `vec3` and `f32`, or using `if`/loops (see
-[the rules](shader-code.md#rules)).
+`2.0`, mixing `vec3` and `f32`, a `while` loop or a `for` loop whose count is
+not a fixed number, or too many heavy helpers (see
+[the rules](shader-code.md#rules)). If loops were switched off under Create
+with AI → Options, shaders that use them show an error until it is back on.
 
 ## Terminal
 
@@ -56,7 +58,8 @@ Set the **Shader generation model** in Settings → AI models. See
 
 **All versions failed.**
 Try a simpler description, fewer moving parts, or a stronger writer model.
-Pick a different model for the judge than for the writer.
+If you use a judge, pick a different model for it than for the writer. With
+Theme + shader, a version can arrive without its theme; hover it to see why.
 
 **AI keeps building on my old shader.**
 Choose **Start: New idea**. **Change current shader** sends your existing

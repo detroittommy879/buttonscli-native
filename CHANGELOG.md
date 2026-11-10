@@ -38,6 +38,9 @@
   pane using it keeps two extra frame-sized images on the GPU; a new frame is
   drawn per animation tick, so fades follow the FPS limit and pause with
   motion.
+- Docs: the shader guide covers loops, the Create with AI options, Theme +
+  shader and the feedback experiment; AI setup notes the HTTPS rule and that
+  the judge model is optional.
 - Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11) for certificate-checking fixes.
 

@@ -6,9 +6,9 @@ description: The inputs, helpers and rules for writing custom WGSL shader code i
 # Shader code reference
 
 Custom shaders are written in **WGSL**, the shader language of WebGPU. You
-write the *body* of one function: a few `let` lines that end with
-`return <color>;`. The app wraps it, checks it, and runs it once per pixel,
-every frame.
+write the *body* of one function: a few `let` lines (and, if you like, short
+loops) that end with `return <color>;`. The app wraps it, checks it, and runs
+it once per pixel, every frame.
 
 ```wgsl
 let d = length(p);
@@ -53,7 +53,7 @@ A single color expression also works, e.g. `mix(c1, c2, 0.5 + 0.5 * sin(p.x + t)
 | `tonemap(color)` | Brings added-up lights back into 0–1 without flat white. |
 
 The heavier helpers have a price: `flow` 44, `voronoi` 28, `fbm` 20, `cloud`
-and `ridged` 12, `noise` 4, `stars` 3, `hash2` 2, the rest 1. One shader can
+and `ridged` 12, `noise` 4, `stars` 3, `hash2` and `prev` 2, the rest 1. One shader can
 spend 240 per pixel, which keeps every shader smooth on laptop graphics. Save
 a result in a `let` and reuse it instead of calling the helper again.
 
@@ -66,20 +66,77 @@ If your code uses `strength`, you decide what it does, usually
 `return mix(bg, color, strength);`. If your code never mentions `strength`,
 the app fades the whole result by the slider for you.
 
+## Loops, `if` and `var`
+
+Code may use `var`, `if`/`else` and `for` loops that always end:
+
+```wgsl
+var glow = 0.0;
+for (var i = 0; i < 8; i++) {
+    let k = f32(i);
+    let c = vec2<f32>(0.7 * sin(t * 0.3 + k * 1.7), 0.35 * cos(t * 0.4 + k * 2.3));
+    glow += halo(sd_circle(p - c, 0.03), 0.05);
+}
+return mix(bg, tonemap(mix(c1, c2, glow * 0.5) * glow), strength);
+```
+
+- A loop must look like `for (var i = 0; i < 8; i++)`: whole numbers written
+  in the code (not a slider or `t`), a step of one, and a body that never
+  changes `i`. One loop runs at most 64 times; nested loops at most 256 times
+  in all.
+- `while` and `loop` are not allowed: nothing can prove they end, and a
+  shader that never ends freezes the graphics driver.
+- Every turn of a loop costs 2 plus the helpers called in it, from the same
+  budget of 240. Keep `flow`, `voronoi` and `fbm` outside loops.
+
+These are on by default. **Create with AI → Options → Allow `var`, `if`/`else`
+and fixed-count `for` loops** switches them off for every shader; shaders that
+use them (some built-in ones too) then stop drawing until it is back on.
+
 ## Rules
 
 The checker rejects code that could hang or crash a GPU driver:
 
-- No loops, `if`, `var`, extra functions, arrays or textures. Use `select()`,
-  `step()` and `smoothstep()` instead of `if`, and `fract()`/`floor()` to repeat
-  shapes instead of loops.
+- No `while`/`loop`, extra functions, arrays, structs or textures (except
+  `prev`, below).
 - Write floats with a decimal point: `2.0`, not `2`. Both sides of an
   operator must be the same type (`f32` with `f32`, `vec3` with `vec3`).
-- Helper calls may cost at most 240 in total (see Helpers).
+- Helper calls may cost at most 240 in total (see Helpers). **Create with AI
+  → Options → Work limit per pixel** changes the limit for every shader; 0
+  turns it off.
 - At most 4,096 bytes of code (about 1,000 operations) and four sliders. Slider names are letters,
-  numbers and `_`, start with a letter, and can't reuse an input name.
+  numbers and `_`, start with a letter, and can't reuse an input or helper
+  name.
 
-Errors show under the code with line numbers. **Fix with AI** can repair them.
+Errors show under the code with line numbers, and say what to change (for
+example the cost and the limit). **Fix with AI** can repair them.
+
+## Previous frame (experiment)
+
+With **Settings → Debug → Shader experiments → Feedback** on, code can call
+`prev(q)`: the color this shader drew at position `q` last frame, as a
+`vec3<f32>`. That makes trails, ripples, smears and slow build-up possible:
+
+```wgsl
+let c = vec2<f32>(0.6 * sin(t * 0.7), 0.3 * sin(t * 1.3));
+let dot = halo(sd_circle(p - c, 0.02), 0.04);
+let new_color = mix(bg, c1, clamp(dot, 0.0, 1.0));
+return max(new_color, prev(p) * 0.96);
+```
+
+- Fade the old frame a little every time (`prev(p) * 0.96`), or it never
+  goes away. Read it at a moved spot to make it flow:
+  `prev(p + vec2<f32>(0.0, 0.004))`.
+- A new frame is drawn each time the animation clock ticks (the FPS limit),
+  so fades are faster at a higher FPS limit, and the picture holds while
+  motion is paused. The first frame, and every resize, starts from black.
+- What is stored is the finished pixel, after Strength.
+- `prev` costs 2. Each pane that uses it keeps two extra frame-sized images
+  on the GPU (at most six panes at once).
+- Settings → Debug is shown in debug builds, or with `"debug": true` in
+  `feature-flags.json` ([local feature flags](../dev/LOCAL-FEATURE-FLAGS.md)).
+  With the switch off, code that calls `prev` does not draw and its error says
+  how to turn it on. Create with AI is told about `prev` only while it is on.
 
 ## Tricks that look great
 
@@ -95,6 +152,8 @@ Errors show under the code with line numbers. **Fix with AI** can repair them.
   darken the borders with `smoothstep(0.02, 0.07, cells.y)`.
 - **Layers:** two or three layers at different sizes and speeds give depth.
   Add lights together, then `tonemap` the sum.
+- **Many objects:** a `for` loop over 8–32 dots, each placed with
+  `hash2(vec2<f32>(f32(i), 1.0))`, then `halo` each one and add them up.
 
 **Create with AI** gives its models the same reference, with worked
 examples: `assets/prompts/shader-guide.md` in the source.

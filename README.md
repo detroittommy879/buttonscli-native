@@ -21,9 +21,11 @@ A fast terminal app for people who'd rather use a mouse: click buttons instead o
   button, give it some text, and optionally have it press Enter for you.
 - **Auto organizing panes**: auto arrange in a grid, row, etc.
 - **Theme/shader generation from a prompt** (with auto self-healing), so you can
-  tell it "make the app look like halloween" and it does it. Shaders get written
-  as several versions at once, checked by a second "judge" model, and you pick
-  the one you like from little live previews.
+  tell it "make the app look like halloween" and it does it: **Theme + shader**
+  designs the colors, fonts and an animated background together. Up to 12
+  versions get written at once, compiled and drawn once to catch blank ones
+  (an optional "judge" model fixes or reviews them), and you pick the one you
+  like from little live previews.
 - **AI agent control of the app**: an agent can control all the tabs through MCP
   or a CLI tool. Click "Agent Inst.", which copies instructions to your
   clipboard, and paste them into Claude, Codex, etc. It can then open new panes
@@ -166,7 +168,7 @@ test pass rates or reliability measurements. Updated October 28, 2026.
 | **Themes, fonts and Settings** | **Complete for the core Windows workflow** | Per-tab appearance, favorites, personal JSON import/export, scoped preview/save, font tracking and detached Settings. Advanced theme collections and persistent tab assignment rules are proposals. |
 | **AI Help** | **Working preview, roughly 70% ready** | Streaming, provider settings, optional context and reviewed actions work in fixture tests; real Mistral backend checks also passed. Broader real-provider GUI, accessibility and hosted access acceptance remain. |
 | **CLI / MCP agent control** | **Working preview, roughly 70% ready** | Authenticated local API, live Windows CLI checks and 14-tool fake-API coverage. Full live tool/client coverage, GUI handoff and Linux/macOS acceptance remain. |
-| **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to six versions in parallel, a judge model checks or fixes each one, and every result is compiled before you see it. Full appearance generation with fonts and effects in one go is still planned. |
+| **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to 12 versions in parallel; every result is compiled (and drawn once) before you see it, and an optional judge model fixes or reviews them. **Theme + shader** designs colors, fonts and an animated background together in one run. |
 | **Effects / shaders** | **Native shaders work; legacy shaders don't** | Gradients, scanlines, noise, row banding, analog static, 34 shader presets and custom WGSL shaders render natively. Old GLSL shaders from the original app, its Shader Lab and HSync warp do not run. |
 | **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
 | **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are planned but not done; old feedback/runtime-config services are disabled. |

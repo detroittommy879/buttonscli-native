@@ -170,6 +170,13 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `SIMPLE_NOISE_HIDDEN` hides and disables simple noise for now.
 - UI tests must not hard-code positions or theme names that depend on the
   built-in catalog/library size or status-bar width; find text in a settled frame.
+  Release picks can add "<name> vN" built-ins: compute expected copy names
+  with `next_theme_version` over `themes.all()` before saving.
+- Python edit scripts: write them with the Write tool and run the file; Bash
+  heredocs mangle `\n` inside Python strings here.
+- Isolated app runs (USERPROFILE scratch): the first run shows a language/look
+  dialog, and its look sets `preferences.pane_looks`, which override
+  `theme_id`. Stop only the PID you started; never stop every `buttonscli`.
 
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
@@ -233,14 +240,32 @@ cargo build --locked --release --bin buttonscli
   and, with a GPU, draw every example: `guide_examples_draw_and_bad_pictures_are_named`
   with `BUTTONSCLI_SHADER_GUIDE_DIR` saves PNGs). `p.y` is -0.5..0.5 at Scale 1.
   A new helper needs four places: `shader_helpers.wgsl`, `HELPER_NAMES`/`HELPER_COSTS`,
-  the guide and `docs/guide/shader-code.md`. Helpers may loop; custom code may not.
+  the guide and `docs/guide/shader-code.md`. Helpers may loop freely; custom code
+  only in fixed-count `for` loops (`loop_trips`).
   wgpu error scopes are per device: build custom pipelines via `checked_pipeline`.
-- Shader lab (Settings → Debug, `power.rs`, `Preferences::shader_lab`): judge mode,
-  picture check, loops, work limit. Rules reach the checker through the global
-  `shader_expression::set_rules`; tests must call `function_with(custom, rules)`
-  so parallel tests do not share it. Loops are proven finite by `loop_trips`
-  (text shape) matched against Naga `Loop` statements in order; keep both in step.
-  A refusal must say its own cause: models repair from the message.
+- Shader options (`Preferences::shader_lab`, UI in `power.rs::shader_options`,
+  shown under Create with AI → Options for everyone): judge mode (default
+  FixOnly), picture check, loops (default on), work limit, `design_theme`.
+  Only `feedback` stays debug-gated (`shader_lab()` masks it; Settings → Debug).
+  Rules reach the checker through the global `shader_expression::set_rules`;
+  tests must call `function_with(custom, rules)` so parallel tests do not share
+  it. The check cache key is `(source, loops, cost_limit, feedback)`: a new rule
+  field must join it. Loops are proven finite by `loop_trips` (text shape)
+  matched against Naga `Loop` statements in order; keep both in step. A refusal
+  must say its own cause: models repair from the message. Built-in library
+  shaders use loops, so `library` tests fail if the default turns them off.
+- Feedback (`prev(q)`): `uses_feedback` detects calls; the checker adds
+  `PREV_STUB`, `combine` adds `PREV_FRAME` (bindings 1/2). Such shaders draw into
+  two `Rgba16Float` frames per pane (8-bit never fades to zero) via
+  `FeedbackPane::advance` in `prepare` (egui's encoder runs before the main
+  pass), then `show` copies to the screen in `paint`. A frame is drawn only when
+  shader time changes (`drawn_at`): repaints are ~2x the animation FPS. Keep
+  the feedback guide text in `shader_ai::FEEDBACK`, not the guide file (its
+  examples compile without feedback).
+- Theme + shader (`shader_ai::ThemeRequest`, `theme_part`): parse only the
+  `<theme>` tag (the shader's braces confuse `extract_json_object`), with the
+  editor draft as base; `theme_generation::schema_text` is shared with the
+  Generate tab. Gated by `theme_generation_available()`, not shader access.
 - Provider endpoints: `validate_endpoint` allows plain HTTP only for loopback,
   private addresses and local names. Every request path calls it.
 - AI shader generation: `src/shader_ai.rs`; workers/editor: `src/app.rs`.

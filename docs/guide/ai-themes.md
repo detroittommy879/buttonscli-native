@@ -10,6 +10,10 @@ app colors, the 16 terminal colors, the background gradient and fonts. It's
 separate from shaders; add a shader afterwards on the Shaders tab, or ask
 [AI shaders](ai-shaders.md) for one.
 
+To get the theme and a matching animated background together, use **Shaders
+→ Create with AI → Design → Theme + shader** instead: it writes up to 12
+complete looks at once ([details](ai-shaders.md#theme--shader)).
+
 You need a **Theme generation model** [set up](ai-setup.md).
 
 <!-- IMAGE: generate-tab.png — Generate tab mid-run: spinner and
