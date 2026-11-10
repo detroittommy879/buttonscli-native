@@ -11,6 +11,35 @@ use egui::Color32;
 const FORMAT_ID: &str = "buttonscli-shader-background-format";
 const MAX_BUFFERS: usize = 32;
 
+/// Previous frames for `prev()` are kept as 16-bit floats: in 8 bits a slow
+/// fade such as `prev(p) * 0.96` gets stuck on rounding and never reaches the
+/// background.
+const FEEDBACK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+/// Panes that keep previous frames at once (each holds two frame-sized
+/// images), and the largest side of those images.
+const MAX_FEEDBACK_PANES: usize = 6;
+const MAX_FEEDBACK_SIDE: u32 = 4096;
+
+/// Shows a pane's newest feedback frame on screen.
+const COPY_SOURCE: &str = "struct Geometry { geometry: vec4<f32> };
+@group(0) @binding(0) var<uniform> u: Geometry;
+@group(0) @binding(1) var frame: texture_2d<f32>;
+@group(0) @binding(2) var frame_sampler: sampler;
+
+@vertex
+fn vertex(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
+    let x = f32((index << 1u) & 2u);
+    let y = f32(index & 2u);
+    return vec4<f32>(x * 2.0 - 1.0, y * 2.0 - 1.0, 0.0, 1.0);
+}
+
+@fragment
+fn fragment(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+    let uv = (position.xy - u.geometry.xy) / u.geometry.zw;
+    return vec4<f32>(textureSampleLevel(frame, frame_sampler, uv, 0.0).rgb, 1.0);
+}
+";
+
 pub(crate) fn register(ctx: &Context, format: wgpu::TextureFormat) {
     ctx.data_mut(|data| data.insert_temp(Id::new(FORMAT_ID), format));
 }
@@ -36,6 +65,10 @@ pub(crate) fn callback(
         }
     }
     let mut knobs = [0.0; 4];
+    let feedback = shader
+        .custom
+        .as_ref()
+        .is_some_and(|custom| super::shader_expression::uses_feedback(&custom.expression));
     let custom_source = if let Some(custom) = &shader.custom {
         // The editor can temporarily contain an inverted range while typing.
         // Validate before clamping, since f32::clamp panics on invalid bounds.
@@ -66,6 +99,7 @@ pub(crate) fn callback(
             colors,
             knobs,
             custom_source,
+            feedback,
         },
     ))
 }
@@ -79,6 +113,9 @@ struct Background {
     colors: [Color32; 6],
     knobs: [f32; 4],
     custom_source: Option<String>,
+    /// The code calls `prev()`: it draws into the pane's feedback frames,
+    /// which are then copied to the screen.
+    feedback: bool,
 }
 
 struct PaneUniform {
@@ -94,6 +131,13 @@ struct Resources {
     /// `None` is a shader the graphics driver refused: it is not drawn and
     /// not tried again every frame.
     custom_pipelines: HashMap<String, (Option<wgpu::RenderPipeline>, u64)>,
+    /// Uniforms plus a frame and its sampler: `prev()` shaders and the copy.
+    feedback_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    copy_pipeline: wgpu::RenderPipeline,
+    /// `prev()` shaders, drawn into [`FEEDBACK_FORMAT`] frames.
+    feedback_pipelines: HashMap<String, (Option<wgpu::RenderPipeline>, u64)>,
+    feedback: HashMap<u64, FeedbackPane>,
     /// One use counter for every window; see [`super::make_room`].
     uses: u64,
 }
@@ -102,13 +146,195 @@ impl Resources {
     fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let layout = uniform_layout(device);
         let pipeline = pipeline(device, format, &layout, super::shader_expression::SOURCE);
+        let feedback_layout = feedback_layout(device);
+        let copy_pipeline = self::pipeline(device, format, &feedback_layout, COPY_SOURCE);
         Self {
             pipeline,
             layout,
             panes: HashMap::new(),
             custom_pipelines: HashMap::new(),
+            sampler: frame_sampler(device),
+            feedback_layout,
+            copy_pipeline,
+            feedback_pipelines: HashMap::new(),
+            feedback: HashMap::new(),
             uses: 0,
         }
+    }
+}
+
+/// Two frames of one pane's `prev()` shader: each frame is drawn into one
+/// while reading the other, then shown with the copy pipeline.
+struct FeedbackPane {
+    size: (u32, u32),
+    /// The program these frames belong to; other code starts from black.
+    source: String,
+    /// Screen geometry, for the copy.
+    screen: wgpu::Buffer,
+    /// The same values with the frame's own geometry, for drawing into it.
+    offscreen: wgpu::Buffer,
+    views: [wgpu::TextureView; 2],
+    /// `draw[i]` writes frame `i` and reads frame `1 - i`.
+    draw: [wgpu::BindGroup; 2],
+    /// `copy[i]` shows frame `i`.
+    copy: [wgpu::BindGroup; 2],
+    /// The frame drawn last.
+    latest: usize,
+    /// Shader time of the frame drawn last. A new frame is drawn only when
+    /// the animation clock moves, so fading follows the FPS limit rather than
+    /// how often the window repaints, and a paused shader holds its picture.
+    drawn_at: Option<f32>,
+    last_used: u64,
+}
+
+impl FeedbackPane {
+    /// New frames start black (wgpu clears new textures).
+    fn new(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        size: (u32, u32),
+        source: String,
+    ) -> Self {
+        let buffer = |label| {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(label),
+                size: 144,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        };
+        let screen = buffer("shader feedback screen");
+        let offscreen = buffer("shader feedback frame");
+        let views = [0, 1].map(|_| {
+            device
+                .create_texture(&wgpu::TextureDescriptor {
+                    label: Some("shader feedback frame"),
+                    size: wgpu::Extent3d {
+                        width: size.0,
+                        height: size.1,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: FEEDBACK_FORMAT,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                        | wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                })
+                .create_view(&Default::default())
+        });
+        let bind = |uniform: &wgpu::Buffer, view: &wgpu::TextureView| {
+            frame_bindings(device, layout, uniform, view, sampler)
+        };
+        Self {
+            draw: [bind(&offscreen, &views[1]), bind(&offscreen, &views[0])],
+            copy: [bind(&screen, &views[0]), bind(&screen, &views[1])],
+            size,
+            source,
+            screen,
+            offscreen,
+            views,
+            latest: 0,
+            drawn_at: None,
+            last_used: 0,
+        }
+    }
+
+    /// Draws the next frame from the last one.
+    fn advance(&mut self, encoder: &mut wgpu::CommandEncoder, pipeline: &wgpu::RenderPipeline) {
+        let next = 1 - self.latest;
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("shader feedback frame"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &self.views[next],
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &self.draw[next], &[]);
+        pass.draw(0..3, 0..1);
+        drop(pass);
+        self.latest = next;
+    }
+
+    /// Copies the newest frame into the pane's rectangle.
+    fn show(&self, pass: &mut wgpu::RenderPass<'_>, copy: &wgpu::RenderPipeline) {
+        pass.set_pipeline(copy);
+        pass.set_bind_group(0, &self.copy[self.latest], &[]);
+        pass.draw(0..3, 0..1);
+    }
+}
+
+fn frame_sampler(device: &wgpu::Device) -> wgpu::Sampler {
+    device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("shader feedback sampler"),
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    })
+}
+
+fn frame_bindings(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform: &wgpu::Buffer,
+    view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("shader feedback bindings"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
+}
+
+/// Builds a custom pipeline once and remembers a driver refusal.
+fn cached_pipeline(
+    pipelines: &mut HashMap<String, (Option<wgpu::RenderPipeline>, u64)>,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::BindGroupLayout,
+    source: &str,
+    now: u64,
+) {
+    if !pipelines.contains_key(source) {
+        super::make_room(pipelines, MAX_BUFFERS, |(_, used)| *used);
+        let built = checked_pipeline(device, format, layout, source);
+        if let Err(error) = &built {
+            log::warn!("the graphics driver refused a custom shader: {error}");
+            if let Ok(mut refused) = REFUSED.lock() {
+                if refused.len() >= 16 {
+                    refused.remove(0);
+                }
+                refused.push((source.to_owned(), error.clone()));
+            }
+        }
+        pipelines.insert(source.to_owned(), (built.ok(), now));
+    }
+    if let Some(entry) = pipelines.get_mut(source) {
+        entry.1 = now;
     }
 }
 
@@ -183,13 +409,17 @@ pub(crate) fn picture_problem(
     animated: bool,
 ) -> Option<String> {
     let (device, queue) = PICTURE_DEVICE.get()?;
-    picture_problem_on(device, queue, custom, background, colors, animated)
+    let source = custom_source(custom).ok()?;
+    picture_problem_on(device, queue, &source, custom, background, colors, animated)
 }
 
+/// `source` is `custom`'s full program. A `prev()` shader is drawn from a
+/// black previous frame, as its first frame on screen is.
 #[cfg(not(target_arch = "wasm32"))]
 fn picture_problem_on(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
+    source: &str,
     custom: &crate::theme::CustomShader,
     background: &str,
     colors: &[String; 5],
@@ -197,9 +427,14 @@ fn picture_problem_on(
 ) -> Option<String> {
     const WIDTH: usize = 64;
     const HEIGHT: usize = 32;
-    let source = custom_source(custom).ok()?;
-    let layout = uniform_layout(device);
-    let pipeline = match checked_pipeline(device, wgpu::TextureFormat::Rgba8Unorm, &layout, &source)
+    let feedback = super::shader_expression::uses_feedback(&custom.expression);
+    let layout = if feedback {
+        feedback_layout(device)
+    } else {
+        uniform_layout(device)
+    };
+    let blank: Option<&[u8]> = feedback.then_some(&[]);
+    let pipeline = match checked_pipeline(device, wgpu::TextureFormat::Rgba8Unorm, &layout, source)
     {
         Ok(pipeline) => pipeline,
         Err(error) => {
@@ -232,7 +467,7 @@ fn picture_problem_on(
         .map(|channel| (channel * 255.0).round() as u8)
         .collect();
     values[4] = 1.3;
-    let first = render_pixels(device, queue, &layout, &pipeline, values)?;
+    let first = render_pixels(device, queue, &layout, &pipeline, values, blank)?;
     let pixels = (WIDTH * HEIGHT) as f32;
     let differs = |a: &[u8], b: &[u8], by: i32| {
         a.iter()
@@ -265,7 +500,7 @@ fn picture_problem_on(
     }
     if animated {
         values[4] = 4.9;
-        let second = render_pixels(device, queue, &layout, &pipeline, values)?;
+        let second = render_pixels(device, queue, &layout, &pipeline, values, blank)?;
         let moved = first
             .chunks_exact(4)
             .zip(second.chunks_exact(4))
@@ -277,6 +512,40 @@ fn picture_problem_on(
         }
     }
     None
+}
+
+fn feedback_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("shader feedback uniforms and frame"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    })
 }
 
 fn uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -297,6 +566,8 @@ fn uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 
 /// Draws one frame into a small off-screen image and returns its RGBA bytes.
 /// `values` is the uniform block; its size must have a width divisible by 64.
+/// `prev` is the previous frame (RGBA bytes, empty for black) for a `prev()`
+/// shader, built with [`feedback_layout`].
 #[cfg(not(target_arch = "wasm32"))]
 fn render_pixels(
     device: &wgpu::Device,
@@ -304,6 +575,7 @@ fn render_pixels(
     layout: &wgpu::BindGroupLayout,
     pipeline: &wgpu::RenderPipeline,
     values: [f32; 36],
+    prev: Option<&[u8]>,
 ) -> Option<Vec<u8>> {
     use wgpu::util::DeviceExt;
     let width = values[2] as u32;
@@ -318,14 +590,81 @@ fn render_pixels(
         contents: &bytes,
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: uniform.as_entire_binding(),
-        }],
-    });
+    let bindings = match prev {
+        Some(prev) => {
+            let frame = device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("shader picture previous frame"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                view_formats: &[],
+            });
+            if prev.len() == (width * height * 4) as usize {
+                queue.write_texture(
+                    frame.as_image_copy(),
+                    prev,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(width * 4),
+                        rows_per_image: Some(height),
+                    },
+                    frame.size(),
+                );
+            }
+            frame_bindings(
+                device,
+                layout,
+                &uniform,
+                &frame.create_view(&Default::default()),
+                &frame_sampler(device),
+            )
+        }
+        None => device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            }],
+        }),
+    };
+    draw_and_read(device, queue, (width, height), |encoder, view| {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bindings, &[]);
+        pass.draw(0..3, 0..1);
+    })
+}
+
+/// Runs `draw` into a new RGBA8 image of `size` (width a multiple of 64) and
+/// returns its bytes.
+#[cfg(not(target_arch = "wasm32"))]
+fn draw_and_read(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    (width, height): (u32, u32),
+    draw: impl FnOnce(&mut wgpu::CommandEncoder, &wgpu::TextureView),
+) -> Option<Vec<u8>> {
     let size = wgpu::Extent3d {
         width,
         height,
@@ -349,25 +688,7 @@ fn render_pixels(
         mapped_at_creation: false,
     });
     let mut encoder = device.create_command_encoder(&Default::default());
-    {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: None,
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bindings, &[]);
-        pass.draw(0..3, 0..1);
-    }
+    draw(&mut encoder, &view);
     encoder.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo {
             texture: &texture,
@@ -475,7 +796,7 @@ impl egui_wgpu::CallbackTrait for Background {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         screen: &egui_wgpu::ScreenDescriptor,
-        _: &mut wgpu::CommandEncoder,
+        encoder: &mut wgpu::CommandEncoder,
         resources: &mut egui_wgpu::CallbackResources,
     ) -> Vec<wgpu::CommandBuffer> {
         if resources.get::<Resources>().is_none() {
@@ -486,26 +807,24 @@ impl egui_wgpu::CallbackTrait for Background {
             .expect("initialized shader background resources");
         resources.uses += 1;
         let now = resources.uses;
-        if let Some(source) = &self.custom_source {
-            if !resources.custom_pipelines.contains_key(source) {
-                super::make_room(&mut resources.custom_pipelines, MAX_BUFFERS, |(_, used)| {
-                    *used
-                });
-                let built = checked_pipeline(device, self.format, &resources.layout, source);
-                if let Err(error) = &built {
-                    log::warn!("the graphics driver refused a custom shader: {error}");
-                    if let Ok(mut refused) = REFUSED.lock() {
-                        if refused.len() >= 16 {
-                            refused.remove(0);
-                        }
-                        refused.push((source.clone(), error.clone()));
-                    }
-                }
-                resources
-                    .custom_pipelines
-                    .insert(source.clone(), (built.ok(), now));
-            }
-            resources.custom_pipelines.get_mut(source).unwrap().1 = now;
+        match &self.custom_source {
+            Some(source) if self.feedback => cached_pipeline(
+                &mut resources.feedback_pipelines,
+                device,
+                FEEDBACK_FORMAT,
+                &resources.feedback_layout,
+                source,
+                now,
+            ),
+            Some(source) => cached_pipeline(
+                &mut resources.custom_pipelines,
+                device,
+                self.format,
+                &resources.layout,
+                source,
+                now,
+            ),
+            None => {}
         }
         if !resources.panes.contains_key(&self.terminal) {
             // Only tiny uniform buffers are cached, with a hard bound even
@@ -567,6 +886,48 @@ impl egui_wgpu::CallbackTrait for Background {
             .flat_map(f32::to_le_bytes)
             .collect();
         queue.write_buffer(&pane.buffer, 0, &bytes);
+        if let (true, Some(source)) = (self.feedback, &self.custom_source) {
+            let side = |points: f32| ((points * scale).round() as u32).clamp(1, MAX_FEEDBACK_SIDE);
+            let size = (side(self.rect.width()), side(self.rect.height()));
+            let Resources {
+                feedback,
+                feedback_pipelines,
+                feedback_layout,
+                sampler,
+                ..
+            } = resources;
+            // A new size or new code starts again from black.
+            if feedback
+                .get(&self.terminal)
+                .is_none_or(|pane| pane.size != size || pane.source != *source)
+            {
+                feedback.remove(&self.terminal);
+                super::make_room(feedback, MAX_FEEDBACK_PANES, |pane| pane.last_used);
+                feedback.insert(
+                    self.terminal,
+                    FeedbackPane::new(device, feedback_layout, sampler, size, source.clone()),
+                );
+            }
+            let pane = feedback.get_mut(&self.terminal).expect("feedback frames");
+            pane.last_used = now;
+            queue.write_buffer(&pane.screen, 0, &bytes);
+            // The frame has its own geometry: it starts at 0, 0 and is `size`.
+            let mut offscreen = bytes.clone();
+            for (index, value) in [0.0, 0.0, size.0 as f32, size.1 as f32]
+                .into_iter()
+                .enumerate()
+            {
+                offscreen[index * 4..index * 4 + 4].copy_from_slice(&value.to_le_bytes());
+            }
+            queue.write_buffer(&pane.offscreen, 0, &offscreen);
+            let time = self.values[0];
+            if let (Some((Some(pipeline), _)), true) =
+                (feedback_pipelines.get(source), pane.drawn_at != Some(time))
+            {
+                pane.advance(encoder, pipeline);
+                pane.drawn_at = Some(time);
+            }
+        }
         Vec::new()
     }
 
@@ -579,6 +940,15 @@ impl egui_wgpu::CallbackTrait for Background {
         let Some(resources) = resources.get::<Resources>() else {
             return;
         };
+        if self.feedback {
+            let drawn = self.custom_source.as_ref().is_some_and(|source| {
+                matches!(resources.feedback_pipelines.get(source), Some((Some(_), _)))
+            });
+            if let (true, Some(pane)) = (drawn, resources.feedback.get(&self.terminal)) {
+                pane.show(pass, &resources.copy_pipeline);
+            }
+            return;
+        }
         let Some(pane) = resources.panes.get(&self.terminal) else {
             return;
         };
@@ -660,6 +1030,7 @@ mod tests {
                 picture_problem_on(
                     &device,
                     &queue,
+                    &custom_source(&custom(code)).unwrap(),
                     &custom(code),
                     &look.background,
                     &look.colors,
@@ -692,7 +1063,7 @@ mod tests {
                         }
                     }
                     let pixels =
-                        render_pixels(&device, &queue, &layout, &pipeline, values).unwrap();
+                        render_pixels(&device, &queue, &layout, &pipeline, values, None).unwrap();
                     let file: String = name
                         .chars()
                         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
@@ -739,6 +1110,122 @@ mod tests {
         });
     }
 
+    /// The real feedback path: frames drawn by `FeedbackPane::advance` and
+    /// shown by the copy pipeline leave a trail behind a moving dot.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires a graphics adapter"]
+    fn feedback_frames_leave_trails_on_the_native_adapter() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+                .expect("native graphics adapter");
+            let (device, queue) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+                .unwrap();
+            device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let rules = super::super::shader_expression::Rules {
+                feedback: true,
+                ..Default::default()
+            };
+            let trail = crate::theme::CustomShader {
+                expression: "let c = vec2<f32>(0.6 * sin(t), 0.0);\nlet dot = halo(sd_circle(p - c, 0.03), 0.05);\nreturn max(mix(bg, c1, clamp(dot, 0.0, 1.0)), prev(p) * 0.96);".into(),
+                variables: Vec::new(),
+                ..Default::default()
+            };
+            let source = super::super::shader_expression::program_with(&trail, rules).unwrap();
+            let format = wgpu::TextureFormat::Rgba8Unorm;
+            let resources = Resources::new(&device, format);
+            let pipeline =
+                checked_pipeline(&device, FEEDBACK_FORMAT, &resources.feedback_layout, &source)
+                    .unwrap();
+            let values = |time: f32| {
+                let mut values = [0.0_f32; 36];
+                (values[2], values[3], values[4]) = (64.0, 32.0, time);
+                (values[5], values[6]) = (1.0, 1.0);
+                // base dark blue, c1 bright orange.
+                values[8..12].copy_from_slice(&[0.02, 0.02, 0.1, 1.0]);
+                values[12..16].copy_from_slice(&[1.0, 0.6, 0.1, 1.0]);
+                values.into_iter().flat_map(f32::to_le_bytes).collect::<Vec<u8>>()
+            };
+            // Draws frames at `times` into fresh feedback frames and shows the last.
+            let frames = |times: &[f32]| {
+                let mut pane = FeedbackPane::new(
+                    &device,
+                    &resources.feedback_layout,
+                    &resources.sampler,
+                    (64, 32),
+                    source.clone(),
+                );
+                for time in times {
+                    queue.write_buffer(&pane.offscreen, 0, &values(*time));
+                    queue.write_buffer(&pane.screen, 0, &values(*time));
+                    let mut encoder = device.create_command_encoder(&Default::default());
+                    pane.advance(&mut encoder, &pipeline);
+                    queue.submit([encoder.finish()]);
+                }
+                draw_and_read(&device, &queue, (64, 32), |encoder, view| {
+                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    pane.show(&mut pass, &resources.copy_pipeline);
+                })
+                .unwrap()
+            };
+            let fresh = frames(&[1.5]);
+            let trailed = frames(&[0.0, 0.5, 1.0, 1.5]);
+            let bright = |pixels: &[u8]| {
+                pixels
+                    .chunks_exact(4)
+                    .filter(|pixel| pixel[0] > 60)
+                    .count()
+            };
+            assert!(
+                bright(&trailed) > bright(&fresh) + 8,
+                "earlier frames leave a trail: {} vs {}",
+                bright(&trailed),
+                bright(&fresh)
+            );
+            // The picture check draws a `prev()` shader too (from black).
+            let look = crate::shader_ai::Look::default();
+            let problem = picture_problem_on(
+                &device,
+                &queue,
+                &source,
+                &trail,
+                &look.background,
+                &look.colors,
+                true,
+            );
+            assert!(
+                !problem.as_deref().unwrap_or_default().contains("refused"),
+                "{problem:?}"
+            );
+            assert!(
+                device.pop_error_scope().await.is_none(),
+                "feedback pipelines validate"
+            );
+        });
+    }
+
     fn render_sample(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -779,6 +1266,7 @@ mod tests {
             &resources.layout,
             &resources.pipeline,
             values,
+            None,
         )
         .expect("rendered sample")
     }

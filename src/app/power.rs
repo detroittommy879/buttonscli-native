@@ -117,6 +117,7 @@ impl ButtonsApp {
             crate::plugins::effects::shader_expression::Rules {
                 loops: lab.loops,
                 cost_limit: lab.cost_limit,
+                feedback: lab.feedback,
             },
         );
     }
@@ -186,6 +187,19 @@ impl ButtonsApp {
             .small()
             .color(self.colors().muted),
         );
+        ui.separator();
+        ui.spaced_heading("Shader experiments");
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.shader_lab.feedback,
+                "Feedback: shader code may call `prev(p)` for the color it drew there last frame",
+            )
+            .on_hover_text("For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off.")
+            .changed()
+        {
+            self.apply_shader_lab();
+            self.persist_native_preferences();
+        }
         ui.separator();
         if ui
             .spaced_checkbox(

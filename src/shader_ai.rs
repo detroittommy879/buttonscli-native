@@ -58,13 +58,33 @@ for (var i = 0; i < 8; i++) {
 return mix(bg, tonemap(mix(c1, c2, glow * 0.5) * glow), strength);
 ```";
 
-/// The guide, plus what the current debug switches change in it.
-fn rules_text(loops: bool) -> String {
+/// Added to the guide when Settings → Debug turns on the previous frame.
+/// Kept out of the guide file: its examples are compiled without feedback.
+const FEEDBACK: &str = "
+
+## The previous frame is available in this session
+
+`prev(q)` returns the color this shader drew last frame at position `q` (same coordinates as `p`), as `vec3<f32>`. Use it for trails, ripples, smears and things that build up or fade over time. Fade the old frame a little every frame, or it never goes away: `prev(p) * 0.96` (closer to 1.0 fades slower). Read it at a moved position to make it flow: `prev(p + vec2<f32>(0.0, 0.004))` drifts the old picture down. It costs 2 per call. The first frame and every resize start from black. A new frame is drawn each time the animation clock ticks (the FPS limit, usually 30 a second), so `* 0.96` fades by about two thirds in a second; nothing changes while animation is paused.
+
+Example, a moving dot that leaves a fading trail:
+
+```
+let c = vec2<f32>(0.6 * sin(t * 0.7), 0.3 * sin(t * 1.3));
+let dot = halo(sd_circle(p - c, 0.02), 0.04);
+let new_color = mix(bg, c1, clamp(dot, 0.0, 1.0));
+return max(new_color, prev(p) * 0.96);
+```";
+
+/// The guide, plus what the current shader switches add to it.
+fn rules_text(loops: bool, feedback: bool) -> String {
+    let mut text = RULES.to_owned();
     if loops {
-        format!("{RULES}{LOOPS}")
-    } else {
-        RULES.to_owned()
+        text.push_str(LOOPS);
     }
+    if feedback {
+        text.push_str(FEEDBACK);
+    }
+    text
 }
 
 /// What the judge said about code that already passed the local checks.
@@ -192,6 +212,8 @@ pub(crate) struct Request<'a> {
     pub(crate) judge: crate::settings::JudgeMode,
     /// Tell the models that loops and branches are allowed.
     pub(crate) loops: bool,
+    /// Tell the models about `prev()`, the previous frame.
+    pub(crate) feedback: bool,
     /// Also design the app and terminal theme in the same reply.
     pub(crate) theme: Option<ThemeRequest<'a>>,
 }
@@ -267,7 +289,7 @@ pub(crate) fn generate(
         .map(|_| ())
     };
 
-    let rules = rules_text(request.loops);
+    let rules = rules_text(request.loops, request.feedback);
     report(Stage::Writing, 0);
     let writer_prompt = writer_prompt(request);
     let (reply, writer) = ask(
@@ -1007,6 +1029,7 @@ mod tests {
                 picture_check: check,
                 judge,
                 loops: false,
+                feedback: false,
                 theme: None,
             },
             &AtomicBool::new(false),
@@ -1043,6 +1066,7 @@ mod tests {
                 picture_check: None,
                 judge: crate::settings::JudgeMode::Off,
                 loops: true,
+                feedback: false,
                 theme: Some(ThemeRequest {
                     seed: &seed,
                     base: &base,
@@ -1077,6 +1101,7 @@ mod tests {
             picture_check: None,
             judge: crate::settings::JudgeMode::Off,
             loops: true,
+            feedback: false,
             theme: Some(ThemeRequest {
                 seed: &serde_json::json!({"mode": "dark"}),
                 base: &serde_json::json!({}),
@@ -1120,6 +1145,7 @@ mod tests {
             picture_check: None,
             judge: crate::settings::JudgeMode::Review,
             loops: false,
+            feedback: false,
             theme: None,
         };
         let prompt = writer_prompt(&request);
@@ -1283,10 +1309,27 @@ mod tests {
         assert_eq!(result.unwrap().code, "return c3;");
         assert_eq!(models, ["writer", "writer"]);
         // The loops switch adds its section to the guide, and its example compiles.
-        let text = rules_text(true);
+        let text = rules_text(true, false);
         assert!(
-            text.contains("for (var i = 0; i < 8; i++)") && !rules_text(false).contains("for (var")
+            text.contains("for (var i = 0; i < 8; i++)")
+                && !rules_text(false, false).contains("for (var")
         );
+        // The feedback section's example compiles once feedback is on.
+        assert!(rules_text(false, true).contains("prev(p) * 0.96"));
+        let trail = FEEDBACK.split("```").nth(1).unwrap();
+        let with_frame = crate::plugins::effects::shader_expression::Rules {
+            feedback: true,
+            ..Default::default()
+        };
+        crate::plugins::effects::shader_expression::function_with(
+            &CustomShader {
+                expression: trail.into(),
+                variables: Vec::new(),
+                ..Default::default()
+            },
+            with_frame,
+        )
+        .unwrap();
         let example = LOOPS.split("```").nth(1).unwrap();
         let loose = crate::plugins::effects::shader_expression::Rules {
             loops: true,
@@ -1339,8 +1382,10 @@ mod tests {
             assert!(code.len() < 1_000, "{name} is short enough to learn from");
         }
         // The guide names every helper, with the price the validator charges.
+        // `prev` is described only when feedback is on (`FEEDBACK`).
         for helper in shader_expression::HELPER_NAMES {
-            assert!(RULES.contains(&format!("{helper}(")), "{helper}");
+            let text = if helper == "prev" { FEEDBACK } else { RULES };
+            assert!(text.contains(&format!("{helper}(")), "{helper}");
         }
         assert!(RULES.contains(&format!("may spend {}", shader_expression::MAX_COST)));
         assert!(
@@ -1470,6 +1515,7 @@ mod tests {
                             picture_check: None,
                             judge: crate::settings::JudgeMode::Review,
                             loops: false,
+                            feedback: false,
                             theme: None,
                         },
                         &AtomicBool::new(false),

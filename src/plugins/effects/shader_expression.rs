@@ -19,7 +19,7 @@ pub(crate) const RESERVED: [&str; 10] = [
 /// The helper functions custom code may call. Sliders the AI adds cannot
 /// take these names.
 #[cfg(not(target_arch = "wasm32"))]
-pub(crate) const HELPER_NAMES: [&str; 21] = [
+pub(crate) const HELPER_NAMES: [&str; 22] = [
     "hash",
     "hash2",
     "noise",
@@ -41,12 +41,15 @@ pub(crate) const HELPER_NAMES: [&str; 21] = [
     "stroke",
     "halo",
     "tonemap",
+    // Not in the helpers file: added with the previous frame (see `PREV_FRAME`).
+    "prev",
 ];
 
 /// Rough work per pixel for one helper call, in `hash` lookups. Helpers that
 /// are not listed cost 1.
-const HELPER_COSTS: [(&str, u32); 8] = [
+const HELPER_COSTS: [(&str, u32); 9] = [
     ("hash2", 2),
+    ("prev", 2),
     ("noise", 4),
     ("stars", 3),
     ("cloud", 12),
@@ -82,6 +85,9 @@ pub(crate) struct Rules {
     pub(crate) loops: bool,
     /// Most helper work per pixel; 0 is no limit.
     pub(crate) cost_limit: u32,
+    /// Accept `prev(q)`, the color this shader drew last frame (experiment,
+    /// Settings → Debug).
+    pub(crate) feedback: bool,
 }
 
 impl Default for Rules {
@@ -89,26 +95,62 @@ impl Default for Rules {
         Self {
             loops: true,
             cost_limit: MAX_COST,
+            feedback: false,
         }
     }
 }
 
 static LOOPS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 static COST_LIMIT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(MAX_COST);
+static FEEDBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The rules every shader is checked against from now on.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn set_rules(rules: Rules) {
     LOOPS.store(rules.loops, std::sync::atomic::Ordering::Relaxed);
     COST_LIMIT.store(rules.cost_limit, std::sync::atomic::Ordering::Relaxed);
+    FEEDBACK.store(rules.feedback, std::sync::atomic::Ordering::Relaxed);
 }
 
 pub(crate) fn rules() -> Rules {
     Rules {
         loops: LOOPS.load(std::sync::atomic::Ordering::Relaxed),
         cost_limit: COST_LIMIT.load(std::sync::atomic::Ordering::Relaxed),
+        feedback: FEEDBACK.load(std::sync::atomic::Ordering::Relaxed),
     }
 }
+
+/// Whether `code` calls `prev(...)`: it reads the previous frame, so it is
+/// drawn through the feedback path. A `let prev` alone does not count.
+pub(crate) fn uses_feedback(code: &str) -> bool {
+    let clean = without_comments(code);
+    let mut rest = clean.as_str();
+    while let Some(at) = rest.find("prev") {
+        let before = rest[..at].chars().next_back();
+        let after = rest[at + 4..].trim_start();
+        let whole = !before.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_');
+        if whole && after.starts_with('(') {
+            return true;
+        }
+        rest = &rest[at + 4..];
+    }
+    false
+}
+
+/// Stands in for `prev` while code is checked on its own; the real one, which
+/// reads a texture, is added by [`combine`].
+const PREV_STUB: &str = "fn prev(q: vec2<f32>) -> vec3<f32> { return vec3<f32>(q, 0.0); }\n";
+
+/// The previous frame for code that calls `prev` (see [`combine`]). `{Y}` is
+/// `-` when p.y grows upward. Bindings 1 and 2 follow the uniforms.
+const PREV_FRAME: &str = "@group(0) @binding(1) var prev_frame: texture_2d<f32>;
+@group(0) @binding(2) var prev_sampler: sampler;
+fn prev(q: vec2<f32>) -> vec3<f32> {
+    let size = vec2<f32>(u.geometry.z / u.geometry.w, 1.0) * u.settings.z;
+    let uv = vec2<f32>(q.x, {Y}q.y) / size + 0.5;
+    return textureSampleLevel(prev_frame, prev_sampler, uv, 0.0).rgb;
+}
+";
 
 /// How many times each `for` loop in `code` runs, in source order, or why a
 /// loop is not allowed. Only this shape is accepted, so every loop provably
@@ -374,9 +416,9 @@ pub(crate) fn function_with(custom: &CustomShader, rules: Rules) -> Result<Strin
         ));
     }
     // The same code can pass under one set of rules and fail under another.
-    type Checked = std::collections::HashMap<(String, bool, u32), Result<(), String>>;
+    type Checked = std::collections::HashMap<(String, bool, u32, bool), Result<(), String>>;
     static CACHE: std::sync::OnceLock<std::sync::Mutex<Checked>> = std::sync::OnceLock::new();
-    let key = (source, rules.loops, rules.cost_limit);
+    let key = (source, rules.loops, rules.cost_limit, rules.feedback);
     let mut cache = CACHE.get_or_init(Default::default).lock().unwrap();
     if let Some(result) = cache.get(&key) {
         result.clone()?;
@@ -393,6 +435,11 @@ pub(crate) fn function_with(custom: &CustomShader, rules: Rules) -> Result<Strin
 
 pub(crate) fn program(custom: &CustomShader) -> Result<String, String> {
     Ok(combine(&function(custom)?, custom.y_up))
+}
+
+#[cfg(test)]
+pub(crate) fn program_with(custom: &CustomShader, rules: Rules) -> Result<String, String> {
+    Ok(combine(&function_with(custom, rules)?, custom.y_up))
 }
 
 /// Helpers (`hash`, `noise`, `cloud`, `stars`, `palette`, `hsv`) shared by the
@@ -415,8 +462,13 @@ fn combine(source: &str, y_up: bool) -> String {
     // Code that uses `strength` decides how it shows; otherwise the host fades
     // the pattern into the background by Strength, as before. A mention in a
     // comment does not count.
-    if uses(source.strip_prefix(HEADER).unwrap_or(source), "strength") {
+    let code = source.strip_prefix(HEADER).unwrap_or(source);
+    if uses(code, "strength") {
         full = full.replace(HOST_FADE, "clamp(glow, 0.0, 1.0)");
+    }
+    if uses_feedback(code) {
+        full.push('\n');
+        full.push_str(&PREV_FRAME.replace("{Y}", if y_up { "-" } else { "" }));
     }
     format!("{full}\n{source}")
 }
@@ -457,15 +509,21 @@ fn shift_line_numbers(line: &str, offset: usize) -> String {
 fn validate(source: &str, rules: Rules) -> Result<(), String> {
     // The helpers come first so the expression can call them; anything beyond
     // them plus the one generated function is rejected below.
+    let code = source.strip_prefix(HEADER).unwrap_or(source);
+    if !rules.feedback && uses_feedback(code) {
+        return Err("`prev()` (last frame's color) is an experiment: switch on Feedback in Settings → Debug to use it.".into());
+    }
     let helper_count = naga::front::wgsl::parse_str(HELPERS)
         .map(|module| module.functions.len())
-        .unwrap_or(0);
-    let standalone = format!("{HELPERS}{source}");
+        .unwrap_or(0)
+        + usize::from(rules.feedback);
+    let stub = if rules.feedback { PREV_STUB } else { "" };
+    let standalone = format!("{HELPERS}{stub}{source}");
     let module = naga::front::wgsl::parse_str(&standalone).map_err(|error| {
         error
             .emit_to_string(&standalone)
             .lines()
-            .map(|line| shift_line_numbers(line, helper_lines()))
+            .map(|line| shift_line_numbers(line, helper_lines() + stub.lines().count()))
             .collect::<Vec<_>>()
             .join("\n")
     })?;
@@ -664,9 +722,13 @@ mod tests {
                 "{name} is missing from HELPER_NAMES"
             );
         }
-        assert_eq!(names.len(), HELPER_NAMES.len());
+        // `prev` comes with the previous frame, not the helpers file.
+        assert_eq!(names.len() + 1, HELPER_NAMES.len());
         for (name, _) in HELPER_COSTS {
-            assert!(names.contains(&name), "{name} is priced but missing");
+            assert!(
+                names.contains(&name) || name == "prev",
+                "{name} is priced but missing"
+            );
         }
     }
 
@@ -693,6 +755,7 @@ mod tests {
         let loose = Rules {
             loops: true,
             cost_limit: MAX_COST,
+            feedback: false,
         };
         let check = |code: &str, rules: Rules| {
             function_with(
@@ -754,6 +817,65 @@ mod tests {
             ),
             Ok(vec![4, 3])
         );
+    }
+
+    #[test]
+    fn feedback_code_reads_the_previous_frame_only_when_switched_on() {
+        let trail = CustomShader {
+            expression: "let d = halo(sd_circle(p - vec2<f32>(sin(t), 0.0), 0.05), 0.05);\nreturn max(c1 * d, prev(p) * 0.95);".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        let off = Rules::default();
+        let on = Rules {
+            feedback: true,
+            ..off
+        };
+        let error = function_with(&trail, off).unwrap_err();
+        assert!(error.contains("Settings → Debug"), "{error}");
+        let source = function_with(&trail, on).unwrap();
+        let program = combine(&source, true);
+        assert!(program.contains("var prev_frame: texture_2d<f32>"));
+        assert!(program.contains("vec2<f32>(q.x, -q.y)"));
+        assert!(combine(&source, false).contains("vec2<f32>(q.x, q.y)"));
+        // Plain code gets no texture, so it keeps the plain pipeline.
+        let plain = function_with(&CustomShader::default(), on).unwrap();
+        assert!(!combine(&plain, true).contains("prev_frame"));
+        // `let prev` or a comment is not a call; errors still count from line 1.
+        assert!(!uses_feedback(
+            "let prev = 0.5; // prev(p)\nreturn c1 * prev;"
+        ));
+        assert!(uses_feedback("return prev (p);"));
+        assert!(!uses_feedback("return preview(p);"));
+        let broken = CustomShader {
+            expression: "return prev(p) + oops;".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        let error = function_with(&broken, on).unwrap_err();
+        let plain = function_with(
+            &CustomShader {
+                expression: "return c1 + oops;".into(),
+                variables: Vec::new(),
+                ..Default::default()
+            },
+            off,
+        )
+        .unwrap_err();
+        let line = |error: &str| {
+            error
+                .split("expression:")
+                .nth(1)
+                .map(|rest| rest[..1].to_owned())
+        };
+        assert_eq!(line(&error), line(&plain), "{error}");
+        // Reading the frame is priced like a cheap helper, per loop turn too.
+        let heavy = CustomShader {
+            expression: "var c = vec3<f32>(0.0);\nfor (var i = 0; i < 64; i++) { c += prev(p + f32(i) * 0.001); }\nfor (var i = 0; i < 64; i++) { c += prev(p - f32(i) * 0.001); }\nreturn c / 128.0;".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        assert!(function_with(&heavy, on).unwrap_err().contains("too heavy"));
     }
 
     fn program_for(expression: &str) -> String {

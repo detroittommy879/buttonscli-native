@@ -10872,6 +10872,7 @@ impl ButtonsApp {
                         }),
                         judge: lab.judge,
                         loops: lab.loops,
+                        feedback: lab.feedback,
                         theme: theme_inputs
                             .as_ref()
                             .map(|(seed, base)| crate::shader_ai::ThemeRequest { seed, base }),

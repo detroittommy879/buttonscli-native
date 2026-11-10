@@ -32,6 +32,12 @@
   such as "halloween" changes the whole look. Cards preview the theme's text
   colors; using one loads both into the draft. The AI Theme Generator stays
   as it was.
+- Experiment (Settings → Debug → Shader experiments → Feedback): shader code
+  may call `prev(p)` for the color it drew there last frame, for trails,
+  ripples and build-up. Create with AI is told about it while it is on. Each
+  pane using it keeps two extra frame-sized images on the GPU; a new frame is
+  drawn per animation tick, so fades follow the FPS limit and pause with
+  motion.
 - Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11) for certificate-checking fixes.
 
