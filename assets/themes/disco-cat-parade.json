@@ -1,0 +1,194 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5421a6",
+        "#ff54b0",
+        "#28e6da",
+        "#ffbf38",
+        "#30165f"
+      ],
+      "custom": {
+        "expression": "return mix(\n  bg,\n  mix(\n    mix(c5, c1, 0.3),\n    mix(\n      mix(\n        mix(c2, c3, step(0.34, hash(floor(p / vec2<f32>(cat_size * 1.45))))),\n        c4,\n        step(0.70, hash(floor(p / vec2<f32>(cat_size * 1.45))))\n      ),\n      c5,\n      1.0 - smoothstep(\n        0.8, 1.1,\n        length(\n          (vec2<f32>(\n            abs(fract(p.x / (cat_size * 1.45)) - 0.5),\n            fract(p.y / (cat_size * 1.45) + 0.035 * sin(t * 3.0) * playfulness) - 0.5\n          ) - vec2<f32>(0.065, 0.14)) /\n          vec2<f32>(0.024, 0.012 + 0.023 * (1.0 - smoothstep(0.88, 0.98, sin(t * 1.4))))\n        )\n      )\n    ),\n    1.0 - smoothstep(\n      -0.008, 0.012,\n      min(\n        min(\n          (length(\n            (fract(p / vec2<f32>(cat_size * 1.45) + vec2<f32>(0.0, 0.035 * sin(t * 3.0) * playfulness)) -\n            vec2<f32>(0.5, 0.62)) / vec2<f32>(0.165, 0.14)\n          ) - 1.0) * 0.14,\n          (length(\n            (fract(p / vec2<f32>(cat_size * 1.45) + vec2<f32>(0.0, 0.035 * sin(t * 3.0) * playfulness)) -\n            vec2<f32>(0.5, 0.38)) / vec2<f32>(0.14, 0.21)\n          ) - 1.0) * 0.14\n        ),\n        min(\n          max(\n            abs(abs(fract(p.x / (cat_size * 1.45)) - 0.5) - 0.11) -\n            (0.83 - fract(p.y / (cat_size * 1.45) + 0.035 * sin(t * 3.0) * playfulness)) * 0.4,\n            max(\n              fract(p.y / (cat_size * 1.45) + 0.035 * sin(t * 3.0) * playfulness) - 0.83,\n              0.65 - fract(p.y / (cat_size * 1.45) + 0.035 * sin(t * 3.0) * playfulness)\n            )\n          ),\n          max(\n            abs(length(\n              fract(p / vec2<f32>(cat_size * 1.45) + vec2<f32>(0.0, 0.035 * sin(t * 3.0) * playfulness)) -\n              vec2<f32>(0.69 + 0.025 * sin(t * 3.6) * playfulness, 0.38)\n            ) - 0.14) - 0.028,\n            0.65 - fract(p.x / (cat_size * 1.45))\n          )\n        )\n      )\n    )\n  ),\n  strength\n);",
+        "name": "Disco Cat Parade",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "cat_size",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "playfulness",
+            "value": 1.75
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 9.0,
+      "speed": 3.0999999046325684,
+      "strength": 0.119999997317791,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-09T15:43:15.370Z",
+    "description": "Gogh dark import from Tempus Dusk by Protesilaos Stavrou (https://protesilaos.com)",
+    "id": "disco-cat-parade",
+    "name": "Disco Cat Parade",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:disco-cat-parade",
+    "updatedAt": "2026-11-09T15:48:03.018Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#8c9abe",
+        "background": "#1d2229",
+        "buttonBackground": "#1e232a",
+        "buttonHover": "#323845",
+        "buttonText": "#a2a8ba"
+      },
+      "settings": {
+        "background": "#1d2229"
+      },
+      "shell": {
+        "accent": "#8c9abe",
+        "accentHover": "#9ca5de",
+        "background": "#1f252d",
+        "backgroundSecondary": "#1d2229",
+        "border": "#3e4656",
+        "buttonBackground": "#1e232b",
+        "paneDivider": {
+          "color": "#8c9abe",
+          "thickness": 2.0
+        },
+        "textDim": "#6b717f",
+        "textMain": "#a2a8ba"
+      },
+      "statusBar": {
+        "background": "#353c4a",
+        "border": "#3e4656",
+        "text": "#a2a8ba",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#1f252d",
+        "activeBorder": "#8c9abe",
+        "background": "#1d2229",
+        "idleBackground": "#1e232b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1f252d",
+        "blue": "#8c9abe",
+        "brightBlack": "#2c3150",
+        "brightBlue": "#9ca5de",
+        "brightCyan": "#8caeb6",
+        "brightGreen": "#80b48f",
+        "brightMagenta": "#c69ac6",
+        "brightRed": "#d39d74",
+        "brightWhite": "#a2a8ba",
+        "brightYellow": "#bda75a",
+        "cyan": "#8e9aba",
+        "green": "#8ba089",
+        "magenta": "#b190af",
+        "red": "#cb8d56",
+        "white": "#a29899",
+        "yellow": "#a79c46"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#a2a8ba",
+      "gradientAngle": 103.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let density = 1.3 + amount * 0.32;\nlet drift = t * gravity * 0.24;\nlet wave = sin(p.y * 2.3 + t * 0.35) * 0.18 + sin(p.x * 1.7 - t * 0.22) * 0.12;\nlet flow = p + vec2<f32>(wave, drift);\nlet grid = flow * vec2<f32>(density);\nlet row = floor(grid.y);\nlet staggered = grid + vec2<f32>(sin(row * 2.4) * 0.28, 0.0);\nlet cell = floor(staggered);\nlet q = fract(staggered) - vec2<f32>(0.5);\nlet seed = hash(cell);\nlet angle = sin(t * 0.32 + seed * 6.283 + row * 0.45) * 0.65 + seed * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.68 + seed * 0.18);\nlet d = max(abs(r.x) * 0.866025 + r.y * 0.5, -r.y) - size * 0.65;\nlet fill = 1.0 - smoothstep(-0.014, 0.012, d);\nlet rim = exp(-abs(d) * 85.0);\nlet halo = exp(-max(d, 0.0) * 17.0) * (1.0 - fill);\nlet bands = 0.5 + 0.5 * sin(d * 110.0 - t * 1.8 + seed * 8.0);\nlet interior = mix(0.32, 0.92, bands) * fill;\nlet contour = pow(0.5 + 0.5 * sin(d * 62.0 - t * 1.1), 14.0) * exp(-max(d, 0.0) * 7.0) * (1.0 - fill);\nlet tide = 0.5 + 0.5 * sin(p.x * 1.9 + p.y * 2.6 + sin(p.y * 3.0 - t * 0.4) + t * 0.23);\nlet blue = mix(vec3<f32>(0.025, 0.17, 0.85), vec3<f32>(0.02, 0.78, 1.0), seed);\nlet neon = mix(blue, vec3<f32>(0.39, 0.16, 1.0), smoothstep(0.7, 1.0, seed) * 0.65);\nlet base = mix(vec3<f32>(0.015, 0.045, 0.19), vec3<f32>(0.035, 0.19, 0.43), tide);\nlet activity = smoothstep(0.0, 0.7, amount);\nlet light = interior * 0.85 + rim * 0.8 + halo * glow * 0.4 + contour * glow * 0.18;\nlet color = clamp(base + neon * vec3<f32>(activity * light), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Blue Triangle Flow",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 6.199999809265137
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.4099999964237213
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 2.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 3.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:39:21.329Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "jack-o-disco-v1",
+    "name": "Jack-o’-Disco v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:jack-o-disco-v1",
+    "updatedAt": "2026-11-01T02:49:52.895Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#1a0705",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

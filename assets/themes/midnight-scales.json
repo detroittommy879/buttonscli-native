@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#122b60",
+        "#51416f",
+        "#83749d",
+        "#486fad",
+        "#ccd9e5"
+      ],
+      "custom": {
+        "expression": "let q = p * (4.0 / scale_size);\nlet row = floor(q.y);\nlet fy = fract(q.y) * 0.72;\nlet x0 = (fract(q.x + row * 0.5) - 0.5) * 1.5;\nlet x1 = (fract(q.x + (row - 1.0) * 0.5) - 0.5) * 1.5;\nlet d0 = abs(length(vec2<f32>(x0, fy)) - 0.95);\nlet d1 = abs(length(vec2<f32>(x1, fy + 0.72)) - 0.95);\nlet edge_distance = min(d0, d1);\nlet rim = exp(-edge_distance * 76.0);\nlet halo = exp(-edge_distance * 13.0);\nlet breath = 0.5 + 0.5 * sin(t * 0.62 + p.y * 1.1 + sin(p.x * 0.8));\nlet mist = cloud(p * 0.85 + vec2<f32>(t * 0.025, -t * 0.018));\nlet violet = 0.5 + 0.5 * sin(q.y * 0.58 + q.x * 0.26 + mist * 2.7);\nlet base = mix(c1, c2, violet * 0.82);\nlet sheen = pow(clamp(fy / 0.72, 0.0, 1.0), 1.8);\nlet body = mix(base, c3, sheen * 0.22 + mist * 0.15);\nlet wave = sin(q.x * 0.83 + q.y * 0.61 - t * 0.49 + sin(q.y * 0.91 + t * 0.23) * 2.0);\nlet interference = pow(0.5 + 0.5 * wave, 22.0);\nlet fleck_cell = floor(q * 9.0);\nlet seed = hash(fleck_cell);\nlet fleck_pos = fract(q * 9.0) - vec2<f32>(0.5);\nlet fleck = exp(-dot(fleck_pos, fleck_pos) * 95.0);\nlet twinkle = pow(0.5 + 0.5 * sin(t * 1.3 + seed * 91.0), 8.0);\nlet silver = rim * interference * smoothstep(0.78, 0.98, noise(q * 1.2 + vec2<f32>(t * 0.08, 0.0)));\nlet dust = fleck * step(0.965, seed) * twinkle;\nlet glow = 0.65 + breathing * breath * 0.55;\nlet color = body + mix(c4, c3, violet) * (rim * 0.32 + halo * 0.15) * glow + c5 * (silver * 0.85 + dust * 0.65) * glint_rate;\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Midnight Scales",
+        "variables": [
+          {
+            "max": 2.5,
+            "min": 0.4000000059604645,
+            "name": "scale_size",
+            "value": 1.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "breathing",
+            "value": 0.550000011920929
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "glint_rate",
+            "value": 0.44999998807907104
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 1.5,
+      "speed": 2.700000047683716,
+      "strength": 0.15000000596046448,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-01T03:01:10.114Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "midnight-scales",
+    "name": "Midnight Scales",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:midnight-scales",
+    "updatedAt": "2026-11-01T03:15:23.714Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#110821",
+        "#170925",
+        "#140033"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

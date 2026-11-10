@@ -476,5 +476,182 @@
     "layout": "grid",
     "visible_panes": 8,
     "row_banding_brightness": 8
+  },
+  {
+    "name": "five",
+    "theme_id": "autumn-to-winter-v1",
+    "app_theme_id": "autumn-to-winter-v1",
+    "terminal_theme_id": "autumn-to-winter-v1",
+    "gradient_theme_id": "autumn-to-winter-v1",
+    "effects_theme_id": "autumn-to-winter-v1",
+    "panes": [
+      {
+        "theme_id": "trapezoid-stampede-v2",
+        "font": null
+      },
+      {
+        "theme_id": "autumn-to-winter-v2",
+        "font": null
+      },
+      {
+        "theme_id": "winter-veil-v4",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 12.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "autumn-to-winter-v3",
+        "font": null
+      },
+      {
+        "theme_id": "ai-qwen-miami-night-coast-v1",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5
+  },
+  {
+    "name": "rowbanding9",
+    "theme_id": "pane-focus-spectrum-ruby",
+    "app_theme_id": "pane-focus-spectrum-ruby",
+    "terminal_theme_id": "pane-focus-spectrum-ruby",
+    "gradient_theme_id": "pane-focus-spectrum-ruby",
+    "effects_theme_id": "pane-focus-spectrum-ruby",
+    "panes": [
+      {
+        "theme_id": "pane-focus-spectrum-ruby",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-orange",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-gold",
+        "font": null
+      },
+      {
+        "theme_id": "pane-focus-spectrum-leaf",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 4
+  },
+  {
+    "name": "rain-snow-thunder",
+    "theme_id": "harmonic-fusion",
+    "app_theme_id": "harmonic-fusion",
+    "terminal_theme_id": "harmonic-fusion",
+    "gradient_theme_id": "harmonic-fusion",
+    "effects_theme_id": "harmonic-fusion",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax",
+        "font": null
+      },
+      {
+        "theme_id": "winter-rain-parallax-v1",
+        "font": null
+      },
+      {
+        "theme_id": "winter-window",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "snow-day-spritz",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "electric-downpour",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "storm-circuit",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 6,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "thunder & water",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v3",
+        "font": null
+      },
+      {
+        "theme_id": "winter-rain-parallax-v2",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst",
+        "font": {
+          "zone": {
+            "family": "Space Mono (System)",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
   }
 ]

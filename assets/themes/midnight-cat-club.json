@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#303d79",
+        "#6575cd",
+        "#f4ad74",
+        "#6ddbc7",
+        "#d989c4"
+      ],
+      "custom": {
+        "expression": "return mix(\n  bg,\n  mix(\n    mix(c1, c2, 0.22),\n    mix(\n      mix(\n        mix(c3, c4, step(0.36, hash(floor(p * vec2<f32>(cat_density * 1.05))))),\n        c5,\n        step(0.70, hash(floor(p * vec2<f32>(cat_density * 1.05))))\n      ),\n      c1,\n      max(\n        1.0 - smoothstep(\n          0.8, 1.1,\n          length(\n            (vec2<f32>(\n              abs(fract(p.x * cat_density * 1.05) - 0.5),\n              fract(p.y * cat_density * 1.05) - 0.5\n            ) - vec2<f32>(0.065, 0.15)) /\n            vec2<f32>(0.022, 0.008 + 0.023 * (1.0 - pow(max(0.0, sin(t * 0.7)), 24.0)))\n          )\n        ),\n        1.0 - smoothstep(\n          0.012, 0.020,\n          length(fract(p * vec2<f32>(cat_density * 1.05)) - vec2<f32>(0.5, 0.60))\n        )\n      )\n    ),\n    max(\n      max(\n        1.0 - smoothstep(\n          0.96, 1.04,\n          length(\n            (fract(p * vec2<f32>(cat_density * 1.05)) - vec2<f32>(0.5, 0.64)) /\n            vec2<f32>(0.17, 0.14)\n          )\n        ),\n        1.0 - smoothstep(\n          -0.004, 0.008,\n          max(\n            abs(abs(fract(p.x * cat_density * 1.05) - 0.5) - 0.12) -\n              (0.84 - fract(p.y * cat_density * 1.05)) * 0.55,\n            max(\n              0.71 - fract(p.y * cat_density * 1.05),\n              fract(p.y * cat_density * 1.05) - 0.84\n            )\n          )\n        )\n      ),\n      max(\n        1.0 - smoothstep(\n          0.96, 1.04,\n          length(\n            (fract(p * vec2<f32>(cat_density * 1.05)) - vec2<f32>(0.5, 0.36)) /\n            vec2<f32>(0.15, 0.21)\n          )\n        ),\n        max(\n          1.0 - smoothstep(\n            0.94, 1.06,\n            length(\n              (vec2<f32>(\n                abs(fract(p.x * cat_density * 1.05) - 0.5),\n                fract(p.y * cat_density * 1.05)\n              ) - vec2<f32>(0.095, 0.16)) / vec2<f32>(0.08, 0.045)\n            )\n          ),\n          1.0 - smoothstep(\n            0.0, 0.012,\n            max(\n              abs(length(\n                fract(p * vec2<f32>(cat_density * 1.05)) -\n                vec2<f32>(0.69 + sin(t * 2.0 + floor(p.y * cat_density * 1.05)) * 0.025 * playfulness, 0.35)\n              ) - 0.13) - 0.032,\n              0.64 - fract(p.x * cat_density * 1.05)\n            )\n          )\n        )\n      )\n    )\n  ),\n  strength\n);",
+        "name": "Midnight Cat Club",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.6000000238418579,
+            "name": "cat_density",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "playfulness",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 7.5,
+      "speed": 1.7999999523162842,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-09T15:48:03.127Z",
+    "description": "Black-to-color gradients in rainbow order. Orange pane; stable hue, dark background, gentle contrast.",
+    "id": "midnight-cat-club",
+    "name": "Midnight Cat Club",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:midnight-cat-club",
+    "updatedAt": "2026-11-09T15:52:30.652Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ee944b",
+        "background": "#17120e",
+        "buttonBackground": "#17120e",
+        "buttonHover": "#483321",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "shell": {
+        "accent": "#ee944b",
+        "accentHover": "#eeab74",
+        "background": "#090c12",
+        "backgroundSecondary": "#17120e",
+        "border": "#483321",
+        "buttonBackground": "#17120e",
+        "paneDivider": {
+          "color": "#ee944b",
+          "thickness": 2.0
+        },
+        "textDim": "#a4afbf",
+        "textMain": "#e5eaf2"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#483321",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      },
+      "tabs": {
+        "activeBackground": "#483321",
+        "activeBorder": "#ee944b",
+        "background": "#090c12",
+        "idleBackground": "#17120e"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#586174",
+        "blue": "#95b9f1",
+        "brightBlack": "#99a3b6",
+        "brightBlue": "#bad2ff",
+        "brightCyan": "#b6eceb",
+        "brightGreen": "#c1ebbc",
+        "brightMagenta": "#e0c7ff",
+        "brightRed": "#ffb0b9",
+        "brightWhite": "#f6f8fc",
+        "brightYellow": "#f5e2ac",
+        "cyan": "#94d6d9",
+        "green": "#a3d6a0",
+        "magenta": "#ceb0ec",
+        "red": "#ed919b",
+        "white": "#dce3ed",
+        "yellow": "#e8ce8a"
+      },
+      "background": "#0b0806",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#e5eaf2",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#030408",
+        "#140d08",
+        "#3b2614",
+        "#301f11"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

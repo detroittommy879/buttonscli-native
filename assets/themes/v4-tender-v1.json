@@ -1,0 +1,157 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-07T20:25:17.580Z",
+    "description": "Gogh dark import from Tender",
+    "id": "v4-tender-v1",
+    "name": "v4-Tender v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:v4-tender-v1",
+    "updatedAt": "2026-11-07T20:25:35.019Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#b3deef",
+        "background": "#252525",
+        "buttonBackground": "#262626",
+        "buttonHover": "#3f474a",
+        "buttonText": "#eeeeee"
+      },
+      "settings": {
+        "background": "#252525"
+      },
+      "shell": {
+        "accent": "#b3deef",
+        "accentHover": "#c0eafb",
+        "background": "#282828",
+        "backgroundSecondary": "#252525",
+        "border": "#4f5b60",
+        "buttonBackground": "#262626",
+        "paneDivider": {
+          "color": "#b3deef",
+          "thickness": 2.0
+        },
+        "textDim": "#9b9b9b",
+        "textMain": "#eeeeee"
+      },
+      "statusBar": {
+        "background": "#444c50",
+        "border": "#4f5b60",
+        "text": "#eeeeee",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#282828",
+        "activeBorder": "#b3deef",
+        "background": "#252525",
+        "idleBackground": "#262626"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#B3DEEF",
+        "brightBlack": "#323232",
+        "brightBlue": "#C0EAFB",
+        "brightCyan": "#A1D6EC",
+        "brightGreen": "#D9E066",
+        "brightMagenta": "#EFD093",
+        "brightRed": "#F43753",
+        "brightWhite": "#FFFFFF",
+        "brightYellow": "#FACC72",
+        "cyan": "#73CEF4",
+        "green": "#C9D05C",
+        "magenta": "#D3B987",
+        "red": "#C5152F",
+        "white": "#EEEEEE",
+        "yellow": "#FFC24B"
+      },
+      "background": "#282828",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#EEEEEE",
+      "gradientAngle": 191.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

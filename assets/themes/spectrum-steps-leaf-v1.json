@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": false,
+      "colors": [
+        "#030408",
+        "#0b110b",
+        "#1f321f",
+        "#1a291a",
+        "#263e27"
+      ],
+      "custom": {
+        "expression": "let x = clamp(p.x * 0.35 + 0.5, 0.0, 1.0);\nlet y = clamp(p.y * 0.5 + 0.5, 0.0, 1.0);\nlet ramp = smoothstep(0.0, 1.0, mix(x, y, tilt));\nlet low = mix(c1, c2, ramp);\nlet high = mix(c3, c4, y * 0.25);\nlet color = mix(low, high, ramp * depth);\nreturn mix(bg, mix(color, c5, ramp * ramp * 0.08), strength);",
+        "name": "Pane Focus / Ink Ramp",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "tilt",
+            "value": 0.25
+          },
+          {
+            "max": 1.0,
+            "min": 0.20000000298023224,
+            "name": "depth",
+            "value": 0.8500000238418579
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.0,
+      "strength": 0.4699999988079071,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-09T18:02:31.111Z",
+    "description": "Black-to-color gradients in rainbow order. Leaf pane; stable hue, dark background, gentle contrast.",
+    "id": "spectrum-steps-leaf-v1",
+    "name": "Spectrum Steps / Leaf v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:spectrum-steps-leaf-v1",
+    "updatedAt": "2026-11-09T19:12:05.939Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#77c87a",
+        "background": "#111511",
+        "buttonBackground": "#111511",
+        "buttonHover": "#2c3f2c",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#0d111a"
+      },
+      "shell": {
+        "accent": "#77c87a",
+        "accentHover": "#95d298",
+        "background": "#090c12",
+        "backgroundSecondary": "#111511",
+        "border": "#2c3f2c",
+        "buttonBackground": "#111511",
+        "paneDivider": {
+          "color": "#77c87a",
+          "thickness": 2.0
+        },
+        "textDim": "#a4afbf",
+        "textMain": "#e5eaf2"
+      },
+      "statusBar": {
+        "background": "#090c12",
+        "border": "#2c3f2c",
+        "text": "#bac5d4",
+        "warning": "#e8ce8a"
+      },
+      "tabs": {
+        "activeBackground": "#2c3f2c",
+        "activeBorder": "#77c87a",
+        "background": "#090c12",
+        "idleBackground": "#111511"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#586174",
+        "blue": "#95b9f1",
+        "brightBlack": "#99a3b6",
+        "brightBlue": "#bad2ff",
+        "brightCyan": "#b6eceb",
+        "brightGreen": "#c1ebbc",
+        "brightMagenta": "#e0c7ff",
+        "brightRed": "#ffb0b9",
+        "brightWhite": "#f6f8fc",
+        "brightYellow": "#f5e2ac",
+        "cyan": "#94d6d9",
+        "green": "#a3d6a0",
+        "magenta": "#ceb0ec",
+        "red": "#ed919b",
+        "white": "#dce3ed",
+        "yellow": "#e8ce8a"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#e5eaf2",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#030408",
+        "#0b110b",
+        "#1f321f",
+        "#1a291a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

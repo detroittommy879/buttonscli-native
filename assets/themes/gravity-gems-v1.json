@@ -1,0 +1,206 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff542b",
+        "#ffc13d",
+        "#d97a26",
+        "#68324c",
+        "#ffe090"
+      ],
+      "custom": {
+        "expression": "let breeze = wind * (0.32 * t + 0.22 * sin(t * 0.8 + p.y * 1.5));\nlet q = vec2<f32>(p.x - breeze, p.y + t * fall_speed * 0.65) * density;\nlet id = floor(q);\nlet seed = hash(id);\nlet local = fract(q) - vec2<f32>(0.5) - (vec2<f32>(seed, hash(id + vec2<f32>(4.3, 8.1))) - vec2<f32>(0.5)) * 0.28;\nlet angle = seed * 6.283 + t * (0.45 + seed * 0.7) + wind * sin(t + seed * 8.0);\nlet a = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / (leaf_size * 0.38);\nlet shape = abs(a.x) / 0.65 + a.y * a.y;\nlet leaf = 1.0 - smoothstep(0.9, 1.04, shape);\nlet vein = (1.0 - smoothstep(0.025, 0.065, abs(a.x))) * (1.0 - smoothstep(0.78, 1.0, abs(a.y)));\nlet branches = (1.0 - smoothstep(0.025, 0.065, abs(fract(a.y * 3.2 - abs(a.x) * 2.0) - 0.5))) * 0.22;\nlet warm = mix(c1, c2, smoothstep(0.15, 0.85, seed));\nlet face = mix(warm, c3, 0.24 * smoothstep(-0.5, 0.5, a.x));\nlet front = mix(face, c5, clamp(vein * 0.65 + branches, 0.0, 0.75));\n\nlet r = vec2<f32>(p.x - breeze * 0.42 + 3.7, p.y + t * fall_speed * 0.28) * density * 1.5;\nlet rid = floor(r);\nlet rs = hash(rid + vec2<f32>(17.2, 9.1));\nlet rl = fract(r) - vec2<f32>(0.5);\nlet ra = rs * 6.283 - t * 0.38;\nlet b = vec2<f32>(rl.x * cos(ra) - rl.y * sin(ra), rl.x * sin(ra) + rl.y * cos(ra)) / (leaf_size * 0.29);\nlet distant = 1.0 - smoothstep(0.88, 1.08, abs(b.x) / 0.6 + b.y * b.y);\nlet haze = cloud(p * 0.65 + vec2<f32>(-t * 0.035, t * 0.025));\nlet base = mix(c4, c3, haze * 0.4) * vec3<f32>(0.62);\nlet back = mix(base, mix(c3, c2, rs) * vec3<f32>(0.75), distant * 0.85);\nlet color = mix(back, front, leaf);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Wild Autumn",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "wind",
+            "value": 1.3700000047683716
+          },
+          {
+            "max": 2.0,
+            "min": 0.10000000149011612,
+            "name": "fall_speed",
+            "value": 1.399999976158142
+          },
+          {
+            "max": 4.0,
+            "min": 1.0,
+            "name": "density",
+            "value": 2.049999952316284
+          },
+          {
+            "max": 1.100000023841858,
+            "min": 0.30000001192092896,
+            "name": "leaf_size",
+            "value": 0.9399999976158142
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 0.550000011920929,
+      "speed": 1.0,
+      "strength": 0.3100000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-01T08:43:25.503Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "gravity-gems-v1",
+    "name": "Gravity Gems v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gravity-gems-v1",
+    "updatedAt": "2026-11-01T08:53:15.344Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

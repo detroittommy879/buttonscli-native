@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#14306b",
+        "#3d2f8f",
+        "#6fb8ff",
+        "#050a1e",
+        "#f2f8ff"
+      ],
+      "custom": {
+        "expression": "let sky = mix(c4 + c1 * 0.5, c2 * 0.45 + c1 * 0.2, smoothstep(-0.5, 0.5, p.y));\nlet g1 = vec2<f32>(p.x * 8.0, p.y * 6.0 + t * 0.25 * fall_speed);\nlet cell1 = floor(g1);\nlet s1 = hash(cell1);\nlet h1 = hash2(cell1);\nlet o1 = vec2<f32>((h1.x - 0.5) * 0.6 + 0.08 * sin(t * 0.8 + s1 * 6.28), (h1.y - 0.5) * 0.6);\nlet d1 = sd_circle(fract(g1) - 0.5 - o1, flake_size * (0.035 + 0.03 * s1));\nlet on1 = step(0.25, s1);\nlet flake1 = fill(d1) * on1;\nlet glow1 = halo(d1, 0.05) * on1;\nlet g2 = vec2<f32>(p.x * 14.0, p.y * 10.0 + t * 0.125 * fall_speed);\nlet cell2 = floor(g2);\nlet s2 = hash(cell2 + vec2<f32>(17.0, 5.0));\nlet h2 = hash2(cell2 + vec2<f32>(17.0, 5.0));\nlet o2 = vec2<f32>((h2.x - 0.5) * 0.6 + 0.05 * sin(t * 0.5 + s2 * 6.28), (h2.y - 0.5) * 0.6);\nlet d2 = sd_circle(fract(g2) - 0.5 - o2, flake_size * (0.025 + 0.02 * s2));\nlet on2 = step(0.3, s2);\nlet flake2 = fill(d2) * on2 * 0.5;\nlet glow2 = halo(d2, 0.04) * on2;\nlet light = c5 * (flake1 + flake2) + c3 * (glow1 * 0.5 + glow2 * 0.2);\nlet color = tonemap(sky + light);\nreturn mix(bg, color, strength);",
+        "name": "Drifting Snowfall",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "flake_size",
+            "value": 1.4700000286102295
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "fall_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 2.299999952316284,
+      "speed": 4.699999809265137,
+      "strength": 0.5600000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-10T19:05:46.779Z",
+    "description": "Its own shader code: a pulsing disco floor of colored tiles with a beat slider. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "id": "drifting-snowfall",
+    "name": "Drifting Snowfall",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:drifting-snowfall",
+    "updatedAt": "2026-11-10T20:00:17.506Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff3fa4",
+        "background": "#2a150b",
+        "buttonBackground": "#552a12",
+        "buttonHover": "#ffd23f",
+        "buttonText": "#fff3e6"
+      },
+      "settings": {
+        "background": "#2a150b"
+      },
+      "shell": {
+        "accent": "#ff5f1f",
+        "accentHover": "#ff3fa4",
+        "background": "#1d0f08",
+        "backgroundSecondary": "#2a150b",
+        "border": "#ffd23f",
+        "buttonBackground": "#3d1e0f",
+        "paneDivider": {
+          "color": "#ff5f1f",
+          "thickness": 2.0
+        },
+        "textDim": "#e6b48f",
+        "textMain": "#fff3e6"
+      },
+      "statusBar": {
+        "background": "#ff5f1f",
+        "border": "#ffd23f",
+        "text": "#fff3e6",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#1d0f08",
+        "activeBorder": "#ff5f1f",
+        "background": "#2a150b",
+        "idleBackground": "#3d1e0f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#4a3022",
+        "blue": "#5aa8ff",
+        "brightBlack": "#856049",
+        "brightBlue": "#90c4ff",
+        "brightCyan": "#88f7ef",
+        "brightGreen": "#a8ff9e",
+        "brightMagenta": "#ff94e3",
+        "brightRed": "#ff8f8f",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe27a",
+        "cyan": "#4ff2e6",
+        "green": "#7cff6b",
+        "magenta": "#ff5fd2",
+        "red": "#ff5a5a",
+        "white": "#fff0e2",
+        "yellow": "#ffd23f"
+      },
+      "background": "#120a06",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Daddy Time Mono Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#fff3e6",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#120a06",
+        "#4a1608",
+        "#3a0b33",
+        "#120a06"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.4000000059604645
+      },
+      "terminal": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

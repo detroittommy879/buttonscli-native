@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#2444a8",
+        "#7843df",
+        "#47dfff",
+        "#c1b5ff",
+        "#ff4fad"
+      ],
+      "custom": {
+        "expression": "let time = t * storm_speed;\nlet drift = p * vec2<f32>(1.3, 1.8) + vec2<f32>(time * 0.09, time * 0.04);\nlet clouds = cloud(drift + vec2<f32>(cloud(drift), 0.0));\nlet billows = smoothstep(0.25, 0.8, clouds);\nlet sky = mix(c1, c2, billows) * vec3<f32>(0.55 + 0.38 * billows);\nlet horizon = exp(-abs(p.y + 0.65) * 1.6);\nlet atmosphere = mix(sky, c5, 0.17 * horizon);\n\nlet epoch = floor(time * 0.65);\nlet lane = floor((p.x + 1.4) / 2.8);\nlet seed = hash(vec2<f32>(lane, epoch));\nlet local_x = p.x - lane * 2.8;\nlet bolt_x = (seed - 0.5) * 1.6 + 0.14 * sin(p.y * 11.0 + seed * 30.0) + 0.07 * sin(p.y * 29.0 + seed * 17.0);\nlet bolt_distance = abs(local_x - bolt_x);\nlet flash_phase = fract(time * 0.65 + seed * 0.45);\nlet flash = pow(max(0.0, sin(flash_phase * 3.141593)), 18.0);\nlet flicker = 0.68 + 0.32 * sin(time * 63.0 + seed * 19.0);\nlet visibility = smoothstep(-1.3, -0.9, p.y) * (0.14 + flash * flicker);\nlet core = exp(-bolt_distance * 185.0);\nlet halo = exp(-bolt_distance * 14.0) * lightning_glow;\nlet branch_x = bolt_x + max(0.0, 0.35 - p.y) * 0.48 + 0.035 * sin(p.y * 42.0);\nlet branch = exp(-abs(local_x - branch_x) * 155.0) * smoothstep(-0.7, -0.4, p.y) * (1.0 - smoothstep(0.25, 0.4, p.y));\nlet lightning = c4 * vec3<f32>((core + branch * 0.55) * visibility) + c3 * vec3<f32>(halo * visibility * 0.65);\n\nlet rain_uv = vec2<f32>((p.x + p.y * 0.18) * 43.0 * rain_density, p.y * 9.0 + time * 10.0);\nlet rain_cell = floor(rain_uv);\nlet rain_random = hash(rain_cell);\nlet rain_pos = fract(rain_uv);\nlet streak = exp(-abs(rain_pos.x - 0.5) * 48.0) * smoothstep(0.05, 0.25, rain_pos.y) * (1.0 - smoothstep(0.55, 0.95, rain_pos.y));\nlet rain = streak * step(0.43, rain_random) * (0.35 + rain_random * 0.65);\nlet color = atmosphere + lightning + c3 * vec3<f32>(rain * 0.65) + c2 * vec3<f32>(flash * 0.16 * billows);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Electric Downpour",
+        "variables": [
+          {
+            "max": 2.5,
+            "min": 0.4000000059604645,
+            "name": "rain_density",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "lightning_glow",
+            "value": 1.0
+          },
+          {
+            "max": 2.5,
+            "min": 0.20000000298023224,
+            "name": "storm_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 10.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 82.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 1.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-02T21:52:01.096Z",
+    "description": "A low-light terminal with glossy, toy-like color bursts and a vivid rainbow sweep over deep black.",
+    "id": "chromatic-arcade-halfbright-copy-v2",
+    "name": "Chromatic Arcade Halfbright Copy v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:chromatic-arcade-halfbright-copy-v2",
+    "updatedAt": "2026-11-02T21:52:01.096Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#101418",
+        "buttonBackground": "#2f2627",
+        "buttonHover": "#4b2d26",
+        "buttonText": "#e6edf3"
+      },
+      "settings": {
+        "background": "#101418"
+      },
+      "shell": {
+        "accent": "#ff5a1f",
+        "accentHover": "#fb7445",
+        "background": "#101418",
+        "backgroundSecondary": "#182028",
+        "border": "#4e261a",
+        "buttonBackground": "#182028",
+        "paneDivider": {
+          "color": "#ff5a1f",
+          "thickness": 2.0
+        },
+        "textDim": "#e6ebef",
+        "textMain": "#e6edf3"
+      },
+      "statusBar": {
+        "background": "#252323",
+        "border": "#4e261a",
+        "text": "#e6edf3",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050505",
+        "activeBorder": "#ff5a1f",
+        "background": "#101418",
+        "idleBackground": "#182028"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#2f87ff",
+        "brightBlack": "#606264",
+        "brightBlue": "#6dabff",
+        "brightCyan": "#66e4ee",
+        "brightGreen": "#74eb97",
+        "brightMagenta": "#d982ff",
+        "brightRed": "#ff756d",
+        "brightWhite": "#f6f8fa",
+        "brightYellow": "#ffe077",
+        "cyan": "#25d8e6",
+        "green": "#39e26a",
+        "magenta": "#c94dff",
+        "red": "#ff3a2f",
+        "white": "#f2f5f8",
+        "yellow": "#ffd33d"
+      },
+      "background": "#292c38",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 18.0,
+      "fontWeight": 600,
+      "fontWeightBold": 900,
+      "foreground": "#000000",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#831b1b",
+        "#895e01",
+        "#607c03",
+        "#057636"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}
