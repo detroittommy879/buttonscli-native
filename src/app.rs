@@ -1313,6 +1313,10 @@ impl ButtonsApp {
                 &cc.egui_ctx,
                 render_state.target_format,
             );
+            crate::plugins::effects::shader_background::register_device(
+                &render_state.device,
+                &render_state.queue,
+            );
             crate::plugins::effects::analog_static::register(
                 &cc.egui_ctx,
                 render_state.target_format,
@@ -9478,7 +9482,15 @@ impl ButtonsApp {
                 self.shader_ai.undo = Some(std::mem::replace(&mut custom.expression, expression));
             }
             // Compile status is checked live (cached), so it doubles as the check button.
-            let compile = crate::plugins::effects::shader_expression::function(custom);
+            let compile =
+                crate::plugins::effects::shader_expression::function(custom).and_then(|source| {
+                    match crate::plugins::effects::shader_background::driver_error(custom) {
+                        Some(error) => Err(format!(
+                        "Your graphics driver refused this shader, so it is not drawn:\n{error}"
+                    )),
+                        None => Ok(source),
+                    }
+                });
             let title = match &compile {
                 Ok(_) => "Code ✓ compiles",
                 Err(_) => "Code ✗ has an error",
@@ -9487,7 +9499,7 @@ impl ButtonsApp {
                 .id_salt("shader-code")
                 .default_open(compile.is_err())
                 .show(ui, |ui| {
-                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c5 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
+                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c5 = colors. Helpers: palette(x), hsv(h, s, v), tonemap(color); noise(p), cloud(p), fbm(p), ridged(p), flow(p, t), voronoi(p), hash(p), stars(p, t); rotate(p, angle), polar(p); shapes sd_circle(p, r), sd_box(p, half), sd_segment(p, a, b), smin(a, b, k) drawn with fill(d), stroke(d, width), halo(d, size). No loops or `if`. Code that never uses strength is faded by Strength for you.");
                     wrapping_row(ui, |ui| {
                         ui.spaced_menu_button("Load example", |ui| {
                             for (label, example) in SHADER_EXAMPLES {
@@ -10760,6 +10772,14 @@ impl ButtonsApp {
                         current: &current,
                         current_error: error.as_deref(),
                         look: &look,
+                        picture_check: Some(&|shader, look| {
+                            crate::plugins::effects::shader_background::picture_problem(
+                                shader,
+                                &look.background,
+                                &look.colors,
+                                look.animated,
+                            )
+                        }),
                     },
                     &cancel,
                     &mut |stage, chars| {

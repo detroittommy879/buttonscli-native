@@ -15,11 +15,86 @@ pub(crate) const RESERVED: [&str; 10] = [
     "p", "t", "knobs", "c1", "c2", "c3", "c4", "c5", "strength", "bg",
 ];
 
-/// Whether `source` uses `name` as a whole identifier.
+/// The helper functions custom code may call. Sliders the AI adds cannot
+/// take these names.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) const HELPER_NAMES: [&str; 21] = [
+    "hash",
+    "hash2",
+    "noise",
+    "cloud",
+    "stars",
+    "palette",
+    "hsv",
+    "fbm",
+    "ridged",
+    "flow",
+    "voronoi",
+    "rotate",
+    "polar",
+    "sd_circle",
+    "sd_box",
+    "sd_segment",
+    "smin",
+    "fill",
+    "stroke",
+    "halo",
+    "tonemap",
+];
+
+/// Rough work per pixel for one helper call, in `hash` lookups. Helpers that
+/// are not listed cost 1.
+const HELPER_COSTS: [(&str, u32); 8] = [
+    ("hash2", 2),
+    ("noise", 4),
+    ("stars", 3),
+    ("cloud", 12),
+    ("ridged", 12),
+    ("fbm", 20),
+    ("voronoi", 28),
+    ("flow", 44),
+];
+
+/// Most helper work one shader may ask for per pixel. Code has no loops, so
+/// this and the 256-expression limit bound the cost of every frame: about
+/// twenty `cloud` calls, twelve `fbm` or five `flow`.
+pub(crate) const MAX_COST: u32 = 240;
+
+/// Whether `source` uses `name` as a whole identifier, comments aside.
 pub(crate) fn uses(source: &str, name: &str) -> bool {
-    source
+    without_comments(source)
         .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
         .any(|word| word == name)
+}
+
+/// `source` with `//` and (nested) `/* */` comments replaced by spaces. WGSL
+/// has no string literals, so what is left is only code.
+fn without_comments(source: &str) -> String {
+    let bytes = source.as_bytes();
+    let mut code = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    let mut depth = 0_usize;
+    while index < bytes.len() {
+        let pair = &bytes[index..(index + 2).min(bytes.len())];
+        if pair == b"/*" {
+            depth += 1;
+            index += 2;
+        } else if depth > 0 && pair == b"*/" {
+            depth -= 1;
+            index += 2;
+            code.push(b' ');
+        } else if depth > 0 {
+            index += 1;
+        } else if pair == b"//" {
+            while index < bytes.len() && bytes[index] != b'\n' {
+                index += 1;
+            }
+        } else {
+            code.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8_lossy(&code).into_owned()
 }
 
 fn is_body(source: &str) -> bool {
@@ -70,8 +145,9 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
         source.push_str(custom.expression.trim());
         source.push_str("\n}");
     } else {
+        // The `;` goes on its own line so a trailing `//` comment cannot eat it.
         source.push_str(&format!(
-            "return {};\n}}",
+            "return {}\n;\n}}",
             custom.expression.trim().trim_end_matches(';')
         ));
     }
@@ -110,19 +186,24 @@ pub(crate) const SOURCE: &str = concat!(
 fn combine(source: &str, y_up: bool) -> String {
     let position = if y_up { "vec2<f32>(p.x, -p.y)" } else { "p" };
     let mut full = SOURCE.replace(
-        "let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);",
+        PRESET_COLOR,
         &format!("let color = clamp(custom_pattern({position}, t, u.knobs, u.first.rgb, u.second.rgb, u.third.rgb, u.fourth.rgb, u.fifth.rgb, u.settings.y, u.base.rgb), vec3<f32>(0.0), vec3<f32>(1.0));\n    glow = 1.0;\n    vivid = vec3<f32>(-1.0);")
     );
     // Code that uses `strength` decides how it shows; otherwise the host fades
-    // the pattern into the background by Strength, as before.
+    // the pattern into the background by Strength, as before. A mention in a
+    // comment does not count.
     if uses(source.strip_prefix(HEADER).unwrap_or(source), "strength") {
-        full = full.replace(
-            "clamp(glow * u.settings.y, 0.0, 1.0)",
-            "clamp(glow, 0.0, 1.0)",
-        );
+        full = full.replace(HOST_FADE, "clamp(glow, 0.0, 1.0)");
     }
     format!("{full}\n{source}")
 }
+
+/// The two preset lines that `combine` swaps for the custom function. A test
+/// checks the preset program still has them, so an edit there cannot quietly
+/// turn every custom shader back into a preset.
+const PRESET_COLOR: &str =
+    "let color = mix(mix(u.first.rgb, u.second.rgb, field), u.third.rgb, (1.0 - field) * 0.3);";
+const HOST_FADE: &str = "clamp(glow * u.settings.y, 0.0, 1.0)";
 
 /// Line numbers in diagnostics refer to the user's expression, not the prelude.
 fn helper_lines() -> usize {
@@ -196,7 +277,7 @@ fn validate(source: &str) -> Result<(), String> {
                 statement,
                 naga::Statement::Emit(_)
                     | naga::Statement::Return { .. }
-                    // Calls can only reach the fixed, loop-free helpers: the
+                    // Calls can only reach the fixed, bounded helpers: the
                     // function count check above rejects any added function.
                     | naga::Statement::Call { .. }
             )
@@ -212,6 +293,25 @@ fn validate(source: &str) -> Result<(), String> {
             "Only a bounded color expression is supported; statements and loops are disabled."
                 .into(),
         );
+    }
+    let cost: u32 = function
+        .body
+        .iter()
+        .filter_map(|statement| match statement {
+            naga::Statement::Call { function, .. } => module.functions[*function].name.as_deref(),
+            _ => None,
+        })
+        .map(|name| {
+            HELPER_COSTS
+                .iter()
+                .find(|(helper, _)| *helper == name)
+                .map_or(1, |(_, cost)| *cost)
+        })
+        .sum();
+    if cost > MAX_COST {
+        return Err(format!(
+            "This shader is too heavy for slower computers: its helper calls cost {cost} and the limit is {MAX_COST}. Use fewer flow (44), voronoi (28), fbm (20), cloud (12), ridged (12) or noise (4) calls, and reuse a result in a `let` instead of calling again."
+        ));
     }
     naga::valid::Validator::new(
         naga::valid::ValidationFlags::all(),
@@ -291,6 +391,87 @@ mod tests {
         let mut clash = CustomShader::default();
         clash.variables[0].name = "strength".into();
         assert!(function(&clash).is_err());
+    }
+
+    #[test]
+    fn a_comment_cannot_claim_the_strength_slider() {
+        for code in [
+            "/* strength */ return c1;",
+            "// uses strength\nreturn c1;",
+            "/* outer /* strength */ still a comment */ return c1;",
+        ] {
+            assert!(
+                program_for(code).contains(HOST_FADE),
+                "the host still fades {code}"
+            );
+        }
+        assert!(!program_for("return mix(bg, c1, strength); // done").contains(HOST_FADE));
+        // A comment that says "return" does not turn an expression into a body.
+        assert!(function(&CustomShader {
+            expression: "c1 * 0.5 // return later".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        })
+        .is_ok());
+        assert!(SOURCE.contains(PRESET_COLOR) && SOURCE.contains(HOST_FADE));
+    }
+
+    #[test]
+    fn helper_work_per_pixel_is_bounded() {
+        let body = |calls: usize, helper: &str| CustomShader {
+            expression: format!(
+                "let v = {};\nreturn c1 * v;",
+                (0..calls)
+                    .map(|index| format!("{helper}(p + {index}.0)"))
+                    .collect::<Vec<_>>()
+                    .join(" + ")
+            ),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        let twelve = function(&body(12, "fbm"));
+        assert!(twelve.is_ok(), "{twelve:?}");
+        let error = function(&body(13, "fbm")).unwrap_err();
+        assert!(
+            error.contains("too heavy") && error.contains("260"),
+            "{error}"
+        );
+        assert!(function(&body(9, "voronoi(p).x + hash")).is_err());
+        // Every helper has a name here, and every priced helper exists.
+        let module = naga::front::wgsl::parse_str(HELPERS).unwrap();
+        let names: Vec<&str> = module
+            .functions
+            .iter()
+            .filter_map(|(_, function)| function.name.as_deref())
+            .collect();
+        for name in &names {
+            assert!(
+                HELPER_NAMES.contains(name),
+                "{name} is missing from HELPER_NAMES"
+            );
+        }
+        assert_eq!(names.len(), HELPER_NAMES.len());
+        for (name, _) in HELPER_COSTS {
+            assert!(names.contains(&name), "{name} is priced but missing");
+        }
+    }
+
+    #[test]
+    fn new_helpers_compile_and_old_code_may_reuse_their_names() {
+        let code = "let cells = voronoi(p * 4.0);\nlet d = smin(sd_circle(p, 0.3), sd_box(rotate(p, t), vec2<f32>(0.2, 0.1)), 0.1);\nlet line = sd_segment(p, vec2<f32>(-0.5, 0.0), hash2(floor(p)));\nlet shape = fill(d) + stroke(line, 0.02) + halo(d, 0.2) * polar(p).y;\nlet smoke = flow(p, t) * fbm(p) * ridged(p) * cells.y;\nreturn mix(bg, tonemap(c1 * shape + c2 * smoke), strength);";
+        let custom = CustomShader {
+            expression: code.into(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        assert!(program(&custom).is_ok(), "{:?}", program(&custom));
+        // Shaders saved before these helpers existed may have used the names.
+        let old = CustomShader {
+            expression: "let flow = sin(p.x + t);\nlet fill = 0.5;\nlet rotate = c1;\nreturn rotate * flow * fill;".into(),
+            variables: Vec::new(),
+            ..Default::default()
+        };
+        assert!(function(&old).is_ok(), "{:?}", function(&old));
     }
 
     fn program_for(expression: &str) -> String {

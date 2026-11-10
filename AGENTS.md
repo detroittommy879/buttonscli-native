@@ -229,6 +229,12 @@ cargo build --locked --release --bin buttonscli
   target/debug/buttonsclictl.exe [--descriptor <live file>]` runs the official MCP
   client against the Rust server. Send integer JSON (`client::number`): the API
   rejects `120.0`.
+- AI shader prompt = `assets/prompts/shader-guide.md` (`include_str!`; tests compile
+  and, with a GPU, draw every example: `guide_examples_draw_and_bad_pictures_are_named`
+  with `BUTTONSCLI_SHADER_GUIDE_DIR` saves PNGs). `p.y` is -0.5..0.5 at Scale 1.
+  A new helper needs four places: `shader_helpers.wgsl`, `HELPER_NAMES`/`HELPER_COSTS`,
+  the guide and `docs/guide/shader-code.md`. Helpers may loop; custom code may not.
+  wgpu error scopes are per device: build custom pipelines via `checked_pipeline`.
 - AI shader generation: `src/shader_ai.rs`; workers/editor: `src/app.rs`.
   Shared admission checks: `src/plugins/effects/shader_expression.rs`; GPU calls:
   `shader_background.rs`. `scripts/theme-eval.py` evaluates palettes, not shaders.

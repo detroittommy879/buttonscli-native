@@ -91,26 +91,16 @@ struct Resources {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     panes: HashMap<u64, PaneUniform>,
-    custom_pipelines: HashMap<String, (wgpu::RenderPipeline, u64)>,
+    /// `None` is a shader the graphics driver refused: it is not drawn and
+    /// not tried again every frame.
+    custom_pipelines: HashMap<String, (Option<wgpu::RenderPipeline>, u64)>,
     /// One use counter for every window; see [`super::make_room`].
     uses: u64,
 }
 
 impl Resources {
     fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("shader background uniforms"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
+        let layout = uniform_layout(device);
         let pipeline = pipeline(device, format, &layout, super::shader_expression::SOURCE);
         Self {
             pipeline,
@@ -124,6 +114,317 @@ impl Resources {
 
 fn custom_source(custom: &crate::theme::CustomShader) -> Result<String, String> {
     super::shader_expression::program(custom)
+}
+
+/// Builds a custom shader's pipeline and reports what the graphics driver
+/// said. Naga already accepted the code, but the driver's own compiler can
+/// still refuse it or run out of memory; without a scope wgpu treats that as
+/// fatal and the whole app closes.
+fn checked_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::BindGroupLayout,
+    source: &str,
+) -> Result<wgpu::RenderPipeline, String> {
+    use std::future::Future;
+    const FILTERS: [wgpu::ErrorFilter; 3] = [
+        wgpu::ErrorFilter::Validation,
+        wgpu::ErrorFilter::OutOfMemory,
+        wgpu::ErrorFilter::Internal,
+    ];
+    #[cfg(not(target_arch = "wasm32"))]
+    let _one_at_a_time = BUILDING.lock();
+    for filter in FILTERS {
+        device.push_error_scope(filter);
+    }
+    let built = pipeline(device, format, layout, source);
+    let mut problem = None;
+    for _ in FILTERS {
+        // Native wgpu answers at once. In a browser the answer comes later,
+        // and the browser reports the error itself instead of aborting.
+        let scope = std::pin::pin!(device.pop_error_scope());
+        let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+        if let std::task::Poll::Ready(Some(error)) = scope.poll(&mut context) {
+            problem.get_or_insert_with(|| error.to_string());
+        }
+    }
+    match problem {
+        Some(error) => Err(error),
+        None => Ok(built),
+    }
+}
+
+/// Error scopes belong to the whole device, so two threads building pipelines
+/// at once would read each other's errors.
+#[cfg(not(target_arch = "wasm32"))]
+static BUILDING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// The app's graphics device, for drawing AI results off screen.
+#[cfg(not(target_arch = "wasm32"))]
+static PICTURE_DEVICE: std::sync::OnceLock<(wgpu::Device, wgpu::Queue)> =
+    std::sync::OnceLock::new();
+
+/// Lets [`picture_problem`] draw with the app's own graphics device.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn register_device(device: &wgpu::Device, queue: &wgpu::Queue) {
+    let _ = PICTURE_DEVICE.set((device.clone(), queue.clone()));
+}
+
+/// Draws a custom shader off screen at full strength, at two moments, and
+/// says what is wrong with the picture: one flat color, almost nothing drawn,
+/// mostly white, or nothing moving. `None` means it looks fine, or that it
+/// could not be drawn here (no graphics device yet); it is advice for the AI
+/// writer, never a reason to refuse a shader the user wrote.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn picture_problem(
+    custom: &crate::theme::CustomShader,
+    background: &str,
+    colors: &[String; 5],
+    animated: bool,
+) -> Option<String> {
+    let (device, queue) = PICTURE_DEVICE.get()?;
+    picture_problem_on(device, queue, custom, background, colors, animated)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn picture_problem_on(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    custom: &crate::theme::CustomShader,
+    background: &str,
+    colors: &[String; 5],
+    animated: bool,
+) -> Option<String> {
+    const WIDTH: usize = 64;
+    const HEIGHT: usize = 32;
+    let source = custom_source(custom).ok()?;
+    let layout = uniform_layout(device);
+    let pipeline = match checked_pipeline(device, wgpu::TextureFormat::Rgba8Unorm, &layout, &source)
+    {
+        Ok(pipeline) => pipeline,
+        Err(error) => {
+            return Some(format!(
+                "the graphics driver refused the code: {}.",
+                error.chars().take(400).collect::<String>()
+            ))
+        }
+    };
+    // geometry, settings (time, strength, scale, preset), base, c1–c3, knobs, c4, c5.
+    let mut values = [0.0_f32; 36];
+    values[2] = WIDTH as f32;
+    values[3] = HEIGHT as f32;
+    values[5] = 1.0;
+    values[6] = 1.0;
+    for (offset, color) in [8, 12, 16, 20, 28, 32]
+        .into_iter()
+        .zip(std::iter::once(background).chain(colors.iter().map(String::as_str)))
+    {
+        let rgba = crate::theme::parse_color(color)?.to_array();
+        for channel in 0..4 {
+            values[offset + channel] = f32::from(rgba[channel]) / 255.0;
+        }
+    }
+    for (target, variable) in values[24..28].iter_mut().zip(&custom.variables) {
+        *target = variable.value;
+    }
+    let base: Vec<u8> = values[8..11]
+        .iter()
+        .map(|channel| (channel * 255.0).round() as u8)
+        .collect();
+    values[4] = 1.3;
+    let first = render_pixels(device, queue, &layout, &pipeline, values)?;
+    let pixels = (WIDTH * HEIGHT) as f32;
+    let differs = |a: &[u8], b: &[u8], by: i32| {
+        a.iter()
+            .zip(b)
+            .take(3)
+            .map(|(a, b)| (i32::from(*a) - i32::from(*b)).abs())
+            .sum::<i32>()
+            > by
+    };
+    let share = |keep: &dyn Fn(&[u8]) -> bool| {
+        first.chunks_exact(4).filter(|pixel| keep(pixel)).count() as f32 / pixels
+    };
+    let spread = (0..3)
+        .map(|channel| {
+            let values = first.chunks_exact(4).map(|pixel| pixel[channel]);
+            values.clone().max().unwrap_or(0) - values.min().unwrap_or(0)
+        })
+        .max()
+        .unwrap_or(0);
+    if spread < 8 {
+        return Some("the whole picture was one flat color.".into());
+    }
+    if share(&|pixel| differs(pixel, &base, 30)) < 0.01 {
+        return Some(
+            "almost all of it was the plain background: hardly anything was drawn.".into(),
+        );
+    }
+    if share(&|pixel| pixel[..3].iter().all(|channel| *channel > 245)) > 0.35 {
+        return Some("more than a third of it was pure white, which hides the text.".into());
+    }
+    if animated {
+        values[4] = 4.9;
+        let second = render_pixels(device, queue, &layout, &pipeline, values)?;
+        let moved = first
+            .chunks_exact(4)
+            .zip(second.chunks_exact(4))
+            .filter(|(a, b)| differs(a, b, 6))
+            .count() as f32
+            / pixels;
+        if moved < 0.005 {
+            return Some("nothing moved between two moments a few seconds apart.".into());
+        }
+    }
+    None
+}
+
+fn uniform_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("shader background uniforms"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    })
+}
+
+/// Draws one frame into a small off-screen image and returns its RGBA bytes.
+/// `values` is the uniform block; its size must have a width divisible by 64.
+#[cfg(not(target_arch = "wasm32"))]
+fn render_pixels(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    layout: &wgpu::BindGroupLayout,
+    pipeline: &wgpu::RenderPipeline,
+    values: [f32; 36],
+) -> Option<Vec<u8>> {
+    use wgpu::util::DeviceExt;
+    let width = values[2] as u32;
+    let height = values[3] as u32;
+    // Rows are copied without padding, which needs 256-byte rows.
+    if width == 0 || height == 0 || width % 64 != 0 {
+        return None;
+    }
+    let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
+    let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("shader picture uniforms"),
+        contents: &bytes,
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+    let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: uniform.as_entire_binding(),
+        }],
+    });
+    let size = wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("shader picture"),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&Default::default());
+    let readback = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: u64::from(width * height * 4),
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = device.create_command_encoder(&Default::default());
+    {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: None,
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &bindings, &[]);
+        pass.draw(0..3, 0..1);
+    }
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &readback,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width * 4),
+                rows_per_image: Some(height),
+            },
+        },
+        size,
+    );
+    queue.submit([encoder.finish()]);
+    let (sender, receiver) = std::sync::mpsc::channel();
+    readback
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+    // The app's own frames also poll the device, so wait in short steps
+    // rather than blocking on it.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let _ = device.poll(wgpu::Maintain::Poll);
+        match receiver.recv_timeout(std::time::Duration::from_millis(5)) {
+            Ok(Ok(())) => break,
+            Ok(Err(_)) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return None,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if std::time::Instant::now() > deadline {
+                    return None;
+                }
+            }
+        }
+    }
+    let output = readback.slice(..).get_mapped_range().to_vec();
+    readback.unmap();
+    Some(output)
+}
+
+/// What the graphics driver said about custom shaders it refused, newest
+/// last. Kept short: it is a hint for the editor, not a history.
+static REFUSED: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
+
+/// The driver's message if it refused this custom shader during this run.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn driver_error(custom: &crate::theme::CustomShader) -> Option<String> {
+    let source = custom_source(custom).ok()?;
+    let refused = REFUSED.lock().ok()?;
+    refused
+        .iter()
+        .find(|(refused, _)| *refused == source)
+        .map(|(_, error)| error.clone())
 }
 
 fn pipeline(
@@ -190,13 +491,19 @@ impl egui_wgpu::CallbackTrait for Background {
                 super::make_room(&mut resources.custom_pipelines, MAX_BUFFERS, |(_, used)| {
                     *used
                 });
-                resources.custom_pipelines.insert(
-                    source.clone(),
-                    (
-                        pipeline(device, self.format, &resources.layout, source),
-                        now,
-                    ),
-                );
+                let built = checked_pipeline(device, self.format, &resources.layout, source);
+                if let Err(error) = &built {
+                    log::warn!("the graphics driver refused a custom shader: {error}");
+                    if let Ok(mut refused) = REFUSED.lock() {
+                        if refused.len() >= 16 {
+                            refused.remove(0);
+                        }
+                        refused.push((source.clone(), error.clone()));
+                    }
+                }
+                resources
+                    .custom_pipelines
+                    .insert(source.clone(), (built.ok(), now));
             }
             resources.custom_pipelines.get_mut(source).unwrap().1 = now;
         }
@@ -279,8 +586,9 @@ impl egui_wgpu::CallbackTrait for Background {
         // show a different shader than the one asked for.
         let selected = match &self.custom_source {
             Some(source) => match resources.custom_pipelines.get(source) {
-                Some((pipeline, _)) => pipeline,
-                None => return,
+                Some((Some(pipeline), _)) => pipeline,
+                // Refused by the driver, or not prepared yet.
+                _ => return,
             },
             None => &resources.pipeline,
         };
@@ -314,6 +622,121 @@ mod tests {
                 });
             });
         }
+    }
+
+    /// Draws every example in the AI shader guide and checks the picture
+    /// check itself: good pictures pass, bad ones are named, and code the
+    /// driver refuses is an error rather than a crash.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires a graphics adapter; optional BUTTONSCLI_SHADER_GUIDE_DIR"]
+    fn guide_examples_draw_and_bad_pictures_are_named() {
+        let directory =
+            std::env::var_os("BUTTONSCLI_SHADER_GUIDE_DIR").map(std::path::PathBuf::from);
+        if let Some(directory) = &directory {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+            let adapter = instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+                .expect("native graphics adapter");
+            let (device, queue) = adapter
+                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .await
+                .unwrap();
+            let look = crate::shader_ai::Look::default();
+            let custom = |code: &str| crate::theme::CustomShader {
+                expression: code.into(),
+                variables: Vec::new(),
+                ..Default::default()
+            };
+            let problem = |code: &str, animated: bool| {
+                picture_problem_on(
+                    &device,
+                    &queue,
+                    &custom(code),
+                    &look.background,
+                    &look.colors,
+                    animated,
+                )
+            };
+            let examples = crate::shader_ai::guide_examples();
+            assert!(examples.len() >= 5);
+            let layout = uniform_layout(&device);
+            for (name, code) in &examples {
+                assert_eq!(problem(code, true), None, "{name}");
+                let Some(directory) = &directory else {
+                    continue;
+                };
+                let source = custom_source(&custom(code)).unwrap();
+                let pipeline =
+                    checked_pipeline(&device, wgpu::TextureFormat::Rgba8Unorm, &layout, &source)
+                        .unwrap();
+                for (suffix, strength) in [("", 1.0), ("-dim", 0.35)] {
+                    let mut values = [0.0_f32; 36];
+                    (values[2], values[3], values[4]) = (512.0, 288.0, 2.0);
+                    (values[5], values[6]) = (strength, 1.0);
+                    for (offset, color) in [8, 12, 16, 20, 28, 32]
+                        .into_iter()
+                        .zip(std::iter::once(&look.background).chain(look.colors.iter()))
+                    {
+                        let rgba = crate::theme::parse_color(color).unwrap().to_array();
+                        for channel in 0..4 {
+                            values[offset + channel] = f32::from(rgba[channel]) / 255.0;
+                        }
+                    }
+                    let pixels =
+                        render_pixels(&device, &queue, &layout, &pipeline, values).unwrap();
+                    let file: String = name
+                        .chars()
+                        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                        .collect();
+                    image::save_buffer(
+                        directory.join(format!("{file}{suffix}.png")),
+                        &pixels,
+                        512,
+                        288,
+                        image::ColorType::Rgba8,
+                    )
+                    .unwrap();
+                }
+            }
+            let named = |code: &str, animated: bool, word: &str| {
+                let found = problem(code, animated).unwrap_or_default();
+                assert!(found.contains(word), "{code}: {found:?}");
+            };
+            named("return c1;", true, "flat");
+            named(
+                "return mix(bg, c1, fill(sd_circle(p, 0.04)));",
+                false,
+                "hardly anything",
+            );
+            named(
+                "return mix(c1, vec3<f32>(1.0), step(0.0, p.x));",
+                false,
+                "white",
+            );
+            let still = "return mix(bg, c1, 0.5 + 0.5 * sin(p.x * 4.0));";
+            named(still, true, "nothing moved");
+            assert_eq!(
+                problem(still, false),
+                None,
+                "a still is fine when asked for"
+            );
+            assert!(checked_pipeline(
+                &device,
+                wgpu::TextureFormat::Rgba8Unorm,
+                &layout,
+                "fn broken("
+            )
+            .is_err());
+        });
     }
 
     fn render_sample(
@@ -350,102 +773,14 @@ mod tests {
         resources: &Resources,
         values: [f32; 36],
     ) -> Vec<u8> {
-        use wgpu::util::DeviceExt;
-        let width = values[2] as u32;
-        let height = values[3] as u32;
-        // Test samples use widths divisible by 64, so no readback padding.
-        assert_eq!(width % 64, 0);
-        let bytes: Vec<u8> = values.into_iter().flat_map(f32::to_le_bytes).collect();
-        let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("test background"),
-            contents: &bytes,
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
-        let bindings = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &resources.layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform.as_entire_binding(),
-            }],
-        });
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-        let view = texture.create_view(&Default::default());
-        let readback = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: u64::from(width * height * 4),
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let mut encoder = device.create_command_encoder(&Default::default());
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            pass.set_pipeline(&resources.pipeline);
-            pass.set_bind_group(0, &bindings, &[]);
-            pass.draw(0..3, 0..1);
-        }
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &readback,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(width * 4),
-                    rows_per_image: Some(height),
-                },
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-        );
-        queue.submit([encoder.finish()]);
-        let (sender, receiver) = std::sync::mpsc::channel();
-        readback
-            .slice(..)
-            .map_async(wgpu::MapMode::Read, move |result| {
-                sender.send(result).unwrap();
-            });
-        device.poll(wgpu::Maintain::Wait);
-        receiver
-            .recv_timeout(std::time::Duration::from_secs(10))
-            .unwrap()
-            .unwrap();
-        let output = readback.slice(..).get_mapped_range().to_vec();
-        readback.unmap();
-        output
+        render_pixels(
+            device,
+            queue,
+            &resources.layout,
+            &resources.pipeline,
+            values,
+        )
+        .expect("rendered sample")
     }
 
     #[cfg(target_os = "windows")]

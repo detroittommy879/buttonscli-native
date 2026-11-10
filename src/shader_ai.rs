@@ -18,34 +18,44 @@ use crate::theme::CustomShader;
 
 const MAX_REQUEST_CHARS: usize = 2_000;
 
-const RULES: &str = "The code is the body of a WGSL function that returns vec3<f32> RGB in 0..1. Write a few `let` lines and end with `return <color>;`. Not allowed: `var`, loops, `if`/`else`, `switch`, extra functions, arrays, structs. Use `select(a, b, condition)` or `mix`/`step` instead of if.
-
-Available values:
-- p: vec2<f32>, pane coordinates centred on 0 (about -1..1 vertically, wider horizontally), already multiplied by the user's Scale slider; the settings say which way p.y points
-- t: f32, time in seconds (already scaled by the user's speed)
-- strength: f32 from 0 to 1, the user's Strength slider. Always use it: it is how the user turns the whole effect up or down. At 0 the result should be just bg, at 1 the full effect. The simplest way is to end with `return mix(bg, color, strength);`; you can also use it to scale contrast or glow. Nothing else fades your result.
-- bg: vec3<f32>, the terminal background color behind the text
-- c1, c2, c3, c4, c5: vec3<f32>, five colors (the settings say where they come from). Use these names instead of hard-coding hex colors, so the user can change them later
-- any slider variables listed in the request, as f32
-
-Available helper functions:
-- hash(vec2<f32>) -> f32, random 0..1 per point
-- noise(vec2<f32>) -> f32, smooth value noise 0..1
-- cloud(vec2<f32>) -> f32, three-octave noise 0..1
-- stars(vec2<f32>, f32) -> f32, twinkling star field for (position, time)
-- palette(f32) -> vec3<f32>, smooth rainbow; palette(x) cycles every 1.0
-- hsv(h, s, v) -> vec3<f32>, all 0..1
-Plus WGSL built-ins: sin, cos, tan, abs, fract, floor, mix, smoothstep, step, length, distance, dot, atan2, exp, pow, sqrt, clamp, min, max, vec2<f32>(...), vec3<f32>(...).
-
-Write float literals with a decimal point (2.0, not 2) and keep both sides of every operator the same type (f32 with f32, vec3 with vec3). Keep it under 3000 characters. There are no loops, so draw at most a few copies of a shape by hand, or use fract()/floor() on coordinates to repeat a pattern.";
+/// The shader guide: the contract, the values and helpers, how to make it
+/// look good, common compile mistakes and worked examples. Both models get it,
+/// so smaller ones can copy a working pattern instead of inventing one. A test
+/// compiles every example in it.
+const RULES: &str = include_str!("../assets/prompts/shader-guide.md");
 
 const WRITER: &str = "You write small WGSL shader programs for an animated terminal background. Text is drawn on top. At strength 1 the effect must be clearly visible and colorful, not mostly near-black: the user keeps text readable with the Strength slider, so do not make the pattern dim on its own. Avoid large areas of pure white.
 
+Follow the guide below. Its examples show the style and the level of polish to aim for; write something new for this request rather than copying one.
+
 Reply with a short, fitting name in <name></name> tags and the code in <shader></shader> tags. Nothing outside the tags is used.";
 
-const JUDGE: &str = "You review WGSL shader code written by another model for an animated terminal background. You get the user's request, their current settings, the code and, if it failed, the compiler error.
+const JUDGE: &str = "You review WGSL shader code written by another model for an animated terminal background. You get the user's request, their current settings, the code and, if it failed, the compiler error or what was wrong with the picture. The guide below is what the writer was given.
 
-If there is a compiler error, fix it with the smallest change that keeps the idea. If it compiles, check that it matches the request, that it uses `strength` so the Strength slider works, that it is clearly visible at strength 1 (not mostly near-black), and that it follows the color and slider notes in the request. If it is good, reply <verdict>keep</verdict>. Otherwise reply <verdict>improve</verdict> and the full improved code in <shader></shader> tags, plus one sentence why in <why></why>. Keep slider names as they are.";
+If there is a compiler error, fix it with the smallest change that keeps the idea. If it compiles, check that it matches the request, that it uses `strength` so the Strength slider works, that it is clearly visible at strength 1 (not mostly near-black, not one flat color), that something moves when animation is on, that edges are drawn with fill, stroke or smoothstep rather than step on a distance, and that it follows the color and slider notes in the request. If it is good, reply <verdict>keep</verdict>. Otherwise reply <verdict>improve</verdict> and the full improved code in <shader></shader> tags, plus one sentence why in <why></why>. Keep slider names as they are.";
+
+/// What the judge said about code that already passed the local checks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Verdict {
+    Keep,
+    Improve,
+    Reject,
+    /// No `<verdict>` tag, or a word that is none of the above.
+    Unclear,
+}
+
+fn verdict(reply: &str) -> Verdict {
+    match extract_tag(reply, "verdict")
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "keep" => Verdict::Keep,
+        "improve" => Verdict::Improve,
+        "reject" => Verdict::Reject,
+        _ => Verdict::Unclear,
+    }
+}
 
 /// Most sliders a shader can have (the GPU passes four values).
 const MAX_SLIDERS: usize = 4;
@@ -103,12 +113,20 @@ pub(crate) struct Candidate {
     pub(crate) y_up: bool,
 }
 
+/// Looks at a drawn shader and names what is wrong with the picture, if
+/// anything.
+pub(crate) type PictureCheck<'a> = &'a dyn Fn(&CustomShader, &Look) -> Option<String>;
+
 pub(crate) struct Request<'a> {
     pub(crate) brief: &'a str,
     pub(crate) direction: Option<(&'a str, &'a str)>,
     pub(crate) current: &'a CustomShader,
     pub(crate) current_error: Option<&'a str>,
     pub(crate) look: &'a Look,
+    /// Draws finished code and says what is wrong with the picture, if
+    /// anything (see `shader_background::picture_problem`). The look carries
+    /// the palette the code will get.
+    pub(crate) picture_check: Option<PictureCheck<'a>>,
 }
 
 /// The Style settings the code will run with, turned into notes for the models.
@@ -232,7 +250,12 @@ pub(crate) fn generate(
         0,
     );
     let judge_prompt = judge_prompt(brief, &code, error.as_deref(), &variables, &judge_look);
-    if let Ok((verdict, judge)) = ask(
+    // Whatever the judge says, only code that passes the local checks is used.
+    // Its verdict is advice about quality, reported as it was given.
+    if error.is_none() {
+        note = "Passed the checks; the judge was not available.".into();
+    }
+    if let Ok((reply, judge)) = ask(
         transport,
         judges,
         load_key,
@@ -252,21 +275,29 @@ pub(crate) fn generate(
         },
     ) {
         judge_name = Some(judge);
-        if let Some(improved) = extract_shader(&verdict) {
+        let why = extract_tag(&reply, "why").map(|why| truncate(&why, 300));
+        if let Some(improved) = extract_shader(&reply) {
             report(Stage::Checking, 0);
             match compiles(&improved, &variables) {
                 Ok(()) => {
                     code = improved;
                     error = None;
-                    note = extract_tag(&verdict, "why")
-                        .unwrap_or_else(|| "Improved by the judge.".into());
+                    note = why.unwrap_or_else(|| "Improved by the judge.".into());
                 }
                 // A broken "improvement" never replaces working code.
                 Err(judge_error) if error.is_some() => error = Some(judge_error),
                 Err(_) => note = "Judge's change did not compile; kept the original.".into(),
             }
         } else if error.is_none() {
-            note = "Judge kept it as is.".into();
+            note = match (verdict(&reply), why) {
+                (Verdict::Keep, _) => "Judge kept it as is.".into(),
+                (Verdict::Reject, Some(why)) => format!("Judge had doubts: {why}"),
+                (Verdict::Reject, None) => "Judge had doubts but gave no fix.".into(),
+                (Verdict::Improve, _) => "Judge wanted changes but sent no code.".into(),
+                (Verdict::Unclear, _) => {
+                    "Passed the checks; the judge's answer was not clear.".into()
+                }
+            };
         }
     }
 
@@ -293,6 +324,48 @@ pub(crate) fn generate(
         compiles(&fixed, &variables).map_err(|error| format!("Still does not compile: {error}"))?;
         code = fixed;
         note = "Fixed after a compiler error.".into();
+    }
+
+    // Code that compiles can still draw nothing worth looking at. One more
+    // try for the writer, told what the picture looked like; if that does not
+    // help, the user still gets the version that works, with a note.
+    if let Some(check) = request.picture_check {
+        let shader = |code: &str| CustomShader {
+            expression: code.to_owned(),
+            variables: variables.clone(),
+            y_up: request.look.y_up,
+            ..Default::default()
+        };
+        report(Stage::Checking, 0);
+        if let Some(problem) = check(&shader(&code), &judge_look) {
+            report(Stage::Fixing, 0);
+            let redo = format!(
+                "{}<code>\n{code}\n</code>\nThis code compiles, but when it was drawn at strength 1 {problem}\nReply with a better version in <shader></shader> tags that fixes this and still matches the request:\n\n{}",
+                settings_text(&variables, &judge_look),
+                if brief.is_empty() { "Keep its look." } else { brief }
+            );
+            let redone = ask(
+                transport,
+                writers,
+                load_key,
+                &format!("{WRITER}\n\n{RULES}"),
+                &redo,
+                &[],
+                cancelled,
+                &mut |chars| report(Stage::Fixing, chars),
+            )
+            .ok()
+            .and_then(|(reply, _)| extract_shader(&reply))
+            .filter(|redone| compiles(redone, &variables).is_ok());
+            report(Stage::Checking, 0);
+            match redone {
+                Some(redone) if check(&shader(&redone), &judge_look).is_none() => {
+                    code = redone;
+                    note = "Redrawn after a look at the picture.".into();
+                }
+                _ => note = format!("Picture check: {problem}"),
+            }
+        }
     }
     report(Stage::Ready, 0);
     Ok(Candidate {
@@ -379,7 +452,7 @@ const IDEA_STYLES: &[&str] = &[
     "op-art",
 ];
 
-const IDEAS: &str = "You invent ideas for animated backgrounds that sit behind terminal text. Each idea is handed to another model that turns it into one small WGSL fragment shader: a single pass that colors each pixel from its position p, the time t and a few colors. There are no textures, images, text, 3D models, loops or memory of earlier frames, so pitch looks that math can draw: noise and domain warping, signed distance shapes, polar and spiral coordinates, fract()/floor() tiling, cell patterns from hash(), interfering waves, smooth gradients and glow.
+const IDEAS: &str = "You invent ideas for animated backgrounds that sit behind terminal text. Each idea is handed to another model that turns it into one small WGSL fragment shader: a single pass that colors each pixel from its position p, the time t and a few colors. There are no textures, images, text, 3D models, loops or memory of earlier frames, so pitch looks that math can draw: detailed noise and flowing, domain-warped smoke, sharp ridged veins, voronoi cells, signed distance shapes (circles, boxes, lines) that melt together and glow, polar and spiral coordinates, fract()/floor() tiling with a different random value per tile, layers at different depths and speeds, interfering waves, smooth gradients and glow. It can place two to four moving objects by hand, or tile a pattern for many copies.
 
 Be smart about it: say which technique or trick makes each idea work, for example \"domain-warped noise for the smoke\" or \"polar coordinates bent by a sine to make petals\". Keep the set varied: about half should be simple and elegant, the rest more ambitious, layering two or three techniques. Make every idea differ from the others in subject, motion and palette.
 
@@ -535,7 +608,7 @@ fn sliders_text(variables: &[crate::theme::ShaderVariable]) -> String {
         text.push_str("Use the slider variables above where they fit. ");
     }
     if free > 0 {
-        text.push_str(&format!("You may add up to {free} new slider(s) for things the request mentions (the speed or size of one object, density, glow and so on): one per line inside <sliders></sliders> tags as `name min max default`, for example `bubble_size 0.1 2.0 0.6`. Names use lowercase letters, digits and underscores, and must not be p, t, strength, bg, c1, c2, c3 or knobs. Then use those names in the code."));
+        text.push_str(&format!("You may add up to {free} new slider(s) for things the request mentions (the speed or size of one object, density, glow and so on): one per line inside <sliders></sliders> tags as `name min max default`, for example `bubble_size 0.1 2.0 0.6`. Names use lowercase letters, digits and underscores, and must not be p, t, strength, bg, c1 to c5, knobs or a helper's name. Then use those names in the code."));
     }
     text.push('\n');
     text
@@ -565,6 +638,7 @@ fn new_sliders(
             && name.as_bytes()[0].is_ascii_alphabetic()
             && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
             && !crate::plugins::effects::shader_expression::RESERVED.contains(&name)
+            && !crate::plugins::effects::shader_expression::HELPER_NAMES.contains(&name)
             && !existing.iter().chain(&added).any(|v| v.name == name);
         let valid_range = [min, max, value].iter().all(|v| v.is_finite())
             && min < max
@@ -667,6 +741,30 @@ fn truncate(text: &str, limit: usize) -> String {
     text.chars().take(limit).collect()
 }
 
+/// The guide's worked examples as (title, code), for tests that compile and
+/// draw them.
+#[cfg(test)]
+pub(crate) fn guide_examples() -> Vec<(String, String)> {
+    let mut examples = Vec::new();
+    let mut title = String::new();
+    let mut code: Option<String> = None;
+    for line in RULES.lines() {
+        if let Some(open) = code.as_mut() {
+            if line.trim_end() == "```" {
+                examples.push((title.clone(), code.take().unwrap_or_default()));
+            } else {
+                open.push_str(line);
+                open.push('\n');
+            }
+        } else if let Some(heading) = line.strip_prefix("### ") {
+            title = heading.trim().to_owned();
+        } else if line.trim_end() == "```wgsl" {
+            code = Some(String::new());
+        }
+    }
+    examples
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -706,6 +804,14 @@ mod tests {
         replies: Vec<&'static str>,
         judges: &[ProviderProfile],
     ) -> (Result<Candidate, String>, Vec<String>, Vec<Stage>) {
+        run_checked(replies, judges, None)
+    }
+
+    fn run_checked(
+        replies: Vec<&'static str>,
+        judges: &[ProviderProfile],
+        check: Option<PictureCheck<'_>>,
+    ) -> (Result<Candidate, String>, Vec<String>, Vec<Stage>) {
         let transport = Replies(Mutex::new(replies), Mutex::new(Vec::new()));
         let mut stages = Vec::new();
         let result = generate(
@@ -719,6 +825,7 @@ mod tests {
                 current: &CustomShader::default(),
                 look: &Look::default(),
                 current_error: None,
+                picture_check: check,
             },
             &AtomicBool::new(false),
             &mut |stage, _| {
@@ -746,6 +853,7 @@ mod tests {
             current: &CustomShader::default(),
             current_error: None,
             look: &look,
+            picture_check: None,
         };
         let prompt = writer_prompt(&request);
         assert!(prompt.contains("c5 = #3ddc84") && prompt.contains("do not add other hues"));
@@ -876,6 +984,105 @@ mod tests {
         assert!(candidate.note.contains("kept the original"));
     }
 
+    #[test]
+    fn the_judges_verdict_is_reported_as_given() {
+        let note = |judge: &'static str| {
+            run(vec!["<shader>return c2;</shader>", judge], &[])
+                .0
+                .unwrap()
+                .note
+        };
+        assert_eq!(note("<verdict>keep</verdict>"), "Judge kept it as is.");
+        assert_eq!(note("<verdict> KEEP </verdict>"), "Judge kept it as is.");
+        assert!(note("not a verdict").contains("not clear"));
+        assert!(note("<verdict>reject</verdict>").contains("doubts"));
+        assert_eq!(
+            note("<verdict>reject</verdict><why>Too dark.</why>"),
+            "Judge had doubts: Too dark."
+        );
+        assert!(note("<verdict>improve</verdict>").contains("sent no code"));
+        assert_eq!(verdict("<verdict>maybe</verdict>"), Verdict::Unclear);
+    }
+
+    #[test]
+    fn every_guide_example_compiles_uses_strength_and_is_cheap() {
+        use crate::plugins::effects::shader_expression;
+        let examples = guide_examples();
+        assert_eq!(examples.len(), 6, "{examples:?}");
+        for (name, code) in &examples {
+            let custom = CustomShader {
+                expression: code.clone(),
+                variables: Vec::new(),
+                ..Default::default()
+            };
+            shader_expression::program(&custom).unwrap_or_else(|error| panic!("{name}: {error}"));
+            assert!(shader_expression::uses(code, "strength"), "{name}");
+            assert!(code.len() < 1_000, "{name} is short enough to learn from");
+        }
+        // The guide names every helper, with the price the validator charges.
+        for helper in shader_expression::HELPER_NAMES {
+            assert!(RULES.contains(&format!("{helper}(")), "{helper}");
+        }
+        assert!(RULES.contains(&format!("may spend {}", shader_expression::MAX_COST)));
+        assert!(
+            RULES.len() < 12_000,
+            "small models still need room to think"
+        );
+    }
+
+    #[test]
+    fn a_bad_picture_gets_one_redraw_and_never_loses_working_code() {
+        let dull = |shader: &CustomShader, _: &Look| {
+            (shader.expression == "return c2;")
+                .then(|| "the whole picture was one flat color.".to_owned())
+        };
+        let (result, models, _) = run_checked(
+            vec![
+                "<shader>return c2;</shader>",
+                "<verdict>keep</verdict>",
+                "<shader>return mix(bg, palette(p.x + t), strength);</shader>",
+            ],
+            &[provider("judge")],
+            Some(&dull),
+        );
+        let candidate = result.unwrap();
+        assert_eq!(
+            candidate.code,
+            "return mix(bg, palette(p.x + t), strength);"
+        );
+        assert!(candidate.note.contains("Redrawn"));
+        assert_eq!(models, ["writer", "judge", "writer"]);
+
+        // A redraw that is no better, or does not compile, keeps the first.
+        for redo in [
+            "<shader>return c2;</shader>",
+            "<shader>return nope;</shader>",
+        ] {
+            let (result, _, _) = run_checked(
+                vec![
+                    "<shader>return c2;</shader>",
+                    "<verdict>keep</verdict>",
+                    redo,
+                ],
+                &[],
+                Some(&dull),
+            );
+            let candidate = result.unwrap();
+            assert_eq!(candidate.code, "return c2;");
+            assert!(candidate
+                .note
+                .starts_with("Picture check: the whole picture"));
+        }
+        // A good picture costs no extra request.
+        let fine = |_: &CustomShader, _: &Look| None;
+        let (_, models, _) = run_checked(
+            vec!["<shader>return c1;</shader>", "<verdict>keep</verdict>"],
+            &[],
+            Some(&fine),
+        );
+        assert_eq!(models.len(), 2);
+    }
+
     /// Uses the active profile's shader and judge chains, read-only.
     #[test]
     #[ignore = "sends real requests; set BUTTONSCLI_TEST_LIVE_SHADER_AI=1"]
@@ -941,6 +1148,7 @@ mod tests {
                                 sliders: true,
                                 ..Look::default()
                             },
+                            picture_check: None,
                         },
                         &AtomicBool::new(false),
                         &mut |stage, _| last = stage,

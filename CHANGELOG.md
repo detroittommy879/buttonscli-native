@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Shader code has 14 new helpers: `fbm`, `ridged`, `flow`, `voronoi`, `hash2`,
+  `rotate`, `polar`, shapes (`sd_circle`, `sd_box`, `sd_segment`, `smin`),
+  `fill`/`stroke`/`halo` to draw them, and `tonemap`. See the Shader code
+  reference.
+- Create with AI writes better shaders: its models get a guide with worked
+  examples, each result is drawn once off screen, and a flat, empty, washed-out
+  or motionless picture goes back to the writer for another try. Notes say
+  what the judge actually answered.
+- Safer shaders: helper calls have a per-pixel budget (240) so no shader can
+  be too heavy for laptop graphics, a shader the graphics driver refuses is
+  skipped with a message instead of closing the app, and a comment that
+  mentions `strength` no longer switches off the Strength slider.
+- New profiles animate at 30 FPS instead of 60 (Settings → Effects changes it).
+
 - Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
   Releases follow Semantic Versioning and pick their own number from commit
   messages (`feat:` → minor, fixes → patch, breaking changes ask first; see
