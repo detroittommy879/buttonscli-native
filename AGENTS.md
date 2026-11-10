@@ -235,6 +235,14 @@ cargo build --locked --release --bin buttonscli
   A new helper needs four places: `shader_helpers.wgsl`, `HELPER_NAMES`/`HELPER_COSTS`,
   the guide and `docs/guide/shader-code.md`. Helpers may loop; custom code may not.
   wgpu error scopes are per device: build custom pipelines via `checked_pipeline`.
+- Shader lab (Settings → Debug, `power.rs`, `Preferences::shader_lab`): judge mode,
+  picture check, loops, work limit. Rules reach the checker through the global
+  `shader_expression::set_rules`; tests must call `function_with(custom, rules)`
+  so parallel tests do not share it. Loops are proven finite by `loop_trips`
+  (text shape) matched against Naga `Loop` statements in order; keep both in step.
+  A refusal must say its own cause: models repair from the message.
+- Provider endpoints: `validate_endpoint` allows plain HTTP only for loopback,
+  private addresses and local names. Every request path calls it.
 - AI shader generation: `src/shader_ai.rs`; workers/editor: `src/app.rs`.
   Shared admission checks: `src/plugins/effects/shader_expression.rs`; GPU calls:
   `shader_background.rs`. `scripts/theme-eval.py` evaluates palettes, not shaders.

@@ -15,6 +15,16 @@
   skipped with a message instead of closing the app, and a comment that
   mentions `strength` no longer switches off the Strength slider.
 - New profiles animate at 30 FPS instead of 60 (Settings → Effects changes it).
+- Longer shaders compile: the size limit is four times higher, and a shader
+  that is too long or uses something that is not allowed now says which.
+- AI model endpoints must use HTTPS unless they are on this computer or your
+  local network (`localhost`, `192.168.x.x`, `name.local` and similar), so an
+  API key is never sent unprotected over the internet.
+- Settings → Debug has a Shader lab for trying things: when the judge model
+  is asked, the picture check, the work limit per pixel, and looser shader
+  rules with `var`, `if`/`else` and fixed-count `for` loops.
+- Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
+  webpki-roots 1.0.11) for certificate-checking fixes.
 
 - Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
   Releases follow Semantic Versioning and pick their own number from commit

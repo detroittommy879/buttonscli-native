@@ -76,7 +76,7 @@ The checker rejects code that could hang or crash a GPU driver:
 - Write floats with a decimal point: `2.0`, not `2`. Both sides of an
   operator must be the same type (`f32` with `f32`, `vec3` with `vec3`).
 - Helper calls may cost at most 240 in total (see Helpers).
-- At most 4,096 bytes of code and four sliders. Slider names are letters,
+- At most 4,096 bytes of code (about 1,000 operations) and four sliders. Slider names are letters,
   numbers and `_`, start with a letter, and can't reuse an input name.
 
 Errors show under the code with line numbers. **Fix with AI** can repair them.
