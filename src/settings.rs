@@ -269,6 +269,9 @@ pub(crate) struct Preferences {
     /// Fewer frames while the window is in the background or minimized
     /// (Settings → Debug). On by default.
     pub(crate) power_saving: bool,
+    /// Experiments with shader generation and the shader rules
+    /// (Settings → Debug). Only read while the debug tools are on.
+    pub(crate) shader_lab: ShaderLab,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -340,6 +343,7 @@ impl Default for Preferences {
             animation_fps: 30,
             notice_seconds: 5,
             power_saving: true,
+            shader_lab: ShaderLab::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -498,6 +502,53 @@ impl Default for SettingsLayout {
     }
 }
 
+/// What the second ("judge") model does after the writer.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum JudgeMode {
+    /// Reviews every result and may rewrite it; repairs compile errors.
+    #[default]
+    Review,
+    /// Only asked when the code does not compile.
+    FixOnly,
+    /// Never asked: the writer repairs its own compile errors.
+    Off,
+}
+
+/// Switches for trying shader generation and shader rules by hand.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct ShaderLab {
+    pub(crate) judge: JudgeMode,
+    /// Draw each AI result off screen and send bad pictures back once.
+    pub(crate) picture_check: bool,
+    /// Accept `var`, `if`/`else` and fixed-count `for` loops in shader code,
+    /// and tell the AI it may use them.
+    pub(crate) loops: bool,
+    /// Most helper work per pixel; 0 turns the limit off.
+    pub(crate) cost_limit: u32,
+    /// Give shader code the previous frame (`prev(uv)`), for trails and
+    /// other effects that build up over time.
+    pub(crate) feedback: bool,
+}
+
+impl ShaderLab {
+    pub(crate) const DEFAULT_COST_LIMIT: u32 = 240;
+    pub(crate) const MAX_COST_LIMIT: u32 = 4_000;
+}
+
+impl Default for ShaderLab {
+    fn default() -> Self {
+        Self {
+            judge: JudgeMode::Review,
+            picture_check: true,
+            loops: false,
+            cost_limit: Self::DEFAULT_COST_LIMIT,
+            feedback: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct KeyboardPreferences {
@@ -597,6 +648,7 @@ impl Preferences {
         self.row_banding_brightness = self.row_banding_brightness.min(64);
         self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
+        self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

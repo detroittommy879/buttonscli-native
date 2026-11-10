@@ -55,10 +55,227 @@ const HELPER_COSTS: [(&str, u32); 8] = [
     ("flow", 44),
 ];
 
-/// Most helper work one shader may ask for per pixel. Code has no loops, so
-/// this and the 256-expression limit bound the cost of every frame: about
-/// twenty `cloud` calls, twelve `fbm` or five `flow`.
-pub(crate) const MAX_COST: u32 = 240;
+/// Most helper work one shader may ask for per pixel, unless Settings → Debug
+/// changes it. With the 256-expression limit this bounds the cost of every
+/// frame: about twenty `cloud` calls, twelve `fbm` or five `flow`.
+pub(crate) const MAX_COST: u32 = crate::settings::ShaderLab::DEFAULT_COST_LIMIT;
+
+/// Most Naga expressions in one shader. It was 256, which a 30-line shader
+/// from a strong model overran, with an error that did not say so.
+const MAX_EXPRESSIONS: usize = 1024;
+
+/// Most times one `for` loop may run, and most times the innermost body of
+/// nested loops may run.
+const MAX_LOOP_TRIPS: u32 = 64;
+const MAX_NESTED_TRIPS: u32 = 256;
+/// What one pass through a loop body costs before its helper calls.
+const LOOP_STEP_COST: u32 = 2;
+
+/// What custom code may contain. The defaults are what ships; Settings →
+/// Debug can loosen them to try things out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Rules {
+    /// Accept `var`, assignment, `if`/`else` and `for` loops whose count is a
+    /// fixed number (see [`loop_trips`]). `while` and `loop` stay out: nothing
+    /// here can prove they end.
+    pub(crate) loops: bool,
+    /// Most helper work per pixel; 0 is no limit.
+    pub(crate) cost_limit: u32,
+}
+
+impl Default for Rules {
+    fn default() -> Self {
+        Self {
+            loops: false,
+            cost_limit: MAX_COST,
+        }
+    }
+}
+
+static LOOPS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static COST_LIMIT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(MAX_COST);
+
+/// The rules every shader is checked against from now on.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn set_rules(rules: Rules) {
+    LOOPS.store(rules.loops, std::sync::atomic::Ordering::Relaxed);
+    COST_LIMIT.store(rules.cost_limit, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub(crate) fn rules() -> Rules {
+    Rules {
+        loops: LOOPS.load(std::sync::atomic::Ordering::Relaxed),
+        cost_limit: COST_LIMIT.load(std::sync::atomic::Ordering::Relaxed),
+    }
+}
+
+/// How many times each `for` loop in `code` runs, in source order, or why a
+/// loop is not allowed. Only this shape is accepted, so every loop provably
+/// ends: `for (var i = 0; i < 8; i++) { ... }` with whole-number bounds, a
+/// step of one, and a body that never changes the counter.
+fn loop_trips(code: &str) -> Result<Vec<u32>, String> {
+    const SHAPE: &str = "Write loops as `for (var i = 0; i < 8; i++) { ... }`: whole-number bounds, a step of one, at most 64 turns, and do not change the counter inside. `while` and `loop` are not allowed.";
+    let clean = without_comments(code);
+    let mut tokens: Vec<&str> = Vec::new();
+    let mut start = None;
+    for (index, c) in clean.char_indices() {
+        let word = c.is_ascii_alphanumeric() || c == '_';
+        if !word {
+            if let Some(from) = start.take() {
+                tokens.push(&clean[from..index]);
+            }
+            if !c.is_whitespace() {
+                tokens.push(&clean[index..index + c.len_utf8()]);
+            }
+        } else if start.is_none() {
+            start = Some(index);
+        }
+    }
+    if let Some(from) = start {
+        tokens.push(&clean[from..]);
+    }
+    let number = |token: &str| {
+        token
+            .trim_end_matches(['i', 'u'])
+            .parse::<i64>()
+            .map_err(|_| SHAPE.to_owned())
+    };
+    let mut trips = Vec::new();
+    for (at, token) in tokens.iter().enumerate() {
+        if matches!(*token, "while" | "loop") {
+            return Err(SHAPE.into());
+        }
+        if *token != "for" {
+            continue;
+        }
+        let mut rest = tokens[at + 1..].iter().copied();
+        let mut next = || rest.next().ok_or_else(|| SHAPE.to_owned());
+        let expect = |found: &str, wanted: &str| {
+            if found == wanted {
+                Ok(())
+            } else {
+                Err(SHAPE.to_owned())
+            }
+        };
+        expect(next()?, "(")?;
+        expect(next()?, "var")?;
+        let counter = next()?;
+        let mut token = next()?;
+        if token == ":" {
+            next()?;
+            token = next()?;
+        }
+        expect(token, "=")?;
+        let low = number(next()?)?;
+        expect(next()?, ";")?;
+        expect(next()?, counter)?;
+        expect(next()?, "<")?;
+        let mut token = next()?;
+        let inclusive = token == "=";
+        if inclusive {
+            token = next()?;
+        }
+        let high = number(token)? + i64::from(inclusive);
+        expect(next()?, ";")?;
+        expect(next()?, counter)?;
+        let step: Vec<&str> = [next()?, next()?].into();
+        if step == ["+", "="] {
+            expect(next()?, "1")?;
+        } else if step[0] == "=" {
+            expect(step[1], counter)?;
+            expect(next()?, "+")?;
+            expect(next()?, "1")?;
+        } else if step != ["+", "+"] {
+            return Err(SHAPE.into());
+        }
+        expect(next()?, ")")?;
+        expect(next()?, "{")?;
+        // Nothing in the body may change or take the address of the counter.
+        let mut depth = 1;
+        let body: Vec<&str> = rest
+            .take_while(|token| {
+                depth += i32::from(*token == "{") - i32::from(*token == "}");
+                depth > 0
+            })
+            .collect();
+        for (index, token) in body.iter().enumerate() {
+            let after = |offset: usize| body.get(index + offset).copied().unwrap_or("");
+            let before = index.checked_sub(1).map_or("", |index| body[index]);
+            let changed = (after(1) == "=" && after(2) != "=")
+                || (matches!(after(1), "+" | "-" | "*" | "/" | "%") && after(2) == "=")
+                || (matches!(after(1), "+" | "-") && after(2) == after(1));
+            if *token == counter && (changed || before == "&") {
+                return Err(SHAPE.into());
+            }
+        }
+        let count = high - low;
+        if !(1..=i64::from(MAX_LOOP_TRIPS)).contains(&count) {
+            return Err(SHAPE.into());
+        }
+        trips.push(count as u32);
+    }
+    Ok(trips)
+}
+
+/// Adds up what `block` costs and rejects statements the rules do not allow.
+fn block_cost(
+    block: &naga::Block,
+    module: &naga::Module,
+    rules: Rules,
+    trips: &mut std::slice::Iter<'_, u32>,
+    times: u32,
+    cost: &mut u64,
+) -> Result<(), String> {
+    const STRICT: &str = "`if`, loops, `var` and changing a value are not allowed here. Use `let` lines with select(), mix() or step(), and end with one `return`.";
+    for statement in block.iter() {
+        match statement {
+            naga::Statement::Emit(_) | naga::Statement::Return { .. } => {}
+            // Calls can only reach the fixed, bounded helpers: the function
+            // count check rejects any added function.
+            naga::Statement::Call { function, .. } => {
+                let name = module.functions[*function].name.as_deref().unwrap_or("");
+                let price = HELPER_COSTS
+                    .iter()
+                    .find(|(helper, _)| *helper == name)
+                    .map_or(1, |(_, price)| *price);
+                *cost += u64::from(price) * u64::from(times);
+            }
+            naga::Statement::Store { .. } | naga::Statement::Break | naga::Statement::Continue
+                if rules.loops => {}
+            naga::Statement::Block(inner) if rules.loops => {
+                block_cost(inner, module, rules, trips, times, cost)?;
+            }
+            naga::Statement::If { accept, reject, .. } if rules.loops => {
+                block_cost(accept, module, rules, trips, times, cost)?;
+                block_cost(reject, module, rules, trips, times, cost)?;
+            }
+            naga::Statement::Loop {
+                body, continuing, ..
+            } if rules.loops => {
+                let count = trips
+                    .next()
+                    .ok_or("A loop here is not a plain `for` loop.")?;
+                let times = times.saturating_mul(*count);
+                if times > MAX_NESTED_TRIPS {
+                    return Err(format!(
+                        "Nested loops may run their inner body at most {MAX_NESTED_TRIPS} times."
+                    ));
+                }
+                *cost += u64::from(LOOP_STEP_COST) * u64::from(times);
+                block_cost(body, module, rules, trips, times, cost)?;
+                block_cost(continuing, module, rules, trips, times, cost)?;
+            }
+            _ if rules.loops => {
+                return Err(
+                    "Only `let`, `var`, assignment, `if`/`else`, `for` and `return` are supported."
+                        .into(),
+                )
+            }
+            _ => return Err(STRICT.into()),
+        }
+    }
+    Ok(())
+}
 
 /// Whether `source` uses `name` as a whole identifier, comments aside.
 pub(crate) fn uses(source: &str, name: &str) -> bool {
@@ -102,6 +319,10 @@ fn is_body(source: &str) -> bool {
 }
 
 pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
+    function_with(custom, rules())
+}
+
+pub(crate) fn function_with(custom: &CustomShader, rules: Rules) -> Result<String, String> {
     if custom.expression.len() > MAX_SOURCE_BYTES || custom.variables.len() > 4 {
         return Err("Use at most 4096 source bytes and four variables.".into());
     }
@@ -151,21 +372,22 @@ pub(crate) fn function(custom: &CustomShader) -> Result<String, String> {
             custom.expression.trim().trim_end_matches(';')
         ));
     }
-    static CACHE: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashMap<String, Result<(), String>>>,
-    > = std::sync::OnceLock::new();
+    // The same code can pass under one set of rules and fail under another.
+    type Checked = std::collections::HashMap<(String, bool, u32), Result<(), String>>;
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<Checked>> = std::sync::OnceLock::new();
+    let key = (source, rules.loops, rules.cost_limit);
     let mut cache = CACHE.get_or_init(Default::default).lock().unwrap();
-    if let Some(result) = cache.get(&source) {
+    if let Some(result) = cache.get(&key) {
         result.clone()?;
-        return Ok(source);
+        return Ok(key.0);
     }
-    let result = validate(&source);
+    let result = validate(&key.0, rules);
     if cache.len() >= 64 {
         cache.clear();
     }
-    cache.insert(source.clone(), result.clone());
+    cache.insert(key.clone(), result.clone());
     result?;
-    Ok(source)
+    Ok(key.0)
 }
 
 pub(crate) fn program(custom: &CustomShader) -> Result<String, String> {
@@ -231,7 +453,7 @@ fn shift_line_numbers(line: &str, offset: usize) -> String {
     }
 }
 
-fn validate(source: &str) -> Result<(), String> {
+fn validate(source: &str, rules: Rules) -> Result<(), String> {
     // The helpers come first so the expression can call them; anything beyond
     // them plus the one generated function is rejected below.
     let helper_count = naga::front::wgsl::parse_str(HELPERS)
@@ -271,46 +493,37 @@ fn validate(source: &str) -> Result<(), String> {
     else {
         return Err("Enter one color expression, without declarations or resources.".into());
     };
-    if function.expressions.len() > 256
-        || function.body.iter().any(|statement| {
-            !matches!(
-                statement,
-                naga::Statement::Emit(_)
-                    | naga::Statement::Return { .. }
-                    // Calls can only reach the fixed, bounded helpers: the
-                    // function count check above rejects any added function.
-                    | naga::Statement::Call { .. }
-            )
-        })
-        || function
-            .body
-            .iter()
-            .filter(|statement| matches!(statement, naga::Statement::Return { .. }))
-            .count()
-            != 1
-    {
-        return Err(
-            "Only a bounded color expression is supported; statements and loops are disabled."
-                .into(),
-        );
-    }
-    let cost: u32 = function
+    let strict_returns = function
         .body
         .iter()
-        .filter_map(|statement| match statement {
-            naga::Statement::Call { function, .. } => module.functions[*function].name.as_deref(),
-            _ => None,
-        })
-        .map(|name| {
-            HELPER_COSTS
-                .iter()
-                .find(|(helper, _)| *helper == name)
-                .map_or(1, |(_, cost)| *cost)
-        })
-        .sum();
-    if cost > MAX_COST {
+        .filter(|statement| matches!(statement, naga::Statement::Return { .. }))
+        .count();
+    // Naga counts every value, name and operator, so this is a few hundred
+    // real operations: room for a rich shader, still a bounded one.
+    let size = function.expressions.len();
+    if size > MAX_EXPRESSIONS {
         return Err(format!(
-            "This shader is too heavy for slower computers: its helper calls cost {cost} and the limit is {MAX_COST}. Use fewer flow (44), voronoi (28), fbm (20), cloud (12), ridged (12) or noise (4) calls, and reuse a result in a `let` instead of calling again."
+            "This shader is too long: it has {size} operations and the limit is {MAX_EXPRESSIONS}. Remove a layer or a few details."
+        ));
+    }
+    if !rules.loops && strict_returns != 1 {
+        return Err("End with exactly one `return <color>;` as the last line.".into());
+    }
+    let trips = if rules.loops {
+        loop_trips(source.strip_prefix(HEADER).unwrap_or(source))?
+    } else {
+        Vec::new()
+    };
+    let mut remaining = trips.iter();
+    let mut cost = 0_u64;
+    block_cost(&function.body, &module, rules, &mut remaining, 1, &mut cost)?;
+    if remaining.next().is_some() {
+        return Err("A `for` loop here could not be checked; simplify it.".into());
+    }
+    let limit = rules.cost_limit;
+    if limit > 0 && cost > u64::from(limit) {
+        return Err(format!(
+            "This shader is too heavy for slower computers: its helper calls cost {cost} and the limit is {limit}. Use fewer flow (44), voronoi (28), fbm (20), cloud (12), ridged (12) or noise (4) calls, and reuse a result in a `let` instead of calling again. Inside a loop every call counts once per turn."
         ));
     }
     naga::valid::Validator::new(
@@ -472,6 +685,69 @@ mod tests {
             ..Default::default()
         };
         assert!(function(&old).is_ok(), "{:?}", function(&old));
+    }
+
+    #[test]
+    fn lab_rules_accept_fixed_loops_and_branches_and_still_bound_the_work() {
+        let loose = Rules {
+            loops: true,
+            cost_limit: MAX_COST,
+        };
+        let check = |code: &str, rules: Rules| {
+            function_with(
+                &CustomShader {
+                    expression: code.into(),
+                    variables: Vec::new(),
+                    ..Default::default()
+                },
+                rules,
+            )
+        };
+        let orbs = "var glow = 0.0;\nfor (var i = 0; i < 8; i++) {\n    let k = f32(i);\n    let c = vec2<f32>(0.7 * sin(t * 0.3 + k * 1.7), 0.35 * cos(t * 0.4 + k * 2.3));\n    glow += halo(sd_circle(p - c, 0.03), 0.05);\n}\nif (p.x > 0.0) { glow = glow * 0.5; } else { glow = glow * 1.5; }\nreturn mix(bg, tonemap(c1 * glow), strength);";
+        assert!(check(orbs, loose).is_ok(), "{:?}", check(orbs, loose));
+        assert!(check(orbs, Rules::default()).is_err(), "off by default");
+        // Old code means the same under the looser rules.
+        assert!(check("let r = length(p);\nreturn palette(r - t);", loose).is_ok());
+        for (why, code) in [
+            ("while", "var x = 0.0;\nwhile (x < 1.0) { x += 0.1; }\nreturn c1 * x;"),
+            ("loop", "var x = 0.0;\nloop { x += 0.1; if (x > 1.0) { break; } }\nreturn c1 * x;"),
+            ("no end", "var x = 0.0;\nfor (var i = 0; ; i++) { x += 0.1; }\nreturn c1 * x;"),
+            ("slider bound", "var x = 0.0;\nfor (var i = 0; i < i32(t); i++) { x += 0.1; }\nreturn c1 * x;"),
+            ("counter reset", "var x = 0.0;\nfor (var i = 0; i < 4; i++) { i = 0; x += 0.1; }\nreturn c1 * x;"),
+            ("counter step back", "var x = 0.0;\nfor (var i = 0; i < 4; i++) { i -= 1; x += 0.1; }\nreturn c1 * x;"),
+            ("counts down", "var x = 0.0;\nfor (var i = 4; i > 0; i--) { x += 0.1; }\nreturn c1 * x;"),
+            ("too long", "var x = 0.0;\nfor (var i = 0; i < 65; i++) { x += 0.1; }\nreturn c1 * x;"),
+            ("nested too long", "var x = 0.0;\nfor (var i = 0; i < 32; i++) { for (var j = 0; j < 9; j++) { x += 0.1; } }\nreturn c1 * x;"),
+            ("heavy body", "var x = 0.0;\nfor (var i = 0; i < 16; i++) { x += fbm(p + f32(i)); }\nreturn c1 * x;"),
+            ("own function", "return c1; } fn extra() -> f32 { return 1.0;"),
+            ("array", "var a: array<f32, 4>;\nreturn c1;"),
+            ("discard", "if (p.x > 0.0) { discard; }\nreturn c1;"),
+        ] {
+            assert!(check(code, loose).is_err(), "{why} must be refused");
+        }
+        // Inside a loop a helper counts once per turn: 8 * (2 + 20) = 176.
+        let eight =
+            "var x = 0.0;\nfor (var i = 0; i < 8; i++) { x += fbm(p + f32(i)); }\nreturn c1 * x;";
+        assert!(check(eight, loose).is_ok(), "{:?}", check(eight, loose));
+        let tight = Rules {
+            cost_limit: 100,
+            ..loose
+        };
+        assert!(check(eight, tight).unwrap_err().contains("176"));
+        // No limit at all is a lab choice too.
+        let heavy = "return c1 * (fbm(p) + flow(p, t) + flow(p * 2.0, t) + flow(p * 3.0, t) + flow(p * 4.0, t) + flow(p * 5.0, t) + flow(p * 6.0, t));";
+        assert!(check(heavy, Rules::default()).is_err());
+        let unlimited = Rules {
+            cost_limit: 0,
+            ..Rules::default()
+        };
+        assert!(check(heavy, unlimited).is_ok());
+        assert_eq!(
+            loop_trips(
+                "for (var i: i32 = 2; i <= 5; i += 1) { } for (var j = 0u; j < 3u; j = j + 1) { }"
+            ),
+            Ok(vec![4, 3])
+        );
     }
 
     fn program_for(expression: &str) -> String {

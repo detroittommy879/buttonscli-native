@@ -1415,6 +1415,8 @@ impl ButtonsApp {
         fonts::install(&cc.egui_ctx, &app.font_catalog);
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
+        app.apply_shader_lab();
+        #[cfg(not(target_arch = "wasm32"))]
         app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
@@ -10752,6 +10754,7 @@ impl ButtonsApp {
             let sender = self.shader_ai.tx.clone();
             let cancel = Arc::clone(&cancel);
             let context = ctx.clone();
+            let lab = self.shader_lab();
             std::thread::spawn(move || {
                 let mut last_sent = (crate::shader_ai::Stage::Queued, 0_usize);
                 let progress_sender = sender.clone();
@@ -10772,7 +10775,7 @@ impl ButtonsApp {
                         current: &current,
                         current_error: error.as_deref(),
                         look: &look,
-                        picture_check: Some(&|shader, look| {
+                        picture_check: lab.picture_check.then_some(&|shader, look| {
                             crate::plugins::effects::shader_background::picture_problem(
                                 shader,
                                 &look.background,
@@ -10780,6 +10783,8 @@ impl ButtonsApp {
                                 look.animated,
                             )
                         }),
+                        judge: lab.judge,
+                        loops: lab.loops,
                     },
                     &cancel,
                     &mut |stage, chars| {

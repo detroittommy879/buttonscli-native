@@ -539,7 +539,39 @@ pub(crate) fn validate_endpoint(raw: &str) -> Result<(), &'static str> {
     {
         return Err("Keep credentials, query strings, and fragments out of endpoint URLs");
     }
+    if endpoint.scheme() == "http" && !is_local_network(&endpoint) {
+        return Err(
+            "Use HTTPS for this endpoint: plain HTTP would send your API key and prompts unprotected. HTTP is only allowed for this computer and your local network",
+        );
+    }
     Ok(())
+}
+
+/// Whether plain HTTP to this host stays on this computer or the local
+/// network: `localhost`, loopback and private addresses, and names without a
+/// public suffix (`gpu-box`, `nas.local`, `ollama.lan`). Local model servers
+/// rarely have certificates; anything that can cross the internet must not
+/// carry an API key in the clear.
+#[cfg(not(target_arch = "wasm32"))]
+fn is_local_network(endpoint: &url::Url) -> bool {
+    match endpoint.host() {
+        Some(url::Host::Ipv4(address)) => {
+            address.is_loopback() || address.is_private() || address.is_link_local()
+        }
+        Some(url::Host::Ipv6(address)) => {
+            let first = address.segments()[0];
+            // Unique local fc00::/7 and link-local fe80::/10.
+            address.is_loopback() || first & 0xfe00 == 0xfc00 || first & 0xffc0 == 0xfe80
+        }
+        Some(url::Host::Domain(name)) => {
+            let name = name.trim_end_matches('.').to_ascii_lowercase();
+            !name.contains('.')
+                || [".local", ".lan", ".localhost", ".internal", ".home.arpa"]
+                    .iter()
+                    .any(|suffix| name.ends_with(suffix))
+        }
+        None => false,
+    }
 }
 
 #[cfg(test)]
@@ -620,6 +652,33 @@ mod tests {
         assert_eq!(warnings.len(), 1);
         assert!(validate_endpoint("https://user:pass@example.test/v1").is_err());
         assert!(validate_endpoint("http://127.0.0.1:11434/v1/chat/completions").is_ok());
+        // Plain HTTP stays on this computer or the local network.
+        for local in [
+            "http://localhost:1234/v1",
+            "http://[::1]:11434/v1",
+            "http://192.168.1.20:11434/v1",
+            "http://10.0.0.5:8080/v1",
+            "http://172.16.4.2/v1",
+            "http://gpu-box:11434/v1",
+            "http://ollama.lan/v1",
+            "http://nas.local:8000/v1",
+            "http://[fd12:3456::1]/v1",
+        ] {
+            assert!(validate_endpoint(local).is_ok(), "{local}");
+        }
+        for remote in [
+            "http://api.example.com/v1",
+            "http://8.8.8.8/v1",
+            "http://172.32.0.1/v1",
+            "http://[2001:db8::1]/v1",
+            "http://localhost.example.com/v1",
+        ] {
+            assert!(
+                validate_endpoint(remote).unwrap_err().contains("HTTPS"),
+                "{remote}"
+            );
+        }
+        assert!(validate_endpoint("https://api.example.com/v1").is_ok());
     }
 }
 

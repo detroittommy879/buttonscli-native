@@ -34,6 +34,39 @@ const JUDGE: &str = "You review WGSL shader code written by another model for an
 
 If there is a compiler error, fix it with the smallest change that keeps the idea. If it compiles, check that it matches the request, that it uses `strength` so the Strength slider works, that it is clearly visible at strength 1 (not mostly near-black, not one flat color), that something moves when animation is on, that edges are drawn with fill, stroke or smoothstep rather than step on a distance, and that it follows the color and slider notes in the request. If it is good, reply <verdict>keep</verdict>. Otherwise reply <verdict>improve</verdict> and the full improved code in <shader></shader> tags, plus one sentence why in <why></why>. Keep slider names as they are.";
 
+/// Added to the guide when Settings → Debug allows loops and branches.
+const LOOPS: &str = "
+
+## Loops and branches are allowed in this session
+
+This replaces the \"Not allowed\" line in the contract. You may also use:
+- `var x = 0.0;` and then change it with `x = ...;` or `x += ...;`
+- `if (condition) { ... } else { ... }`
+- `for (var i = 0; i < 8; i++) { ... }` to repeat something. The bounds must be whole numbers written in the code (not a slider or t), the step must be `i++`, a loop runs at most 64 times, and the body must not change `i`. Use `f32(i)` to get the counter as a number. `while` and `loop` are not allowed.
+
+Every turn of a loop costs 2 plus the price of the helpers called in it, from the same budget, so keep heavy helpers (flow, voronoi, fbm) outside loops. Do not call fill, stroke or stars inside a loop or an `if`: use `smoothstep` or `halo` there. Still end with `return`, and still no functions, arrays or structs.
+
+Example, eight drifting lights:
+
+```
+var glow = 0.0;
+for (var i = 0; i < 8; i++) {
+    let k = f32(i);
+    let c = vec2<f32>(0.7 * sin(t * 0.3 + k * 1.7), 0.35 * cos(t * 0.4 + k * 2.3));
+    glow += halo(sd_circle(p - c, 0.03), 0.05);
+}
+return mix(bg, tonemap(mix(c1, c2, glow * 0.5) * glow), strength);
+```";
+
+/// The guide, plus what the current debug switches change in it.
+fn rules_text(loops: bool) -> String {
+    if loops {
+        format!("{RULES}{LOOPS}")
+    } else {
+        RULES.to_owned()
+    }
+}
+
 /// What the judge said about code that already passed the local checks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Verdict {
@@ -127,6 +160,10 @@ pub(crate) struct Request<'a> {
     /// anything (see `shader_background::picture_problem`). The look carries
     /// the palette the code will get.
     pub(crate) picture_check: Option<PictureCheck<'a>>,
+    /// When the judge model is asked (Settings → Debug).
+    pub(crate) judge: crate::settings::JudgeMode,
+    /// Tell the models that loops and branches are allowed.
+    pub(crate) loops: bool,
 }
 
 /// The Style settings the code will run with, turned into notes for the models.
@@ -200,13 +237,14 @@ pub(crate) fn generate(
         .map(|_| ())
     };
 
+    let rules = rules_text(request.loops);
     report(Stage::Writing, 0);
     let writer_prompt = writer_prompt(request);
     let (reply, writer) = ask(
         transport,
         writers,
         load_key,
-        &format!("{WRITER}\n\n{RULES}"),
+        &format!("{WRITER}\n\n{rules}"),
         &writer_prompt,
         &[],
         cancelled,
@@ -241,39 +279,58 @@ pub(crate) fn generate(
     let mut judge_name = None;
 
     // Judge: repair a failure, or review code that already compiles.
-    report(
-        if error.is_some() {
-            Stage::Fixing
-        } else {
-            Stage::Judging
-        },
-        0,
-    );
+    use crate::settings::JudgeMode;
+    let ask_judge = match request.judge {
+        JudgeMode::Review => true,
+        JudgeMode::FixOnly => error.is_some(),
+        JudgeMode::Off => false,
+    };
+    if ask_judge {
+        report(
+            if error.is_some() {
+                Stage::Fixing
+            } else {
+                Stage::Judging
+            },
+            0,
+        );
+    }
     let judge_prompt = judge_prompt(brief, &code, error.as_deref(), &variables, &judge_look);
     // Whatever the judge says, only code that passes the local checks is used.
     // Its verdict is advice about quality, reported as it was given.
     if error.is_none() {
-        note = "Passed the checks; the judge was not available.".into();
+        note = if ask_judge {
+            "Passed the checks; the judge was not available."
+        } else {
+            "Passed the checks; no judge was asked."
+        }
+        .into();
     }
-    if let Ok((reply, judge)) = ask(
-        transport,
-        judges,
-        load_key,
-        &format!("{JUDGE}\n\n{RULES}"),
-        &judge_prompt,
-        &[],
-        cancelled,
-        &mut |chars| {
-            report(
-                if error.is_some() {
-                    Stage::Fixing
-                } else {
-                    Stage::Judging
-                },
-                chars,
-            )
-        },
-    ) {
+    let judged = if ask_judge {
+        ask(
+            transport,
+            judges,
+            load_key,
+            &format!("{JUDGE}\n\n{rules}"),
+            &judge_prompt,
+            &[],
+            cancelled,
+            &mut |chars| {
+                report(
+                    if error.is_some() {
+                        Stage::Fixing
+                    } else {
+                        Stage::Judging
+                    },
+                    chars,
+                )
+            },
+        )
+        .ok()
+    } else {
+        None
+    };
+    if let Some((reply, judge)) = judged {
         judge_name = Some(judge);
         let why = extract_tag(&reply, "why").map(|why| truncate(&why, 300));
         if let Some(improved) = extract_shader(&reply) {
@@ -313,7 +370,7 @@ pub(crate) fn generate(
             transport,
             writers,
             load_key,
-            &format!("{WRITER}\n\n{RULES}"),
+            &format!("{WRITER}\n\n{rules}"),
             &fix,
             &history,
             cancelled,
@@ -348,7 +405,7 @@ pub(crate) fn generate(
                 transport,
                 writers,
                 load_key,
-                &format!("{WRITER}\n\n{RULES}"),
+                &format!("{WRITER}\n\n{rules}"),
                 &redo,
                 &[],
                 cancelled,
@@ -812,6 +869,15 @@ mod tests {
         judges: &[ProviderProfile],
         check: Option<PictureCheck<'_>>,
     ) -> (Result<Candidate, String>, Vec<String>, Vec<Stage>) {
+        run_with(replies, judges, check, crate::settings::JudgeMode::Review)
+    }
+
+    fn run_with(
+        replies: Vec<&'static str>,
+        judges: &[ProviderProfile],
+        check: Option<PictureCheck<'_>>,
+        judge: crate::settings::JudgeMode,
+    ) -> (Result<Candidate, String>, Vec<String>, Vec<Stage>) {
         let transport = Replies(Mutex::new(replies), Mutex::new(Vec::new()));
         let mut stages = Vec::new();
         let result = generate(
@@ -826,6 +892,8 @@ mod tests {
                 look: &Look::default(),
                 current_error: None,
                 picture_check: check,
+                judge,
+                loops: false,
             },
             &AtomicBool::new(false),
             &mut |stage, _| {
@@ -854,6 +922,8 @@ mod tests {
             current_error: None,
             look: &look,
             picture_check: None,
+            judge: crate::settings::JudgeMode::Review,
+            loops: false,
         };
         let prompt = writer_prompt(&request);
         assert!(prompt.contains("c5 = #3ddc84") && prompt.contains("do not add other hues"));
@@ -982,6 +1052,58 @@ mod tests {
         let candidate = result.unwrap();
         assert_eq!(candidate.code, "return c2;");
         assert!(candidate.note.contains("kept the original"));
+    }
+
+    #[test]
+    fn the_judge_can_be_limited_to_compile_errors_or_switched_off() {
+        use crate::settings::JudgeMode;
+        let good = "<shader>return c2;</shader>";
+        let broken = "<shader>return vec3<f32>(oops);</shader>";
+        // Good code: neither mode spends a judge request.
+        for mode in [JudgeMode::FixOnly, JudgeMode::Off] {
+            let (result, models, stages) = run_with(vec![good], &[provider("judge")], None, mode);
+            let candidate = result.unwrap();
+            assert_eq!(models, ["writer"], "{mode:?}");
+            assert_eq!(candidate.judge, None);
+            assert!(candidate.note.contains("no judge was asked"));
+            assert!(!stages.contains(&Stage::Judging));
+        }
+        // Broken code: "fix only" asks the judge, "off" lets the writer repair.
+        let (result, models, _) = run_with(
+            vec![broken, "<shader>return c1;</shader>"],
+            &[provider("judge")],
+            None,
+            JudgeMode::FixOnly,
+        );
+        assert_eq!(result.unwrap().code, "return c1;");
+        assert_eq!(models, ["writer", "judge"]);
+        let (result, models, _) = run_with(
+            vec![broken, "<shader>return c3;</shader>"],
+            &[provider("judge")],
+            None,
+            JudgeMode::Off,
+        );
+        assert_eq!(result.unwrap().code, "return c3;");
+        assert_eq!(models, ["writer", "writer"]);
+        // The loops switch adds its section to the guide, and its example compiles.
+        let text = rules_text(true);
+        assert!(
+            text.contains("for (var i = 0; i < 8; i++)") && !rules_text(false).contains("for (var")
+        );
+        let example = LOOPS.split("```").nth(1).unwrap();
+        let loose = crate::plugins::effects::shader_expression::Rules {
+            loops: true,
+            ..Default::default()
+        };
+        crate::plugins::effects::shader_expression::function_with(
+            &CustomShader {
+                expression: example.into(),
+                variables: Vec::new(),
+                ..Default::default()
+            },
+            loose,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1149,6 +1271,8 @@ mod tests {
                                 ..Look::default()
                             },
                             picture_check: None,
+                            judge: crate::settings::JudgeMode::Review,
+                            loops: false,
                         },
                         &AtomicBool::new(false),
                         &mut |stage, _| last = stage,
