@@ -15,10 +15,34 @@ const MAX_BUFFERS: usize = 32;
 /// fade such as `prev(p) * 0.96` gets stuck on rounding and never reaches the
 /// background.
 const FEEDBACK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
-/// Panes that keep previous frames at once (each holds two frame-sized
-/// images), and the largest side of those images.
-const MAX_FEEDBACK_PANES: usize = 6;
+/// What all previous frames together may cover, in pixels: two 4K screens.
+/// Each pane keeps two 16-bit frames, so this is about 265 MB at most. Size,
+/// not count, is what costs memory; twelve AI result cards plus the panes
+/// fit easily, and thrashing (frames rebuilt every frame) never starts.
+const FEEDBACK_PIXEL_BUDGET: u64 = 2 * 3840 * 2160;
+/// A backstop on the number of entries, and the largest side of a frame.
+const MAX_FEEDBACK_PANES: usize = 24;
 const MAX_FEEDBACK_SIDE: u32 = 4096;
+
+/// Drops the least recently used frames until `size` more fits the budget.
+/// A single frame larger than the whole budget still gets its place.
+fn make_feedback_room(feedback: &mut HashMap<u64, FeedbackPane>, size: (u32, u32)) {
+    let area = |size: (u32, u32)| u64::from(size.0) * u64::from(size.1);
+    loop {
+        let used: u64 = feedback.values().map(|pane| area(pane.size)).sum();
+        if feedback.len() < MAX_FEEDBACK_PANES && used + area(size) <= FEEDBACK_PIXEL_BUDGET {
+            return;
+        }
+        let Some(oldest) = feedback
+            .iter()
+            .min_by_key(|(_, pane)| pane.last_used)
+            .map(|(key, _)| *key)
+        else {
+            return;
+        };
+        feedback.remove(&oldest);
+    }
+}
 
 /// Shows a pane's newest feedback frame on screen.
 const COPY_SOURCE: &str = "struct Geometry { geometry: vec4<f32> };
@@ -902,7 +926,7 @@ impl egui_wgpu::CallbackTrait for Background {
                 .is_none_or(|pane| pane.size != size || pane.source != *source)
             {
                 feedback.remove(&self.terminal);
-                super::make_room(feedback, MAX_FEEDBACK_PANES, |pane| pane.last_used);
+                make_feedback_room(feedback, size);
                 feedback.insert(
                     self.terminal,
                     FeedbackPane::new(device, feedback_layout, sampler, size, source.clone()),

@@ -131,8 +131,9 @@ return max(new_color, prev(p) * 0.96);
   so fades are faster at a higher FPS limit, and the picture holds while
   motion is paused. The first frame, and every resize, starts from black.
 - What is stored is the finished pixel, after Strength.
-- `prev` costs 2. Each pane that uses it keeps two extra frame-sized images
-  on the GPU (at most six panes at once).
+- `prev` costs 2. Each pane (and AI result card) that uses it keeps two
+  extra frame-sized images on the GPU; all of them together are capped at
+  about two 4K screens' worth (around 265 MB), oldest dropped first.
 - Settings → Debug is shown in debug builds, or with `"debug": true` in
   `feature-flags.json` ([local feature flags](../dev/LOCAL-FEATURE-FLAGS.md)).
   With the switch off, code that calls `prev` does not draw and its error says

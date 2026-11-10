@@ -1529,4 +1529,93 @@ mod tests {
             }
         });
     }
+
+    /// "Theme + shader" against the active profile's Shader chain, read-only:
+    /// two lanes, bundled fonts, judge only for compile errors.
+    #[test]
+    #[ignore = "sends real requests; set BUTTONSCLI_TEST_LIVE_SHADER_AI=1"]
+    fn live_theme_and_shader_with_active_profile() {
+        use crate::assistant::credentials::SystemCredentialStore;
+        assert_eq!(
+            std::env::var("BUTTONSCLI_TEST_LIVE_SHADER_AI").as_deref(),
+            Ok("1")
+        );
+        let root = home::home_dir().unwrap().join(".buttonscli-native");
+        let active: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(root.join("active-profile.json")).unwrap())
+                .unwrap();
+        let profile =
+            crate::storage::paths::sanitize_profile_name(active["name"].as_str().unwrap()).unwrap();
+        let document: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(root.join("profiles").join(&profile).join("native.json")).unwrap(),
+        )
+        .unwrap();
+        let settings: crate::assistant::provider::ProviderSettings =
+            serde_json::from_value(document["preferences"]["provider_settings"].clone()).unwrap();
+        let writers = settings.chain(crate::assistant::provider::AiTask::Shader);
+        let judges = settings.chain(crate::assistant::provider::AiTask::ShaderJudge);
+        let base = crate::theme_generation::tests::base_document();
+        let mut seed = crate::theme_generation::seed_palette(&base);
+        seed["fontCatalog"] = crate::fonts::FontCatalog::bundled().generation_catalog(false);
+        std::thread::scope(|scope| {
+            for (index, direction) in DIRECTIONS.iter().take(2).enumerate() {
+                let (writers, judges, profile, seed, base) =
+                    (&writers, &judges, &profile, &seed, &base);
+                scope.spawn(move || {
+                    let started = std::time::Instant::now();
+                    let result = generate(
+                        &crate::assistant::transport::ReqwestTransport,
+                        writers,
+                        judges,
+                        &mut |provider| {
+                            crate::assistant::chatgpt::saved_key(
+                                &SystemCredentialStore,
+                                profile,
+                                provider,
+                            )
+                            .map_err(|_| crate::assistant::client::ClientError::Credential)
+                        },
+                        &Request {
+                            brief: "halloween",
+                            direction: Some(*direction),
+                            current: &CustomShader {
+                                expression: String::new(),
+                                variables: Vec::new(),
+                                ..Default::default()
+                            },
+                            current_error: None,
+                            look: &Look::default(),
+                            picture_check: None,
+                            judge: crate::settings::JudgeMode::FixOnly,
+                            loops: true,
+                            feedback: false,
+                            theme: Some(ThemeRequest { seed, base }),
+                        },
+                        &AtomicBool::new(false),
+                        &mut |_, _| {},
+                    );
+                    let summary = result.as_ref().map(|candidate| {
+                        (
+                            &candidate.name,
+                            &candidate.writer,
+                            &candidate.note,
+                            candidate.code.len(),
+                            candidate.theme.as_ref().map(|theme| {
+                                (
+                                    theme["metadata"]["name"].clone(),
+                                    theme["theme"]["terminal"]["background"].clone(),
+                                    theme["theme"]["terminal"]["fontFamily"].clone(),
+                                )
+                            }),
+                        )
+                    });
+                    println!(
+                        "--- lane {index} {:?} in {:.0?}: {summary:#?}",
+                        direction.0,
+                        started.elapsed()
+                    );
+                });
+            }
+        });
+    }
 }

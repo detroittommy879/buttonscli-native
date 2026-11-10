@@ -9934,11 +9934,13 @@ impl ButtonsApp {
                     "For example: deep ocean blues, warm amber highlights, readable ANSI colors",
                 )),
         );
-        ui.spaced_label(
-            RichText::new("New: Shaders → Create with AI → Design → Theme + shader writes several themes at once, each with a matching animated background.")
-                .small()
-                .color(self.colors().muted),
-        );
+        if shader_ai_available() {
+            ui.spaced_label(
+                RichText::new("New: Shaders → Create with AI → Design → Theme + shader writes several themes at once, each with a matching animated background.")
+                    .small()
+                    .color(self.colors().muted),
+            );
+        }
         ui.spaced_checkbox(
             &mut self.preferences.ai_theme_allow_system_fonts,
             "Allow installed and custom fonts (less portable)",
