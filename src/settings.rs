@@ -336,7 +336,8 @@ impl Default for Preferences {
             settings_layout: SettingsLayout::default(),
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
-            animation_fps: 60,
+            // Smooth enough for slow backgrounds and half the GPU work of 60.
+            animation_fps: 30,
             notice_seconds: 5,
             power_saving: true,
             right_click_copies_selection: true,
@@ -956,7 +957,7 @@ mod tests {
     fn settings_layout_keyboard_and_band_brightness_persist_and_migrate() {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert_eq!(prefs.row_banding_brightness, 0);
-        assert_eq!(prefs.animation_fps, 60);
+        assert_eq!(prefs.animation_fps, 30);
         assert!(prefs.keyboard.bracketed_paste);
         prefs.settings_layout.size = [1200.0, 900.0];
         prefs.settings_layout.position = Some([-900.0, 120.0]);
