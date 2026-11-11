@@ -302,7 +302,7 @@ cargo build --locked --release --bin buttonscli
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
 - Release check: `src/update_check.rs` (one GitHub `releases/latest` request
   at startup, `check_for_updates`, `BUTTONSCLI_NO_UPDATE_CHECK=1`) and the
-  status bar link in `src/app/updates.rs`. Tests never call `spawn`; feed
+  status bar link in `src/app/updates.rs`. Tests never call `spawn` (smoke runs set the env var); feed
   `update_rx` by hand. Not an updater: `src/distribution.rs` is the future
   signed one.
 - `self.notice` messages render as a fading overlay (`src/app/notices.rs`,

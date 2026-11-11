@@ -8895,6 +8895,9 @@ impl ButtonsApp {
             return;
         };
         let before = document.clone();
+        // "Use on the whole app" ends the editor session, so it waits until
+        // this local copy of the draft has been written back.
+        let mut use_everywhere = false;
         let mut enabled = document["effects"]["shaderBackground"].is_object();
         let mut shader: crate::theme::ShaderBackground =
             serde_json::from_value(document["effects"]["shaderBackground"].clone())
@@ -9400,7 +9403,7 @@ impl ButtonsApp {
                         self.persist_native_preferences();
                     }
                 }
-                self.look_target_hint(ui);
+                use_everywhere |= self.look_target_hint(ui);
                 if !design_theme {
                     wrapping_row(ui, |ui| {
                         ui.spaced_label("Colors");
@@ -9795,7 +9798,7 @@ impl ButtonsApp {
         // 5. One place to keep or drop the result.
         settings_section(ui, base, 4, |ui| {
             ui.spaced_label(RichText::new("Keep it").strong());
-            self.look_target_hint(ui);
+            use_everywhere |= self.look_target_hint(ui);
             self.theme_apply_controls(ui);
             wrapping_row(ui, |ui| {
                 if ui.spaced_button("Preview on terminals").clicked() {
@@ -9823,6 +9826,9 @@ impl ButtonsApp {
                 ui.spaced_label(status);
             }
         });
+        if use_everywhere {
+            self.use_look_everywhere();
+        }
     }
 
     /// Draws the theme background with an optional shader on top.
@@ -13085,8 +13091,10 @@ impl ButtonsApp {
     /// Says when editor results won't reach the whole app (one pane is being
     /// edited, or displayed panes keep their own theme), with the way out.
     /// Shown next to Generate and Keep: the "Edit for" row is far above.
+    /// True when its button was clicked; the caller then calls
+    /// `use_look_everywhere` once its own copy of the draft is saved back.
     #[cfg(not(target_arch = "wasm32"))]
-    fn look_target_hint(&mut self, ui: &mut egui::Ui) {
+    fn look_target_hint(&mut self, ui: &mut egui::Ui) -> bool {
         let displayed = if self.rendered_panes.is_empty() {
             self.visible_panes.clone()
         } else {
@@ -13120,7 +13128,7 @@ impl ButtonsApp {
                 .map(|index| slot_name(*index))
                 .collect();
             if own.is_empty() {
-                return;
+                return false;
             }
             format!(
                 "{} {} a theme of {} own, so {} the shared theme.",
@@ -13143,9 +13151,7 @@ impl ButtonsApp {
                 .on_hover_text("Use this look for the app colors and every pane. Edits made to one pane are saved first, under a new name when the theme came from another file.")
                 .clicked();
         });
-        if clicked {
-            self.use_look_everywhere();
-        }
+        clicked
     }
 
     /// Changes one pane's look from a menu. It goes through the same draft as
