@@ -10,7 +10,8 @@ shader and font — plus the shared theme and the layout. Apply it later and
 every open terminal gets its look back.
 
 <!-- IMAGE: bundle-applied.jpg — four panes, each with its own shader, right after
-     applying a built-in bundle (e.g. "Autumn-3-panes"). -->
+     applying a built-in bundle (e.g. "Autumn-3-panes"). | alt: Four terminals in a grid right after applying a built-in bundle, each with its own shader background -->
+![Four terminals in a grid right after applying a built-in bundle, each with its own shader background](images/bundle-applied.jpg)
 
 ## Save one
 
