@@ -352,7 +352,8 @@ cargo build --locked --release --bin buttonscli
   web root `/var/www/buttonscli.com/html`. `/docs/` is the Classic (Tauri)
   docs: never overwrite it. The native guide is `site/` built with
   `DOCS_SITE=https://buttonscli.com DOCS_BASE=/native/docs` and copied to
-  `html/native/docs/`. Homepage variants come from
+  `html/native/docs/` (build in PowerShell: Git Bash rewrites `/native/docs`
+  into a Windows path; delete `screenshots/` from the output). Homepage variants come from
   `/var/www/buttonscli.com/site-src/build_new.py` (staged under
   `/new_abcd00/`); `activate.sh b` makes one live, `rollback.sh` undoes it.
   Site icon source: `.private/icons/codex-output/tom1.png` (black tile);
