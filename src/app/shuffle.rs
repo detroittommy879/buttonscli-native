@@ -268,7 +268,12 @@ impl ButtonsApp {
 
     /// Changes to the next theme now, fading from what is on screen.
     pub(super) fn shuffle_now(&mut self, now: f64) {
-        let current = self.preferences.theme_id.clone();
+        // Shaders only changes just the effects source, so that is what is on screen.
+        let current = if self.preferences.shuffle.shader_only {
+            self.preferences.effects_theme_id.clone()
+        } else {
+            self.preferences.theme_id.clone()
+        };
         let Some(id) = self.next_shuffle_theme(&current) else {
             self.notice = Some(format!(
                 "Shuffle has no themes to use: {} is empty.",
@@ -294,9 +299,17 @@ impl ButtonsApp {
         // only when asked: a font change resizes every terminal.
         let theme = self.themes.get(&id).clone();
         let scopes = std::mem::replace(&mut self.preferences.theme_apply, shuffle_scopes(&shuffle));
-        self.set_theme_all(&id);
         let calm = self.preferences.calm_mode;
-        self.apply_theme_sources(theme, calm);
+        if shuffle.shader_only {
+            // `set_theme_all` sets every source and clears pane themes, so
+            // only the effects source moves here; the shared theme stays.
+            let shared = self.preferences.theme_id.clone();
+            self.apply_theme_sources(theme, calm);
+            self.preferences.theme_id = shared;
+        } else {
+            self.set_theme_all(&id);
+            self.apply_theme_sources(theme, calm);
+        }
         self.preferences.theme_apply = scopes;
         // Shaders only keeps every pane's colors, so per-pane themes are skipped.
         if shuffle.every_pane && !shuffle.shader_only {
@@ -414,7 +427,7 @@ impl ButtonsApp {
                 .text("Fade seconds"),
         );
         ui.spaced_checkbox(&mut shuffle.shader_only, "Shaders only")
-            .on_hover_text("Changes only each theme's shader and keeps the current colors. Pick the pool \"Themes with a shader\" to use only themes that have one.");
+            .on_hover_text("Changes only the shared shader and keeps the current colors. Panes with a theme of their own keep their own shader. Pick the pool \"Themes with a shader\" to use only themes that have one.");
         ui.add_enabled_ui(!shuffle.shader_only, |ui| {
             ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
         })
@@ -733,6 +746,44 @@ mod tests {
             serde_json::from_str(r#"{"strength_override":{"enabled":true,"strength":7}}"#).unwrap();
         saved.normalize_theme_sources();
         assert_eq!(saved.strength_override.strength, 1.0);
+    }
+
+    #[test]
+    fn shaders_only_shuffle_moves_just_the_effects_source() {
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        // Pane 2 has a theme of its own.
+        let own = app
+            .shuffle_pool()
+            .into_iter()
+            .find(|id| id != &app.preferences.theme_id)
+            .unwrap();
+        app.set_theme_for_tab(1, &own);
+        let overrides = app.theme_overrides.clone();
+        assert!(!overrides.is_empty());
+        app.preferences.shuffle.shader_only = true;
+        let sources = |app: &ButtonsApp| {
+            let p = &app.preferences;
+            (
+                p.theme_id.clone(),
+                p.app_theme_id.clone(),
+                p.terminal_theme_id.clone(),
+                p.gradient_theme_id.clone(),
+            )
+        };
+        let before = sources(&app);
+        let effects = app.preferences.effects_theme_id.clone();
+
+        app.shuffle_now(0.0);
+        assert_eq!(sources(&app), before, "colors and the shared theme stay");
+        assert_eq!(app.theme_overrides, overrides, "pane themes stay");
+        assert_ne!(
+            app.preferences.effects_theme_id, effects,
+            "the shader moved"
+        );
     }
 
     #[test]
