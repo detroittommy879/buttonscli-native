@@ -5302,7 +5302,10 @@ impl ButtonsApp {
                             .map(|tab| (tab.id, tab.title.clone(), self.terminal_presentation_for(tab.id)));
                         let (choices, saved_count) = shader_choices(&self.preferences.saved_shaders);
                         let mut shader_action = None;
-                        let mut fps = self.preferences.animation_fps;
+                        let mut fps = (
+                            self.preferences.animation_match_display.unwrap_or(true),
+                            self.preferences.animation_fps,
+                        );
                         let mut fps_done = false;
                         // Keep each control in the outer wrapping row.
                             ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
@@ -5319,14 +5322,13 @@ impl ButtonsApp {
                                     pane_shader_menu(ui, theme, &choices, saved_count, &mut shader_action);
                                 }
                                 ui.separator();
-                                fps_done = animation_fps_slider(ui, &mut fps);
+                                fps_done = animation_fps_slider(ui, &mut fps.0, &mut fps.1);
                             })
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
                         if let Some(action) = action { self.perform_global_theme_action(action); }
-                        if fps != self.preferences.animation_fps {
-                            self.preferences.animation_fps = fps;
-                        }
+                        self.preferences.animation_match_display = Some(fps.0);
+                        self.preferences.animation_fps = fps.1;
                         if fps_done {
                             self.persist_native_preferences();
                         }
@@ -8818,7 +8820,7 @@ impl ButtonsApp {
             serde_json::from_value(document["effects"]["shaderBackground"].clone())
                 .unwrap_or_default();
         let mut chosen: Option<crate::shader_ai::Candidate> = None;
-        let time = animation_clock(ui.input(|i| i.time), self.preferences.animation_fps);
+        let time = animation_clock(ui.input(|i| i.time), self.effective_animation_fps());
 
         // 1. Live preview first, so every change below is visible right away.
         settings_section(ui, base, 0, |ui| {
@@ -9109,7 +9111,9 @@ impl ButtonsApp {
                         .on_hover_text("Positive y is the top of the pane, as most shader code expects. Turn off if this shader looks upside down.");
                 }
             });
-            if animation_fps_slider(ui, &mut self.preferences.animation_fps) {
+            let mut matched = self.preferences.animation_match_display.unwrap_or(true);
+            if animation_fps_slider(ui, &mut matched, &mut self.preferences.animation_fps) {
+                self.preferences.animation_match_display = Some(matched);
                 self.persist_native_preferences();
             }
 
@@ -11254,6 +11258,10 @@ impl ButtonsApp {
         for (key, _) in NATIVE_APPEARANCE_FIELDS {
             document["nativeAppearance"][*key] = preferences[*key].clone();
         }
+        // Older copies saved the frame rate; it is no longer part of a look.
+        if let Some(native) = document["nativeAppearance"].as_object_mut() {
+            native.remove("animation_fps");
+        }
         document
     }
 
@@ -11312,7 +11320,6 @@ impl ButtonsApp {
         let mut document = self.appearance_copy_document();
         if let Some(native) = document["nativeAppearance"].as_object_mut() {
             for key in [
-                "animation_fps",
                 "calm_mode",
                 "shader_backgrounds_enabled",
                 "effects_focused_pane_only",
@@ -13128,6 +13135,13 @@ impl ButtonsApp {
         use crate::i18n::{text, MessageKey as M};
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.spaced_label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut matched = self.preferences.animation_match_display.unwrap_or(true);
+            animation_fps_slider(ui, &mut matched, &mut self.preferences.animation_fps);
+            self.preferences.animation_match_display = Some(matched);
+        }
+        #[cfg(target_arch = "wasm32")]
         ui.add(
             egui::Slider::new(
                 &mut self.preferences.animation_fps,
@@ -14755,30 +14769,49 @@ const SIMPLE_NOISE_HIDDEN: bool = true;
 /// The animation clock, stepped to the FPS limit. Typing, output and mouse
 /// moves redraw more often than the limit; a stepped clock keeps shaders and
 /// effects changing only `fps` times a second however often frames come.
+/// At `MAX_ANIMATION_FPS` (Match display) it is not stepped: frames come at
+/// the refresh rate, and stepping to another rate would make motion judder.
 #[cfg(not(target_arch = "wasm32"))]
 fn animation_clock(time: f64, fps: u32) -> f32 {
-    let step = 1.0 / f64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
+    if fps >= crate::settings::MAX_ANIMATION_FPS {
+        return time as f32;
+    }
+    let step = 1.0 / f64::from(fps.max(1));
     ((time / step).floor() * step) as f32
 }
 
 /// The app-wide FPS limit slider. True once a change is finished (drag
 /// released or a click), so callers save it once rather than every frame.
 #[cfg(not(target_arch = "wasm32"))]
-fn animation_fps_slider(ui: &mut egui::Ui, fps: &mut u32) -> bool {
-    let response = ui
-        .add(
-            egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
-                .logarithmic(true)
-                .text("FPS limit (all panes)"),
-        )
-        .on_hover_text("How often shaders and effects change, in every pane. Lower it to save GPU, for example while recording.");
-    response.drag_stopped() || (response.changed() && !response.dragged())
+fn animation_fps_slider(ui: &mut egui::Ui, match_display: &mut bool, fps: &mut u32) -> bool {
+    let mut done = false;
+    wrapping_row(ui, |ui| {
+        done |= ui
+            .spaced_checkbox(match_display, "Match display")
+            .on_hover_text("Shaders and effects change once per screen refresh (60, 75, 144 Hz…), the smoothest motion. Turn off to set a lower limit.")
+            .changed();
+        let response = ui
+            .add_enabled(
+                !*match_display,
+                egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
+                    .logarithmic(true)
+                    .text("FPS limit (all panes)"),
+            )
+            .on_hover_text("How often shaders and effects change, in every pane, while Match display is off. Lower it to save GPU, for example while recording.");
+        done |= response.drag_stopped() || (response.changed() && !response.dragged());
+    });
+    done
 }
 
 /// Milliseconds between animation frames at the FPS limit.
 #[cfg(not(target_arch = "wasm32"))]
+/// 0 at `MAX_ANIMATION_FPS` (Match display): repaint at once, and vsync
+/// paces frames to the display.
 fn animation_interval_ms(fps: u32) -> u64 {
-    1000_u64.div_ceil(u64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS)))
+    if fps >= crate::settings::MAX_ANIMATION_FPS {
+        return 0;
+    }
+    1000_u64.div_ceil(u64::from(fps.max(1)))
 }
 
 /// The terminal background, then c1–c5: c1–c3 as before (gradient, or accent,
@@ -16517,7 +16550,8 @@ const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
     ("chrome_corner_radius", "app"),
     ("pane_hover_label", "fonts"),
     ("row_banding_brightness", "effects"),
-    ("animation_fps", "effects"),
+    // Not animation_fps: the frame rate belongs to the display, and themes
+    // saved with one used to reset it whenever they were applied.
     ("advanced_effects", "effects"),
     ("shader_backgrounds_enabled", "effects"),
     ("calm_mode", "effects"),
@@ -19008,10 +19042,18 @@ Start-Sleep -Seconds 300
         assert!(persisted.calm_mode);
         assert_eq!(persisted.dock_width, 222.0);
         document["nativeAppearance"]["calm_mode"] = json!(false);
+        // Older theme files carry the FPS they were saved at; it must never
+        // replace the user's own frame rate.
+        document["nativeAppearance"]["animation_fps"] = json!(30);
         app.theme_editor_document = Some(document.clone());
         app.preferences.calm_mode = false;
+        app.preferences.animation_fps = 90;
         app.preview_personal_theme_draft();
         assert!(!app.preferences.calm_mode);
+        assert_eq!(app.preferences.animation_fps, 90);
+        assert!(app.appearance_copy_document()["nativeAppearance"]
+            .get("animation_fps")
+            .is_none());
         app.preferences.calm_mode = true;
         app.preview_personal_theme_draft();
         app.preview_personal_theme_draft();
@@ -22894,8 +22936,11 @@ Start-Sleep -Seconds 300
     fn animation_clock_steps_at_the_fps_limit() {
         assert!((animation_clock(1.26, 10) - 1.2).abs() < 1e-6);
         assert_eq!(animation_clock(1.26, 10), animation_clock(1.29, 10));
-        assert_ne!(animation_clock(1.26, 240), animation_clock(1.29, 240));
-        assert_eq!(animation_interval_ms(240), 5);
+        // Match display: the clock is not stepped, and frames come at once.
+        assert_eq!(animation_clock(1.26, 240), 1.26);
+        assert_ne!(animation_clock(1.26, 120), animation_clock(1.29, 120));
+        assert_eq!(animation_interval_ms(240), 0);
+        assert_eq!(animation_interval_ms(120), 9);
         assert_eq!(animation_interval_ms(0), 1000);
     }
 

@@ -91,7 +91,7 @@ impl ButtonsApp {
     pub(super) fn power_budget(&self) -> (u32, u64) {
         power_budget(
             self.preferences.power_saving,
-            self.preferences.animation_fps,
+            self.preferences.animation_fps_limit(),
             self.power.focused,
             self.power.minimized,
         )
@@ -229,7 +229,15 @@ impl ButtonsApp {
                 ui.spaced_label(state);
                 ui.end_row();
                 ui.spaced_label("Animation FPS now");
-                ui.spaced_label(format!("{fps} (limit {})", self.preferences.animation_fps));
+                ui.spaced_label(
+                    if self.preferences.animation_fps_limit() >= crate::settings::MAX_ANIMATION_FPS
+                        && fps >= crate::settings::MAX_ANIMATION_FPS
+                    {
+                        "display refresh rate (no limit)".to_owned()
+                    } else {
+                        format!("{fps} (limit {})", self.preferences.animation_fps)
+                    },
+                );
                 ui.end_row();
                 ui.spaced_label("Output repaint");
                 ui.spaced_label(if output_ms == 0 {

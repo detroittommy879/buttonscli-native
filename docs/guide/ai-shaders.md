@@ -21,10 +21,10 @@ The **Create with AI** section is on **Settings → Themes → Shaders**.
      sliders are *not* sent, so the result isn't stuck on the old shader.
    - **Change current shader** — send the current code and change it as you
      describe ("make it slower", "add stars", "more purple").
-2. Pick **Design**:
-   - **Shader only** (default) — write the shader; the theme stays as it is.
-   - **Theme + shader** — every version also designs a matching theme. See
-     [Theme + shader](#theme--shader) below.
+2. Pick **Design** (shown when AI themes are available):
+   - **Theme + shader** (default) — every version also designs a matching
+     theme. See [Theme + shader](#theme--shader) below.
+   - **Shader only** — write the shader; the theme stays as it is.
 3. Pick **Colors** (Shader only):
    - **AI picks new ones** (default) — every version chooses its own palette
      to fit the idea.
@@ -87,7 +87,8 @@ and everything changes together.
 - Thumbnails show the new background with a line of terminal text in the
   theme's colors.
 - **Use this one** loads the shader and the theme into the draft, which
-  saves as a new theme. Parts switched off under **Library → Apply to
+  saves as one new theme file: colors, fonts and shader stay together, so
+  picking that theme later brings back the whole look. Parts switched off under **Library → Apply to
   shared** (app chrome, terminal colors, fonts) don't show, and while you
   edit one pane only that pane's terminal changes; the message says so.
 - **Undo AI change** puts back only the code; to undo the theme as well,

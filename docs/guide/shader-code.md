@@ -127,9 +127,11 @@ return max(new_color, prev(p) * 0.96);
 - Fade the old frame a little every time (`prev(p) * 0.96`), or it never
   goes away. Read it at a moved spot to make it flow:
   `prev(p + vec2<f32>(0.0, 0.004))`.
-- A new frame is drawn each time the animation clock ticks (the FPS limit),
-  so fades are faster at a higher FPS limit, and the picture holds while
-  motion is paused. The first frame, and every resize, starts from black.
+- A new frame is drawn each time the animation clock ticks (every screen
+  refresh with **Match display**, otherwise the FPS limit), so fades are
+  faster on a faster screen or at a higher limit, and the picture holds
+  while motion is paused. The first frame, and every resize, starts from
+  black.
 - What is stored is the finished pixel, after Strength.
 - `prev` costs 2. Each pane (and AI result card) that uses it keeps two
   extra frame-sized images on the GPU; all of them together are capped at

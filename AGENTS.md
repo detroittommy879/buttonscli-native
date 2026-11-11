@@ -158,7 +158,11 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
-  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Use
+  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Match display
+  (`animation_match_display`, default) is `animation_fps_limit()` =
+  `MAX_ANIMATION_FPS`: an unstepped clock and repaint at once (vsync paces).
+  FPS is never part of a theme: keep it out of `NATIVE_APPEARANCE_FIELDS`
+  (theme copies used to reset it on apply). Use
   `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
   or minimized (`power_saving`); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar

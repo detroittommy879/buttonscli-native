@@ -14,7 +14,12 @@
   be too heavy for laptop graphics, a shader the graphics driver refuses is
   skipped with a message instead of closing the app, and a comment that
   mentions `strength` no longer switches off the Strength slider.
-- New profiles animate at 30 FPS instead of 60 (Settings → Effects changes it).
+- Shaders and effects now match the display's refresh rate (60, 75, 120,
+  144 Hz…) by default, so motion is smooth without skipped or doubled frames.
+  Untick **Match display** next to the FPS limit to set a lower cap; profiles
+  whose limit was lowered below 30 keep it.
+- Fixed: applying a saved theme no longer changes the FPS limit. Theme copies
+  used to store the FPS they were saved at and put it back when applied.
 - Longer shaders compile: the size limit is four times higher, and a shader
   that is too long or uses something that is not allowed now says which.
 - AI model endpoints must use HTTPS unless they are on this computer or your
@@ -30,13 +35,14 @@
 - Create with AI → Design → **Theme + shader**: each version also designs a
   matching theme (app and terminal colors, ANSI colors, fonts), so one idea
   such as "halloween" changes the whole look. Cards preview the theme's text
-  colors; using one loads both into the draft. The AI Theme Generator stays
-  as it was.
+  colors; using one loads both into the draft, which saves as one theme. It
+  is the default Design where AI themes are available. The AI Theme
+  Generator stays as it was.
 - Experiment (Settings → Debug → Shader experiments → Feedback): shader code
   may call `prev(p)` for the color it drew there last frame, for trails,
   ripples and build-up. Create with AI is told about it while it is on. Each
   pane using it keeps two extra frame-sized images on the GPU; a new frame is
-  drawn per animation tick, so fades follow the FPS limit and pause with
+  drawn per animation tick, so fades follow the frame rate and pause with
   motion.
 - Docs: the shader guide covers loops, the Create with AI options, Theme +
   shader and the feedback experiment; AI setup notes the HTTPS rule and that

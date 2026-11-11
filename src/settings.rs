@@ -261,8 +261,13 @@ pub(crate) struct Preferences {
     pub(crate) settings_layout: SettingsLayout,
     pub(crate) keyboard: KeyboardPreferences,
     pub(crate) row_banding_brightness: u8,
-    /// Frames per second for shaders and other animated effects, all panes.
+    /// Frames per second for shaders and other animated effects, all panes,
+    /// while `animation_match_display` is off.
     pub(crate) animation_fps: u32,
+    /// Animate at the display's own refresh rate (60, 75, 144 Hz…) instead
+    /// of the FPS limit. Absent in older profiles: those match the display
+    /// unless their limit was lowered below the old default of 30.
+    pub(crate) animation_match_display: Option<bool>,
     /// Seconds a workspace message stays before fading; 0 keeps it until
     /// dismissed or replaced.
     pub(crate) notice_seconds: u32,
@@ -339,8 +344,9 @@ impl Default for Preferences {
             settings_layout: SettingsLayout::default(),
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
-            // Smooth enough for slow backgrounds and half the GPU work of 60.
-            animation_fps: 30,
+            // The limit once "Match display" is switched off.
+            animation_fps: 60,
+            animation_match_display: Some(true),
             notice_seconds: 5,
             power_saving: true,
             shader_lab: ShaderLab::default(),
@@ -536,6 +542,20 @@ pub(crate) struct ShaderLab {
     pub(crate) design_theme: bool,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+impl Preferences {
+    /// The FPS animations aim for: the limit, or `MAX_ANIMATION_FPS` while
+    /// matching the display (which then never steps the clock and lets
+    /// vsync pace frames).
+    pub(crate) fn animation_fps_limit(&self) -> u32 {
+        if self.animation_match_display.unwrap_or(true) {
+            MAX_ANIMATION_FPS
+        } else {
+            self.animation_fps
+        }
+    }
+}
+
 impl ShaderLab {
     pub(crate) const DEFAULT_COST_LIMIT: u32 = 240;
     pub(crate) const MAX_COST_LIMIT: u32 = 4_000;
@@ -549,7 +569,7 @@ impl Default for ShaderLab {
             loops: true,
             cost_limit: Self::DEFAULT_COST_LIMIT,
             feedback: false,
-            design_theme: false,
+            design_theme: true,
         }
     }
 }
@@ -652,6 +672,8 @@ impl Preferences {
         }
         self.row_banding_brightness = self.row_banding_brightness.min(64);
         self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
+        self.animation_match_display
+            .get_or_insert(self.animation_fps >= 30);
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
         self.motion_speed = if self.motion_speed.is_finite() {
@@ -1014,7 +1036,17 @@ mod tests {
     fn settings_layout_keyboard_and_band_brightness_persist_and_migrate() {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert_eq!(prefs.row_banding_brightness, 0);
-        assert_eq!(prefs.animation_fps, 30);
+        assert_eq!(prefs.animation_fps, 60);
+        assert_eq!(prefs.animation_fps_limit(), MAX_ANIMATION_FPS);
+        // Older profiles have no match switch: the old default of 30 now
+        // follows the display, a deliberately lowered limit stays.
+        for (fps, matched) in [(30, true), (90, true), (12, false)] {
+            let mut old: Preferences =
+                serde_json::from_value(serde_json::json!({"animation_fps": fps})).unwrap();
+            old.animation_match_display = None;
+            old.normalize_theme_sources();
+            assert_eq!(old.animation_match_display, Some(matched), "{fps}");
+        }
         assert!(prefs.keyboard.bracketed_paste);
         prefs.settings_layout.size = [1200.0, 900.0];
         prefs.settings_layout.position = Some([-900.0, 120.0]);
