@@ -437,7 +437,7 @@ pub(crate) fn program(custom: &CustomShader) -> Result<String, String> {
     Ok(combine(&function(custom)?, custom.y_up))
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "windows"))]
 pub(crate) fn program_with(custom: &CustomShader, rules: Rules) -> Result<String, String> {
     Ok(combine(&function_with(custom, rules)?, custom.y_up))
 }
