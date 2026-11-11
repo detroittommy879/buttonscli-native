@@ -1,0 +1,218 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#163766",
+        "#275c9e",
+        "#35b5d0",
+        "#8c80e8",
+        "#c1e8ff"
+      ],
+      "custom": {
+        "expression": "let sky = cloud(p * 1.6 + vec2<f32>(t * 0.045, -t * 0.025));\nlet mist = cloud(p * 3.0 + vec2<f32>(-t * 0.08, t * 0.035));\nlet horizon = exp(-abs(p.y + 0.45) * 1.4);\nlet base = mix(c1, c2, smoothstep(0.2, 0.85, sky));\nlet atmosphere = mix(base, c3, horizon * mist * 0.32);\nlet storm = mix(atmosphere, c4, pow(sky, 3.0) * 0.32);\n\nlet q = vec2<f32>(p.x - wind * p.y, p.y);\nlet r1 = q * vec2<f32>(42.0 * rain_density, 7.0) + vec2<f32>(0.0, t * 8.0);\nlet id1 = floor(r1);\nlet h1 = hash(id1);\nlet f1 = fract(r1);\nlet streak1 = (1.0 - smoothstep(0.025, 0.095, abs(f1.x - 0.5))) * smoothstep(0.12, 0.85, f1.y) * step(0.36, h1);\nlet r2 = q * vec2<f32>(69.0 * rain_density, 11.0) + vec2<f32>(17.0, t * 12.0);\nlet id2 = floor(r2);\nlet f2 = fract(r2);\nlet streak2 = (1.0 - smoothstep(0.018, 0.075, abs(f2.x - 0.5))) * smoothstep(0.25, 0.95, f2.y) * step(0.56, hash(id2));\n\nlet clock = t * lightning_rate * 0.22;\nlet cycle = floor(clock);\nlet phase = fract(clock);\nlet flash = min(1.0, exp(-phase * 55.0) + 0.65 * exp(-abs(phase - 0.095) * 95.0));\nlet anchor = (hash(vec2<f32>(cycle, 8.3)) - 0.5) * 3.2;\nlet zig = (noise(vec2<f32>(p.y * 15.0, cycle * 11.0)) - 0.5) * 0.24;\nlet path = anchor + 0.13 * p.y + zig;\nlet d = abs(p.x - path);\nlet bolt = exp(-d * 320.0) + 0.32 * exp(-d * 34.0);\nlet branchPath = path + max(0.0, 0.35 - p.y) * 0.58;\nlet branch = exp(-abs(p.x - branchPath) * 240.0) * smoothstep(-0.7, -0.35, p.y) * (1.0 - smoothstep(0.25, 0.4, p.y));\nlet gate = smoothstep(-0.95, -0.65, p.y);\nlet litSky = storm + c4 * vec3<f32>(flash * (0.16 + 0.22 * sky));\nlet rainfall = c3 * vec3<f32>(streak1 * 0.42) + c5 * vec3<f32>(streak2 * 0.30);\nlet electricity = c5 * vec3<f32>((bolt + branch * 0.65) * flash * gate);\nlet color = clamp(litSky + rainfall + electricity, vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Electric Downpour",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.4000000059604645,
+            "name": "rain_density",
+            "value": 1.0
+          },
+          {
+            "max": 1.0,
+            "min": -1.0,
+            "name": "wind",
+            "value": 0.25
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "lightning_rate",
+            "value": 0.800000011920929
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.2199999988079071,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "electric-downpour",
+    "name": "Electric Downpour",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:electric-downpour",
+    "updatedAt": "2026-11-09T16:28:21.155Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff398f",
+        "#21dbff",
+        "#b8ff38",
+        "#9955ff"
+      ],
+      "custom": {
+        "expression": "let grid = p * vec2<f32>(density) + vec2<f32>(0.12 * sin(t * 0.19), -t * 0.16);\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet phase = 6.2831853 * seed;\nlet drift = vec2<f32>(sin(t * 0.65 + phase), cos(t * 0.49 + phase)) * vec2<f32>(0.065);\nlet local = fract(grid) - vec2<f32>(0.5) - drift;\nlet elastic = stretch * smoothstep(0.35, 0.8, seed) * sin(t * 1.3 + phase);\nlet shape = local / vec2<f32>(1.0 + elastic * 0.28, 1.0 - elastic * 0.22);\nlet radius = 0.29 + 0.045 * sin(phase * 3.1);\nlet angle = atan2(shape.y, shape.x) + phase + t * (seed - 0.5) * 0.32;\nlet sector = floor((angle + 0.5235988) / 1.0471976);\nlet folded = angle - sector * 1.0471976;\nlet radial = length(shape);\nlet q = vec2<f32>(radial * cos(folded), radial * sin(folded));\nlet outer = length(q - vec2<f32>(radius * 0.8660254, clamp(q.y, -radius * 0.5, radius * 0.5)));\nlet inner = length(q - vec2<f32>(radius * 0.64, clamp(q.y, -radius * 0.28, radius * 0.28)));\nlet alternate = 1.0 - step(0.5, fract(sector * 0.5));\nlet bond = min(outer, mix(1.0, inner, alternate));\nlet stroke = 1.0 - smoothstep(0.009, 0.019, bond);\nlet halo = exp(-bond * 35.0) * glow;\nlet hue = mix(c1, c2, smoothstep(0.05, 0.6, seed));\nlet tint0 = mix(hue, mix(c3, c4, seed), smoothstep(0.58, 0.85, seed));\nlet tint = mix(tint0, c5, smoothstep(0.85, 1.0, seed));\nlet atmosphere = mix(c4, c2, 0.5 + 0.5 * sin(p.x * 0.8 + p.y * 0.6 + t * 0.22)) * vec3<f32>(0.13);\nlet color = clamp(atmosphere + tint * vec3<f32>(stroke * 0.95 + halo * 0.48), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Electric Benzene",
+        "variables": [
+          {
+            "max": 4.5,
+            "min": 1.0,
+            "name": "density",
+            "value": 2.200000047683716
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "stretch",
+            "value": 0.550000011920929
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.550000011920929
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "plasma",
+      "scale": 1.2000000476837158,
+      "speed": 5.0,
+      "strength": 0.3100000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-01T08:43:25.416Z",
+    "description": "A classic Halloween palette of deep midnight, glowing pumpkin orange, and warm candlelight.",
+    "id": "electric-benzene",
+    "name": "Electric Benzene",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:electric-benzene",
+    "updatedAt": "2026-11-01T08:50:27.630Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#000305",
+        "background": "#0e111b",
+        "buttonBackground": "#1f1f30",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#0d0906"
+      },
+      "shell": {
+        "accent": "#4b5be7",
+        "accentHover": "#6b79eb",
+        "background": "#0c0e12",
+        "backgroundSecondary": "#14172c",
+        "border": "#332211",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#7f7159",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#858585",
+        "textMain": "#cccccc"
+      },
+      "statusBar": {
+        "background": "#080604",
+        "border": "#332211",
+        "text": "#ffffff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#17100a",
+        "activeBorder": "#ff9900",
+        "background": "#080604",
+        "idleBackground": "#2d2d30"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#27201a",
+        "blue": "#4a4a4a",
+        "brightBlack": "#4d3926",
+        "brightBlue": "#6e6e6e",
+        "brightCyan": "#c29970",
+        "brightGreen": "#7acc00",
+        "brightMagenta": "#b34732",
+        "brightRed": "#ff751a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd147",
+        "cyan": "#a37c58",
+        "green": "#5c8a00",
+        "magenta": "#8a3324",
+        "red": "#e65c00",
+        "white": "#f0d8b8",
+        "yellow": "#ffb300"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f0d8b8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.5,
+        "fontWeight": 400,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

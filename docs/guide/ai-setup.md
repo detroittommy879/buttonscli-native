@@ -31,6 +31,14 @@ model, and paste your key. Keys are stored in your operating system's
 credential store (Windows Credential Manager, macOS Keychain, Secret Service
 on Linux), never in a settings file.
 
+Endpoints must use `https://`. Plain `http://` is accepted only for servers
+on this computer or your local network (`localhost`, `127.0.0.1`,
+`192.168.x.x`, `10.x.x.x`, `name.local` and similar), such as Ollama or LM
+Studio, so a key is never sent unprotected over the internet.
+
+For shaders and Theme + shader, an affordable fast model works well: for
+example Claude Haiku through OpenRouter, or DeepSeek.
+
 ## 2. Choose models per job
 
 **Settings → AI models** has one row per job:
@@ -40,7 +48,7 @@ on Linux), never in a settings file.
 | **AI Help model** | The AI Help chat |
 | **Theme generation model** | [AI themes](ai-themes.md) |
 | **Shader generation model** | Writing [AI shaders](ai-shaders.md) and random ideas |
-| **Shader judge model** | Checking and fixing shaders — pick a *different* model from the writer for a real second opinion |
+| **Shader judge model** | Optional. Fixes shaders that do not compile (and, if you choose so under Create with AI → Options, reviews every one). Without it, the Shader model fixes its own. A *different* model gives a real second opinion. |
 | **Simulated terminal model** | The simulated terminal demo |
 
 **Add fallback** adds a second choice that is used if the first one fails or

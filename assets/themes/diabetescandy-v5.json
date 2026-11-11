@@ -1,0 +1,183 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 300.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 67.0,
+    "staticAmplitude": 96.0,
+    "staticBrightness": 95.0,
+    "staticDensity": 100.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.3400000035762787
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T23:21:25.964Z",
+    "description": "Blue-black shell with cyan-magenta remaps and a cold off-center glow.",
+    "id": "diabetescandy-v5",
+    "name": "DiabetesCandy v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:diabetescandy-v5",
+    "updatedAt": "2026-11-03T20:27:10.170Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#6be1c8",
+        "background": "#0d1116",
+        "buttonBackground": "#264b60",
+        "buttonHover": "#2d5e78",
+        "buttonText": "#eef4f8"
+      },
+      "settings": {
+        "background": "#11171f"
+      },
+      "shell": {
+        "accent": "#59c7ff",
+        "accentHover": "#77d1ff",
+        "background": "#0e1217",
+        "backgroundSecondary": "#172833",
+        "border": "#263241",
+        "buttonBackground": "#14202a",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#949a9e",
+        "textMain": "#eef4f8"
+      },
+      "statusBar": {
+        "background": "#0b0f14",
+        "border": "#214356",
+        "text": "#b7c5d4",
+        "warning": "#a08a3a"
+      },
+      "tabs": {
+        "activeBackground": "#18212b",
+        "activeBorder": "#59c7ff",
+        "background": "#10151c",
+        "idleBackground": "#14202a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#241B2C",
+        "blue": "#3a28bd",
+        "brightBlack": "#64546E",
+        "brightBlue": "#dd00fa",
+        "brightCyan": "#874fe0",
+        "brightGreen": "#e08e00",
+        "brightMagenta": "#9a4c71",
+        "brightRed": "#3f414c",
+        "brightWhite": "#FFF9FE",
+        "brightYellow": "#3f618e",
+        "cyan": "#6d28d9",
+        "green": "#0ba9b1",
+        "magenta": "#ec4899",
+        "red": "#444651",
+        "white": "#F2DFF6",
+        "yellow": "#153e75"
+      },
+      "background": "#100c18",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#FFF2FB",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#100d1a",
+        "#061407",
+        "#34496a",
+        "#100d1a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 14.5,
+        "fontWeight": 300,
+        "letterSpacing": -0.10000000149011612
+      },
+      "settings": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

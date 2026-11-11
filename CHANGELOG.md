@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+- Shader code has 14 new helpers: `fbm`, `ridged`, `flow`, `voronoi`, `hash2`,
+  `rotate`, `polar`, shapes (`sd_circle`, `sd_box`, `sd_segment`, `smin`),
+  `fill`/`stroke`/`halo` to draw them, and `tonemap`. See the Shader code
+  reference.
+- Create with AI writes better shaders: its models get a guide with worked
+  examples, each result is drawn once off screen, and a flat, empty, washed-out
+  or motionless picture goes back to the writer for another try. Notes say
+  what the judge actually answered.
+- Safer shaders: helper calls have a per-pixel budget (240) so no shader can
+  be too heavy for laptop graphics, a shader the graphics driver refuses is
+  skipped with a message instead of closing the app, and a comment that
+  mentions `strength` no longer switches off the Strength slider.
+- New profiles animate at 30 FPS instead of 60 (Settings → Effects changes it).
+- Longer shaders compile: the size limit is four times higher, and a shader
+  that is too long or uses something that is not allowed now says which.
+- AI model endpoints must use HTTPS unless they are on this computer or your
+  local network (`localhost`, `192.168.x.x`, `name.local` and similar), so an
+  API key is never sent unprotected over the internet.
+- Create with AI → Options: when the judge model is asked (default: only to
+  fix compile errors, so a judge model is optional), the picture check, the
+  work limit per pixel, and whether shader code may use `var`, `if`/`else` and
+  fixed-count `for` loops (now on by default).
+- Create with AI writes up to 12 versions at once (was 6), with six new
+  directions (Minimal, Layered, Retro, Dreamy, Cosmic, Graphic), and Random
+  ideas can suggest up to 12.
+- Create with AI → Design → **Theme + shader**: each version also designs a
+  matching theme (app and terminal colors, ANSI colors, fonts), so one idea
+  such as "halloween" changes the whole look. Cards preview the theme's text
+  colors; using one loads both into the draft. The AI Theme Generator stays
+  as it was.
+- Experiment (Settings → Debug → Shader experiments → Feedback): shader code
+  may call `prev(p)` for the color it drew there last frame, for trails,
+  ripples and build-up. Create with AI is told about it while it is on. Each
+  pane using it keeps two extra frame-sized images on the GPU; a new frame is
+  drawn per animation tick, so fades follow the FPS limit and pause with
+  motion.
+- Docs: the shader guide covers loops, the Create with AI options, Theme +
+  shader and the feedback experiment; AI setup notes the HTTPS rule and that
+  the judge model is optional.
+- Updated the TLS libraries (rustls 0.23.46, rustls-webpki 0.103.16,
+  webpki-roots 1.0.11) for certificate-checking fixes.
+
 - Version 1.0.0: the native rewrite continues past the old Tauri app's 0.9.x.
   Releases follow Semantic Versioning and pick their own number from commit
   messages (`feat:` → minor, fixes → patch, breaking changes ask first; see

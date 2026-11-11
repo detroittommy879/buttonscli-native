@@ -1,0 +1,209 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff487b",
+        "#36dcff",
+        "#ffc857"
+      ],
+      "custom": {
+        "expression": "let wind = sin(t * 0.7 + p.y * 1.8) * 0.18;\nlet sky = cloud(p * vec2<f32>(1.4, 2.8) + vec2<f32>(t * 0.12, 0.0));\nlet haze = mix(c1 * vec3<f32>(0.48), c3 * vec3<f32>(0.85), smoothstep(0.15, 0.85, sky));\nlet spacing = 1.15 - amount * 0.065;\nlet drift = vec2<f32>(p.x + wind - t * 0.22, p.y + t * gravity * 0.32);\nlet grid = drift / vec2<f32>(spacing);\nlet cell = floor(grid);\nlet seed = hash(cell);\nlet local = (fract(grid) - vec2<f32>(0.5)) * vec2<f32>(spacing);\nlet angle = seed * 6.2831853 + sin(t * 1.8 + seed * 12.0) * 0.9;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle)) / vec2<f32>(shape_size * (0.65 + seed * 0.45));\nlet taper = max(0.0, 1.0 - q.y * q.y);\nlet edge = abs(q.x) - taper * (0.42 + 0.09 * cos(q.y * 19.0));\nlet leaf = (1.0 - smoothstep(-0.025, 0.025, edge)) * (1.0 - smoothstep(0.92, 1.02, abs(q.y)));\nlet vein = exp(-abs(q.x) * 65.0) * leaf;\nlet leafColor = mix(mix(c1, c3, smoothstep(0.1, 0.7, seed)), c2, step(0.84, seed));\nlet litLeaf = leafColor * vec3<f32>(0.78 + 0.22 * sin(q.y * 3.0 + seed * 5.0)) + c3 * vec3<f32>(vein * 0.3);\nlet rainCoord = p.x * 28.0 + p.y * 5.0;\nlet rain = pow(0.5 + 0.5 * cos(rainCoord), 28.0) * pow(0.5 + 0.5 * sin(p.y * 20.0 + t * gravity * 9.0 + floor(rainCoord) * 2.7), 12.0);\nlet halo = exp(-max(edge, 0.0) * 12.0) * exp(-max(abs(q.y) - 0.9, 0.0) * 12.0);\nlet color = mix(haze, litLeaf, leaf) + c3 * vec3<f32>(rain * 0.22 + glow * halo * 0.22);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "AutumnFallingLeaves",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 6.0
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 1.100000023841858
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.3199999928474426
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.20000000298023224
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7999999523162842,
+      "speed": 2.200000047683716,
+      "strength": 0.0,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T02:10:18.451Z",
+    "description": "A neutral dark theme with conventional ANSI hues, pure red, a familiar blue accent, and clean everyday typography.",
+    "id": "standard-dark",
+    "name": "Standard Dark",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:standard-dark",
+    "updatedAt": "2026-11-03T02:11:37.787Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#70aaff",
+        "background": "#1c1c1c",
+        "buttonBackground": "#1f1f30",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#1c1c1c"
+      },
+      "shell": {
+        "accent": "#408cff",
+        "accentHover": "#70aaff",
+        "background": "#121212",
+        "backgroundSecondary": "#1c1c1c",
+        "border": "#383838",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#408cff",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#a0a0a0",
+        "textMain": "#e6e6e6"
+      },
+      "statusBar": {
+        "background": "#1c1c1c",
+        "border": "#383838",
+        "text": "#a0a0a0",
+        "warning": "#dddd00"
+      },
+      "tabs": {
+        "activeBackground": "#121212",
+        "activeBorder": "#408cff",
+        "background": "#1c1c1c",
+        "idleBackground": "#1c1c1c"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#303030",
+        "blue": "#5555ff",
+        "brightBlack": "#808080",
+        "brightBlue": "#8888ff",
+        "brightCyan": "#55ffff",
+        "brightGreen": "#55ff55",
+        "brightMagenta": "#ff55ff",
+        "brightRed": "#ff5555",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffff55",
+        "cyan": "#00cccc",
+        "green": "#00cc00",
+        "magenta": "#dd00dd",
+        "red": "#ff0000",
+        "white": "#cccccc",
+        "yellow": "#dddd00"
+      },
+      "background": "#101010",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Cascadia Mono (System)",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e5e5e5",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#101014",
+        "#1c304d",
+        "#193b3b",
+        "#342747"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.2
+      },
+      "settings": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Segoe UI (System)",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Cascadia Mono (System)",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

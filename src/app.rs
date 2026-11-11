@@ -968,6 +968,7 @@ enum TextEditorKind {
 }
 /// One parallel AI shader attempt, as shown in the progress flowchart.
 #[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
 pub(crate) struct ShaderLane {
     pub(crate) direction: &'static str,
     pub(crate) stage: crate::shader_ai::Stage,
@@ -1313,6 +1314,10 @@ impl ButtonsApp {
                 &cc.egui_ctx,
                 render_state.target_format,
             );
+            crate::plugins::effects::shader_background::register_device(
+                &render_state.device,
+                &render_state.queue,
+            );
             crate::plugins::effects::analog_static::register(
                 &cc.egui_ctx,
                 render_state.target_format,
@@ -1410,6 +1415,8 @@ impl ButtonsApp {
         }
         fonts::install(&cc.egui_ctx, &app.font_catalog);
         app.apply_style(&cc.egui_ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        app.apply_shader_lab();
         #[cfg(not(target_arch = "wasm32"))]
         app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
@@ -9249,7 +9256,7 @@ impl ButtonsApp {
         if shader_ai_available() {
             settings_section(ui, base, 2, |ui| {
                 ui.spaced_label(RichText::new("Create with AI").strong());
-                ui.spaced_label("Describe a look. Several versions are written at once by your Shader model and checked or fixed by your Shader judge model (set both in AI models). Click a result to use it.");
+                ui.spaced_label("Describe a look. Several versions are written at once by your Shader model (set in AI models); an optional Shader judge model can fix or review them (see Options). Click a result to use it.");
                 let has_code = shader.custom.as_ref().is_some_and(|c| {
                     !c.expression.trim().is_empty() && c.expression.trim() != "return bg;"
                 });
@@ -9280,30 +9287,57 @@ impl ButtonsApp {
                         self.shader_ai.fresh = false;
                     }
                 });
-                wrapping_row(ui, |ui| {
-                    ui.spaced_label("Colors");
-                    if ui
+                let design_theme =
+                    theme_generation_available() && self.preferences.shader_lab.design_theme;
+                if theme_generation_available() {
+                    let before = self.preferences.shader_lab.design_theme;
+                    wrapping_row(ui, |ui| {
+                        ui.spaced_label("Design");
+                        if ui
+                            .selectable_label(!design_theme, "Shader only")
+                            .on_hover_text("Write only the shader; the theme stays as it is.")
+                            .clicked()
+                        {
+                            self.preferences.shader_lab.design_theme = false;
+                        }
+                        if ui
+                            .selectable_label(design_theme, "Theme + shader")
+                            .on_hover_text("Each version also designs a matching theme: app and terminal colors, ANSI colors and fonts, all from the same idea (\"halloween\" changes everything). Using a result loads both into this draft.")
+                            .clicked()
+                        {
+                            self.preferences.shader_lab.design_theme = true;
+                        }
+                    });
+                    if self.preferences.shader_lab.design_theme != before {
+                        self.persist_native_preferences();
+                    }
+                }
+                if !design_theme {
+                    wrapping_row(ui, |ui| {
+                        ui.spaced_label("Colors");
+                        if ui
                         .selectable_label(self.shader_ai.ai_colors, "AI picks new ones")
                         .on_hover_text("Each version chooses its own c1–c5. Using a result makes them this shader's colors, which you can still change.")
                         .clicked()
                     {
                         self.shader_ai.ai_colors = true;
                     }
-                    if ui
-                        .selectable_label(
-                            !self.shader_ai.ai_colors,
-                            if own_palette {
-                                "Keep this shader's"
-                            } else {
-                                "Keep the theme's"
-                            },
-                        )
-                        .on_hover_text("AI builds from the c1–c5 shown under Style.")
-                        .clicked()
-                    {
-                        self.shader_ai.ai_colors = false;
-                    }
-                });
+                        if ui
+                            .selectable_label(
+                                !self.shader_ai.ai_colors,
+                                if own_palette {
+                                    "Keep this shader's"
+                                } else {
+                                    "Keep the theme's"
+                                },
+                            )
+                            .on_hover_text("AI builds from the c1–c5 shown under Style.")
+                            .clicked()
+                        {
+                            self.shader_ai.ai_colors = false;
+                        }
+                    });
+                }
                 ui.add(
                     egui::TextEdit::multiline(&mut self.shader_ai.prompt)
                         .hint_text("e.g. bouncing fireballs with gravity, on a dark red night sky")
@@ -9375,6 +9409,9 @@ impl ButtonsApp {
                         self.start_random_shader_idea(ui.ctx());
                     }
                 });
+                egui::CollapsingHeader::new("Options")
+                    .id_salt("shader-ai-options")
+                    .show(ui, |ui| self.shader_options(ui));
                 if !self.shader_ai.ideas.is_empty() {
                     let mut write_all = false;
                     let mut clear = false;
@@ -9439,7 +9476,9 @@ impl ButtonsApp {
                     },
                     "use Strength",
                 ];
-                notes.push(if look.ai_colors {
+                notes.push(if design_theme {
+                    "design a matching theme (colors and fonts) and pick shader colors from it"
+                } else if look.ai_colors {
                     "pick its own colors"
                 } else if look.own_colors {
                     "use this shader's colors"
@@ -9478,7 +9517,15 @@ impl ButtonsApp {
                 self.shader_ai.undo = Some(std::mem::replace(&mut custom.expression, expression));
             }
             // Compile status is checked live (cached), so it doubles as the check button.
-            let compile = crate::plugins::effects::shader_expression::function(custom);
+            let compile =
+                crate::plugins::effects::shader_expression::function(custom).and_then(|source| {
+                    match crate::plugins::effects::shader_background::driver_error(custom) {
+                        Some(error) => Err(format!(
+                        "Your graphics driver refused this shader, so it is not drawn:\n{error}"
+                    )),
+                        None => Ok(source),
+                    }
+                });
             let title = match &compile {
                 Ok(_) => "Code ✓ compiles",
                 Err(_) => "Code ✗ has an error",
@@ -9487,7 +9534,7 @@ impl ButtonsApp {
                 .id_salt("shader-code")
                 .default_open(compile.is_err())
                 .show(ui, |ui| {
-                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c5 = colors. Helpers: palette(x), hsv(h, s, v), noise(p), cloud(p), hash(p), stars(p, t). No loops or `if`. Code that never uses strength is faded by Strength for you.");
+                    ui.spaced_label("WGSL: a few `let` lines ending in `return <color>;`, or one color expression. p = coordinates, t = time, strength = the Strength slider (0–1), bg = background, c1–c5 = colors. Helpers: palette(x), hsv(h, s, v), tonemap(color); noise(p), cloud(p), fbm(p), ridged(p), flow(p, t), voronoi(p), hash(p), stars(p, t); rotate(p, angle), polar(p); shapes sd_circle(p, r), sd_box(p, half), sd_segment(p, a, b), smin(a, b, k) drawn with fill(d), stroke(d, width), halo(d, size). No loops or `if`. Code that never uses strength is faded by Strength for you.");
                     wrapping_row(ui, |ui| {
                         ui.spaced_menu_button("Load example", |ui| {
                             for (label, example) in SHADER_EXAMPLES {
@@ -9616,8 +9663,19 @@ impl ButtonsApp {
                 }
             }
             let theme_name = self.unused_theme_name(&candidate.name);
+            let mut theme_note = String::new();
+            if let Some(theme) = &candidate.theme {
+                document["theme"] = theme["theme"].clone();
+                if let Some(description) = theme["metadata"]["description"].as_str() {
+                    document["metadata"]["description"] = json!(description);
+                }
+                theme_note = theme_part_note(
+                    &self.preferences.theme_apply,
+                    self.theme_editor_pane.is_some(),
+                );
+            }
             self.shader_ai.message = Some(format!(
-                "Using \"{}\". It saves as a new theme, \"{theme_name}\", so the one you started from stays as it was.",
+                "Using \"{}\". It saves as a new theme, \"{theme_name}\", so the one you started from stays as it was.{theme_note}",
                 candidate.name
             ));
             if let Some(colors) = candidate.colors {
@@ -9780,15 +9838,22 @@ impl ButtonsApp {
                         if preview.strength < 0.3 {
                             preview.strength = 0.45;
                         }
+                        let own_theme = candidate
+                            .theme
+                            .as_ref()
+                            .and_then(|document| ThemeDefinition::editor_document(document).ok());
                         self.paint_shader_preview(
                             ui,
                             rect,
-                            theme,
+                            own_theme.as_ref().unwrap_or(theme),
                             Some(&preview),
                             u64::MAX - 1 - *index as u64,
                             time,
                             true,
                         );
+                        if let Some(document) = &candidate.theme {
+                            paint_theme_sample(ui, rect, document);
+                        }
                         if response.hovered() {
                             ui.painter().rect_stroke(
                                 rect,
@@ -9798,7 +9863,13 @@ impl ButtonsApp {
                             );
                         }
                         let response = response.on_hover_text(format!(
-                            "Written by {}{}\n{}",
+                            "{}Written by {}{}\n{}",
+                            candidate
+                                .theme
+                                .as_ref()
+                                .and_then(|document| document["metadata"]["name"].as_str())
+                                .map(|name| format!("Theme + shader (theme \"{name}\")\n"))
+                                .unwrap_or_default(),
                             candidate.writer,
                             candidate
                                 .judge
@@ -9863,6 +9934,13 @@ impl ButtonsApp {
                     "For example: deep ocean blues, warm amber highlights, readable ANSI colors",
                 )),
         );
+        if shader_ai_available() {
+            ui.spaced_label(
+                RichText::new("New: Shaders → Create with AI → Design → Theme + shader writes several themes at once, each with a matching animated background.")
+                    .small()
+                    .color(self.colors().muted),
+            );
+        }
         ui.spaced_checkbox(
             &mut self.preferences.ai_theme_allow_system_fonts,
             "Allow installed and custom fonts (less portable)",
@@ -10700,8 +10778,30 @@ impl ButtonsApp {
         self.shader_ai.cancel = Some(Arc::clone(&cancel));
         self.shader_ai.busy = true;
         let count = count.clamp(1, crate::shader_ai::DIRECTIONS.len());
+        // "Theme + shader": the draft's palette and the bundled fonts go to
+        // every version (installed fonts would make each request much longer).
+        let theme_inputs = (self.preferences.shader_lab.design_theme
+            && !self.shader_ai.fix_only
+            && theme_generation_available())
+        .then(|| self.theme_editor_document.clone())
+        .flatten()
+        .map(|base| {
+            let mut seed = crate::theme_generation::seed_palette(&base);
+            seed["fontCatalog"] = self.font_catalog.generation_catalog(false);
+            (seed, base)
+        });
+        // The shader's colors come from the new theme, so the writer picks them.
+        let look = crate::shader_ai::Look {
+            ai_colors: look.ai_colors || theme_inputs.is_some(),
+            ..look
+        };
         self.shader_ai.message = Some(format!(
-            "Writing {count} version{} with {} · {}, checked by {}.",
+            "Writing {count} {}{} with {} · {}, checked by {}.",
+            if theme_inputs.is_some() {
+                "theme + shader version"
+            } else {
+                "version"
+            },
             if count == 1 { "" } else { "s" },
             writers[0].name,
             writers[0].model,
@@ -10710,8 +10810,10 @@ impl ButtonsApp {
                 .map(|judge| format!("{} · {}", judge.name, judge.model))
                 .unwrap_or_else(|| "the same model".into())
         ));
-        const IDEA_LABELS: [&str; crate::shader_ai::MAX_IDEAS] =
-            ["Idea 1", "Idea 2", "Idea 3", "Idea 4", "Idea 5", "Idea 6"];
+        const IDEA_LABELS: [&str; crate::shader_ai::MAX_IDEAS] = [
+            "Idea 1", "Idea 2", "Idea 3", "Idea 4", "Idea 5", "Idea 6", "Idea 7", "Idea 8",
+            "Idea 9", "Idea 10", "Idea 11", "Idea 12",
+        ];
         self.shader_ai.lanes = (0..count)
             .map(|lane| ShaderLane {
                 direction: if briefs.is_some() {
@@ -10736,10 +10838,12 @@ impl ButtonsApp {
                 error.clone(),
                 look.clone(),
             );
+            let theme_inputs = theme_inputs.clone();
             let session = Arc::clone(&self.credential_session);
             let sender = self.shader_ai.tx.clone();
             let cancel = Arc::clone(&cancel);
             let context = ctx.clone();
+            let lab = self.shader_lab();
             std::thread::spawn(move || {
                 let mut last_sent = (crate::shader_ai::Stage::Queued, 0_usize);
                 let progress_sender = sender.clone();
@@ -10760,6 +10864,20 @@ impl ButtonsApp {
                         current: &current,
                         current_error: error.as_deref(),
                         look: &look,
+                        picture_check: lab.picture_check.then_some(&|shader, look| {
+                            crate::plugins::effects::shader_background::picture_problem(
+                                shader,
+                                &look.background,
+                                &look.colors,
+                                look.animated,
+                            )
+                        }),
+                        judge: lab.judge,
+                        loops: lab.loops,
+                        feedback: lab.feedback,
+                        theme: theme_inputs
+                            .as_ref()
+                            .map(|(seed, base)| crate::shader_ai::ThemeRequest { seed, base }),
                     },
                     &cancel,
                     &mut |stage, chars| {
@@ -16430,6 +16548,74 @@ fn merge_theme_edits(target: &mut Value, original: &Value, edited: &Value) {
     }
 }
 
+/// What "Theme + shader" tells the user about the theme part of a result:
+/// which Apply switches hide parts of it, and that pane mode changes only
+/// that pane's terminal.
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_part_note(scopes: &crate::settings::ThemeApplyScopes, pane: bool) -> String {
+    let hidden: Vec<&str> = [
+        (scopes.app, "app chrome"),
+        (scopes.terminal, "terminal colors"),
+        (scopes.fonts, "fonts"),
+    ]
+    .into_iter()
+    .filter_map(|(on, name)| (!on).then_some(name))
+    .collect();
+    let mut note = " Its theme (colors and fonts) is in the draft too".to_owned();
+    if pane {
+        note.push_str("; while editing one pane, only that pane's terminal shows it");
+    }
+    if !hidden.is_empty() {
+        note.push_str(&format!(
+            "; {} {} switched off under Library → Apply to shared, so {} not show",
+            hidden.join(" and "),
+            if hidden.len() == 1 { "is" } else { "are" },
+            if hidden.len() == 1 {
+                "it does"
+            } else {
+                "they do"
+            }
+        ));
+    }
+    note.push('.');
+    note
+}
+
+/// A line of terminal text in a generated theme's colors, over a result card.
+#[cfg(not(target_arch = "wasm32"))]
+fn paint_theme_sample(ui: &egui::Ui, rect: egui::Rect, document: &Value) {
+    let terminal = &document["theme"]["terminal"];
+    let color = |value: &Value| value.as_str().and_then(crate::theme::parse_color);
+    let Some(foreground) = color(&terminal["foreground"]) else {
+        return;
+    };
+    let painter = ui.painter_at(rect);
+    let font = egui::FontId::monospace(11.0);
+    let mut at = rect.left_bottom() + egui::vec2(8.0, -8.0);
+    for (text, key) in [
+        ("~ ", "green"),
+        ("$ ", "brightBlack"),
+        ("ls ", ""),
+        ("src ", "blue"),
+        ("ok ", "yellow"),
+        ("err", "red"),
+    ] {
+        let text_color = if key.is_empty() {
+            foreground
+        } else {
+            color(&terminal["ansiColors"][key]).unwrap_or(foreground)
+        };
+        let shown = painter.text(
+            at,
+            egui::Align2::LEFT_BOTTOM,
+            text,
+            font.clone(),
+            text_color,
+        );
+        at.x = shown.right();
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn next_theme_version<'a>(name: &str, existing: impl Iterator<Item = &'a str>) -> String {
     fn split(name: &str) -> (&str, u64) {
@@ -17045,10 +17231,18 @@ mod tests {
         app.preferences.theme_apply.app = false;
         app.preferences.theme_apply.fonts = false;
         let source_name = app.themes.get(&app.preferences.theme_id).name.clone();
+        // Built-in themes may already use "<name> vN"; the copy takes the next one.
+        let next = |app: &ButtonsApp| {
+            next_theme_version(
+                &source_name,
+                app.themes.all().iter().map(|theme| theme.name.as_str()),
+            )
+        };
+        let expected = next(&app);
         app.save_appearance_copy();
         let first = app.preferences.theme_id.clone();
         let saved = app.themes.personal_document(&first).unwrap();
-        assert_eq!(saved["metadata"]["name"], format!("{source_name} v1"));
+        assert_eq!(saved["metadata"]["name"], expected);
         assert_eq!(saved["theme"]["terminal"]["background"], "#123456");
         assert_eq!(saved["theme"]["typography"]["shell"]["fontSize"], 21.0);
         assert_eq!(saved["futureExtension"]["keep"], true);
@@ -17069,11 +17263,9 @@ mod tests {
         assert!(!app.preferences.theme_apply.app);
         assert!(!app.appearance_is_dirty());
         app.preferences.typography.shell.size = 22.0;
+        let expected = next(&app);
         app.save_appearance_copy();
-        assert_eq!(
-            app.themes.get(&app.preferences.theme_id).name,
-            format!("{source_name} v2")
-        );
+        assert_eq!(app.themes.get(&app.preferences.theme_id).name, expected);
         assert_eq!(
             app.themes
                 .get(&first)
@@ -21468,6 +21660,7 @@ Start-Sleep -Seconds 300
                 note: String::new(),
                 colors: Some(vec!["#112233".into(), "#445566".into()]),
                 y_up: true,
+                theme: None,
             })),
         });
         let theme = ThemeDefinition::editor_document(&document).unwrap();
@@ -21507,6 +21700,38 @@ Start-Sleep -Seconds 300
             });
         });
         assert_eq!(callbacks(&output), 1, "the candidate thumbnail draws");
+
+        // A "Theme + shader" result previews with its own theme and a text sample.
+        let patch = crate::theme_generation::tests::valid_patch().to_string();
+        let whole = crate::theme_generation::candidate_from_reply(&patch, &document, None)
+            .unwrap()
+            .document;
+        let mut lane = app.shader_ai.lanes[0].clone();
+        if let Some(Ok(candidate)) = &mut lane.result {
+            candidate.theme = Some(whole);
+        }
+        app.shader_ai.lanes.push(lane);
+        let output = ctx.run(input(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                app.shader_lane_results(
+                    ui,
+                    &theme,
+                    &crate::theme::ShaderBackground::default(),
+                    0.0,
+                );
+            });
+        });
+        assert_eq!(callbacks(&output), 2);
+        assert!(text_position(&output, "err").is_some(), "theme text sample");
+        assert!(theme_part_note(&Default::default(), false).ends_with("draft too."));
+        let note = theme_part_note(
+            &crate::settings::ThemeApplyScopes {
+                fonts: false,
+                ..Default::default()
+            },
+            true,
+        );
+        assert!(note.contains("only that pane") && note.contains("fonts is switched off"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -22559,10 +22784,15 @@ Start-Sleep -Seconds 300
         };
 
         // Editing pane 2, then moving on, saves it under the next number.
+        // Built-in themes may already use "<name> vN"; the save takes the next one.
+        let expected = next_theme_version(
+            &shared_name,
+            app.themes.all().iter().map(|theme| theme.name.as_str()),
+        );
         app.theme_editor_pane = Some(second);
         edit(&mut app, "#123456");
         let saved = app.autosave_theme_draft().unwrap().unwrap();
-        assert_eq!(saved, next_theme_version(&shared_name, std::iter::empty()));
+        assert_eq!(saved, expected);
         app.discard_theme_editor_session();
         let second_theme = app.theme_overrides[&second].clone();
         assert!(second_theme.starts_with("personal:"), "{second_theme}");

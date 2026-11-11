@@ -1,0 +1,187 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 14.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 39.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 58.999996185302734,
+    "staticAmplitude": 67.0,
+    "staticBrightness": 86.0,
+    "staticDensity": 0.3199999928474426,
+    "staticEnabled": false,
+    "staticIntensity": 68.0,
+    "staticOpacity": 0.07999999821186066
+  },
+  "metadata": {
+    "createdAt": "2026-11-02T21:04:08.230Z",
+    "description": "A sugary haunted arcade with hot pink ghosts and pumpkin orange sparks.",
+    "id": "neutrality",
+    "name": "neutrality",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:miss-underappreciated_sophistication-v1",
+    "updatedAt": "2026-11-02T21:05:02.478Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 60,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff8a1f",
+        "background": "#210d25",
+        "buttonBackground": "#611f45",
+        "buttonHover": "#792654",
+        "buttonText": "#fff0f6"
+      },
+      "settings": {
+        "background": "#32113a"
+      },
+      "shell": {
+        "accent": "#ff4fa3",
+        "accentHover": "#ff6fb4",
+        "background": "#18091b",
+        "backgroundSecondary": "#34112b",
+        "border": "#70245f",
+        "buttonBackground": "#2a0f26",
+        "paneDivider": {
+          "color": "#ff4fa3",
+          "thickness": 2.0
+        },
+        "textDim": "#b0a1ac",
+        "textMain": "#fff0f6"
+      },
+      "statusBar": {
+        "background": "#111c22",
+        "border": "#ff7944",
+        "text": "#fff0f6",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#ff4fa3",
+        "activeBorder": "#ff4fa3",
+        "background": "#260c2c",
+        "idleBackground": "#2a0f26"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#271a28",
+        "blue": "#6BA7FF",
+        "brightBlack": "#765777",
+        "brightBlue": "#9BC5FF",
+        "brightCyan": "#A0F7FF",
+        "brightGreen": "#B8FFB2",
+        "brightMagenta": "#FF9DCE",
+        "brightRed": "#FF8299",
+        "brightWhite": "#FFFFFF",
+        "brightYellow": "#FFF39A",
+        "cyan": "#42E8FF",
+        "green": "#7DFF82",
+        "magenta": "#FF4FA3",
+        "red": "#FF3864",
+        "white": "#FFF0F6",
+        "yellow": "#FFE45C"
+      },
+      "background": "#120817",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#FFF0F6",
+      "gradientAngle": 210.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#120817",
+        "#29103c",
+        "#3a102b",
+        "#121a3a"
+      ],
+      "gradientRadialPosition": "top",
+      "gradientType": "conic",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 700,
+        "letterSpacing": 0.20000000298023224
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 700,
+        "letterSpacing": 0.20000000298023224
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.20000000298023224
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 700,
+        "letterSpacing": 0.20000000298023224
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 700,
+        "letterSpacing": 0.4000000059604645
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 700,
+        "letterSpacing": 0.3499999940395355
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

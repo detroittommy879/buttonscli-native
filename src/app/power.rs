@@ -102,6 +102,82 @@ impl ButtonsApp {
         self.power_budget().0
     }
 
+    /// The shader options in effect. Feedback is still an experiment, so it
+    /// only applies while the debug tools are on.
+    pub(super) fn shader_lab(&self) -> crate::settings::ShaderLab {
+        let mut lab = self.preferences.shader_lab.clone();
+        lab.feedback &= debug_tools_available();
+        lab
+    }
+
+    /// Hands the shader rules to the checker every shader goes through.
+    pub(super) fn apply_shader_lab(&self) {
+        let lab = self.shader_lab();
+        crate::plugins::effects::shader_expression::set_rules(
+            crate::plugins::effects::shader_expression::Rules {
+                loops: lab.loops,
+                cost_limit: lab.cost_limit,
+                feedback: lab.feedback,
+            },
+        );
+    }
+
+    /// Create with AI → Options: how results are checked, and what shader
+    /// code may contain. The rule switches apply to every shader at once.
+    pub(super) fn shader_options(&mut self, ui: &mut egui::Ui) {
+        use crate::settings::{JudgeMode, ShaderLab};
+        let before = self.preferences.shader_lab.clone();
+        let lab = &mut self.preferences.shader_lab;
+        ui.horizontal(|ui| {
+            ui.spaced_label("Judge model");
+            egui::ComboBox::from_id_salt("shader-lab-judge")
+                .selected_text(match lab.judge {
+                    JudgeMode::Review => "Reviews every result",
+                    JudgeMode::FixOnly => "Only fixes compile errors",
+                    JudgeMode::Off => "Off (writer fixes its own errors)",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut lab.judge, JudgeMode::Review, "Reviews every result")
+                        .on_hover_text("One extra request per version. The judge may rewrite code that already works.");
+                    ui.selectable_value(&mut lab.judge, JudgeMode::FixOnly, "Only fixes compile errors")
+                        .on_hover_text("No extra request unless the writer's code fails the checks. Without a Shader judge model in AI models, the Shader model does it.");
+                    ui.selectable_value(&mut lab.judge, JudgeMode::Off, "Off (writer fixes its own errors)")
+                        .on_hover_text("The judge model is never asked.");
+                });
+        });
+        ui.spaced_checkbox(
+            &mut lab.picture_check,
+            "Picture check: draw each result once and send flat, empty, white or still ones back",
+        )
+        .on_hover_text("A fixed pixel test, not a model: it never judges taste. One extra writer request only when the test fails.");
+        ui.spaced_checkbox(
+            &mut lab.loops,
+            "Allow `var`, `if`/`else` and fixed-count `for` loops in shader code",
+        )
+        .on_hover_text("Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Switching this off stops every shader that uses them from drawing, including some built-in ones.");
+        ui.horizontal(|ui| {
+            ui.spaced_label("Work limit per pixel");
+            ui.add(
+                egui::DragValue::new(&mut lab.cost_limit)
+                    .range(0..=ShaderLab::MAX_COST_LIMIT)
+                    .speed(5),
+            )
+            .on_hover_text("Helper calls are priced (flow 44, voronoi 28, fbm 20, cloud and ridged 12, noise 4, others 1 to 3) and a shader may spend this much. 240 stays smooth on laptop graphics; 0 is no limit.");
+            if ui.spaced_button("Reset").clicked() {
+                lab.cost_limit = ShaderLab::DEFAULT_COST_LIMIT;
+            }
+            ui.spaced_label(if lab.cost_limit == 0 {
+                "no limit".to_owned()
+            } else {
+                format!("about {} fbm or {} flow calls", lab.cost_limit / 20, lab.cost_limit / 44)
+            });
+        });
+        if *lab != before {
+            self.apply_shader_lab();
+            self.persist_native_preferences();
+        }
+    }
+
     pub(super) fn debug_settings(&mut self, ui: &mut egui::Ui) {
         ui.spaced_heading("Debug");
         ui.spaced_label(
@@ -111,6 +187,19 @@ impl ButtonsApp {
             .small()
             .color(self.colors().muted),
         );
+        ui.separator();
+        ui.spaced_heading("Shader experiments");
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.shader_lab.feedback,
+                "Feedback: shader code may call `prev(p)` for the color it drew there last frame",
+            )
+            .on_hover_text("For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off.")
+            .changed()
+        {
+            self.apply_shader_lab();
+            self.persist_native_preferences();
+        }
         ui.separator();
         if ui
             .spaced_checkbox(

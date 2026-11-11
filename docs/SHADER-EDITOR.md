@@ -1,5 +1,10 @@
 # Shader backgrounds
 
+> Historical notes from October 2026. The current user guide is
+> `docs/guide/shaders.md`, `ai-shaders.md` and `shader-code.md`; limits and
+> rules there replace the ones below (4,096 bytes, about 1,000 operations,
+> fixed-count loops, a 240 work limit per pixel, 34 presets).
+
 Open **Settings → Themes → Shaders**, enable GPU backgrounds, and create a variant. Select a preset or turn on **Edit custom shader expression**. Preview is behind synthetic terminal text; saved variants use normal theme Library/Edit/apply scopes. Per-terminal theme overrides remain separate.
 
 Ten additions: Prism ribbons, Lava lamp, Kaleidoscope, Rainbow mist, Chromatic tunnel, Fireflies, Sunset dunes, Ocean currents, Hex bloom, Electric silk. Selecting these gives a pink/cyan/gold palette; the three color pickers can change it. Turn off custom colors to inherit the theme palette.

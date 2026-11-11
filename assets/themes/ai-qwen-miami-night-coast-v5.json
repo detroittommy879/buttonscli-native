@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let density = 0.8 + amount * 0.23;\nlet column = floor(p.x * density);\nlet seed = hash(vec2<f32>(column, 7.3));\nlet clock = t * gravity * 0.42 + seed * 8.0;\nlet fall = floor(clock) + pow(fract(clock), 2.0);\nlet grid = vec2<f32>(p.x * density, p.y * density + fall);\nlet cell = floor(grid);\nlet id = hash(cell + vec2<f32>(2.7, 9.1));\nlet q = fract(grid) - vec2<f32>(0.5);\nlet angle = sin(clock * 2.4 + id * 14.0) * 0.65 + id * 6.283;\nlet r = vec2<f32>(q.x * cos(angle) - q.y * sin(angle), q.x * sin(angle) + q.y * cos(angle));\nlet size = shape_size * (0.65 + 0.2 * sin(clock * 5.0 + id * 20.0));\nlet round = length(r) - size;\nlet box = max(abs(r.x), abs(r.y)) - size * 0.86;\nlet star = length(r) - size * (0.78 + 0.22 * cos(atan2(r.y, r.x) * 5.0));\nlet d = select(select(round, box, id > 0.33), star, id > 0.66);\nlet body = 1.0 - smoothstep(-0.006, 0.008, d);\nlet eye1 = 1.0 - smoothstep(0.018, 0.03, length(r - vec2<f32>(-0.065, 0.035)));\nlet eye2 = 1.0 - smoothstep(0.018, 0.03, length(r - vec2<f32>(0.065, 0.035)));\nlet grin = (1.0 - smoothstep(0.008, 0.018, abs(length(r - vec2<f32>(0.0, 0.025)) - 0.09))) * (1.0 - smoothstep(-0.025, -0.012, r.y));\nlet accent = select(select(c1, c2, id > 0.33), c3, id > 0.66);\nlet paper = mix((c1 + c2 + c3) / 3.0, vec3<f32>(1.0), 0.7);\nlet ink = mix(bg, accent, 0.08);\nlet dots = step(0.83, sin(p.x * 48.0) * sin(p.y * 48.0));\nlet backdrop = mix(ink, paper, 0.08 + dots * 0.12);\nlet halo = exp(-max(d, 0.0) * 16.0) * (1.0 - body) * glow * 0.22;\nlet face = mix(paper, ink, clamp(eye1 + eye2 + grin, 0.0, 1.0));\nlet activity = smoothstep(0.0, 0.8, amount);\nlet color = clamp(mix(backdrop + accent * halo, face, body * activity), vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Happyfaces",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 10.0
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 0.8999999761581421
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.2300000041723251
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.8700000047683716
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.10999999940395357,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Dark coastal palette inspired by Miami beaches: ocean teal, hot pink neon, sunset coral, warm sand, and tropical green for readable high-contrast controls.",
+    "id": "ai-qwen-miami-night-coast-v5",
+    "name": "AI Qwen - Miami Night Coast v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ai-qwen-miami-night-coast-v5",
+    "updatedAt": "2026-11-07T04:25:19.909Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb066",
+        "background": "#0e1b24",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#0e1b24"
+      },
+      "shell": {
+        "accent": "#007d76",
+        "accentHover": "#00685f",
+        "background": "#071018",
+        "backgroundSecondary": "#0e1b24",
+        "border": "#2f6470",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#b9d6df",
+        "textMain": "#f7fcff"
+      },
+      "statusBar": {
+        "background": "#0e1b24",
+        "border": "#2f6470",
+        "text": "#d8eff5",
+        "warning": "#ffd166"
+      },
+      "tabs": {
+        "activeBackground": "#071018",
+        "activeBorder": "#007d76",
+        "background": "#0e1b24",
+        "idleBackground": "#142733"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101820",
+        "blue": "#4aa8ff",
+        "brightBlack": "#7c8f9a",
+        "brightBlue": "#82c3ff",
+        "brightCyan": "#6ee7e7",
+        "brightGreen": "#6ef0b5",
+        "brightMagenta": "#ff6bb5",
+        "brightRed": "#ff8a8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe08a",
+        "cyan": "#20c5c5",
+        "green": "#2ecf8f",
+        "magenta": "#ff2e88",
+        "red": "#ff5c5c",
+        "white": "#dcecf2",
+        "yellow": "#ffd166"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f2fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

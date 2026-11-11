@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let density = (0.8 + amount * 0.13) / (0.45 + shape_size * 2.0);\nlet y = p.y * density + t * gravity * 0.32;\nlet row = floor(y);\nlet clock = t * (0.65 + gravity * 1.3) + hash(vec2<f32>(row, 8.0)) * 7.0;\nlet beat = floor(clock);\nlet dart = smoothstep(0.12, 0.38, fract(clock));\nlet start = hash(vec2<f32>(row, beat)) * 4.0;\nlet finish = hash(vec2<f32>(row, beat + 1.0)) * 4.0;\nlet x = p.x * density * 0.72 + mix(start, finish, dart);\nlet cell = floor(x);\nlet uv = vec2<f32>(fract(x), fract(y));\nlet lean = 0.22 * cos(row * 2.3);\nlet divider = 0.5 + lean * (uv.y * 2.0 - 1.0);\nlet side = step(divider, uv.x);\nlet seam = abs(uv.x - divider) / sqrt(1.0 + 4.0 * lean * lean);\nlet edge = min(min(uv.x, 1.0 - uv.x), min(min(uv.y, 1.0 - uv.y), seam));\nlet tile = smoothstep(0.012, 0.028, edge);\nlet seed = hash(vec2<f32>(cell * 2.0 + side, row));\nlet base = mix(c1, c2, seed);\nlet tint = mix(base, c3, 0.26 * step(0.76, seed));\nlet shading = 0.72 + 0.25 * uv.y + 0.08 * sin(seed * 6.283 + t * 1.4);\nlet rim = exp(-edge * 65.0) * tile;\nlet halo = exp(-edge * 22.0) * glow * 0.12;\nlet grout = mix(bg, c1, 0.2);\nlet color = mix(grout, tint * vec3<f32>(shading), tile)\n  + mix(c2, c3, 0.35) * vec3<f32>(rim * (0.18 + glow * 0.2) + halo);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Trapezoid Frenzy",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 9.100000381469728
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.12999999523162842
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.20000000298023224
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Dark coastal palette inspired by Miami beaches: ocean teal, hot pink neon, sunset coral, warm sand, and tropical green for readable high-contrast controls.",
+    "id": "ai-qwen-miami-night-coast-v2",
+    "name": "AI Qwen - Miami Night Coast v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ai-qwen-miami-night-coast-v2",
+    "updatedAt": "2026-11-03T02:06:45.355Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb066",
+        "background": "#0e1b24",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#0e1b24"
+      },
+      "shell": {
+        "accent": "#007d76",
+        "accentHover": "#00685f",
+        "background": "#071018",
+        "backgroundSecondary": "#0e1b24",
+        "border": "#2f6470",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#b9d6df",
+        "textMain": "#f7fcff"
+      },
+      "statusBar": {
+        "background": "#0e1b24",
+        "border": "#2f6470",
+        "text": "#d8eff5",
+        "warning": "#ffd166"
+      },
+      "tabs": {
+        "activeBackground": "#071018",
+        "activeBorder": "#007d76",
+        "background": "#0e1b24",
+        "idleBackground": "#142733"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101820",
+        "blue": "#4aa8ff",
+        "brightBlack": "#7c8f9a",
+        "brightBlue": "#82c3ff",
+        "brightCyan": "#6ee7e7",
+        "brightGreen": "#6ef0b5",
+        "brightMagenta": "#ff6bb5",
+        "brightRed": "#ff8a8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe08a",
+        "cyan": "#20c5c5",
+        "green": "#2ecf8f",
+        "magenta": "#ff2e88",
+        "red": "#ff5c5c",
+        "white": "#dcecf2",
+        "yellow": "#ffd166"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f2fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

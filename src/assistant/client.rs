@@ -86,7 +86,7 @@ fn completion_body(
     }));
     messages.push(json!({"role":"user", "content":prompts.1}));
     if provider.resolved_api() == ProviderApi::Anthropic {
-        json!({"model":provider.model, "system":prompts.0, "messages":messages, "stream":stream, "max_tokens":4096})
+        json!({"model":provider.model, "system":prompts.0, "messages":messages, "stream":stream, "max_tokens":8192})
     } else if provider.uses_responses() {
         json!({"model":provider.model, "instructions":prompts.0, "input":messages, "stream":stream, "store":false})
     } else {

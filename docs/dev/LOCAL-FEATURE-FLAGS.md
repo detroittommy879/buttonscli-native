@@ -14,8 +14,17 @@ Restart after editing it. Set `enable_all` to `false` or delete the file to
 restore ordinary access. Missing, invalid or oversized files do not grant access;
 invalid files produce a startup log warning. The size limit is 16 KiB.
 
-`"debug": true` only adds Settings → Debug (power saving toggle and frame
-readout) to an optimized build; debug builds always show it.
+`"debug": true` only adds Settings → Debug (power saving toggle, frame
+readout and **Shader experiments**) to an optimized build; debug builds
+always show it.
+
+Shader experiments has one switch, **Feedback**: shader code may call
+`prev(q)` for last frame's color (see `docs/guide/shader-code.md`). It is
+saved in the profile (`shader_lab.feedback`) but only applies while the debug
+tools are on; otherwise the checker refuses `prev` with a message saying how
+to switch it on. The other shader switches (judge mode, picture check, loops,
+work limit) are ordinary options under Create with AI → Options and apply in
+every build.
 
 This explicit local flag overrides catalog rollout, account/Pro requirements,
 internal feature restrictions and runtime kill switches. AI theme generation,

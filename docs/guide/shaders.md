@@ -58,7 +58,7 @@ Picking a preset sets your code aside; pick **Your code** to get it back.
 - **Y up** (custom code only) — on by default. Shader code usually treats "up"
   as up; turn it off if an older shader now looks upside down.
 - **FPS limit (all panes)** — how many times a second shaders and effects
-  change, for every pane at once (1–240, default 60). Lower it to save GPU,
+  change, for every pane at once (1–240; new profiles start at 30). Lower it to save GPU,
   for example while recording with OBS. It's a real cap: typing and mouse
   moves don't make shaders run faster.
 

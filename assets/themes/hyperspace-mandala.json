@@ -1,0 +1,216 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff2366",
+        "#ffab16",
+        "#7538ff",
+        "#00efd5",
+        "#176cff"
+      ],
+      "custom": {
+        "expression": "let r = length(p);\nlet a = atan2(p.y, p.x);\nlet warp = sin(r * 7.0 - t * pulse) * 0.35;\nlet petals = sin(a * complexity + warp + t * 0.25);\nlet rings = sin(r * 14.0 - t * pulse * 2.0 + petals * 1.8);\nlet lattice = sin(a * complexity * 0.5 - r * 9.0 + t * pulse);\nlet field = 0.5 + 0.5 * sin(petals * 2.0 + rings * 1.4 + lattice);\nlet band = smoothstep(0.15, 0.85, field);\nlet base = mix(c1, c3, band);\nlet flare = pow(0.5 + 0.5 * rings, 6.0);\nlet facets = smoothstep(0.25, 0.9, 0.5 + 0.5 * lattice);\nlet color = mix(mix(base, c5, facets * 0.65), mix(c2, c4, band), flare * 0.7);\nreturn mix(bg, color, strength);",
+        "name": "Hyperspace Mandala",
+        "variables": [
+          {
+            "max": 12.0,
+            "min": 2.0,
+            "name": "complexity",
+            "value": 6.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "pulse",
+            "value": 0.699999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 1.7999999523162842,
+      "speed": 1.899999976158142,
+      "strength": 0.5,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 0.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.119999997317791
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T18:55:04.836Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "hyperspace-mandala",
+    "name": "Hyperspace Mandala",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hyperspace-mandala",
+    "updatedAt": "2026-11-01T09:02:56.565Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

@@ -21,7 +21,7 @@ Windows app/PTY integration: `cargo test ai_help_fixture_stream_retry_cancel_and
 The latter runs real AI Help request/state/target handling against the loopback
 server, without interacting with personal terminals or sending external requests.
 
-Open **Settings → AI providers** to add a provider, choose the active provider, and edit its chat completions endpoint and model ID. The endpoint must be an HTTP or HTTPS URL. You can save an API key in your operating system's credential store or keep it in memory for this app session. The key field is cleared after a save attempt; the key is never placed in native settings files.
+Open **Settings → AI providers** to add a provider, choose the active provider, and edit its chat completions endpoint and model ID. The endpoint must be an HTTPS URL; plain HTTP is accepted only for loopback, private-network addresses and local names (`validate_endpoint`). You can save an API key in your operating system's credential store or keep it in memory for this app session. The key field is cleared after a save attempt; the key is never placed in native settings files.
 
 ## Use your ChatGPT plan (Sign in with ChatGPT)
 

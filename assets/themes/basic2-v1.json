@@ -1,0 +1,162 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 5.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-08T19:49:40.594Z",
+    "description": "Complementary ANSI swaps (red↔cyan, green↔magenta, blue↔yellow); subtle bottom burst",
+    "id": "basic2-v1",
+    "name": "basic2 v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:basic2-v1",
+    "updatedAt": "2026-11-08T19:49:40.594Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#2472c8",
+        "brightBlack": "#666666",
+        "brightBlue": "#3b8eea",
+        "brightCyan": "#29b8db",
+        "brightGreen": "#23d18b",
+        "brightMagenta": "#d670d6",
+        "brightRed": "#f14c4c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f5f543",
+        "cyan": "#11a8cd",
+        "green": "#0dbc79",
+        "magenta": "#bc3fbc",
+        "red": "#cd3131",
+        "white": "#e5e5e5",
+        "yellow": "#e5e510"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Lnr St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#d0d0d4",
+      "gradientAngle": 133.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#000000",
+        "#220c0c",
+        "#111017"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

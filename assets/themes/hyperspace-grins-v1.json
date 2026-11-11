@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#110821",
+        "#170925",
+        "#140033",
+        "#00ff00",
+        "#ffff00"
+      ],
+      "custom": {
+        "expression": "let trip = m * 0.1;\nlet drift = p * vec2<f32>(density) + vec2<f32>(t * 0.055, -t * 0.035);\nlet warp = vec2<f32>(sin(drift.y * 3.4 + t * 0.7), cos(drift.x * 3.1 - t * 0.6)) * vec2<f32>(wobble * (0.06 + trip * 0.22));\nlet uv = drift + warp;\nlet id = floor(uv);\nlet seed = hash(id);\nlet q = fract(uv) - vec2<f32>(0.5);\nlet r = length(q);\nlet angle = atan2(q.y, q.x);\nlet wave = sin(r * (25.0 + trip * 35.0) - t * 2.0 + sin(angle * 6.0 + t * 0.4) * trip * 2.0);\nlet hue = seed * 0.65 + t * 0.045 + wave * 0.09 + trip * 0.12;\nlet electric = palette(hue);\nlet secondary = palette(hue + 0.32);\nlet ink = mix(c3, vec3<f32>(0.025, 0.008, 0.085), 0.65);\nlet ground = mix(c1, secondary * vec3<f32>(0.40), 0.75);\nlet lattice = pow(0.5 + 0.5 * wave, 7.0);\nlet backdrop = ground + electric * vec3<f32>(lattice * (0.12 + glow * 0.27));\nlet body_distance = length(max(abs(q) - vec2<f32>(0.24, 0.20), vec2<f32>(0.0))) - 0.15;\nlet body = 1.0 - smoothstep(-0.008, 0.014, body_distance);\nlet rim = exp(-100.0 * abs(body_distance));\nlet cheek = mix(electric, secondary, 0.25 + 0.16 * wave);\nlet shading = 0.78 + 0.22 * cos(q.y * 4.0 - q.x * 2.0);\nlet face = mix(backdrop, cheek * vec3<f32>(shading), body);\nlet outlined = mix(face, ink, rim * 0.85);\nlet eye_y = -0.075 + 0.018 * sin(t * 1.4 + seed * 12.0);\nlet eye_q = vec2<f32>(abs(q.x) - 0.125, q.y - eye_y);\nlet eyes = 1.0 - smoothstep(0.052, 0.066, length(eye_q));\nlet pupil_q = eye_q - vec2<f32>(0.013 * sin(t + seed * 8.0), 0.006 * cos(t * 1.3));\nlet pupils = 1.0 - smoothstep(0.019, 0.026, length(pupil_q));\nlet eye_color = mix(c2, secondary, 0.12);\nlet eyed = mix(outlined, eye_color, eyes);\nlet looking = mix(eyed, palette(hue + 0.55), pupils);\nlet smile_q = q - vec2<f32>(0.0, 0.015);\nlet smile = (1.0 - smoothstep(0.012, 0.025, abs(length(smile_q) - 0.18))) * smoothstep(0.025, 0.065, smile_q.y);\nlet grinning = mix(looking, ink, smile);\nlet aura = secondary * vec3<f32>(exp(-23.0 * abs(body_distance)) * glow * 0.32);\nlet color = clamp(grinning + aura, vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Hyperspace Grins",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "m",
+            "value": 8.600000381469727
+          },
+          {
+            "max": 4.0,
+            "min": 0.800000011920929,
+            "name": "density",
+            "value": 3.0999999046325684
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "wobble",
+            "value": 0.30000001192092896
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.2199999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 1.5,
+      "speed": 2.700000047683716,
+      "strength": 0.15000000596046448,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-01T03:01:10.114Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "hyperspace-grins-v1",
+    "name": "Hyperspace Grins v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hyperspace-grins-v1",
+    "updatedAt": "2026-11-01T03:01:39.073Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#110821",
+        "#170925",
+        "#140033"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

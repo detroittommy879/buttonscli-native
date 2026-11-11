@@ -1,0 +1,217 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#26c6da",
+        "#8b5cf6",
+        "#f15bb5",
+        "#ffb454"
+      ],
+      "custom": {
+        "expression": "let x = p.x * frequency;\nlet phase = x - t * 1.3;\nlet overtone = sin(phase * 2.0 + t * 0.35) * 0.12 + sin(phase * 3.0 - t * 0.2) * 0.06;\nlet wave_a = sin(phase) * 0.23 + overtone * harmonic_mix;\nlet wave_b = sin(x * 1.25 + t * 1.05) * 0.22 + sin(x * 2.5 + t * 0.8) * harmonic_mix * 0.1;\nlet wave_c = (wave_a + wave_b) * 0.65;\nlet da = abs(p.y - 0.58 - wave_a);\nlet db = abs(p.y + 0.58 - wave_b);\nlet dc = abs(p.y - wave_c);\nlet trace_a = exp(-da * 80.0) + exp(-da * 12.0) * 0.3 * glow;\nlet trace_b = exp(-db * 80.0) + exp(-db * 12.0) * 0.3 * glow;\nlet trace_c = exp(-dc * 70.0) + exp(-dc * 10.0) * 0.4 * glow;\nlet beat = 0.5 + 0.5 * sin(x * 0.25 + t * 0.55);\nlet interference = 0.5 + 0.5 * sin(p.y * 9.0 + sin(phase) * 1.8 + sin(x * 1.25 + t) * 1.5);\nlet field = mix(c2, c3, interference) * vec3<f32>(0.25 + 0.13 * beat);\nlet grid_x = pow(0.5 + 0.5 * cos(p.x * 24.0), 24.0);\nlet grid_y = pow(0.5 + 0.5 * cos(p.y * 24.0), 24.0);\nlet grid = c1 * vec3<f32>((grid_x + grid_y) * 0.035);\nlet signal_a = c1 * vec3<f32>(trace_a * 0.8);\nlet signal_b = c3 * vec3<f32>(trace_b * 0.8);\nlet signal_c = mix(c4, c5, beat) * vec3<f32>(trace_c * 0.85);\nlet color = clamp(field + grid + signal_a + signal_b + signal_c, vec3<f32>(0.0), vec3<f32>(1.0));\nreturn mix(bg, color, strength);",
+        "name": "Harmonic Fusion",
+        "variables": [
+          {
+            "max": 8.0,
+            "min": 1.0,
+            "name": "frequency",
+            "value": 5.5
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "harmonic_mix",
+            "value": 0.6499999761581421
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "glow",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.5600000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "harmonic-fusion",
+    "name": "Harmonic Fusion",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:harmonic-fusion",
+    "updatedAt": "2026-11-01T02:52:33.493Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}
