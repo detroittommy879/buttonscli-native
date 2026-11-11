@@ -117,3 +117,8 @@ bundle names:
 
 Check with `git show origin/main:assets/library/bundles.json` before relying on
 a name. The two local-only bundles need the library file committed first.
+
+Single shaders and themes for the showcase are picked in **Settings → Gallery**
+(debug tools). Each pick in `<profile>/gallery-picks.json` has the WGSL, the
+full program, knob values, the five colors and the background, so a plain web
+page can draw it without the app.

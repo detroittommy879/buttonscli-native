@@ -78,6 +78,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `power::debug_tools_available()`: debug builds, or `"debug": true` /
   `"enable_all": true` in `~/.buttonscli-native/feature-flags.json`. Put new
   diagnostics and test toggles there instead of inventing another gate.
+  Settings → Gallery (`src/app/gallery.rs`, same gate) pages shaders/themes
+  four at a time; picks go to `<profile>/gallery-picks.json` (`pick_entry`:
+  WGSL, program, knobs, c1–c5, background) for a future web showcase.
 
 ## Pane and input rules
 

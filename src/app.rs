@@ -553,6 +553,9 @@ pub struct ButtonsApp {
     /// (ms). Not saved; a pane's quiet time counts from here or its last output.
     #[cfg(not(target_arch = "wasm32"))]
     idle_glow_panes: std::collections::BTreeMap<u64, u64>,
+    /// Settings → Gallery (debug tools).
+    #[cfg(not(target_arch = "wasm32"))]
+    gallery: gallery::GalleryState,
     /// The startup release check, until it answers.
     #[cfg(not(target_arch = "wasm32"))]
     update_rx: Option<Receiver<crate::update_check::Update>>,
@@ -787,6 +790,9 @@ enum SettingsTab {
     ReleasePicks,
     #[cfg(not(target_arch = "wasm32"))]
     Debug,
+    /// Debug tools: shaders four at a time with picks for a showcase.
+    #[cfg(not(target_arch = "wasm32"))]
+    Gallery,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1657,6 +1663,8 @@ impl ButtonsApp {
             shuffle: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             idle_glow_panes: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            gallery: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             update_rx: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -5956,6 +5964,11 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 if power::debug_tools_available() {
                     ui.spaced_selectable_value(&mut self.settings_tab, SettingsTab::Debug, "Debug");
+                    ui.spaced_selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Gallery,
+                        "Gallery",
+                    );
                 }
             });
         });
@@ -6032,6 +6045,8 @@ impl ButtonsApp {
                 SettingsTab::ReleasePicks => self.release_picks_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Debug => self.debug_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Gallery => self.gallery_settings(ui),
             });
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_editor_preview(ctx);
@@ -17274,6 +17289,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
 mod docs_capture;
+#[cfg(not(target_arch = "wasm32"))]
+mod gallery;
 #[cfg(not(target_arch = "wasm32"))]
 mod idle_glow;
 #[cfg(all(test, windows))]
