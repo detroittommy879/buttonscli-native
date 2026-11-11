@@ -63,8 +63,8 @@ docs/guide/images/colors-row.png   (the site shows it in place of the marker)
   (`FROZEN_TIME`), the real mouse and keyboard are ignored, and the window is
   resized before the app is built. Two runs in a row rewrite nothing.
 - **Looks.** The hero and the first shader shots use the newest built-in
-  bundle in `assets/library/bundles.json`; the next shot uses the one before
-  it. New saves are appended to that file, so each run steps back through the
+  bundle in `assets/library/bundles.json` whose first four looks all show a
+  shader (Strength above 0.05); the next shot uses the one before it. New saves are appended to that file, so each run steps back through the
   looks saved most recently. The capture never reads your own profile.
 - **Writing.** PNG for UI, JPG (quality 85) for shader-heavy shots, chosen by
   the file extension. The new picture is encoded first; identical bytes mean
