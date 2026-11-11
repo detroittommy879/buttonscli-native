@@ -102,6 +102,11 @@ These change only that pane, the same way **Edit for: Pane N** does, and the
 change is saved like any pane edit: as a numbered personal theme when you
 switch panes, close Settings or quit.
 
+**◐ Look → Override panes** sets one Strength for every pane's shader at
+once, whatever each theme says; moving its slider turns it on. Nothing is
+saved into the themes, so unticking it puts each pane's own Strength back.
+While it is on, the pane Strength sliders are greyed out.
+
 <!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
      Background color, Use a shader list and the FPS limit. -->
 
@@ -134,5 +139,6 @@ don't draw. If your machine struggles, lower the number of animated panes, untic
 and gradient motion at once: drag it left or right, or double-click to type.
 0% holds the current frame and stops redrawing, 100% is each theme's own
 speed, and 200% is double. **◐ Look** next to it has Minimal, Moderate and
-Showoff presets, Calm effects, the GPU shader switch and
-[Shuffle](themes.md#shuffle), which changes the theme every few minutes.
+Showoff presets, Calm effects, the GPU shader switch, **Override panes** (one
+Strength for every pane) and [Shuffle](themes.md#shuffle), which changes the
+theme every few minutes.

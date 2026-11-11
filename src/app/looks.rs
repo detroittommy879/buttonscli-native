@@ -168,6 +168,31 @@ impl ButtonsApp {
         }
     }
 
+    /// Look → Override panes: one shader Strength for every pane. Moving the
+    /// slider turns the override on. True when it should be saved.
+    fn strength_override_row(&mut self, ui: &mut egui::Ui) -> bool {
+        let setting = &mut self.preferences.strength_override;
+        let mut changed = false;
+        wrapping_row(ui, |ui| {
+            changed |= ui
+                .spaced_checkbox(&mut setting.enabled, "Override panes")
+                .on_hover_text("Every pane's shader uses this Strength instead of its own, for bright shaders or a Strength left too high. Themes are not changed: untick it and each pane goes back to its own.")
+                .changed();
+            let response = ui.add(
+                egui::Slider::new(
+                    &mut setting.strength,
+                    crate::theme::ShaderBackground::STRENGTH,
+                )
+                .text("Strength"),
+            );
+            if response.changed() {
+                setting.enabled = true;
+            }
+            changed |= response.drag_stopped() || (response.changed() && !response.dragged());
+        });
+        changed
+    }
+
     /// Status bar: the motion speed drag control and the Look menu (look
     /// presets, Calm effects, GPU shader backgrounds).
     pub(super) fn motion_status_controls(
@@ -233,6 +258,8 @@ impl ButtonsApp {
                         changed = true;
                     }
                 });
+                ui.separator();
+                changed |= self.strength_override_row(ui);
                 ui.separator();
                 changed |= self.shuffle_menu(ui);
             })

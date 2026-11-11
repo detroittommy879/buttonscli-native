@@ -392,7 +392,8 @@ impl ButtonsApp {
             egui::Slider::new(&mut shuffle.fade_seconds, crate::settings::Shuffle::FADE)
                 .text("Fade seconds"),
         );
-        ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane");
+        ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
+            .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
         ui.spaced_checkbox(&mut shuffle.fonts, "Fonts too")
             .on_hover_text("Also use each theme's fonts. A font change resizes the terminals.");
         let count = self.shuffle_pool().len();
@@ -518,6 +519,148 @@ mod tests {
             "each pane gets its own pick"
         );
         assert!(pool.contains(&app.theme_overrides[&id]));
+    }
+
+    /// A Theme + shader result used after Shuffle: `pane_edit` first edits
+    /// pane 1's strength from the status bar, as the Look menu does.
+    fn use_theme_result_after_shuffle(pane_edit: bool) -> (ButtonsApp, std::path::PathBuf) {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-shuffle-result-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        app.preferences.shuffle.every_pane = true;
+        app.preferences.shuffle.fade_seconds = 0.0;
+        app.preferences.shuffle.enabled = true;
+        app.shuffle_now(0.0);
+        app.preferences.shuffle.enabled = false;
+        if pane_edit {
+            app.edit_pane_look(0, |document| {
+                document["effects"]["shaderBackground"]["strength"] = json!(0.9);
+            });
+        }
+        app.sync_theme_editor_to_current();
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        set_theme_document_value(&mut draft, "/theme/app/shell/background", json!("#123456"));
+        set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#654321"));
+        app.theme_editor_document = Some(draft);
+        app.preview_personal_theme_draft();
+        (app, base)
+    }
+
+    /// Shuffle's per-pane picks, or a status-bar edit that left the editor
+    /// on one pane, kept results off the app or the panes; "Use on the
+    /// whole app" puts the result everywhere.
+    #[test]
+    fn theme_results_reach_the_whole_app_after_shuffle() {
+        for pane_edit in [false, true] {
+            let (mut app, base) = use_theme_result_after_shuffle(pane_edit);
+            let reached = app.app_theme_colors().canvas == Color32::from_rgb(0x12, 0x34, 0x56)
+                && app.tabs.iter().all(|tab| {
+                    app.terminal_presentation_for(tab.id)
+                        .terminal_colors
+                        .background
+                        == "#654321"
+                });
+            assert!(
+                !reached,
+                "the case this covers (pane edit first: {pane_edit})"
+            );
+            let other = app.tabs[1].id;
+            let other_theme = app.theme_overrides.get(&other).cloned();
+            app.use_look_everywhere();
+            assert!(app.theme_overrides.is_empty());
+            assert!(!app.theme_editor_pane_mode && app.theme_editor_pane.is_none());
+            if pane_edit {
+                // The pane's edit was saved as a new theme; the theme the other
+                // pane used is untouched.
+                assert!(app.preferences.theme_id.starts_with("personal:"));
+                if let Some(id) = other_theme {
+                    assert_ne!(app.preferences.theme_id, id);
+                }
+            }
+            assert_eq!(
+                app.app_theme_colors().canvas,
+                Color32::from_rgb(0x12, 0x34, 0x56),
+                "app colors (pane edit first: {pane_edit})"
+            );
+            for tab in &app.tabs {
+                assert_eq!(
+                    app.terminal_presentation_for(tab.id)
+                        .terminal_colors
+                        .background,
+                    "#654321",
+                    "pane {} (pane edit first: {pane_edit})",
+                    tab.id
+                );
+            }
+            std::fs::remove_dir_all(base).unwrap();
+        }
+    }
+
+    #[test]
+    fn strength_override_sets_every_pane_without_editing_themes() {
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        let shader_theme = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| theme.effects.shader_background.is_some())
+            .unwrap()
+            .id
+            .clone();
+        app.set_theme_all(&shader_theme);
+        app.theme_overrides
+            .insert(app.tabs[1].id, shader_theme.clone());
+        let own = app
+            .themes
+            .get(&shader_theme)
+            .effects
+            .shader_background
+            .clone();
+        let strength = |app: &ButtonsApp, id: u64| {
+            app.terminal_presentation_for(id)
+                .effects
+                .shader_background
+                .unwrap()
+                .strength
+        };
+        app.preferences.strength_override.strength = 0.12;
+        assert_eq!(
+            strength(&app, app.tabs[0].id),
+            own.as_ref().unwrap().strength
+        );
+        app.preferences.strength_override.enabled = true;
+        for tab in &app.tabs {
+            assert_eq!(strength(&app, tab.id), 0.12, "shared and own themes");
+        }
+        assert_eq!(
+            app.themes.get(&shader_theme).effects.shader_background,
+            own,
+            "no theme changes"
+        );
+        let mut saved: Preferences =
+            serde_json::from_str(r#"{"strength_override":{"enabled":true,"strength":7}}"#).unwrap();
+        saved.normalize_theme_sources();
+        assert_eq!(saved.strength_override.strength, 1.0);
     }
 
     #[test]

@@ -7,6 +7,14 @@
   the colors fading into the next one and shaders fading out and in. It can
   give each pane its own theme, keeps fonts unless asked, and waits while
   Settings is open. It never edits a theme file.
+- **◐ Look → Override panes**: one shader Strength for every pane, for very
+  bright shaders or a Strength left too high. Themes keep their own value and
+  come back when you untick it.
+- Fixed: Create with AI results could stop reaching the whole app. After a
+  Strength or shader change from the status bar the editor stayed on one
+  pane, and panes with a theme of their own (for example Shuffle's per-pane
+  picks) ignored the shared theme. The Shaders tab now says so next to the
+  results and has a **Use on the whole app** button.
 - Shader code has 14 new helpers: `fbm`, `ridged`, `flow`, `voronoi`, `hash2`,
   `rotate`, `polar`, shapes (`sd_circle`, `sd_box`, `sd_segment`, `smin`),
   `fill`/`stroke`/`halo` to draw them, and `tonemap`. See the Shader code

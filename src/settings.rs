@@ -278,6 +278,9 @@ pub(crate) struct Preferences {
     pub(crate) shader_lab: ShaderLab,
     /// Status bar → Look → Shuffle: change the theme now and then.
     pub(crate) shuffle: Shuffle,
+    /// Status bar → Look → Override panes: one shader Strength for every
+    /// pane. Changes only what is drawn; no theme is edited.
+    pub(crate) strength_override: StrengthOverride,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -351,6 +354,7 @@ impl Default for Preferences {
             power_saving: true,
             shader_lab: ShaderLab::default(),
             shuffle: Shuffle::default(),
+            strength_override: StrengthOverride::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -534,6 +538,40 @@ impl ShufflePool {
             Self::Shaders => "Themes with a shader",
             Self::All => "All themes",
         }
+    }
+}
+
+/// Status bar → Look → Override panes.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct StrengthOverride {
+    pub(crate) enabled: bool,
+    pub(crate) strength: f32,
+}
+
+impl Default for StrengthOverride {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            strength: 0.5,
+        }
+    }
+}
+
+impl StrengthOverride {
+    /// The Strength every pane uses, while the override is on.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn active(&self) -> Option<f32> {
+        self.enabled.then_some(self.strength)
+    }
+
+    fn normalize(&mut self) {
+        let range = crate::theme::ShaderBackground::STRENGTH;
+        self.strength = if self.strength.is_finite() {
+            self.strength.clamp(*range.start(), *range.end())
+        } else {
+            Self::default().strength
+        };
     }
 }
 
@@ -739,6 +777,7 @@ impl Preferences {
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
         self.shuffle.normalize();
+        self.strength_override.normalize();
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

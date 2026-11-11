@@ -157,6 +157,14 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - Terminal shader/gradient time is `motion_time` (real time × `motion_speed`,
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
+  Look → Override panes (`strength_override`) is presentation only:
+  `with_strength_override` in `terminal_presentation` and the override
+  branch of `settled_presentation_for`; never write it into themes.
+  Status-bar shader edits (`edit_pane_look`) leave the editor in pane mode,
+  so results skip the app colors; `look_target_hint`/`use_look_everywhere`
+  is the way out. Shared panes use `terminal_presentation()` directly in
+  the pane loop, so per-pane effects (the Shuffle fade) must add them to
+  `override_themes`.
   Shuffle (Look menu): `src/app/shuffle.rs`. Its fade goes through
   `app_theme_colors()` and `terminal_presentation_for` (which wraps
   `settled_presentation_for`); read colors through those, not

@@ -91,6 +91,9 @@ and everything changes together.
   picking that theme later brings back the whole look. Parts switched off under **Library → Apply to
   shared** (app chrome, terminal colors, fonts) don't show, and while you
   edit one pane only that pane's terminal changes; the message says so.
+  A note above the results also says when a pane, or panes with a theme of
+  their own, keep the result from the whole app; **Use on the whole app**
+  fixes that in one click.
 - **Undo AI change** puts back only the code; to undo the theme as well,
   use **Revert and close**, or pick your old theme in the Library.
 

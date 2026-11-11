@@ -2020,6 +2020,19 @@ impl ButtonsApp {
             simple_noise_idle_delay_seconds: effects.simple_noise_idle_delay_seconds,
             simple_noise_idle_ramp_seconds: effects.simple_noise_idle_ramp_seconds,
         };
+        self.with_strength_override(theme)
+    }
+
+    /// Look → Override panes: every pane's shader at one Strength. Only what
+    /// is drawn changes; theme files and pane looks keep their own value.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn with_strength_override(&self, mut theme: ThemeDefinition) -> ThemeDefinition {
+        if let (Some(strength), Some(shader)) = (
+            self.preferences.strength_override.active(),
+            &mut theme.effects.shader_background,
+        ) {
+            shader.strength = strength;
+        }
         theme
     }
 
@@ -2048,7 +2061,7 @@ impl ButtonsApp {
                     theme.effects.scanlines_strength = 0.0;
                     theme.effects.simple_noise_enabled = false;
                 }
-                return theme;
+                return self.with_strength_override(theme);
             }
         }
         self.terminal_presentation()
@@ -3525,7 +3538,9 @@ impl ButtonsApp {
             .iter()
             .filter_map(|index| self.tabs.get(*index).map(|tab| (*index, tab)))
             .filter(|(index, tab)| {
+                // Mid-fade every pane has its own look (from its old one).
                 self.theme_overrides.contains_key(&tab.id)
+                    || self.shuffle.fade.is_some()
                     || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
@@ -3544,6 +3559,7 @@ impl ButtonsApp {
         let mut render_state = PaneRenderState {
             shader_choices: &shader_choices,
             saved_shader_count,
+            strength_override: self.preferences.strength_override.active(),
             ratios: &mut self.preferences.pane_split_ratios,
             tabs: &mut self.tabs,
             focused,
@@ -5368,7 +5384,7 @@ impl ButtonsApp {
                                 ui.set_max_width(340.0);
                                 if let Some((_, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
-                                    pane_shader_menu(ui, theme, &choices, saved_count, &mut shader_action);
+                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), &mut shader_action);
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
@@ -9126,6 +9142,12 @@ impl ButtonsApp {
                 .text("Strength"),
             )
             .on_hover_text("How strongly the pattern shows behind the text. Create with AI is told to use it, so lower it if text is hard to read.");
+            if let Some(strength) = self.preferences.strength_override.active() {
+                ui.spaced_colored_label(
+                    self.colors().warning,
+                    format!("◐ Look → Override panes is on: every pane shows Strength {strength:.2}. This value is saved with the theme and comes back when you untick it."),
+                );
+            }
             // Strength 0 shows this color, so it sits right next to Strength.
             wrapping_row(ui, |ui| {
                 ui.spaced_label("Background");
@@ -9362,6 +9384,7 @@ impl ButtonsApp {
                         self.persist_native_preferences();
                     }
                 }
+                self.look_target_hint(ui);
                 if !design_theme {
                     wrapping_row(ui, |ui| {
                         ui.spaced_label("Colors");
@@ -9756,6 +9779,7 @@ impl ButtonsApp {
         // 5. One place to keep or drop the result.
         settings_section(ui, base, 4, |ui| {
             ui.spaced_label(RichText::new("Keep it").strong());
+            self.look_target_hint(ui);
             self.theme_apply_controls(ui);
             wrapping_row(ui, |ui| {
                 if ui.spaced_button("Preview on terminals").clicked() {
@@ -13006,6 +13030,108 @@ impl ButtonsApp {
         self.discard_theme_editor_session();
     }
 
+    /// "Use on the whole app": the look being edited goes to the app colors
+    /// and every pane. From one pane, its edit is saved first (a new numbered
+    /// theme when it came from another file, as switching panes does) and that
+    /// theme is then used everywhere. From All panes, panes with a theme of
+    /// their own (a Library pick, Shuffle's per-pane picks) drop it.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn use_look_everywhere(&mut self) {
+        let pane = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
+        if let Some(tab) = pane {
+            if let Err(error) = self.autosave_theme_draft() {
+                self.theme_editor_status =
+                    Some(format!("Could not save this pane's edit first: {error}"));
+                return;
+            }
+            self.discard_theme_editor_session();
+            let id = self
+                .theme_overrides
+                .get(&tab)
+                .cloned()
+                .unwrap_or_else(|| self.preferences.theme_id.clone());
+            self.theme_editor_pane = None;
+            self.theme_editor_pane_mode = false;
+            let theme = self.themes.get(&id).clone();
+            self.set_theme_all(&id);
+            let calm = self.preferences.calm_mode;
+            self.apply_theme_sources(theme, calm);
+        } else {
+            self.theme_editor_pane_mode = false;
+            self.theme_overrides.clear();
+            self.pending_pane_looks = None;
+        }
+        self.persist_native_preferences();
+    }
+
+    /// Says when editor results won't reach the whole app (one pane is being
+    /// edited, or displayed panes keep their own theme), with the way out.
+    /// Shown next to Generate and Keep: the "Edit for" row is far above.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn look_target_hint(&mut self, ui: &mut egui::Ui) {
+        let displayed = if self.rendered_panes.is_empty() {
+            self.visible_panes.clone()
+        } else {
+            self.rendered_panes.clone()
+        };
+        let slot_name = |index: usize| {
+            displayed
+                .iter()
+                .position(|shown| *shown == index)
+                .map_or_else(
+                    || "a hidden tab".to_owned(),
+                    |slot| format!("Pane {}", slot + 1),
+                )
+        };
+        let editing = self
+            .theme_editor_pane
+            .and_then(|tab| self.tabs.iter().position(|t| t.id == tab));
+        let note = if let Some(index) = editing {
+            format!(
+                "Editing {} only: results change its terminal and shader, not the app colors or the other panes.",
+                slot_name(index)
+            )
+        } else {
+            let own: Vec<String> = displayed
+                .iter()
+                .filter(|index| {
+                    self.tabs
+                        .get(**index)
+                        .is_some_and(|tab| self.theme_overrides.contains_key(&tab.id))
+                })
+                .map(|index| slot_name(*index))
+                .collect();
+            if own.is_empty() {
+                return;
+            }
+            format!(
+                "{} {} a theme of {} own, so {} the shared theme.",
+                own.join(", "),
+                if own.len() == 1 { "has" } else { "have" },
+                if own.len() == 1 { "its" } else { "their" },
+                if own.len() == 1 {
+                    "it won't show changes to"
+                } else {
+                    "they won't show changes to"
+                }
+            )
+        };
+        let warning = self.colors().warning;
+        let mut clicked = false;
+        wrapping_row(ui, |ui| {
+            ui.spaced_colored_label(warning, note);
+            clicked = ui
+                .spaced_button("Use on the whole app")
+                .on_hover_text("Use this look for the app colors and every pane. Edits made to one pane are saved first, under a new name when the theme came from another file.")
+                .clicked();
+        });
+        if clicked {
+            self.use_look_everywhere();
+        }
+    }
+
     /// Changes one pane's look from a menu. It goes through the same draft as
     /// Settings → "Edit for: Pane N", so only that pane changes, and the edit
     /// is saved like any pane edit (as a numbered theme when you switch to
@@ -15402,6 +15528,7 @@ struct PaneRenderState<'a> {
     favorites: &'a [(String, String)],
     shader_choices: &'a [crate::theme::SavedShader],
     saved_shader_count: usize,
+    strength_override: Option<f32>,
     auto_tile: &'a crate::autotile::AutoTile,
     action: &'a mut Option<(u64, PaneAction)>,
     hover_label: &'a crate::settings::PaneHoverLabel,
@@ -15530,6 +15657,7 @@ fn render_pane_tree(
                                         theme,
                                         state.shader_choices,
                                         state.saved_shader_count,
+                                        state.strength_override,
                                         &mut action,
                                     );
                                 });
@@ -15993,10 +16121,19 @@ fn pane_shader_menu(
     theme: &ThemeDefinition,
     choices: &[crate::theme::SavedShader],
     saved_count: usize,
+    strength_override: Option<f32>,
     action: &mut Option<PaneAction>,
 ) {
     let shader = theme.effects.shader_background.as_ref();
-    if let Some(shader) = shader {
+    if let (Some(strength), Some(_)) = (strength_override, shader) {
+        let mut shown = strength;
+        ui.add_enabled(
+            false,
+            egui::Slider::new(&mut shown, crate::theme::ShaderBackground::STRENGTH)
+                .text("Strength"),
+        );
+        ui.spaced_small("Set for every pane: ◐ Look → Override panes.");
+    } else if let Some(shader) = shader {
         let mut strength = shader.strength;
         if ui
             .add(
