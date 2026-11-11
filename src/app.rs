@@ -9825,6 +9825,26 @@ impl ButtonsApp {
             ui.spaced_label(RichText::new("Keep it").strong());
             use_everywhere |= self.look_target_hint(ui);
             self.theme_apply_controls(ui);
+            // The draft's display name: the file name and id stay as they are,
+            // so renaming here never breaks a reference to the theme.
+            if let Some(document) = self.theme_editor_document.as_mut() {
+                let mut name = document["metadata"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned();
+                wrapping_row(ui, |ui| {
+                    ui.spaced_label("Name");
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut name)
+                            .hint_text("theme name")
+                            .desired_width(220.0)
+                            .char_limit(80),
+                    );
+                    if response.changed() {
+                        document["metadata"]["name"] = json!(name);
+                    }
+                });
+            }
             wrapping_row(ui, |ui| {
                 if ui.spaced_button("Preview on terminals").clicked() {
                     self.preferences.theme_apply.effects = true;

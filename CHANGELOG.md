@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Name a generated theme before saving**: the Shaders tab's "Keep it" section
+  has a Name box for the new theme, so you do not have to scroll up to rename it.
 - **Shuffle** goes through its whole list before any theme repeats, and a
   new round starts when Shuffle is turned back on. Check the count under
   "From" if it seems short: the list is only the themes you picked.
