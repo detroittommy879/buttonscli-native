@@ -102,3 +102,18 @@ text (`setup::PANES`).
   guide against labels in `src/`) are planned.
 
 The probe runs on Windows only and can't run in CI yet, which has no GPU.
+
+## Showcase looks (for a web demo later)
+
+Looks the owner wants for a web showcase or new screenshots. Use the exact
+bundle names:
+
+| Bundle | Where it is |
+| --- | --- |
+| `rain-snow-thunder` | `origin/main` |
+| `thunder & water` | `origin/main` |
+| `Water-Desert-Landscapes` | local `assets/library/bundles.json` only; not committed yet |
+| `Bubbles, Fish, Thunderstorm, Coral R` | local `assets/library/bundles.json` only; not committed yet |
+
+Check with `git show origin/main:assets/library/bundles.json` before relying on
+a name. The two local-only bundles need the library file committed first.
