@@ -17,6 +17,9 @@ pub fn app_icon() -> std::sync::Arc<egui::IconData> {
 mod account;
 #[cfg(not(target_arch = "wasm32"))]
 mod account_api;
+#[cfg(not(target_arch = "wasm32"))]
+#[doc(hidden)]
+pub mod announcements;
 pub mod app;
 mod assistant;
 #[cfg(not(target_arch = "wasm32"))]

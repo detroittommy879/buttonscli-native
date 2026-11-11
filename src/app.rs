@@ -563,6 +563,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     update_available: Option<crate::update_check::Update>,
     #[cfg(not(target_arch = "wasm32"))]
+    announcements: announcements::NoticeState,
+    #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
     import_busy: bool,
@@ -1670,6 +1672,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             update_available: None,
             #[cfg(not(target_arch = "wasm32"))]
+            announcements: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_busy: false,
@@ -2216,6 +2220,7 @@ impl ButtonsApp {
             log::warn!("personal theme: {warning}");
         }
         self.preferences = preferences;
+        self.announcements = Default::default();
         self.refresh_locale();
         self.theme_overrides.clear();
         self.pending_pane_looks = None;
@@ -5399,6 +5404,8 @@ impl ButtonsApp {
                     }
                     #[cfg(not(target_arch = "wasm32"))]
                     self.update_link(ui);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    self.announcement_status(ui);
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -5649,9 +5656,14 @@ impl ButtonsApp {
     }
 
     fn restore_settings_snapshot(&mut self, snapshot: SettingsSnapshot) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let announcement_history = self.preferences.announcements.clone();
         self.preferences = snapshot.preferences;
         #[cfg(not(target_arch = "wasm32"))]
         {
+            self.preferences
+                .announcements
+                .retain_history_from(&announcement_history);
             self.theme_overrides = snapshot.theme_overrides;
             self.pane_fonts = snapshot.pane_fonts;
             self.appearance_baseline = snapshot.appearance_baseline;
@@ -6233,6 +6245,9 @@ impl ButtonsApp {
                     ));
                     looks::look_slider(ui, &mut first_run_look);
                     ui.spaced_small(crate::i18n::literal(&self.locale, first_run_look.description()));
+                    ui.separator();
+                    ui.checkbox(&mut self.preferences.announcements.enabled, "Receive signed developer notices");
+                    ui.add(egui::Label::new(RichText::new("Optional security notices and product news from the ButtonsCLI developer. Checks buttonscli.com at startup and every six hours; the host sees your IP. Promotions are off unless enabled in Settings → Workspace. No terminal content is sent.").small()).wrap());
                 }
                 ui.add_space(8.0);
                 confirmed = ui.spaced_button(crate::i18n::literal(&self.locale, "Continue")).clicked();
@@ -13479,6 +13494,8 @@ impl ButtonsApp {
             self.persist_native_preferences();
         }
         ui.push_id("settings-workspace", |ui| {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.announcement_settings(ui);
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
                 ui.add(egui::TextEdit::singleline(&mut self.preferences.dock_title).char_limit(60)).labelled_by(label.id);
@@ -17317,6 +17334,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
+#[cfg(not(target_arch = "wasm32"))]
+mod announcements;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
 mod gallery;
@@ -17387,6 +17406,8 @@ impl eframe::App for ButtonsApp {
         self.process_theme_generation_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_shader_ai_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.poll_announcements(ctx);
 
         #[cfg(not(target_arch = "wasm32"))]
         self.process_quick_secrets_events();
@@ -17510,6 +17531,8 @@ impl eframe::App for ButtonsApp {
         self.terminal_reader_window(ctx);
         self.about_window(ctx);
         self.localization_onboarding(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.announcement_popup(ctx);
         self.refresh_locale();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_simulated_terminals(ctx);

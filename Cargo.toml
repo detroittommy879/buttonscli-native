@@ -27,6 +27,11 @@ path = "src/bin/native-release.rs"
 required-features = ["release-tools"]
 
 [[bin]]
+name = "announcement-tool"
+path = "src/bin/announcement-tool.rs"
+required-features = ["release-tools"]
+
+[[bin]]
 name = "buttonscli-web"
 path = "src/bin/buttonscli-web.rs"
 required-features = ["desktop"]

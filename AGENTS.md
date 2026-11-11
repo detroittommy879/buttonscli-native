@@ -325,6 +325,13 @@ cargo build --locked --release --bin buttonscli
   status bar link in `src/app/updates.rs`. Tests never call `spawn` (smoke runs set the env var); feed
   `update_rx` by hand. Not an updater: `src/distribution.rs` is the future
   signed one.
+- Signed developer notices: `src/announcements.rs` (bounded Ed25519 envelope),
+  `src/app/announcements.rs` (UI); maintainer flow `docs/dev/SIGNED-NOTICES.md`.
+  `assets/announcement-keys.json` embeds public keys only; never regenerate those
+  identities casually or put private keys in Git/on AMP. `announcement-tool`
+  requires `--features release-tools`. Feed `app-notices/messages.json.txt` is
+  inactive until renamed to `.json`; every edit needs a new signature and higher
+  sequence. Tests inject feeds; never enable network checks in tests.
 - `self.notice` messages render as a fading overlay (`src/app/notices.rs`,
   `notice_seconds`), never a layout row: rows above terminals resize every PTY.
   Logs/crash reports: `src/diagnostics.rs` (`~/.buttonscli-native/logs`, local only);
