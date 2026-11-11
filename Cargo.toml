@@ -31,6 +31,10 @@ name = "buttonscli-web"
 path = "src/bin/buttonscli-web.rs"
 required-features = ["desktop"]
 
+# Exe icon and version info on Windows (build.rs, packaging/icon.ico).
+[target.'cfg(windows)'.build-dependencies]
+winresource = { version = "0.1.34", default-features = false }
+
 [features]
 default = ["desktop"]
 desktop = []

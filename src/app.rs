@@ -5744,6 +5744,10 @@ impl ButtonsApp {
             .with_title(title.clone())
             .with_inner_size(layout.size)
             .with_min_inner_size([720.0, 520.0]);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            builder = builder.with_icon(crate::app_icon());
+        }
         if let Some(position) = layout.position {
             builder = builder.with_position(position);
         }

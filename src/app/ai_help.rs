@@ -646,6 +646,7 @@ impl ButtonsApp {
             egui::ViewportId::from_hash_of("buttonscli-ai-help"),
             egui::ViewportBuilder::default()
                 .with_title("AI Help")
+                .with_icon(crate::app_icon())
                 .with_inner_size([780.0, 760.0])
                 .with_min_inner_size([480.0, 480.0]),
             move |child_ctx, class| {
