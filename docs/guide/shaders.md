@@ -12,11 +12,15 @@ always draws on top, and the **Strength** slider keeps it readable.
 
 ![Blue Triangle Flow: a custom shader of drifting blue triangles behind terminal text](images/themes/blue-triangle-flow.jpg)
 
+*Turned up for this picture so the motion shows.* Strength fades a shader toward the background color, which keeps text readable. The default is much calmer, and nothing here is stuck at this level: change Strength any time.
+
 Open **Settings → Themes → Shaders**.
 
 <!-- IMAGE: shaders-page.png — the whole Shaders tab: live preview at the top,
      Style section with Pattern picker, Colors row with c1–c5 swatches. | alt: Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row -->
 ![Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row](images/shaders-page.png)
+
+*Turned up for this picture so the motion shows.* Strength fades a shader toward the background color, which keeps text readable. The default is much calmer, and nothing here is stuck at this level: change Strength any time.
 
 ## The page, top to bottom
 
@@ -113,6 +117,8 @@ While it is on, the pane Strength sliders are greyed out.
 <!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
      Background color, Use a shader list and the FPS limit. | alt: The status bar's Shader menu: Strength, Background color, Use a shader, Shader settings and the FPS limit -->
 ![The status bar's Shader menu: Strength, Background color, Use a shader, Shader settings and the FPS limit](images/status-shader-menu.png)
+
+*Turned up for this picture so the motion shows.* Strength fades a shader toward the background color, which keeps text readable. The default is much calmer, and nothing here is stuck at this level: change Strength any time.
 
 ## Your shader list
 

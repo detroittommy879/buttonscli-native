@@ -13,6 +13,8 @@ every open terminal gets its look back.
      applying a built-in bundle (e.g. "Autumn-3-panes"). | alt: Four terminals in a grid right after applying a built-in bundle, each with its own shader background -->
 ![Four terminals in a grid right after applying a built-in bundle, each with its own shader background](images/bundle-applied.jpg)
 
+*Turned up for this picture so the motion shows.* Strength fades a shader toward the background color, which keeps text readable. The default is much calmer, and nothing here is stuck at this level: change Strength any time.
+
 ## Save one
 
 1. Give your panes the looks you want (see [Themes](themes.md) and
