@@ -24,7 +24,8 @@ Run the same command again to update. Linux needs a few system packages; see
 ## The window
 
 <!-- IMAGE: window-tour.png — annotated full window: tab bar (top), panes,
-     command dock, SSH dock, status bar (bottom) with Favorite themes menu. -->
+     command dock, SSH dock, status bar (bottom) with Favorite themes menu. | alt: The ButtonsCLI window with its parts numbered: 1 tabs, 2 command dock, 3 panes, 4 status bar -->
+![The ButtonsCLI window with its parts numbered: 1 tabs, 2 command dock, 3 panes, 4 status bar](images/window-tour.png)
 
 | Area | What it does |
 | --- | --- |

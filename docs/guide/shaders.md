@@ -15,7 +15,8 @@ always draws on top, and the **Strength** slider keeps it readable.
 Open **Settings → Themes → Shaders**.
 
 <!-- IMAGE: shaders-page.png — the whole Shaders tab: live preview at the top,
-     Style section with Pattern picker, Colors row with c1–c5 swatches. -->
+     Style section with Pattern picker, Colors row with c1–c5 swatches. | alt: Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row -->
+![Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row](images/shaders-page.png)
 
 ## The page, top to bottom
 
@@ -43,7 +44,8 @@ The **Pattern** picker lists, in order:
 | **◆ Built-in shaders** | Custom shaders that come with the app. |
 | **Presets** | The 34 built-in patterns: Aurora, Lava lamp, Synthwave, Galaxy swirl, VHS tape, CRT static and more. |
 
-<!-- IMAGE: pattern-picker.png — the Pattern dropdown open, showing all five groups. -->
+<!-- IMAGE: pattern-picker.png — the Pattern dropdown open, showing all five groups. | alt: The Pattern dropdown open: New blank shader, Your code and the built-in shaders -->
+![The Pattern dropdown open: New blank shader, Your code and the built-in shaders](images/pattern-picker.png)
 
 Picking a preset sets your code aside; pick **Your code** to get it back.
 
@@ -79,7 +81,8 @@ Switching to **Theme's** does not throw your own colors away; switch back and
 they return. Editing a theme swatch switches to **This shader's**
 automatically, starting from the theme's colors.
 
-<!-- IMAGE: colors-row.png — the Colors row with Theme's / This shader's and five swatches. -->
+<!-- IMAGE: colors-row.png — the Colors row with Theme's / This shader's and five swatches. | alt: The Colors row: Theme's or This shader's, then the five swatches c1 to c5 -->
+![The Colors row: Theme's or This shader's, then the five swatches c1 to c5](images/colors-row.png)
 
 Some presets (the full-color ones like Neon plasma and Tropical) pick their own
 colors and ignore c1–c5.
@@ -108,7 +111,8 @@ saved into the themes, so unticking it puts each pane's own Strength back.
 While it is on, the pane Strength sliders are greyed out.
 
 <!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
-     Background color, Use a shader list and the FPS limit. -->
+     Background color, Use a shader list and the FPS limit. | alt: The status bar's Shader menu: Strength, Background color, Use a shader, Shader settings and the FPS limit -->
+![The status bar's Shader menu: Strength, Background color, Use a shader, Shader settings and the FPS limit](images/status-shader-menu.png)
 
 ## Your shader list
 

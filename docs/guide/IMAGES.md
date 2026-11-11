@@ -61,8 +61,32 @@ page and Create with AI best. Shaders move, and a still image undersells them.
 
 ## Automated captures
 
-Theme screenshots are made by an existing probe. It runs in an owned
-temporary profile with synthetic terminal content, so nothing personal shows.
+Most UI screenshots are made by the app itself. After a UI change, run
+
+```powershell
+./scripts/docs-capture.ps1
+```
+
+It opens an owned window with simulated panes and synthetic text (no shells,
+no network, never your profile), steps through the shot list, crops each
+picture to the right part of the UI and writes it here only if it really
+changed. `-Only colors-row` refreshes one shot, `-DryRun` previews into
+`target/docs-capture/preview/`, and `-Locale de` makes German screenshots in
+`images/de/`. How it works and how to add a shot:
+[Docs screenshots](../dev/DOCS-SCREENSHOTS.md).
+
+Automated now: `hero.jpg`, `window-tour.png`, `layouts.png`,
+`button-editor.png`, `theme-library.png`, `edit-for-row.png`,
+`theme-editor.png`, `bundle-applied.jpg`, `shaders-page.png`,
+`pattern-picker.png`, `colors-row.png` and `status-shader-menu.png`. The AI
+shots (`create-with-ai.png`, `random-ideas.png`, `generate-tab.png`,
+`chatgpt-signin.png`) still need a person; `cargo test` fails when a new
+marker is neither automated nor listed as manual.
+
+Translated runs show English for labels that have no translation in
+`src/i18n/` yet (Shaders, Library, Create with AI…).
+
+Theme thumbnails come from a separate probe that renders theme files:
 
 ```powershell
 $env:BUTTONSCLI_THEME_EVAL_INPUT_DIR = "<folder with theme .json files>"
@@ -74,16 +98,3 @@ It writes one 1200×720 PNG per theme. The images in `images/themes/` came from
 it (resized to 1000 px JPG) on 2026-10-30, using the themes picked with
 Release picks. Shader preset thumbnails come from `render_shader_gallery`
 (see [Shader editor](../SHADER-EDITOR.md)); copies are in `website/img/shaders/`.
-
-**Next step to automate the UI shots:** one more ignored probe,
-`native_docs_capture`, that starts PTY-free simulated panes (like
-`native_simulation_panes_capture`), applies a built-in bundle, opens each
-Settings page from the shot list in turn and screenshots it into
-`docs/guide/images/ui/`. Then every UI image can be refreshed with one command
-whenever the interface changes.
-
-The same probe can make translated screenshots: set the app language
-(`localization.manual_locale`) per run and write into
-`docs/guide/images/<lang>/`. Note that many newer labels (Shaders, Library,
-Create with AI…) have no translations in `src/i18n/` yet, so those screens
-still show English until the catalog catches up.

@@ -18,8 +18,8 @@ rest keep running in the background.
 - **Tab groups:** save the set of open terminals under a name and reopen it
   later from the tab menu.
 
-<!-- IMAGE: layouts.png — the same four terminals as COL, ROW and GRID, side by side. -->
-![Three panes in rows](../images/workspace-rows-2026-10-07.png)
+<!-- IMAGE: layouts.png — the same four terminals as COL, ROW and GRID, side by side. | alt: The same four terminals in the COL, ROW and GRID layouts, side by side -->
+![The same four terminals in the COL, ROW and GRID layouts, side by side](images/layouts.png)
 
 ## Command buttons
 
@@ -34,7 +34,8 @@ Enter for you.
 The SSH dock works the same way for server connections. Docks can resize,
 collapse and auto-hide.
 
-<!-- IMAGE: button-editor.png — the preset editor with label, command and Send Enter after typing. -->
+<!-- IMAGE: button-editor.png — the preset editor with label, command and Send Enter after typing. | alt: The Add preset window: button label Run tests, command cargo test and Send Enter after typing ticked -->
+![The Add preset window: button label Run tests, command cargo test and Send Enter after typing ticked](images/button-editor.png)
 
 ## Right-click menus
 

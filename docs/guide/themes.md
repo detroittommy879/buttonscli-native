@@ -18,8 +18,8 @@ Open **Settings → Themes**. It has four tabs:
 | **Generate** | Making a theme from a description with AI ([AI themes](ai-themes.md)) |
 | **Shaders** | The animated background ([Shader backgrounds](shaders.md)) |
 
-<!-- IMAGE: theme-library.png — Library tab with search, favorites row and Apply to shared checkboxes. -->
-![Theme library](../images/native-theme-library.png)
+<!-- IMAGE: theme-library.png — Library tab with search, favorites row and Apply to shared checkboxes. | alt: Settings, Themes, Library: Apply to shared checkboxes, theme bundles, favorites and the theme search -->
+![Settings, Themes, Library: Apply to shared checkboxes, theme bundles, favorites and the theme search](images/theme-library.png)
 
 ## Whole app or one pane
 
@@ -85,7 +85,8 @@ Create with AI and **Keep it**. **Use on the whole app** then saves the
 pane's edit and uses it for the app colors and every pane, or, from **All
 panes**, makes every pane use the shared theme again.
 
-<!-- IMAGE: edit-for-row.png — the Edit for row with Pane 1–3 chips in their pane colors. -->
+<!-- IMAGE: edit-for-row.png — the Edit for row with Pane 1–3 chips in their pane colors. | alt: The Edit for row: All panes, then Pane 1, Pane 2 and Pane 3, each in its pane color -->
+![The Edit for row: All panes, then Pane 1, Pane 2 and Pane 3, each in its pane color](images/edit-for-row.png)
 
 ## Making your own theme
 
@@ -95,8 +96,8 @@ panes**, makes every pane use the shared theme again.
 - **Edit raw theme file…** opens the JSON if you like editing text.
 - Themes import and export as `.json` files, so you can share them.
 
-<!-- IMAGE: theme-editor.png — Edit tab with the ANSI palette and gradient controls. -->
-![Theme editor](../images/theme-editor-october-2026.png)
+<!-- IMAGE: theme-editor.png — Edit tab with the ANSI palette and gradient controls. | alt: Settings, Themes, Edit: the Edit for row, the theme picker and the first color groups of the theme editor -->
+![Settings, Themes, Edit: the Edit for row, the theme picker and the first color groups of the theme editor](images/theme-editor.png)
 
 ## Fonts
 

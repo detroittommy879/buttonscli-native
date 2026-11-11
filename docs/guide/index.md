@@ -11,8 +11,8 @@ and every pane can have its own theme, font and animated shader background.
 The shaders can be written for you by AI.
 
 <!-- IMAGE: hero.jpg — three or four panes, each with a different bundle look
-     and shader, command dock visible. Use a built-in bundle, not a real host. -->
-![Three terminals with animated shader backgrounds and a command dock](../images/main.png)
+     and shader, command dock visible. Use a built-in bundle, not a real host. | alt: Four terminals in a grid, each with its own animated shader background from a built-in bundle, under the tab bar and command dock -->
+![Four terminals in a grid, each with its own animated shader background from a built-in bundle, under the tab bar and command dock](images/hero.jpg)
 
 ## Start here
 
