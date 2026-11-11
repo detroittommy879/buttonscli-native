@@ -397,13 +397,27 @@ mod setup {
         app.theme_settings_tab = tab;
     }
 
-    /// The bundle in the hero picture and most shader shots.
-    pub(super) fn bundle_hero(app: &mut ButtonsApp, ctx: &egui::Context) {
-        bundle(app, ctx, "geometryflow");
+    /// The `back`th newest built-in bundle (0 = newest). New saves are
+    /// appended to the library file, so this steps back through the looks
+    /// saved most recently. The capture still runs in its own profile.
+    pub(super) fn newest_bundle(back: usize) -> String {
+        crate::library::bundles()
+            .iter()
+            .rev()
+            .nth(back)
+            .unwrap_or_else(|| panic!("the library has fewer than {} bundles", back + 1))
+            .name
+            .clone()
     }
 
+    /// The newest bundle: the hero picture and most shader shots.
+    pub(super) fn bundle_hero(app: &mut ButtonsApp, ctx: &egui::Context) {
+        bundle(app, ctx, &newest_bundle(0));
+    }
+
+    /// The bundle before the newest one, for shots that show a second look.
     pub(super) fn bundle_other(app: &mut ButtonsApp, ctx: &egui::Context) {
-        bundle(app, ctx, "night_tripper");
+        bundle(app, ctx, &newest_bundle(1));
     }
 
     pub(super) fn two(app: &mut ButtonsApp, ctx: &egui::Context) {
