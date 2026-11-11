@@ -243,7 +243,10 @@ cargo build --locked --release --bin buttonscli
   (`docs_capture::anchor`); a new `<!-- IMAGE: -->` marker needs a shot or a
   `MANUAL` entry, or `shot_list_matches_image_markers` fails. It clears egui
   memory per shot, so anything a probe puts in ctx data (the shader format)
-  must be put back.
+  must be put back. Simulated tabs ask a real provider on their first tick,
+  with the keychain entry of profile `default`: probes set
+  `tab.simulated = None`. `ViewportCommand::InnerSize` is in points at the
+  current zoom, so set pixels-per-point first.
 - `scripts/native-smoke.ps1 -SkipBuild -Release` checks isolated startup, not interactive
   acceptance. Do not rebuild a running test executable; Windows locks it.
 - Real-mouse checks: Win32 `SendInput`/`mouse_event` drags against the isolated

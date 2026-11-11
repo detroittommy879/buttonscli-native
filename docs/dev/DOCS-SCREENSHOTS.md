@@ -88,9 +88,12 @@ text (`setup::PANES`).
 - The `MANUAL` shots need state the probe cannot fake yet: AI results
   (Create with AI, the ideas list, a theme generation in progress) and a
   signed-in ChatGPT provider.
-- `theme-editor.png` shows the top of the Edit tab; the ANSI palette and
-  gradient controls the marker asks for are further down and need an anchor
-  to scroll to.
+- Some pictures don't yet show everything their marker asks for:
+  - `theme-editor.png` shows the top of the Edit tab; the ANSI palette and
+    gradient controls are further down and need an anchor to scroll to.
+  - `pattern-picker.png`: the dropdown scrolls, so not all five groups show.
+  - `window-tour.png` has no SSH dock or open Favorites menu.
+- Callout labels (`window-tour.png`) are English in every language.
 - Short clips (hero, shaders) and a stale-docs check (bold UI names in the
   guide against labels in `src/`) are planned.
 

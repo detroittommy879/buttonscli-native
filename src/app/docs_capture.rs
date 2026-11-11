@@ -100,6 +100,8 @@ pub(super) struct Shot {
 /// One capture: window size, setup, clicks, then a crop.
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[derive(Clone, Copy)]
+// Only the Windows probe reads the fields; other targets check the list.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(super) struct Part {
     /// Layout size of the window in points.
     pub size: [f32; 2],
