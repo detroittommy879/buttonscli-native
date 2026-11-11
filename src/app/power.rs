@@ -260,7 +260,7 @@ impl ButtonsApp {
             });
         ui.spaced_label(
             RichText::new(
-                "To test: note the frame count, click another app (background), then minimize. Task Manager's GPU column should drop too.",
+                "To test: note the frame count, then minimize the window. Task Manager's GPU column should drop. A visible window keeps its full rate even when another app is in front.",
             )
             .small()
             .color(self.colors().muted),
