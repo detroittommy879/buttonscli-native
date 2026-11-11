@@ -63,7 +63,8 @@ The procedural static effect is labeled Analog TV effect.
 
 Rendering was already event driven: input, terminal output and animations request
 updates. There is no unconditional 60 FPS repaint loop. Settings → Workspace
-now caps requested effect-animation frames (default 30 FPS, adjustable 1–240;
-also on the Shaders tab and the status-bar Shader menu).
+sets the effect-animation rate (default 60 FPS, adjustable 1–240; also on
+the Shaders tab and the status-bar Shader menu). Motion speed never changes
+it, and themes never change it.
 Noise texture updates honor the cap. Input/output remains responsive independently
 of that limit. No GPU power benchmark or macOS performance certification is claimed.

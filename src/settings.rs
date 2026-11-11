@@ -263,15 +263,26 @@ pub(crate) struct Preferences {
     pub(crate) row_banding_brightness: u8,
     /// Frames per second for shaders and other animated effects, all panes.
     pub(crate) animation_fps: u32,
+    /// Only read: the short-lived "Match display" switch. Profiles that had
+    /// it on get 60 FPS; it is never written again.
+    #[serde(skip_serializing)]
+    pub(crate) animation_match_display: Option<bool>,
     /// Seconds a workspace message stays before fading; 0 keeps it until
     /// dismissed or replaced.
     pub(crate) notice_seconds: u32,
+    /// Look for a newer GitHub release at startup (a status bar link only).
+    pub(crate) check_for_updates: bool,
     /// Fewer frames while the window is in the background or minimized
     /// (Settings → Debug). On by default.
     pub(crate) power_saving: bool,
     /// Experiments with shader generation and the shader rules
     /// (Settings → Debug). Only read while the debug tools are on.
     pub(crate) shader_lab: ShaderLab,
+    /// Status bar → Look → Shuffle: change the theme now and then.
+    pub(crate) shuffle: Shuffle,
+    /// Status bar → Look → Override panes: one shader Strength for every
+    /// pane. Changes only what is drawn; no theme is edited.
+    pub(crate) strength_override: StrengthOverride,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -339,11 +350,14 @@ impl Default for Preferences {
             settings_layout: SettingsLayout::default(),
             keyboard: KeyboardPreferences::default(),
             row_banding_brightness: 0,
-            // Smooth enough for slow backgrounds and half the GPU work of 60.
-            animation_fps: 30,
+            animation_fps: 60,
+            animation_match_display: None,
             notice_seconds: 5,
+            check_for_updates: true,
             power_saving: true,
             shader_lab: ShaderLab::default(),
+            shuffle: Shuffle::default(),
+            strength_override: StrengthOverride::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -502,6 +516,114 @@ impl Default for SettingsLayout {
     }
 }
 
+/// Which themes Shuffle picks from.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ShufflePool {
+    Favorites,
+    /// Personal themes, including saved AI results.
+    Mine,
+    /// Every theme with a shader background.
+    #[default]
+    Shaders,
+    All,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ShufflePool {
+    pub(crate) const ALL: [ShufflePool; 4] =
+        [Self::Favorites, Self::Mine, Self::Shaders, Self::All];
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Favorites => "Favorite themes",
+            Self::Mine => "My themes",
+            Self::Shaders => "Themes with a shader",
+            Self::All => "All themes",
+        }
+    }
+}
+
+/// Status bar → Look → Override panes.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct StrengthOverride {
+    pub(crate) enabled: bool,
+    pub(crate) strength: f32,
+}
+
+impl Default for StrengthOverride {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            strength: 0.5,
+        }
+    }
+}
+
+impl StrengthOverride {
+    /// The Strength every pane uses, while the override is on.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn active(&self) -> Option<f32> {
+        self.enabled.then_some(self.strength)
+    }
+
+    fn normalize(&mut self) {
+        let range = crate::theme::ShaderBackground::STRENGTH;
+        self.strength = if self.strength.is_finite() {
+            self.strength.clamp(*range.start(), *range.end())
+        } else {
+            Self::default().strength
+        };
+    }
+}
+
+/// Status bar → Look → Shuffle.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct Shuffle {
+    pub(crate) enabled: bool,
+    pub(crate) pool: ShufflePool,
+    /// Minutes between changes.
+    pub(crate) minutes: f32,
+    /// How long colors take to fade into the next theme; 0 switches at once.
+    pub(crate) fade_seconds: f32,
+    /// Every pane gets its own theme from the pool, not just the shared one.
+    pub(crate) every_pane: bool,
+    /// Also take each theme's fonts (resizes the terminals).
+    pub(crate) fonts: bool,
+}
+
+impl Shuffle {
+    pub(crate) const MINUTES: std::ops::RangeInclusive<f32> = 0.1..=240.0;
+    pub(crate) const FADE: std::ops::RangeInclusive<f32> = 0.0..=10.0;
+
+    fn normalize(&mut self) {
+        let clamp = |value: f32, range: &std::ops::RangeInclusive<f32>, fallback: f32| {
+            if value.is_finite() {
+                value.clamp(*range.start(), *range.end())
+            } else {
+                fallback
+            }
+        };
+        self.minutes = clamp(self.minutes, &Self::MINUTES, 5.0);
+        self.fade_seconds = clamp(self.fade_seconds, &Self::FADE, 2.5);
+    }
+}
+
+impl Default for Shuffle {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            pool: ShufflePool::default(),
+            minutes: 5.0,
+            fade_seconds: 2.5,
+            every_pane: false,
+            fonts: false,
+        }
+    }
+}
+
 /// What the second ("judge") model does after the writer.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -549,7 +671,7 @@ impl Default for ShaderLab {
             loops: true,
             cost_limit: Self::DEFAULT_COST_LIMIT,
             feedback: false,
-            design_theme: false,
+            design_theme: true,
         }
     }
 }
@@ -652,8 +774,13 @@ impl Preferences {
         }
         self.row_banding_brightness = self.row_banding_brightness.min(64);
         self.animation_fps = self.animation_fps.clamp(1, MAX_ANIMATION_FPS);
+        if self.animation_match_display.take() == Some(true) {
+            self.animation_fps = 60;
+        }
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
+        self.shuffle.normalize();
+        self.strength_override.normalize();
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {
@@ -1014,7 +1141,26 @@ mod tests {
     fn settings_layout_keyboard_and_band_brightness_persist_and_migrate() {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert_eq!(prefs.row_banding_brightness, 0);
-        assert_eq!(prefs.animation_fps, 30);
+        assert_eq!(prefs.animation_fps, 60);
+        // The short-lived Match display switch becomes 60 FPS, once.
+        for (json, fps) in [
+            (
+                r#"{"animation_fps": 30, "animation_match_display": true}"#,
+                60,
+            ),
+            (
+                r#"{"animation_fps": 30, "animation_match_display": false}"#,
+                30,
+            ),
+            (r#"{"animation_fps": 90}"#, 90),
+        ] {
+            let mut old: Preferences = serde_json::from_str(json).unwrap();
+            old.normalize_theme_sources();
+            assert_eq!(old.animation_fps, fps, "{json}");
+            assert!(old.animation_match_display.is_none());
+            let saved = serde_json::to_value(&old).unwrap();
+            assert!(saved.get("animation_match_display").is_none());
+        }
         assert!(prefs.keyboard.bracketed_paste);
         prefs.settings_layout.size = [1200.0, 900.0];
         prefs.settings_layout.position = Some([-900.0, 120.0]);

@@ -25,8 +25,13 @@ Toggle **Y up** under Style. New and AI shaders expect it on; very old ones
 may need it off.
 
 **My GPU is busy (recording, games).**
-Lower **FPS limit (all panes)** under **✦ Shader** in the status bar, or on
-the Shaders tab. 15–30 is plenty for slow shaders.
+Lower **FPS (all panes)** under **✦ Shader** in the status bar, or on the
+Shaders tab. 15–30 is plenty for slow shaders.
+
+**Motion looks choppy.**
+Settings → Debug → **Animation frames in the last second** shows the real
+rate. Close to the FPS setting: raise FPS. Much lower: the graphics card
+can't keep up; use fewer animated panes or lighter shaders.
 
 **It stopped moving.**
 Check **Animate**, Speed above 0, **Motion** in the status bar above 0%, and

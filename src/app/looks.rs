@@ -168,6 +168,31 @@ impl ButtonsApp {
         }
     }
 
+    /// Look → Override panes: one shader Strength for every pane. Moving the
+    /// slider turns the override on. True when it should be saved.
+    fn strength_override_row(&mut self, ui: &mut egui::Ui) -> bool {
+        let setting = &mut self.preferences.strength_override;
+        let mut changed = false;
+        wrapping_row(ui, |ui| {
+            changed |= ui
+                .spaced_checkbox(&mut setting.enabled, "Override panes")
+                .on_hover_text("Every pane's shader uses this Strength instead of its own, for bright shaders or a Strength left too high. Themes are not changed: untick it and each pane goes back to its own.")
+                .changed();
+            let response = ui.add(
+                egui::Slider::new(
+                    &mut setting.strength,
+                    crate::theme::ShaderBackground::STRENGTH,
+                )
+                .text("Strength"),
+            );
+            if response.changed() {
+                setting.enabled = true;
+            }
+            changed |= response.drag_stopped() || (response.changed() && !response.dragged());
+        });
+        changed
+    }
+
     /// Status bar: the motion speed drag control and the Look menu (look
     /// presets, Calm effects, GPU shader backgrounds).
     pub(super) fn motion_status_controls(
@@ -233,10 +258,14 @@ impl ButtonsApp {
                         changed = true;
                     }
                 });
+                ui.separator();
+                changed |= self.strength_override_row(ui);
+                ui.separator();
+                changed |= self.shuffle_menu(ui);
             })
             .response
             .on_hover_text(
-                "Look presets, Calm effects, GPU shaders and motion speed for every pane.",
+                "Look presets, Calm effects, GPU shaders, motion speed and Shuffle for every pane.",
             );
         }
         if let Some(look) = chosen {
@@ -267,6 +296,38 @@ mod tests {
         app.preferences.motion_speed = 1.0;
         app.advance_motion_clock(500.0);
         assert!((app.motion_time - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn animation_ticks_follow_real_time_at_any_motion_speed() {
+        // A 144 Hz display at the 60 FPS default, and a 60 Hz one whose
+        // frames come up to 1.5 ms early or late.
+        for (display_hz, jitter) in [(144.0, 0.0), (60.0, 0.0015)] {
+            for speed in [1.0_f32, 0.5, 0.1] {
+                let mut app = ButtonsApp::empty(Preferences::default());
+                assert_eq!(app.preferences.animation_fps, 60);
+                app.preferences.motion_speed = speed;
+                let mut times = Vec::new();
+                let frames = (display_hz * 2.0) as usize;
+                for frame in 0..=frames {
+                    let wobble = if frame % 2 == 0 { jitter } else { -jitter };
+                    app.advance_motion_clock(10.0 + frame as f64 / display_hz + wobble);
+                    if times.last() != Some(&app.motion_time) {
+                        times.push(app.motion_time);
+                    }
+                }
+                let per_second = (times.len() - 1) as f64 / 2.0;
+                assert!(
+                    (58.0..=61.0).contains(&per_second),
+                    "{display_hz} Hz, Motion {speed}: {per_second} ticks a second"
+                );
+                // Every tick moves the same distance: even motion.
+                let step = f64::from(speed) / 60.0;
+                for pair in times.windows(2) {
+                    assert!(((pair[1] - pair[0]) - step).abs() < 1e-6, "{display_hz} Hz");
+                }
+            }
+        }
     }
 
     #[test]

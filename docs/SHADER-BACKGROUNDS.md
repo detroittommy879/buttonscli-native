@@ -42,8 +42,8 @@ gradient). This is a background pass, not glyph distortion/post-processing.
 Native only; the browser demo retains its existing gradient/solid fallback.
 Patterns have fixed, loop-free work, one shared pipeline and at most 32 tiny
 per-pane uniform buffers. Hidden panes do not draw and minimized viewports skip
-the shader callback. Motion requests repaint at the lesser of the user's frame
-limit and 30 FPS. Input/output or resize can cause extra renders: this is not a
+the shader callback. Motion requests repaint at the next tick of the
+user's frame rate. Input/output or resize can cause extra renders: this is not a
 strict GPU frame budget, and no old-GPU performance guarantee is made.
 
 The `shaderBackgrounds` feature is active/free. `ShaderLab` and `VibeCodeShaders`

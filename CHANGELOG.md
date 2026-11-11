@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- New version notice: at startup ButtonsCLI asks GitHub which release is the
+  latest, and when it is newer a green **⬆ vX.Y.Z available** link shows in
+  the status bar and opens the release page. Nothing is downloaded or
+  installed. Turn it off in Settings → Workspace.
+- **Shuffle** (status bar → ◐ Look): change the theme every few minutes from
+  your favorites, your own themes, themes with a shader or all themes, with
+  the colors fading into the next one and shaders fading out and in. It can
+  give each pane its own theme, keeps fonts unless asked, and waits while
+  Settings is open. It never edits a theme file.
+- **◐ Look → Override panes**: one shader Strength for every pane, for very
+  bright shaders or a Strength left too high. Themes keep their own value and
+  come back when you untick it.
+- Fixed: Create with AI results could stop reaching the whole app. After a
+  Strength or shader change from the status bar the editor stayed on one
+  pane, and panes with a theme of their own (for example Shuffle's per-pane
+  picks) ignored the shared theme. The Shaders tab now says so next to the
+  results and has a **Use on the whole app** button.
 - Shader code has 14 new helpers: `fbm`, `ridged`, `flow`, `voronoi`, `hash2`,
   `rotate`, `polar`, shapes (`sd_circle`, `sd_box`, `sd_segment`, `smin`),
   `fill`/`stroke`/`halo` to draw them, and `tonemap`. See the Shader code
@@ -14,7 +31,14 @@
   be too heavy for laptop graphics, a shader the graphics driver refuses is
   skipped with a message instead of closing the app, and a comment that
   mentions `strength` no longer switches off the Strength slider.
-- New profiles animate at 30 FPS instead of 60 (Settings → Effects changes it).
+- Shaders and effects really run at the FPS setting (60 by default, one
+  setting for all panes). Before, a lower **Motion** also lowered the frame
+  rate (Motion 50% gave 30 frames a second), and each frame waited a full
+  interval after the last one finished, so the real rate stayed well below
+  the setting. Motion now only changes speed. Settings → Debug shows how many
+  animation frames really came in the last second.
+- Fixed: applying a saved theme no longer changes the FPS limit. Theme copies
+  used to store the FPS they were saved at and put it back when applied.
 - Longer shaders compile: the size limit is four times higher, and a shader
   that is too long or uses something that is not allowed now says which.
 - AI model endpoints must use HTTPS unless they are on this computer or your
@@ -30,13 +54,14 @@
 - Create with AI → Design → **Theme + shader**: each version also designs a
   matching theme (app and terminal colors, ANSI colors, fonts), so one idea
   such as "halloween" changes the whole look. Cards preview the theme's text
-  colors; using one loads both into the draft. The AI Theme Generator stays
-  as it was.
+  colors; using one loads both into the draft, which saves as one theme. It
+  is the default Design where AI themes are available. The AI Theme
+  Generator stays as it was.
 - Experiment (Settings → Debug → Shader experiments → Feedback): shader code
   may call `prev(p)` for the color it drew there last frame, for trails,
   ripples and build-up. Create with AI is told about it while it is on. Each
   pane using it keeps two extra frame-sized images on the GPU; a new frame is
-  drawn per animation tick, so fades follow the FPS limit and pause with
+  drawn per animation tick, so fades follow the frame rate and pause with
   motion.
 - Docs: the shader guide covers loops, the Create with AI options, Theme +
   shader and the feedback experiment; AI setup notes the HTTPS rule and that

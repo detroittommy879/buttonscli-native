@@ -66,6 +66,7 @@ try {
     $startInfo.WorkingDirectory = $smokeHome
     $startInfo.UseShellExecute = $false
     $startInfo.Environment['USERPROFILE'] = $smokeHome
+    $startInfo.Environment['BUTTONSCLI_NO_UPDATE_CHECK'] = '1'
     $startInfo.Environment['HOME'] = $smokeHome
     $startInfo.Environment['APPDATA'] = $roaming
     $startInfo.Environment['LOCALAPPDATA'] = $local

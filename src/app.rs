@@ -546,6 +546,15 @@ pub struct ButtonsApp {
     motion_time: f64,
     #[cfg(not(target_arch = "wasm32"))]
     motion_clock_at: Option<f64>,
+    /// Look → Shuffle: the timer, this round's themes and the fade.
+    #[cfg(not(target_arch = "wasm32"))]
+    shuffle: shuffle::ShuffleState,
+    /// The startup release check, until it answers.
+    #[cfg(not(target_arch = "wasm32"))]
+    update_rx: Option<Receiver<crate::update_check::Update>>,
+    /// A newer release, shown as a green status bar link.
+    #[cfg(not(target_arch = "wasm32"))]
+    update_available: Option<crate::update_check::Update>,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1420,6 +1429,10 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
+        if app.preferences.check_for_updates {
+            app.update_rx = crate::update_check::spawn(cc.egui_ctx.clone());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
             app.notice = Some(format!("Native settings could not load: {error}"));
         }
@@ -1632,6 +1645,12 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             motion_clock_at: None,
             #[cfg(not(target_arch = "wasm32"))]
+            shuffle: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            update_rx: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            update_available: None,
+            #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_busy: false,
@@ -1837,6 +1856,9 @@ impl ButtonsApp {
         // when Windows reports a different system theme after initialization.
         ctx.set_theme(egui::Theme::Dark);
         crate::ui_text::set_default_spacing(ctx, self.preferences.typography.shell.letter_spacing);
+        #[cfg(not(target_arch = "wasm32"))]
+        let colors = &self.app_theme_colors();
+        #[cfg(target_arch = "wasm32")]
         let colors = &self.active_app_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
@@ -1901,6 +1923,9 @@ impl ButtonsApp {
     }
 
     fn colors(&self) -> AppColors {
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut colors = self.app_theme_colors();
+        #[cfg(target_arch = "wasm32")]
         let mut colors = self.active_app_theme().colors.clone();
         if let Some(color) = self
             .preferences
@@ -1921,15 +1946,43 @@ impl ButtonsApp {
         colors
     }
 
-    /// Adds the real time since the last frame, times `motion_speed`.
+    /// Moves the motion clock on by one animation tick when one is due.
+    /// Ticks follow real time at the FPS limit, so shaders change `fps`
+    /// times a second at any Motion speed; Motion only scales how far each
+    /// tick moves. Each tick moves exactly one step, so motion stays even
+    /// when frames arrive a little early or late (vsync, timers).
     #[cfg(not(target_arch = "wasm32"))]
     fn advance_motion_clock(&mut self, now: f64) {
-        if let Some(last) = self.motion_clock_at {
-            let elapsed = (now - last).clamp(0.0, 1.0);
-            self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
-            self.motion_time %= 3600.0 * 24.0;
+        let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
+        let Some(last) = self.motion_clock_at else {
+            self.motion_clock_at = Some(now);
+            return;
+        };
+        if now < last + step - ANIMATION_TICK_SLACK.min(step * 0.5) {
+            return;
         }
-        self.motion_clock_at = Some(now);
+        // Behind by more than a step (idle, a slow frame): start again from now.
+        let tick = if now - (last + step) > step {
+            now
+        } else {
+            last + step
+        };
+        let elapsed = (tick - last).clamp(0.0, 1.0);
+        self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
+        self.motion_time %= 3600.0 * 24.0;
+        self.motion_clock_at = Some(tick);
+        self.power.ticks.push_back(now);
+        while self.power.ticks.len() > 2 * crate::settings::MAX_ANIMATION_FPS as usize {
+            self.power.ticks.pop_front();
+        }
+    }
+
+    /// How long until the next animation tick is due, for repaint requests.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn animation_delay(&self, now: f64) -> std::time::Duration {
+        let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
+        let due = self.motion_clock_at.map_or(now, |last| last + step);
+        std::time::Duration::from_secs_f64((due - now).clamp(0.001, step))
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1981,11 +2034,35 @@ impl ButtonsApp {
             simple_noise_idle_delay_seconds: effects.simple_noise_idle_delay_seconds,
             simple_noise_idle_ramp_seconds: effects.simple_noise_idle_ramp_seconds,
         };
+        self.with_strength_override(theme)
+    }
+
+    /// Look → Override panes: every pane's shader at one Strength. Only what
+    /// is drawn changes; theme files and pane looks keep their own value.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn with_strength_override(&self, mut theme: ThemeDefinition) -> ThemeDefinition {
+        if let (Some(strength), Some(shader)) = (
+            self.preferences.strength_override.active(),
+            &mut theme.effects.shader_background,
+        ) {
+            shader.strength = strength;
+        }
         theme
     }
 
+    /// A pane's look: its own theme or the shared one, mid-fade while
+    /// Shuffle changes themes.
     #[cfg(not(target_arch = "wasm32"))]
     fn terminal_presentation_for(&self, session_id: u64) -> ThemeDefinition {
+        let theme = self.settled_presentation_for(session_id);
+        match &self.shuffle.fade {
+            Some(fade) => fade.pane(session_id, theme),
+            None => theme,
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn settled_presentation_for(&self, session_id: u64) -> ThemeDefinition {
         if let Some(id) = self.theme_overrides.get(&session_id) {
             if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
                 let mut theme = theme.clone();
@@ -1998,7 +2075,7 @@ impl ButtonsApp {
                     theme.effects.scanlines_strength = 0.0;
                     theme.effects.simple_noise_enabled = false;
                 }
-                return theme;
+                return self.with_strength_override(theme);
             }
         }
         self.terminal_presentation()
@@ -3475,7 +3552,9 @@ impl ButtonsApp {
             .iter()
             .filter_map(|index| self.tabs.get(*index).map(|tab| (*index, tab)))
             .filter(|(index, tab)| {
+                // Mid-fade every pane has its own look (from its old one).
                 self.theme_overrides.contains_key(&tab.id)
+                    || self.shuffle.fade.is_some()
                     || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
@@ -3490,9 +3569,11 @@ impl ButtonsApp {
         let (shader_choices, saved_shader_count) = shader_choices(&self.preferences.saved_shaders);
         ui.allocate_rect(rect, egui::Sense::hover());
         let animation_fps = self.effective_animation_fps();
+        let animation_delay = self.animation_delay(ui.input(|input| input.time));
         let mut render_state = PaneRenderState {
             shader_choices: &shader_choices,
             saved_shader_count,
+            strength_override: self.preferences.strength_override.active(),
             ratios: &mut self.preferences.pane_split_ratios,
             tabs: &mut self.tabs,
             focused,
@@ -3521,6 +3602,7 @@ impl ButtonsApp {
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps,
+            animation_delay,
             motion: (self.motion_time, self.preferences.motion_speed),
             keyboard_navigation: self.keyboard_navigation,
         };
@@ -5268,6 +5350,8 @@ impl ButtonsApp {
                     if let Some(last) = self.notice.as_ref().or(self.last_notice.as_ref()) {
                         status.on_hover_text(format!("Last message: {last}"));
                     }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    self.update_link(ui);
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -5316,7 +5400,7 @@ impl ButtonsApp {
                                 ui.set_max_width(340.0);
                                 if let Some((_, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
-                                    pane_shader_menu(ui, theme, &choices, saved_count, &mut shader_action);
+                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), &mut shader_action);
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
@@ -5324,9 +5408,7 @@ impl ButtonsApp {
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
                         if let Some(action) = action { self.perform_global_theme_action(action); }
-                        if fps != self.preferences.animation_fps {
-                            self.preferences.animation_fps = fps;
-                        }
+                        self.preferences.animation_fps = fps;
                         if fps_done {
                             self.persist_native_preferences();
                         }
@@ -8813,12 +8895,15 @@ impl ButtonsApp {
             return;
         };
         let before = document.clone();
+        // "Use on the whole app" ends the editor session, so it waits until
+        // this local copy of the draft has been written back.
+        let mut use_everywhere = false;
         let mut enabled = document["effects"]["shaderBackground"].is_object();
         let mut shader: crate::theme::ShaderBackground =
             serde_json::from_value(document["effects"]["shaderBackground"].clone())
                 .unwrap_or_default();
         let mut chosen: Option<crate::shader_ai::Candidate> = None;
-        let time = animation_clock(ui.input(|i| i.time), self.preferences.animation_fps);
+        let time = animation_clock(ui.input(|i| i.time), self.effective_animation_fps());
 
         // 1. Live preview first, so every change below is visible right away.
         settings_section(ui, base, 0, |ui| {
@@ -9076,6 +9161,12 @@ impl ButtonsApp {
                 .text("Strength"),
             )
             .on_hover_text("How strongly the pattern shows behind the text. Create with AI is told to use it, so lower it if text is hard to read.");
+            if let Some(strength) = self.preferences.strength_override.active() {
+                ui.spaced_colored_label(
+                    self.colors().warning,
+                    format!("◐ Look → Override panes is on: every pane shows Strength {strength:.2}. This value is saved with the theme and comes back when you untick it."),
+                );
+            }
             // Strength 0 shows this color, so it sits right next to Strength.
             wrapping_row(ui, |ui| {
                 ui.spaced_label("Background");
@@ -9312,6 +9403,7 @@ impl ButtonsApp {
                         self.persist_native_preferences();
                     }
                 }
+                use_everywhere |= self.look_target_hint(ui);
                 if !design_theme {
                     wrapping_row(ui, |ui| {
                         ui.spaced_label("Colors");
@@ -9706,6 +9798,7 @@ impl ButtonsApp {
         // 5. One place to keep or drop the result.
         settings_section(ui, base, 4, |ui| {
             ui.spaced_label(RichText::new("Keep it").strong());
+            use_everywhere |= self.look_target_hint(ui);
             self.theme_apply_controls(ui);
             wrapping_row(ui, |ui| {
                 if ui.spaced_button("Preview on terminals").clicked() {
@@ -9733,6 +9826,9 @@ impl ButtonsApp {
                 ui.spaced_label(status);
             }
         });
+        if use_everywhere {
+            self.use_look_everywhere();
+        }
     }
 
     /// Draws the theme background with an optional shader on top.
@@ -9770,10 +9866,8 @@ impl ButtonsApp {
         ) {
             ui.painter().add(egui::Shape::Callback(callback));
             if shader.animated && shader.speed > 0.0 {
-                ui.ctx()
-                    .request_repaint_after(std::time::Duration::from_millis(
-                        animation_interval_ms(self.effective_animation_fps()),
-                    ));
+                let now = ui.input(|input| input.time);
+                ui.ctx().request_repaint_after(self.animation_delay(now));
             }
         }
     }
@@ -11254,6 +11348,10 @@ impl ButtonsApp {
         for (key, _) in NATIVE_APPEARANCE_FIELDS {
             document["nativeAppearance"][*key] = preferences[*key].clone();
         }
+        // Older copies saved the frame rate; it is no longer part of a look.
+        if let Some(native) = document["nativeAppearance"].as_object_mut() {
+            native.remove("animation_fps");
+        }
         document
     }
 
@@ -11312,7 +11410,6 @@ impl ButtonsApp {
         let mut document = self.appearance_copy_document();
         if let Some(native) = document["nativeAppearance"].as_object_mut() {
             for key in [
-                "animation_fps",
                 "calm_mode",
                 "shader_backgrounds_enabled",
                 "effects_focused_pane_only",
@@ -12955,6 +13052,108 @@ impl ButtonsApp {
         self.discard_theme_editor_session();
     }
 
+    /// "Use on the whole app": the look being edited goes to the app colors
+    /// and every pane. From one pane, its edit is saved first (a new numbered
+    /// theme when it came from another file, as switching panes does) and that
+    /// theme is then used everywhere. From All panes, panes with a theme of
+    /// their own (a Library pick, Shuffle's per-pane picks) drop it.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn use_look_everywhere(&mut self) {
+        let pane = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
+        if let Some(tab) = pane {
+            if let Err(error) = self.autosave_theme_draft() {
+                self.theme_editor_status =
+                    Some(format!("Could not save this pane's edit first: {error}"));
+                return;
+            }
+            self.discard_theme_editor_session();
+            let id = self
+                .theme_overrides
+                .get(&tab)
+                .cloned()
+                .unwrap_or_else(|| self.preferences.theme_id.clone());
+            self.theme_editor_pane = None;
+            self.theme_editor_pane_mode = false;
+            let theme = self.themes.get(&id).clone();
+            self.set_theme_all(&id);
+            let calm = self.preferences.calm_mode;
+            self.apply_theme_sources(theme, calm);
+        } else {
+            self.theme_editor_pane_mode = false;
+            self.theme_overrides.clear();
+            self.pending_pane_looks = None;
+        }
+        self.persist_native_preferences();
+    }
+
+    /// Says when editor results won't reach the whole app (one pane is being
+    /// edited, or displayed panes keep their own theme), with the way out.
+    /// Shown next to Generate and Keep: the "Edit for" row is far above.
+    /// True when its button was clicked; the caller then calls
+    /// `use_look_everywhere` once its own copy of the draft is saved back.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn look_target_hint(&mut self, ui: &mut egui::Ui) -> bool {
+        let displayed = if self.rendered_panes.is_empty() {
+            self.visible_panes.clone()
+        } else {
+            self.rendered_panes.clone()
+        };
+        let slot_name = |index: usize| {
+            displayed
+                .iter()
+                .position(|shown| *shown == index)
+                .map_or_else(
+                    || "a hidden tab".to_owned(),
+                    |slot| format!("Pane {}", slot + 1),
+                )
+        };
+        let editing = self
+            .theme_editor_pane
+            .and_then(|tab| self.tabs.iter().position(|t| t.id == tab));
+        let note = if let Some(index) = editing {
+            format!(
+                "Editing {} only: results change its terminal and shader, not the app colors or the other panes.",
+                slot_name(index)
+            )
+        } else {
+            let own: Vec<String> = displayed
+                .iter()
+                .filter(|index| {
+                    self.tabs
+                        .get(**index)
+                        .is_some_and(|tab| self.theme_overrides.contains_key(&tab.id))
+                })
+                .map(|index| slot_name(*index))
+                .collect();
+            if own.is_empty() {
+                return false;
+            }
+            format!(
+                "{} {} a theme of {} own, so {} the shared theme.",
+                own.join(", "),
+                if own.len() == 1 { "has" } else { "have" },
+                if own.len() == 1 { "its" } else { "their" },
+                if own.len() == 1 {
+                    "it won't show changes to"
+                } else {
+                    "they won't show changes to"
+                }
+            )
+        };
+        let warning = self.colors().warning;
+        let mut clicked = false;
+        wrapping_row(ui, |ui| {
+            ui.spaced_colored_label(warning, note);
+            clicked = ui
+                .spaced_button("Use on the whole app")
+                .on_hover_text("Use this look for the app colors and every pane. Edits made to one pane are saved first, under a new name when the theme came from another file.")
+                .clicked();
+        });
+        clicked
+    }
+
     /// Changes one pane's look from a menu. It goes through the same draft as
     /// Settings → "Edit for: Pane N", so only that pane changes, and the edit
     /// is saved like any pane edit (as a numbered theme when you switch to
@@ -13134,7 +13333,7 @@ impl ButtonsApp {
                 1..=crate::settings::MAX_ANIMATION_FPS,
             )
             .logarithmic(true)
-            .text("Animation FPS limit (shaders and effects, all panes)"),
+            .text("Animation FPS (shaders and effects, all panes, any Motion speed)"),
         );
         ui.add(
             egui::Slider::new(
@@ -13145,6 +13344,21 @@ impl ButtonsApp {
             .text("Seconds before messages fade (0 = keep until dismissed)"),
         )
         .on_hover_text("Workspace messages such as \"Applied theme bundle\" float over the terminals, then fade. The last one stays on the status bar's SHELL READY hover.");
+        #[cfg(not(target_arch = "wasm32"))]
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.check_for_updates,
+                "Check GitHub for a new release at startup",
+            )
+            .on_hover_text("Asks GitHub once per start which ButtonsCLI release is the latest. Nothing is downloaded or installed: a newer one shows a green link in the status bar.")
+            .changed()
+        {
+            if !self.preferences.check_for_updates {
+                self.update_rx = None;
+                self.update_available = None;
+            }
+            self.persist_native_preferences();
+        }
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
@@ -14752,9 +14966,14 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 #[cfg(not(target_arch = "wasm32"))]
 const SIMPLE_NOISE_HIDDEN: bool = true;
 
-/// The animation clock, stepped to the FPS limit. Typing, output and mouse
-/// moves redraw more often than the limit; a stepped clock keeps shaders and
-/// effects changing only `fps` times a second however often frames come.
+/// How early a frame may come and still count as the next animation tick:
+/// timers and vsync wake a little early or late, and a fixed grid would then
+/// drop or double frames.
+#[cfg(not(target_arch = "wasm32"))]
+const ANIMATION_TICK_SLACK: f64 = 0.002;
+
+/// Real time stepped to the FPS limit, for previews outside the panes
+/// (the panes use the motion clock, which steps the same way).
 #[cfg(not(target_arch = "wasm32"))]
 fn animation_clock(time: f64, fps: u32) -> f32 {
     let step = 1.0 / f64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
@@ -14769,16 +14988,10 @@ fn animation_fps_slider(ui: &mut egui::Ui, fps: &mut u32) -> bool {
         .add(
             egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
                 .logarithmic(true)
-                .text("FPS limit (all panes)"),
+                .text("FPS (all panes)"),
         )
-        .on_hover_text("How often shaders and effects change, in every pane. Lower it to save GPU, for example while recording.");
+        .on_hover_text("How many times a second shaders and effects change, in every pane, at any Motion speed. Settings → Debug shows how many frames really came. Lower it to save GPU, for example while recording.");
     response.drag_stopped() || (response.changed() && !response.dragged())
-}
-
-/// Milliseconds between animation frames at the FPS limit.
-#[cfg(not(target_arch = "wasm32"))]
-fn animation_interval_ms(fps: u32) -> u64 {
-    1000_u64.div_ceil(u64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS)))
 }
 
 /// The terminal background, then c1–c5: c1–c3 as before (gradient, or accent,
@@ -14844,6 +15057,7 @@ struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    animation_delay: std::time::Duration,
     /// The motion clock and the global speed; speed 0 holds every frame.
     motion: (f64, f32),
     focused: bool,
@@ -14868,7 +15082,8 @@ fn terminal_surface(
     });
     let (motion_time, motion_speed) = interaction.motion;
     let moving = motion_speed > 0.0;
-    let time = animation_clock(motion_time, interaction.animation_fps);
+    // Already stepped: the motion clock only moves on animation ticks.
+    let time = motion_time as f32;
     let gradient = theme
         .effects
         .gradient
@@ -14943,10 +15158,7 @@ fn terminal_surface(
         && background_callback.is_some()
         && shader.is_some_and(|s| s.animated && s.speed > 0.0)
     {
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(animation_interval_ms(
-                interaction.animation_fps,
-            )));
+        ui.ctx().request_repaint_after(interaction.animation_delay);
     }
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(interaction.focused)
@@ -15179,8 +15391,8 @@ fn paint_terminal_effects(
     }
     if let Some(delay) = repaint_after_ms {
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(
-                delay.max(animation_interval_ms(animation_fps)),
+            .request_repaint_after(std::time::Duration::from_millis(delay).max(
+                std::time::Duration::from_secs_f64(1.0 / f64::from(animation_fps.max(1))),
             ));
     }
 }
@@ -15331,6 +15543,8 @@ struct PaneRenderState<'a> {
     keyboard: &'a crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    /// Time until the next animation tick.
+    animation_delay: std::time::Duration,
     motion: (f64, f32),
     right_click_copies_selection: bool,
     advanced_effects: bool,
@@ -15351,6 +15565,7 @@ struct PaneRenderState<'a> {
     favorites: &'a [(String, String)],
     shader_choices: &'a [crate::theme::SavedShader],
     saved_shader_count: usize,
+    strength_override: Option<f32>,
     auto_tile: &'a crate::autotile::AutoTile,
     action: &'a mut Option<(u64, PaneAction)>,
     hover_label: &'a crate::settings::PaneHoverLabel,
@@ -15391,6 +15606,7 @@ fn render_pane_tree(
                     keyboard: state.keyboard.clone(),
                     row_brightness: state.row_brightness,
                     animation_fps: state.animation_fps,
+                    animation_delay: state.animation_delay,
                     motion: state.motion,
                     focused: state.focused == *index
                         && !state.modal_open
@@ -15478,6 +15694,7 @@ fn render_pane_tree(
                                         theme,
                                         state.shader_choices,
                                         state.saved_shader_count,
+                                        state.strength_override,
                                         &mut action,
                                     );
                                 });
@@ -15941,10 +16158,19 @@ fn pane_shader_menu(
     theme: &ThemeDefinition,
     choices: &[crate::theme::SavedShader],
     saved_count: usize,
+    strength_override: Option<f32>,
     action: &mut Option<PaneAction>,
 ) {
     let shader = theme.effects.shader_background.as_ref();
-    if let Some(shader) = shader {
+    if let (Some(strength), Some(_)) = (strength_override, shader) {
+        let mut shown = strength;
+        ui.add_enabled(
+            false,
+            egui::Slider::new(&mut shown, crate::theme::ShaderBackground::STRENGTH)
+                .text("Strength"),
+        );
+        ui.spaced_small("Set for every pane: ◐ Look → Override panes.");
+    } else if let Some(shader) = shader {
         let mut strength = shader.strength;
         if ui
             .add(
@@ -16517,7 +16743,8 @@ const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
     ("chrome_corner_radius", "app"),
     ("pane_hover_label", "fonts"),
     ("row_banding_brightness", "effects"),
-    ("animation_fps", "effects"),
+    // Not animation_fps: the frame rate belongs to the display, and themes
+    // saved with one used to reset it whenever they were applied.
     ("advanced_effects", "effects"),
     ("shader_backgrounds_enabled", "effects"),
     ("calm_mode", "effects"),
@@ -16951,12 +17178,16 @@ mod notices;
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(not(target_arch = "wasm32"))]
+mod shuffle;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
+#[cfg(not(target_arch = "wasm32"))]
+mod updates;
 
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
@@ -17019,6 +17250,8 @@ impl eframe::App for ButtonsApp {
         self.deliver_menu_paste(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.update_power_status(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_shuffle(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -19008,10 +19241,18 @@ Start-Sleep -Seconds 300
         assert!(persisted.calm_mode);
         assert_eq!(persisted.dock_width, 222.0);
         document["nativeAppearance"]["calm_mode"] = json!(false);
+        // Older theme files carry the FPS they were saved at; it must never
+        // replace the user's own frame rate.
+        document["nativeAppearance"]["animation_fps"] = json!(30);
         app.theme_editor_document = Some(document.clone());
         app.preferences.calm_mode = false;
+        app.preferences.animation_fps = 90;
         app.preview_personal_theme_draft();
         assert!(!app.preferences.calm_mode);
+        assert_eq!(app.preferences.animation_fps, 90);
+        assert!(app.appearance_copy_document()["nativeAppearance"]
+            .get("animation_fps")
+            .is_none());
         app.preferences.calm_mode = true;
         app.preview_personal_theme_draft();
         app.preview_personal_theme_draft();
@@ -22894,9 +23135,7 @@ Start-Sleep -Seconds 300
     fn animation_clock_steps_at_the_fps_limit() {
         assert!((animation_clock(1.26, 10) - 1.2).abs() < 1e-6);
         assert_eq!(animation_clock(1.26, 10), animation_clock(1.29, 10));
-        assert_ne!(animation_clock(1.26, 240), animation_clock(1.29, 240));
-        assert_eq!(animation_interval_ms(240), 5);
-        assert_eq!(animation_interval_ms(0), 1000);
+        assert_ne!(animation_clock(1.26, 120), animation_clock(1.29, 120));
     }
 
     #[cfg(not(target_arch = "wasm32"))]

@@ -157,8 +157,27 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - Terminal shader/gradient time is `motion_time` (real time × `motion_speed`,
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
+  Look → Override panes (`strength_override`) is presentation only:
+  `with_strength_override` in `terminal_presentation` and the override
+  branch of `settled_presentation_for`; never write it into themes.
+  Status-bar shader edits (`edit_pane_look`) leave the editor in pane mode,
+  so results skip the app colors; `look_target_hint`/`use_look_everywhere`
+  is the way out. Shared panes use `terminal_presentation()` directly in
+  the pane loop, so per-pane effects (the Shuffle fade) must add them to
+  `override_themes`.
+  Shuffle (Look menu): `src/app/shuffle.rs`. Its fade goes through
+  `app_theme_colors()` and `terminal_presentation_for` (which wraps
+  `settled_presentation_for`); read colors through those, not
+  `active_app_theme().colors`, or chrome jumps mid-fade.
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
-  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Use
+  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Panes use
+  the motion clock: `advance_motion_clock` ticks on real time (fixed steps,
+  `ANIMATION_TICK_SLACK`), Motion only scales each step; never step
+  `motion_time` itself (that made Motion lower the frame rate). Repaint with
+  `animation_delay(now)` (time to the next tick), not a fixed interval
+  after the frame. `animation_match_display` is read-only migration.
+  FPS is never part of a theme: keep it out of `NATIVE_APPEARANCE_FIELDS`
+  (theme copies used to reset it on apply). Use
   `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
   or minimized (`power_saving`); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar
@@ -281,6 +300,11 @@ cargo build --locked --release --bin buttonscli
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
 - A Windows pass does not certify Linux/macOS interaction or a multi-hour soak.
+- Release check: `src/update_check.rs` (one GitHub `releases/latest` request
+  at startup, `check_for_updates`, `BUTTONSCLI_NO_UPDATE_CHECK=1`) and the
+  status bar link in `src/app/updates.rs`. Tests never call `spawn` (smoke runs set the env var); feed
+  `update_rx` by hand. Not an updater: `src/distribution.rs` is the future
+  signed one.
 - `self.notice` messages render as a fading overlay (`src/app/notices.rs`,
   `notice_seconds`), never a layout row: rows above terminals resize every PTY.
   Logs/crash reports: `src/diagnostics.rs` (`~/.buttonscli-native/logs`, local only);

@@ -57,10 +57,12 @@ Picking a preset sets your code aside; pick **Your code** to get it back.
 - **Animate** and **Speed** — untick Animate for a still picture.
 - **Y up** (custom code only) — on by default. Shader code usually treats "up"
   as up; turn it off if an older shader now looks upside down.
-- **FPS limit (all panes)** — how many times a second shaders and effects
-  change, for every pane at once (1–240; new profiles start at 30). Lower it to save GPU,
-  for example while recording with OBS. It's a real cap: typing and mouse
-  moves don't make shaders run faster.
+- **FPS (all panes)** — how many times a second shaders and effects change,
+  for every pane at once (1–240, default 60). **Motion** in the status bar
+  changes only their speed, never the frame rate. Lower FPS to save GPU, for
+  example while recording with OBS. It's a real cap: typing and mouse moves
+  don't make shaders run faster. Settings → Debug shows how many animation
+  frames really came in the last second.
 
 ### Colors: c1 to c5
 
@@ -100,6 +102,11 @@ These change only that pane, the same way **Edit for: Pane N** does, and the
 change is saved like any pane edit: as a numbered personal theme when you
 switch panes, close Settings or quit.
 
+**◐ Look → Override panes** sets one Strength for every pane's shader at
+once, whatever each theme says; moving its slider turns it on. Nothing is
+saved into the themes, so unticking it puts each pane's own Strength back.
+While it is on, the pane Strength sliders are greyed out.
+
 <!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
      Background color, Use a shader list and the FPS limit. -->
 
@@ -124,12 +131,14 @@ your shader list or a [theme bundle](theme-bundles.md).
 
 ## Performance
 
-Shaders run on the GPU at up to 30 frames per second, and hidden panes don't
-draw. If your machine struggles, lower the number of animated panes, untick
+Shaders run on the GPU at the FPS setting (60 by default), and hidden panes
+don't draw. If your machine struggles, lower the number of animated panes, untick
 **Animate**, or use **Calm** in the Library.
 
 **Motion N%** in the status bar speeds up or slows down every pane's shader
 and gradient motion at once: drag it left or right, or double-click to type.
 0% holds the current frame and stops redrawing, 100% is each theme's own
 speed, and 200% is double. **◐ Look** next to it has Minimal, Moderate and
-Showoff presets, Calm effects and the GPU shader switch.
+Showoff presets, Calm effects, the GPU shader switch, **Override panes** (one
+Strength for every pane) and [Shuffle](themes.md#shuffle), which changes the
+theme every few minutes.
