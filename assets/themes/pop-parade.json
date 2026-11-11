@@ -1,0 +1,186 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff4fd8",
+        "#39ff88",
+        "#ffd23f",
+        "#2a1450",
+        "#3ad6ff"
+      ],
+      "custom": {
+        "expression": "let base = mix(bg, c4, smoothstep(-0.5, 0.5, p.y));\nlet g1 = p * 6.0 - vec2<f32>(0.0, t * 0.1);\nlet id1 = floor(g1);\nlet h1 = hash(id1);\nlet o1 = (hash2(id1 + vec2<f32>(4.0, 9.0)) - 0.5) * 0.3;\nlet q1 = fract(g1) - 0.5 - o1;\nlet d1 = length(q1);\nlet rr = 0.07 + 0.05 * h1;\nlet ring1 = 1.0 - smoothstep(0.0, 0.02, abs(d1 - rr));\nlet fill1 = 1.0 - smoothstep(rr - 0.01, rr, d1);\nlet far = c5 * (ring1 * 0.9 + fill1 * 0.2);\nlet g2 = p * 3.5 - vec2<f32>(t * 0.2, 0.0);\nlet id2 = floor(g2);\nlet h2 = hash(id2);\nlet bob = 0.1 * sin(t * 0.9 + h2 * 6.28);\nlet q2 = fract(g2) - 0.5 - vec2<f32>(0.0, bob);\nlet d2 = abs(q2.x) + abs(q2.y) - (0.13 + 0.05 * h2);\nlet fill2 = 1.0 - smoothstep(0.0, 0.02, d2);\nlet mid = mix(c3, c1, step(0.6, h2)) * fill2;\nlet g3 = p * 9.0 + vec2<f32>(t * 0.35, t * 0.2);\nlet id3 = floor(g3);\nlet h3 = hash(id3);\nlet o3 = (hash2(id3 + vec2<f32>(2.0, 5.0)) - 0.5) * 0.3;\nlet q3 = fract(g3) - 0.5 - o3;\nlet d3 = length(q3);\nlet tw = 0.5 + 0.5 * sin(t * 4.0 + h3 * 6.28);\nlet spark = (1.0 - smoothstep(0.0, 0.03, d3 - 0.03)) * tw * step(0.5, h3);\nlet near = mix(c2, c3, h3) * spark;\nlet color = base + far + mid + near;\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Pop Parade",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 1.899999976158142,
+      "speed": 3.299999952316284,
+      "strength": 0.15000000596046448,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T00:44:37.407Z",
+    "description": "Wildly inverted ANSI colors on black, with bubbles, diamonds and sparks drifting past in three layers.",
+    "id": "pop-parade",
+    "name": "Pop Parade",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pop-parade",
+    "updatedAt": "2026-11-11T00:57:35.389Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#7dffb0",
+        "background": "#140a24",
+        "buttonBackground": "#170f10",
+        "buttonHover": "#482327",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#140a24"
+      },
+      "shell": {
+        "accent": "#39ff88",
+        "accentHover": "#7dffb0",
+        "background": "#0a0414",
+        "backgroundSecondary": "#140a24",
+        "border": "#3a2466",
+        "buttonBackground": "#170f10",
+        "paneDivider": {
+          "color": "#39ff88",
+          "thickness": 2.0
+        },
+        "textDim": "#b8a8dc",
+        "textMain": "#f7f0ff"
+      },
+      "statusBar": {
+        "background": "#140a24",
+        "border": "#3a2466",
+        "text": "#b8a8dc",
+        "warning": "#ff4fd8"
+      },
+      "tabs": {
+        "activeBackground": "#0a0414",
+        "activeBorder": "#39ff88",
+        "background": "#140a24",
+        "idleBackground": "#140a24"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#8a7ac4",
+        "blue": "#ffd23f",
+        "brightBlack": "#a594d6",
+        "brightBlue": "#fff08a",
+        "brightCyan": "#ff8070",
+        "brightGreen": "#6fe6ff",
+        "brightMagenta": "#7fffe8",
+        "brightRed": "#7dff9c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ff8ce6",
+        "cyan": "#ff5a4e",
+        "green": "#3ad6ff",
+        "magenta": "#3affe0",
+        "red": "#39ff88",
+        "white": "#f0e6ff",
+        "yellow": "#ff4fd8"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f7f0ff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0c0618",
+        "#ff4fd8",
+        "#39ff88",
+        "#3ad6ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 100,
+        "letterSpacing": 1.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

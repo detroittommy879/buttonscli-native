@@ -1,0 +1,221 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5fd3c8",
+        "#9d7bd8",
+        "#e8b75a",
+        "#4a9ad8",
+        "#e88aa0"
+      ],
+      "custom": {
+        "expression": "let tt = t * drift_speed;\nlet g1 = p * 3.0 + vec2<f32>(tt * 0.06, tt * 0.02);\nlet k1 = floor(g1);\nlet s1 = hash(k1);\nlet l1 = fract(g1) - 0.5;\nlet r1 = rotate(l1, tt * (0.2 + 0.3 * s1) + s1 * 6.283);\nlet bond1 = sd_segment(r1, vec2<f32>(-0.12, 0.0), vec2<f32>(0.12, 0.0));\nlet atoms1 = fill(min(sd_circle(r1 - vec2<f32>(-0.12, 0.0), 0.035), sd_circle(r1 - vec2<f32>(0.12, 0.0), 0.035)));\nlet morph = 0.3 + 0.05 * sin(tt * 0.8 + s1 * 6.283);\nlet ring1 = stroke(abs(length(l1 * vec2<f32>(1.0, 1.6)) - morph), 0.008);\nlet near = (atoms1 * c3 + stroke(bond1, 0.01) * c1 * 0.8 + ring1 * c2 * 0.6) * glow;\nlet g2 = p * 6.0 + vec2<f32>(-tt * 0.03, tt * 0.01);\nlet k2 = floor(g2);\nlet s2 = hash(k2);\nlet l2 = fract(g2) - 0.5;\nlet wave = abs(l2.y - 0.15 * cos(l2.x * 12.0 + tt * 0.8 + s2 * 6.283));\nlet corner = min(sd_segment(l2, vec2<f32>(-0.2, -0.2), vec2<f32>(0.2, -0.2)), sd_segment(l2, vec2<f32>(-0.2, -0.2), vec2<f32>(-0.2, 0.2)));\nlet sym = select(wave, corner, s2 > 0.5);\nlet mask2 = select(1.0 - smoothstep(0.3, 0.5, abs(l2.x)), 1.0, s2 > 0.5);\nlet mid = stroke(sym, 0.006) * mask2 * (0.6 + 0.4 * sin(tt * 0.6 + s2 * 6.283));\nlet g3 = p * 9.0 + vec2<f32>(tt * 0.02, 0.0);\nlet k3 = floor(g3);\nlet s3 = hash(k3);\nlet l3 = fract(g3) - 0.5;\nlet dot3 = halo(sd_circle(l3 - vec2<f32>(-0.15, 0.0), 0.03), 0.02);\nlet line3 = stroke(sd_segment(l3, vec2<f32>(-0.15, 0.0), vec2<f32>(0.25, 0.12)), 0.005);\nlet far = (dot3 + line3 * 0.6) * step(0.3, s3);\nlet wash = mix(bg * 0.8, c4 * 0.10 + c2 * 0.06, smoothstep(-0.5, 0.5, p.y));\nlet color = wash + (near + mid * c4 * 0.7 + far * c5 * 0.5) * 0.9;\nlet shaded = color * (1.0 - 0.3 * dot(p, p));\nreturn mix(bg, tonemap(shaded), strength);",
+        "name": "Parallax Molecular Lattice",
+        "variables": [
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "drift_speed",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "glow",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7000000476837158,
+      "speed": 3.0999999046325684,
+      "strength": 0.27000001072883606,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T23:50:38.127Z",
+    "description": "Deep ink background with drifting teal and violet molecular lattices and amber accents.",
+    "id": "parallax-molecular-lattice",
+    "name": "Parallax Molecular Lattice",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:parallax-molecular-lattice",
+    "updatedAt": "2026-11-11T15:27:54.281Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9fe9e0",
+        "background": "#16141a",
+        "buttonBackground": "#554e3a",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#16141a"
+      },
+      "shell": {
+        "accent": "#5fd3c8",
+        "accentHover": "#9fe9e0",
+        "background": "#0c0b0e",
+        "backgroundSecondary": "#16141a",
+        "border": "#2a2c34",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#5fd3c8",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#9aa6a0",
+        "textMain": "#e9efe9"
+      },
+      "statusBar": {
+        "background": "#16141a",
+        "border": "#2a2c34",
+        "text": "#9aa6a0",
+        "warning": "#e8b75a"
+      },
+      "tabs": {
+        "activeBackground": "#0c0b0e",
+        "activeBorder": "#5fd3c8",
+        "background": "#16141a",
+        "idleBackground": "#16141a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1a1e",
+        "blue": "#4a9ad8",
+        "brightBlack": "#5c6068",
+        "brightBlue": "#7ab8ec",
+        "brightCyan": "#8ff0e6",
+        "brightGreen": "#9fe8bb",
+        "brightMagenta": "#b89ce8",
+        "brightRed": "#f09aab",
+        "brightWhite": "#f0f4f1",
+        "brightYellow": "#f2cc7e",
+        "cyan": "#5fd3c8",
+        "green": "#7fd6a0",
+        "magenta": "#9d7bd8",
+        "red": "#e8788a",
+        "white": "#c8d0ca",
+        "yellow": "#e8b75a"
+      },
+      "background": "#0d0b0a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e4ebe6",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0d0b0a",
+        "#1d5a63",
+        "#5b3f8a",
+        "#c78f3a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,193 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0f1f3d",
+        "#1f5a6e",
+        "#9fd0d8",
+        "#e6ba99",
+        "#3c5a8f"
+      ],
+      "custom": {
+        "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nlet w1 = noise(vec2<f32>(px * 0.8 + t * 0.15 * wave_speed, depth * 2.0 - t * 0.5 * wave_speed));\nlet w2 = noise(vec2<f32>(px * 1.7 - t * 0.25 * wave_speed, depth * 4.0 + t * 0.7 * wave_speed));\nlet ripple = w1 * 0.6 + w2 * 0.4;\nlet crest = smoothstep(0.55, 0.8, ripple);\nlet glint_x = p.x - 0.42 + (w2 - 0.5) * 0.12 * (1.0 + depth * 0.2);\nlet glint = smoothstep(0.1, 0.0, abs(glint_x)) * (0.3 + 0.7 * fog) * (0.5 + 0.5 * crest);\nlet water = mix(c1 * 0.7, c2, ripple) * (0.5 + 0.5 * fog) + c3 * crest * 0.3 + c4 * glint * 0.7;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c5 * 0.45, c1 * 0.3, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = smoothstep(0.02, 0.0, abs(p.y - hz)) * (0.4 + 0.6 * ripple) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Night Swim",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 0.800000011920929
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 2.299999952316284,
+      "speed": 4.699999809265137,
+      "strength": 0.5600000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-10T19:05:46.779Z",
+    "description": "Its own shader code: a pulsing disco floor of colored tiles with a beat slider. Turn on GPU shader backgrounds in Themes > Shaders to see it move; a gradient shows otherwise.",
+    "id": "dune-sunburst-v1",
+    "name": "Dune Sunburst v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:dune-sunburst-v1",
+    "updatedAt": "2026-11-11T16:06:46.140Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff3fa4",
+        "background": "#2a150b",
+        "buttonBackground": "#552a12",
+        "buttonHover": "#ffd23f",
+        "buttonText": "#fff3e6"
+      },
+      "settings": {
+        "background": "#2a150b"
+      },
+      "shell": {
+        "accent": "#ff5f1f",
+        "accentHover": "#ff3fa4",
+        "background": "#1d0f08",
+        "backgroundSecondary": "#2a150b",
+        "border": "#ffd23f",
+        "buttonBackground": "#3d1e0f",
+        "paneDivider": {
+          "color": "#ff5f1f",
+          "thickness": 2.0
+        },
+        "textDim": "#e6b48f",
+        "textMain": "#fff3e6"
+      },
+      "statusBar": {
+        "background": "#ff5f1f",
+        "border": "#ffd23f",
+        "text": "#fff3e6",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#1d0f08",
+        "activeBorder": "#ff5f1f",
+        "background": "#2a150b",
+        "idleBackground": "#3d1e0f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#4a3022",
+        "blue": "#5aa8ff",
+        "brightBlack": "#856049",
+        "brightBlue": "#90c4ff",
+        "brightCyan": "#88f7ef",
+        "brightGreen": "#a8ff9e",
+        "brightMagenta": "#ff94e3",
+        "brightRed": "#ff8f8f",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe27a",
+        "cyan": "#4ff2e6",
+        "green": "#7cff6b",
+        "magenta": "#ff5fd2",
+        "red": "#ff5a5a",
+        "white": "#fff0e2",
+        "yellow": "#ffd23f"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Daddy Time Mono Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#fff3e6",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#120a06",
+        "#4a1608",
+        "#3a0b33",
+        "#120a06"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 600,
+        "letterSpacing": 0.4000000059604645
+      },
+      "terminal": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#b9a8e4",
+        "#ffc8a6",
+        "#b4d9f0",
+        "#fde3d4",
+        "#7f70b8"
+      ],
+      "custom": {
+        "expression": "let qp = floor(p / pixel_size);\nlet row = floor(qp.y / 3.0);\nlet sp = 0.15 + 0.5 * hash(vec2<f32>(row, 7.0));\nlet drifted = qp.x + t * sp * drift * 0.5;\nlet n1 = noise(vec2<f32>(drifted * 0.22, qp.y * 0.55 + 3.0));\nlet n2 = noise(vec2<f32>(drifted * 0.5 + 11.0, qp.y * 1.1));\nlet dens = n1 * 0.7 + n2 * 0.3;\nlet thr = mix(0.62, 0.38, cover);\nlet puff = smoothstep(thr, thr + 0.04, dens);\nlet below = noise(vec2<f32>(drifted * 0.22, (qp.y - 1.0) * 0.55 + 3.0));\nlet shade = clamp(0.5 + (n1 - below) * 4.0, 0.0, 1.0);\nlet dusk = 0.5 + 0.5 * sin(t * 0.03);\nlet grad = smoothstep(-0.5, 0.5, p.y);\nlet sky = mix(mix(c3, c4, grad), mix(c1, c2, grad), dusk);\nlet cloudcol = mix(mix(c1, c5, 0.4), mix(c4, c2, dusk * 0.5), shade);\nlet color = mix(sky, cloudcol, puff * 0.9);\nreturn mix(bg, color, strength);",
+        "name": "Pixel Puffs at Dusk",
+        "variables": [
+          {
+            "max": 0.10000000149011612,
+            "min": 0.019999999552965164,
+            "name": "pixel_size",
+            "value": 0.04500000178813934
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "cover",
+            "value": 0.5
+          },
+          {
+            "max": 3.0,
+            "min": 0.0,
+            "name": "drift",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.600000023841858,
+      "speed": 3.799999952316284,
+      "strength": 0.6000000238418579,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-10T20:30:48.814Z",
+    "description": "Gogh dark import from Aura",
+    "id": "pixel-puffs-at-dusk",
+    "name": "Pixel Puffs at Dusk",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pixel-puffs-at-dusk",
+    "updatedAt": "2026-11-10T20:30:48.814Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#a277ff",
+        "background": "#131219",
+        "buttonBackground": "#14131a",
+        "buttonHover": "#2e2543",
+        "buttonText": "#edecee"
+      },
+      "settings": {
+        "background": "#131219"
+      },
+      "shell": {
+        "accent": "#a277ff",
+        "accentHover": "#a277ff",
+        "background": "#15141b",
+        "backgroundSecondary": "#131219",
+        "border": "#3c305b",
+        "buttonBackground": "#14131a",
+        "paneDivider": {
+          "color": "#a277ff",
+          "thickness": 2.0
+        },
+        "textDim": "#929195",
+        "textMain": "#edecee"
+      },
+      "statusBar": {
+        "background": "#312849",
+        "border": "#3c305b",
+        "text": "#edecee",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#15141b",
+        "activeBorder": "#a277ff",
+        "background": "#131219",
+        "idleBackground": "#14131a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#110F18",
+        "blue": "#A277FF",
+        "brightBlack": "#6D6D6D",
+        "brightBlue": "#A277FF",
+        "brightCyan": "#61FFCA",
+        "brightGreen": "#A277FF",
+        "brightMagenta": "#A277FF",
+        "brightRed": "#FFCA85",
+        "brightWhite": "#EDECEE",
+        "brightYellow": "#FFCA85",
+        "cyan": "#61FFCA",
+        "green": "#61FFCA",
+        "magenta": "#A277FF",
+        "red": "#FF6767",
+        "white": "#EDECEE",
+        "yellow": "#FFCA85"
+      },
+      "background": "#15141B",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#EDECEE",
+      "gradientAngle": 155.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

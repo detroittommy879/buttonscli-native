@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0d1b4f",
+        "#1a7f9c",
+        "#b8f0f5",
+        "#ffb36b",
+        "#5b3fa6"
+      ],
+      "custom": {
+        "expression": "let moon_p = vec2<f32>(0.32, 0.24);\nlet md = sd_circle(p - moon_p, moon_size);\nlet moon = fill(md) * c4 * 1.1 + halo(md, 0.22) * c4 * 0.35 + halo(md, 0.05) * c3 * 0.3;\nlet warm = c4 * 0.5 * (1.0 - smoothstep(-0.08, 0.4, p.y));\nlet sky_base = mix(c5 * 0.55, c1 * 0.5, smoothstep(-0.08, 0.5, p.y));\nlet stars_l = stars(p * 26.0 * star_density, t) * smoothstep(-0.02, 0.1, p.y);\nlet sky = sky_base + warm + moon + c3 * stars_l;\nvar col = sky;\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let top = -0.08 - 0.13 * k;\n    let dd = max(top - p.y, 0.0) + 0.03;\n    let z = (0.1 + 0.08 * k) / dd;\n    let wx = p.x * z;\n    let n1 = noise(vec2<f32>(wx * 0.9 + t * 0.2, z * 0.6 - t * 0.4 + k * 3.0));\n    let n2 = noise(vec2<f32>(wx * 1.9 - t * 0.35, z * 1.4 + t * 0.7 + k * 5.0));\n    let h = n1 * 0.6 + n2 * 0.4 * wave_height;\n    let crest = smoothstep(0.55, 0.9, h);\n    let trough = 1.0 - smoothstep(0.25, 0.55, h);\n    let base = mix(c1, c2, 0.35 + 0.3 * k);\n    let body = mix(base * 0.5, base * 1.3, crest) * (1.0 - 0.3 * trough);\n    let refl_x = p.x - moon_p.x + (n2 - 0.5) * 0.15 * wave_height;\n    let streak = exp(-abs(refl_x) * 7.0) * crest;\n    let layer = body + c3 * crest * 0.25 + c4 * streak * 0.9;\n    let mask = 1.0 - smoothstep(top - 0.004, top + 0.004, p.y);\n    col = mix(col, layer, mask);\n}\nreturn mix(bg, tonemap(col * 1.15), strength);",
+        "name": "Night swim",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "wave_height",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "star_density",
+            "value": 1.0
+          },
+          {
+            "max": 0.119999997317791,
+            "min": 0.03999999910593033,
+            "name": "moon_size",
+            "value": 0.07000000029802322
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T16:07:43.836Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "gravity-arcade-v5",
+    "name": "Gravity Arcade v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gravity-arcade-v5",
+    "updatedAt": "2026-11-11T16:07:43.836Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}
