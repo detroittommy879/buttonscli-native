@@ -157,6 +157,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - Terminal shader/gradient time is `motion_time` (real time × `motion_speed`,
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
+  Shuffle (Look menu): `src/app/shuffle.rs`. Its fade goes through
+  `app_theme_colors()` and `terminal_presentation_for` (which wraps
+  `settled_presentation_for`); read colors through those, not
+  `active_app_theme().colors`, or chrome jumps mid-fade.
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
   `animation_fps`, 1–240); repaint requests alone don't cap FPS. Match display
   (`animation_match_display`, default) is `animation_fps_limit()` =

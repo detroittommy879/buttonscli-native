@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Shuffle** (status bar → ◐ Look): change the theme every few minutes from
+  your favorites, your own themes, themes with a shader or all themes, with
+  the colors fading into the next one and shaders fading out and in. It can
+  give each pane its own theme, keeps fonts unless asked, and waits while
+  Settings is open. It never edits a theme file.
 - Shader code has 14 new helpers: `fbm`, `ridged`, `flow`, `voronoi`, `hash2`,
   `rotate`, `polar`, shapes (`sd_circle`, `sd_box`, `sd_segment`, `smin`),
   `fill`/`stroke`/`halo` to draw them, and `tonemap`. See the Shader code

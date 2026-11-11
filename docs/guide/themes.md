@@ -43,6 +43,27 @@ Click the star next to a theme to favorite it. Favorites appear at the top of
 the Library and in the status bar's **Favorite themes** menu. **Random theme**
 picks one you are not already using.
 
+## Shuffle
+
+**◐ Look → Shuffle** in the status bar changes the theme by itself, with the
+colors fading into the next theme's:
+
+- **Change theme every N min** turns it on; **Next** changes now.
+- **From**: favorite themes, my themes (yours, including saved AI results),
+  themes with a shader (the default) or all themes. Each theme comes once, in
+  random order, before any repeats.
+- **Fade seconds**: how long the change takes (0 switches at once). Colors
+  blend; a different shader fades out and the new one fades in.
+- **A different theme in each pane** gives every pane its own pick.
+- **Fonts too** also takes each theme's fonts. Off by default: a font change
+  resizes the terminals. Panes you zoomed keep their size.
+
+Shuffle applies themes the way **Random theme** does, so panes with their own
+theme follow the shared one again. It never edits or saves a theme file. It
+waits while Settings is open and while the window is minimized. A **Theme +
+shader** result from Create with AI is one theme, so its colors, fonts and
+shader always come together.
+
 ## Edit for: All panes / Pane 1 / Pane 2…
 
 When two or more panes are on screen, the Edit and Shaders tabs show an

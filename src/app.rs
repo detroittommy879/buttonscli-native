@@ -546,6 +546,9 @@ pub struct ButtonsApp {
     motion_time: f64,
     #[cfg(not(target_arch = "wasm32"))]
     motion_clock_at: Option<f64>,
+    /// Look → Shuffle: the timer, this round's themes and the fade.
+    #[cfg(not(target_arch = "wasm32"))]
+    shuffle: shuffle::ShuffleState,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1632,6 +1635,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             motion_clock_at: None,
             #[cfg(not(target_arch = "wasm32"))]
+            shuffle: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_busy: false,
@@ -1837,6 +1842,9 @@ impl ButtonsApp {
         // when Windows reports a different system theme after initialization.
         ctx.set_theme(egui::Theme::Dark);
         crate::ui_text::set_default_spacing(ctx, self.preferences.typography.shell.letter_spacing);
+        #[cfg(not(target_arch = "wasm32"))]
+        let colors = &self.app_theme_colors();
+        #[cfg(target_arch = "wasm32")]
         let colors = &self.active_app_theme().colors;
         let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = colors.panel;
@@ -1901,6 +1909,9 @@ impl ButtonsApp {
     }
 
     fn colors(&self) -> AppColors {
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut colors = self.app_theme_colors();
+        #[cfg(target_arch = "wasm32")]
         let mut colors = self.active_app_theme().colors.clone();
         if let Some(color) = self
             .preferences
@@ -1984,8 +1995,19 @@ impl ButtonsApp {
         theme
     }
 
+    /// A pane's look: its own theme or the shared one, mid-fade while
+    /// Shuffle changes themes.
     #[cfg(not(target_arch = "wasm32"))]
     fn terminal_presentation_for(&self, session_id: u64) -> ThemeDefinition {
+        let theme = self.settled_presentation_for(session_id);
+        match &self.shuffle.fade {
+            Some(fade) => fade.pane(session_id, theme),
+            None => theme,
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn settled_presentation_for(&self, session_id: u64) -> ThemeDefinition {
         if let Some(id) = self.theme_overrides.get(&session_id) {
             if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
                 let mut theme = theme.clone();
@@ -16985,6 +17007,8 @@ mod notices;
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(not(target_arch = "wasm32"))]
+mod shuffle;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
@@ -17053,6 +17077,8 @@ impl eframe::App for ButtonsApp {
         self.deliver_menu_paste(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.update_power_status(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_shuffle(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]

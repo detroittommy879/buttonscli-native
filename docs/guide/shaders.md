@@ -126,12 +126,13 @@ your shader list or a [theme bundle](theme-bundles.md).
 
 ## Performance
 
-Shaders run on the GPU at up to 30 frames per second, and hidden panes don't
-draw. If your machine struggles, lower the number of animated panes, untick
+Shaders run on the GPU once per screen refresh (or at the FPS limit), and
+hidden panes don't draw. If your machine struggles, lower the number of animated panes, untick
 **Animate**, or use **Calm** in the Library.
 
 **Motion N%** in the status bar speeds up or slows down every pane's shader
 and gradient motion at once: drag it left or right, or double-click to type.
 0% holds the current frame and stops redrawing, 100% is each theme's own
 speed, and 200% is double. **◐ Look** next to it has Minimal, Moderate and
-Showoff presets, Calm effects and the GPU shader switch.
+Showoff presets, Calm effects, the GPU shader switch and
+[Shuffle](themes.md#shuffle), which changes the theme every few minutes.

@@ -277,6 +277,8 @@ pub(crate) struct Preferences {
     /// Experiments with shader generation and the shader rules
     /// (Settings → Debug). Only read while the debug tools are on.
     pub(crate) shader_lab: ShaderLab,
+    /// Status bar → Look → Shuffle: change the theme now and then.
+    pub(crate) shuffle: Shuffle,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -350,6 +352,7 @@ impl Default for Preferences {
             notice_seconds: 5,
             power_saving: true,
             shader_lab: ShaderLab::default(),
+            shuffle: Shuffle::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -504,6 +507,80 @@ impl Default for SettingsLayout {
             size: [980.0, 760.0],
             position: None,
             section_heights: Default::default(),
+        }
+    }
+}
+
+/// Which themes Shuffle picks from.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ShufflePool {
+    Favorites,
+    /// Personal themes, including saved AI results.
+    Mine,
+    /// Every theme with a shader background.
+    #[default]
+    Shaders,
+    All,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ShufflePool {
+    pub(crate) const ALL: [ShufflePool; 4] =
+        [Self::Favorites, Self::Mine, Self::Shaders, Self::All];
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Favorites => "Favorite themes",
+            Self::Mine => "My themes",
+            Self::Shaders => "Themes with a shader",
+            Self::All => "All themes",
+        }
+    }
+}
+
+/// Status bar → Look → Shuffle.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct Shuffle {
+    pub(crate) enabled: bool,
+    pub(crate) pool: ShufflePool,
+    /// Minutes between changes.
+    pub(crate) minutes: f32,
+    /// How long colors take to fade into the next theme; 0 switches at once.
+    pub(crate) fade_seconds: f32,
+    /// Every pane gets its own theme from the pool, not just the shared one.
+    pub(crate) every_pane: bool,
+    /// Also take each theme's fonts (resizes the terminals).
+    pub(crate) fonts: bool,
+}
+
+impl Shuffle {
+    pub(crate) const MINUTES: std::ops::RangeInclusive<f32> = 0.1..=240.0;
+    pub(crate) const FADE: std::ops::RangeInclusive<f32> = 0.0..=10.0;
+
+    fn normalize(&mut self) {
+        let clamp = |value: f32, range: &std::ops::RangeInclusive<f32>, fallback: f32| {
+            if value.is_finite() {
+                value.clamp(*range.start(), *range.end())
+            } else {
+                fallback
+            }
+        };
+        self.minutes = clamp(self.minutes, &Self::MINUTES, 5.0);
+        self.fade_seconds = clamp(self.fade_seconds, &Self::FADE, 2.5);
+    }
+}
+
+impl Default for Shuffle {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            pool: ShufflePool::default(),
+            minutes: 5.0,
+            fade_seconds: 2.5,
+            every_pane: false,
+            fonts: false,
         }
     }
 }
@@ -676,6 +753,7 @@ impl Preferences {
             .get_or_insert(self.animation_fps >= 30);
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
+        self.shuffle.normalize();
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

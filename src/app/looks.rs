@@ -233,10 +233,12 @@ impl ButtonsApp {
                         changed = true;
                     }
                 });
+                ui.separator();
+                changed |= self.shuffle_menu(ui);
             })
             .response
             .on_hover_text(
-                "Look presets, Calm effects, GPU shaders and motion speed for every pane.",
+                "Look presets, Calm effects, GPU shaders, motion speed and Shuffle for every pane.",
             );
         }
         if let Some(look) = chosen {
