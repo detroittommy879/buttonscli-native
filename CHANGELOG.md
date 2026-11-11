@@ -6,10 +6,11 @@
   (a second monitor used as a screensaver) keeps its full animation rate.
   Minimized still drops to about one frame a second.
 - **Name a generated theme before saving**: the Shaders tab's "Keep it" section
-  has a Name box for the new theme, so you do not have to scroll up to rename it.
-- **Shuffle** goes through its whole list before any theme repeats, and a
-  new round starts when Shuffle is turned back on. Check the count under
-  "From" if it seems short: the list is only the themes you picked.
+  has Theme name and Shader name boxes, so you do not have to scroll up to rename them.
+- **Shuffle → Shaders only**: change only each theme's shader and keep the
+  current colors. Shuffle's theme list is unchanged: it already goes through
+  every theme before any repeats. The count under "From" shows how many themes
+  the chosen list has.
 - **Seed word for Random ideas**: a small box next to "Random ideas" takes an
   optional word or phrase. The shader model may take it as a loose spark, ignore
   it, flip it, or drift from it. Empty means no change.
