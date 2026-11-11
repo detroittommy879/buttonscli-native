@@ -167,6 +167,52 @@ mod tests {
     }
 
     #[test]
+    fn a_glow_pane_menu_never_saves_strength() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-idle-glow-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        let pane = app.tabs[0].id;
+        let shader = crate::theme::SavedShader {
+            shader: crate::theme::CustomShader {
+                name: "Glow".into(),
+                expression: "c1".into(),
+                ..Default::default()
+            },
+            colors: None,
+        };
+        app.perform_pane_action(pane, PaneAction::UseShader(Box::new(shader)), &ctx);
+        let strength = |app: &ButtonsApp| {
+            app.terminal_presentation_for(pane)
+                .effects
+                .shader_background
+                .unwrap()
+                .strength
+        };
+        // Without glow the menu edits the pane's Strength.
+        app.perform_pane_action(pane, PaneAction::ShaderStrength(0.4), &ctx);
+        assert_eq!(strength(&app), 0.4);
+        // With glow on, the ramped value shown there is never saved.
+        app.toggle_idle_glow(pane);
+        app.perform_pane_action(pane, PaneAction::ShaderStrength(0.9), &ctx);
+        assert_eq!(strength(&app), 0.4);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn idle_glow_is_per_pane_and_follows_calm_mode() {
         let mut app = ButtonsApp::empty(Preferences::default());
         let ctx = egui::Context::default();

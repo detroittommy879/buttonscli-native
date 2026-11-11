@@ -2202,6 +2202,11 @@ impl ButtonsApp {
         // Resolve the old profile's preview and draft before its files stop being the target.
         #[cfg(not(target_arch = "wasm32"))]
         self.discard_theme_editor_session();
+        // Gallery picks belong to a profile folder: read the new one's next time.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.gallery = Default::default();
+        }
         preferences.normalize_theme_sources();
         self.themes = ThemeCatalog::load();
         self.theme_load_warnings = self
@@ -2420,6 +2425,13 @@ impl ButtonsApp {
                 self.focused = index;
                 self.settings_tab = SettingsTab::Themes;
                 self.show_settings = true;
+            }
+            // The pane shows the glow's ramped Strength; saving it would bake
+            // the glow into the pane's look.
+            PaneAction::ShaderStrength(_) if self.idle_glow_panes.contains_key(&id) => {
+                self.notice = Some(
+                    "Idle glow sets Strength on this pane. Turn Idle glow off to edit it.".into(),
+                );
             }
             PaneAction::ShaderStrength(value) => self.edit_pane_look(index, |document| {
                 if document["effects"]["shaderBackground"].is_object() {
@@ -3585,7 +3597,9 @@ impl ButtonsApp {
             })
             .map(|(index, tab)| {
                 let mut theme = self.terminal_presentation_for(tab.id);
-                if let (Some(glow), Some(shader)) = (
+                // Override panes sets one Strength for every pane, so it wins.
+                if let (None, Some(glow), Some(shader)) = (
+                    self.preferences.strength_override.active(),
                     self.pane_glow(tab.id),
                     theme.effects.shader_background.as_mut(),
                 ) {
@@ -5431,9 +5445,9 @@ impl ButtonsApp {
                             }
                             let shader_button = ui.spaced_menu_button("✦ Shader", |ui| {
                                 ui.set_max_width(340.0);
-                                if let Some((_, title, theme)) = &focused_pane {
+                                if let Some((id, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
-                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), &mut shader_action);
+                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), self.idle_glow_panes.contains_key(id), &mut shader_action);
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
@@ -15805,6 +15819,7 @@ fn render_pane_tree(
                                         state.shader_choices,
                                         state.saved_shader_count,
                                         state.strength_override,
+                                        state.idle_glow_panes.contains_key(&tab.id),
                                         &mut action,
                                     );
                                 });
@@ -16269,6 +16284,7 @@ fn pane_shader_menu(
     choices: &[crate::theme::SavedShader],
     saved_count: usize,
     strength_override: Option<f32>,
+    idle_glow: bool,
     action: &mut Option<PaneAction>,
 ) {
     let shader = theme.effects.shader_background.as_ref();
@@ -16280,6 +16296,15 @@ fn pane_shader_menu(
                 .text("Strength"),
         );
         ui.spaced_small("Set for every pane: ◐ Look → Override panes.");
+    } else if let (true, Some(shader)) = (idle_glow, shader) {
+        // The theme here may carry the glow's ramped value; never save it.
+        let mut shown = shader.strength;
+        ui.add_enabled(
+            false,
+            egui::Slider::new(&mut shown, crate::theme::ShaderBackground::STRENGTH)
+                .text("Strength"),
+        );
+        ui.spaced_small("Idle glow sets Strength on this pane. Turn Idle glow off to edit it.");
     } else if let Some(shader) = shader {
         let mut strength = shader.strength;
         if ui
@@ -23383,16 +23408,22 @@ Start-Sleep -Seconds 300
         );
         let mut rows = std::collections::BTreeSet::new();
         let mut found = 0;
+        // The tab row is painted first. Later text with the same words (the
+        // Library's "Fonts" checkbox) belongs to the page, not to a tab.
+        let mut seen = std::collections::BTreeSet::new();
         for clipped in &output.shapes {
             if let egui::Shape::Text(text) = &clipped.shape {
+                if !seen.insert(text.galley.job.text.clone()) {
+                    continue;
+                }
                 if [
                     "Themes",
                     "Fonts",
-                    "Commands",
+                    "Pre-typed commands",
                     "Workspace",
                     "Keyboard",
                     "Shortcuts",
-                    "Import from original",
+                    "Import from original ButtonsCLI",
                 ]
                 .contains(&text.galley.job.text.as_str())
                 {
