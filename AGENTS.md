@@ -201,6 +201,12 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   dialog, and its look sets `preferences.pane_looks`, which override
   `theme_id`. Stop only the PID you started; never stop every `buttonscli`.
 
+- App icon: `packaging/icon.png` (1024, Linux/macOS packages), `icon.ico`
+  (embedded in the Windows exe by `build.rs` via `winresource`, with the
+  build version) and `icon-256.png` (`buttonscli::app_icon()`, every native
+  viewport; detached viewports don't inherit it). Source art is in
+  `.private/icons/` (gitignored): never `include_bytes!` from there.
+
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.

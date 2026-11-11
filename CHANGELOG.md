@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **New app icon**: the rainbow "bu" made of buttons, on the window, the
+  taskbar, Settings and AI Help windows, and the Windows exe (Explorer,
+  pinned taskbar buttons, shortcuts). Linux and macOS packages use it too.
+- **More built-in looks**: new themes and shaders, and the bundles
+  *Water-Desert-Landscapes*, *Bubbles, Fish, Thunderstorm, Coral R* and
+  *bluevisions, highres*.
 - **Power saving only when minimized**: a visible window that is not focused
   (a second monitor used as a screensaver) keeps its full animation rate.
   Minimized still drops to about one frame a second.

@@ -110,13 +110,12 @@ bundle names:
 
 | Bundle | Where it is |
 | --- | --- |
-| `rain-snow-thunder` | `origin/main` |
-| `thunder & water` | `origin/main` |
-| `Water-Desert-Landscapes` | local `assets/library/bundles.json` only; not committed yet |
-| `Bubbles, Fish, Thunderstorm, Coral R` | local `assets/library/bundles.json` only; not committed yet |
+| `rain-snow-thunder` | `assets/library/bundles.json` |
+| `thunder & water` | `assets/library/bundles.json` |
+| `Water-Desert-Landscapes` | `assets/library/bundles.json` |
+| `Bubbles, Fish, Thunderstorm, Coral R` | `assets/library/bundles.json` |
 
-Check with `git show origin/main:assets/library/bundles.json` before relying on
-a name. The two local-only bundles need the library file committed first.
+Names are matched exactly; check the library file before relying on one.
 
 Single shaders and themes for the showcase are picked in **Settings → Gallery**
 (debug tools). Each pick in `<profile>/gallery-picks.json` has the WGSL, the
