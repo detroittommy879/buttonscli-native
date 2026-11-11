@@ -549,6 +549,10 @@ pub struct ButtonsApp {
     /// Look → Shuffle: the timer, this round's themes and the fade.
     #[cfg(not(target_arch = "wasm32"))]
     shuffle: shuffle::ShuffleState,
+    /// Idle glow: the panes that turned it on, each with the time it went on
+    /// (ms). Not saved; a pane's quiet time counts from here or its last output.
+    #[cfg(not(target_arch = "wasm32"))]
+    idle_glow_panes: std::collections::BTreeMap<u64, u64>,
     /// The startup release check, until it answers.
     #[cfg(not(target_arch = "wasm32"))]
     update_rx: Option<Receiver<crate::update_check::Update>>,
@@ -1218,6 +1222,8 @@ enum PaneAction {
     Paste,
     /// Turn off mouse reporting a program left on (clicks typing `0;12;5M`).
     ResetMouseMode,
+    /// Turn idle glow on or off for this pane.
+    ToggleIdleGlow,
     SelectAll,
     Clear,
     Rename,
@@ -1649,6 +1655,8 @@ impl ButtonsApp {
             motion_clock_at: None,
             #[cfg(not(target_arch = "wasm32"))]
             shuffle: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            idle_glow_panes: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             update_rx: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2392,6 +2400,7 @@ impl ButtonsApp {
                 ctx.request_repaint();
             }
             PaneAction::ResetMouseMode => self.tabs[index].backend.reset_mouse_modes(),
+            PaneAction::ToggleIdleGlow => self.toggle_idle_glow(id),
             PaneAction::SelectAll => self.tabs[index].backend.select_all(),
             PaneAction::Clear => self.tabs[index].backend.clear_screen(),
             PaneAction::Rename => self.open_tab_rename(index),
@@ -3563,10 +3572,17 @@ impl ButtonsApp {
                 // Mid-fade every pane has its own look (from its old one).
                 self.theme_overrides.contains_key(&tab.id)
                     || self.shuffle.fade.is_some()
+                    || self.idle_glow_panes.contains_key(&tab.id)
                     || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
                 let mut theme = self.terminal_presentation_for(tab.id);
+                if let (Some(glow), Some(shader)) = (
+                    self.pane_glow(tab.id),
+                    theme.effects.shader_background.as_mut(),
+                ) {
+                    shader.strength = glow.strength;
+                }
                 theme.effects =
                     pane_effects_for_focus(&theme.effects, index == focused, focused_effects_only);
                 (tab.id, theme)
@@ -3590,6 +3606,7 @@ impl ButtonsApp {
             font_catalog: &self.font_catalog,
             theme: &theme,
             override_themes: &override_themes,
+            idle_glow_panes: &self.idle_glow_panes,
             divider_style,
             clicked: &mut clicked,
             latest_activity_at_ms,
@@ -15633,6 +15650,8 @@ struct PaneRenderState<'a> {
     font_catalog: &'a fonts::FontCatalog,
     theme: &'a ThemeDefinition,
     override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
+    /// Panes with idle glow on (for their menus).
+    idle_glow_panes: &'a std::collections::BTreeMap<u64, u64>,
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
     latest_activity_at_ms: u64,
@@ -15755,6 +15774,7 @@ fn render_pane_tree(
                                     state.favorites,
                                     state.auto_tile.includes(tab.id),
                                     tab.backend.scrollback_state().mouse_reporting,
+                                    state.idle_glow_panes.contains_key(&tab.id),
                                     &mut action,
                                 );
                                 ui.separator();
@@ -16311,6 +16331,7 @@ fn pane_action_menu(
     favorites: &[(String, String)],
     included: bool,
     mouse_reporting: bool,
+    glow_on: bool,
     action: &mut Option<PaneAction>,
 ) {
     egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -16344,6 +16365,15 @@ fn pane_action_menu(
             .clicked()
     {
         *action = Some(PaneAction::ResetMouseMode);
+        ui.close_menu();
+    }
+    let mut glow = glow_on;
+    if ui
+        .spaced_checkbox(&mut glow, crate::i18n::literal(locale, "Idle glow"))
+        .on_hover_text("When this terminal has been quiet for a while, its shader ramps up to the High strength under Look → Idle glow.")
+        .changed()
+    {
+        *action = Some(PaneAction::ToggleIdleGlow);
         ui.close_menu();
     }
     let mut include = included;
@@ -17244,6 +17274,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
 mod docs_capture;
+#[cfg(not(target_arch = "wasm32"))]
+mod idle_glow;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
@@ -17328,6 +17360,8 @@ impl eframe::App for ButtonsApp {
         self.update_power_status(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_shuffle(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.tick_idle_glow(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -19930,6 +19964,7 @@ Start-Sleep -Seconds 300
                                 "basic2",
                                 &favorites,
                                 true,
+                                false,
                                 false,
                                 &mut action,
                             )

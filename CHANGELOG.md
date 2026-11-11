@@ -7,6 +7,10 @@
   Minimized still drops to about one frame a second.
 - **Name a generated theme before saving**: the Shaders tab's "Keep it" section
   has Theme name and Shader name boxes, so you do not have to scroll up to rename them.
+- **Idle glow** (pane menu → Idle glow): a terminal that has been quiet for a
+  while ramps its shader up to a High strength, and output brings it back to
+  Low. Set Low, High, the quiet time and the ramp under ◐ Look → Idle glow.
+  It is turned on per pane and is not kept across restarts.
 - **Shuffle → Shaders only**: change only each theme's shader and keep the
   current colors. Shuffle's theme list is unchanged: it already goes through
   every theme before any repeats. The count under "From" shows how many themes
