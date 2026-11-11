@@ -338,6 +338,8 @@ impl ButtonsApp {
             ui.spaced_checkbox(&mut pick, RichText::new(name).strong());
             ui.spaced_small(key.split(':').next().unwrap_or_default());
         });
+        // Sliders fill the card, leaving room for the value and label.
+        ui.spacing_mut().slider_width = (width - 170.0).max(80.0);
         let mut changed = false;
         changed |= ui
             .add(
