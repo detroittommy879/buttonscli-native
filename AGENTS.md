@@ -348,3 +348,12 @@ cargo build --locked --release --bin buttonscli
   40% of the window with vertical scroll, ignores unusable minimize/restore sizes
   and repaints when its height changes (egui panels reuse last frame's height). `status_bar_tests.rs` covers cached heights, narrow
   windows, 1px transitions and fonts; `native_status_bar_resize_probe` captures QA.
+- Website (amp, `ssh 193.122.157.24` from PowerShell; Git Bash has no key):
+  web root `/var/www/buttonscli.com/html`. `/docs/` is the Classic (Tauri)
+  docs: never overwrite it. The native guide is `site/` built with
+  `DOCS_SITE=https://buttonscli.com DOCS_BASE=/native/docs` and copied to
+  `html/native/docs/`. Homepage variants come from
+  `/var/www/buttonscli.com/site-src/build_new.py` (staged under
+  `/new_abcd00/`); `activate.sh b` makes one live, `rollback.sh` undoes it.
+  Site icon source: `.private/icons/codex-output/tom1.png` (black tile);
+  the app icon uses `tom1-transp.png`.

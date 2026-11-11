@@ -292,10 +292,9 @@ pub(super) const SHOTS: &[Shot] = &[
 pub(super) const MANUAL: &[(&str, &str)] = &[
     (
         "create-with-ai.png",
-        "needs four finished AI versions and their flowcharts",
+        "needs a real AI provider for the prompt and options",
     ),
     ("random-ideas.png", "needs an AI-written ideas list"),
-    ("generate-tab.png", "needs a theme generation in progress"),
     ("chatgpt-signin.png", "needs a signed-in ChatGPT provider"),
 ];
 

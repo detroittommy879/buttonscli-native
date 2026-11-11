@@ -11,8 +11,8 @@ you like. You need a [Shader model set up](ai-setup.md) first.
 
 The **Create with AI** section is on **Settings → Themes → Shaders**.
 
-<!-- IMAGE: create-with-ai.png — Create with AI with a prompt, four finished
-     versions as moving thumbnails, the flowchart progress under each. -->
+<!-- IMAGE: create-with-ai.png — Create with AI: Start, Design with Theme + shader picked, a prompt, the versions slider and Options. | alt: Create with AI on the Shaders tab: New idea and Theme + shader picked, a prompt, 12 versions, Generate, and the Options below -->
+![Create with AI on the Shaders tab: New idea and Theme + shader picked, a prompt, 12 versions, Generate, and the Options below](images/create-with-ai.png)
 
 ## Make one
 
@@ -97,8 +97,7 @@ and everything changes together.
 - **Undo AI change** puts back only the code; to undo the theme as well,
   use **Revert and close**, or pick your old theme in the Library.
 
-The separate **Generate** tab ([AI themes](ai-themes.md)) still works as
-before for a theme without a shader.
+For a theme without a shader, see [AI themes](ai-themes.md).
 
 ## Use a result
 

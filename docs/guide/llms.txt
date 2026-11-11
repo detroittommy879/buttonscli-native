@@ -16,7 +16,7 @@ Notes for AI assistants:
 - [Theme bundles](theme-bundles.md): save and apply the look of every pane at once
 - [Shader backgrounds](shaders.md): patterns, Strength/Scale/Speed, Y up, colors c1–c5, sliders, shader list
 - [AI shaders](ai-shaders.md): New idea vs Change current shader, write/check/judge pipeline, random ideas
-- [AI themes](ai-themes.md): generate a full theme, preview, save or discard
+- [AI themes](ai-themes.md): Theme + shader under Create with AI (recommended), the older Generate tab
 - [Set up AI](ai-setup.md): ChatGPT plan sign-in, API keys, models per job, privacy
 
 ## Reference

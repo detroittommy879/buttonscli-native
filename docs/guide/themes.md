@@ -15,7 +15,7 @@ Open **Settings → Themes**. It has four tabs:
 | --- | --- |
 | **Library** | Browsing and applying themes, favorites, theme bundles |
 | **Edit** | Changing colors, gradients and effects of a theme |
-| **Generate** | Making a theme from a description with AI ([AI themes](ai-themes.md)) |
+| **Generate** | Making one theme from a description with AI; Shaders → Create with AI makes several, each with a background ([AI themes](ai-themes.md)) |
 | **Shaders** | The animated background ([Shader backgrounds](shaders.md)) |
 
 <!-- IMAGE: theme-library.png — Library tab with search, favorites row and Apply to shared checkboxes. | alt: Settings, Themes, Library: Apply to shared checkboxes, theme bundles, favorites and the theme search -->
