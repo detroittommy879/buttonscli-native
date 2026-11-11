@@ -397,27 +397,49 @@ mod setup {
         app.theme_settings_tab = tab;
     }
 
-    /// The `back`th newest built-in bundle (0 = newest). New saves are
-    /// appended to the library file, so this steps back through the looks
-    /// saved most recently. The capture still runs in its own profile.
-    pub(super) fn newest_bundle(back: usize) -> String {
+    /// The `back`th newest built-in bundle that shows a shader in each of its
+    /// first `panes` looks (0 = newest). New saves are appended to the library
+    /// file, so this steps back through the looks saved most recently. A look
+    /// at Strength 0 draws a plain pane, so such bundles are skipped. The
+    /// capture still runs in its own profile.
+    pub(super) fn newest_bundle(app: &ButtonsApp, back: usize, panes: usize) -> String {
+        let shows = |id: &str| {
+            app.themes
+                .all()
+                .iter()
+                .find(|theme| theme.id == id)
+                .and_then(|theme| theme.effects.shader_background.as_ref())
+                .is_some_and(|shader| shader.strength > 0.05)
+        };
         crate::library::bundles()
             .iter()
             .rev()
+            .filter(|bundle| {
+                bundle.panes.len() >= panes
+                    && bundle
+                        .panes
+                        .iter()
+                        .take(panes)
+                        .all(|look| look.theme_id.as_deref().is_some_and(&shows))
+            })
             .nth(back)
-            .unwrap_or_else(|| panic!("the library has fewer than {} bundles", back + 1))
+            .unwrap_or_else(|| {
+                panic!("no built-in bundle has {panes} shader panes at index {back}")
+            })
             .name
             .clone()
     }
 
     /// The newest bundle: the hero picture and most shader shots.
     pub(super) fn bundle_hero(app: &mut ButtonsApp, ctx: &egui::Context) {
-        bundle(app, ctx, &newest_bundle(0));
+        let name = newest_bundle(app, 0, 4);
+        bundle(app, ctx, &name);
     }
 
     /// The bundle before the newest one, for shots that show a second look.
     pub(super) fn bundle_other(app: &mut ButtonsApp, ctx: &egui::Context) {
-        bundle(app, ctx, &newest_bundle(1));
+        let name = newest_bundle(app, 1, 4);
+        bundle(app, ctx, &name);
     }
 
     pub(super) fn two(app: &mut ButtonsApp, ctx: &egui::Context) {
