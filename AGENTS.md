@@ -178,8 +178,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   after the frame. `animation_match_display` is read-only migration.
   FPS is never part of a theme: keep it out of `NATIVE_APPEARANCE_FIELDS`
   (theme copies used to reset it on apply). Use
-  `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
-  or minimized (`power_saving`); output repaints are capped via
+  `effective_animation_fps()` for repaint pacing: it lowers FPS only while
+  minimized (`power_saving`; an unfocused visible window keeps full rate, egui
+  0.31 has no occlusion flag); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar
   shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
   Changing another pane's theme must call `settle_pane_draft` (autosave), never a

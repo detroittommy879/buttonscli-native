@@ -272,8 +272,8 @@ pub(crate) struct Preferences {
     pub(crate) notice_seconds: u32,
     /// Look for a newer GitHub release at startup (a status bar link only).
     pub(crate) check_for_updates: bool,
-    /// Fewer frames while the window is in the background or minimized
-    /// (Settings → Debug). On by default.
+    /// Fewer frames while the window is minimized (Settings → Debug). A
+    /// visible window, even unfocused, keeps its full rate. On by default.
     pub(crate) power_saving: bool,
     /// Experiments with shader generation and the shader rules
     /// (Settings → Debug). Only read while the debug tools are on.

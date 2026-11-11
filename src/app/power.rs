@@ -1,18 +1,18 @@
-//! Background power saving and Settings → Debug.
+//! Power saving and Settings → Debug.
 //!
-//! While the window is in the background, shaders and animated effects run at
-//! no more than `BACKGROUND_FPS` and terminal output repaints at most every
-//! `BACKGROUND_OUTPUT_MS`; minimized, both drop to about one frame a second
-//! (eframe still runs `update` then, it just skips painting). par-term does
-//! the same with `pause_shaders_on_blur`/`unfocused_fps`. The Debug tab can
-//! switch it off and shows what is in effect. It is shown in debug builds, or
-//! with `"debug": true` (or `"enable_all": true`) in `feature-flags.json`.
+//! Only a minimized window saves power: shaders and animated effects drop to
+//! about one frame a second and terminal output repaints at most every
+//! `MINIMIZED_OUTPUT_MS` (eframe still runs `update` then, it just skips
+//! painting). A window that is visible but unfocused, such as a second
+//! monitor used as a screensaver, keeps its full rate. egui 0.31 reports no
+//! occlusion, so minimized is the only "off screen" signal there is. The Debug
+//! tab can switch it off and shows what is in effect. It is shown in debug
+//! builds, or with `"debug": true` (or `"enable_all": true`) in
+//! `feature-flags.json`.
 use std::collections::VecDeque;
 
 use super::*;
 
-pub(super) const BACKGROUND_FPS: u32 = 15;
-pub(super) const BACKGROUND_OUTPUT_MS: u64 = 33;
 pub(super) const MINIMIZED_FPS: u32 = 1;
 pub(super) const MINIMIZED_OUTPUT_MS: u64 = 250;
 
@@ -37,19 +37,11 @@ impl Default for PowerStatus {
 }
 
 /// The animation FPS and the output repaint interval (ms, 0 = at once) for
-/// a window state. Power saving only ever lowers the user's FPS limit.
-pub(super) fn power_budget(
-    power_saving: bool,
-    fps: u32,
-    focused: bool,
-    minimized: bool,
-) -> (u32, u64) {
-    if !power_saving {
-        (fps, 0)
-    } else if minimized {
+/// a window state. Power saving only ever lowers the user's FPS limit, and
+/// only while minimized.
+pub(super) fn power_budget(power_saving: bool, fps: u32, minimized: bool) -> (u32, u64) {
+    if power_saving && minimized {
         (fps.min(MINIMIZED_FPS), MINIMIZED_OUTPUT_MS)
-    } else if !focused {
-        (fps.min(BACKGROUND_FPS), BACKGROUND_OUTPUT_MS)
     } else {
         (fps, 0)
     }
@@ -97,12 +89,11 @@ impl ButtonsApp {
         power_budget(
             self.preferences.power_saving,
             self.preferences.animation_fps,
-            self.power.focused,
             self.power.minimized,
         )
     }
 
-    /// The FPS animations use right now (the limit, lowered in the background).
+    /// The FPS animations use right now (the limit, lowered while minimized).
     pub(super) fn effective_animation_fps(&self) -> u32 {
         self.power_budget().0
     }
@@ -209,10 +200,10 @@ impl ButtonsApp {
         if ui
             .spaced_checkbox(
                 &mut self.preferences.power_saving,
-                "Power saving while the window is in the background or minimized",
+                "Power saving while the window is minimized",
             )
             .on_hover_text(format!(
-                "Background: shaders at most {BACKGROUND_FPS} FPS, output redrawn at most every {BACKGROUND_OUTPUT_MS} ms. Minimized: about one frame a second. Off: always full rate."
+                "Minimized: shaders about one frame a second, output redrawn at most every {MINIMIZED_OUTPUT_MS} ms. Visible windows, even unfocused ones, keep the full rate. Off: always full rate."
             ))
             .changed()
         {
@@ -286,19 +277,16 @@ mod tests {
 
     #[test]
     fn power_saving_only_lowers_fps_in_the_background() {
-        assert_eq!(power_budget(true, 60, true, false), (60, 0));
+        // Visible, focused or not: full rate.
+        assert_eq!(power_budget(true, 60, false), (60, 0));
+        assert_eq!(power_budget(true, 144, false), (144, 0));
+        // Minimized: about one frame a second, and never above the user's limit.
         assert_eq!(
-            power_budget(true, 60, false, false),
-            (BACKGROUND_FPS, BACKGROUND_OUTPUT_MS)
-        );
-        assert_eq!(
-            power_budget(true, 10, false, false),
-            (10, BACKGROUND_OUTPUT_MS)
-        );
-        assert_eq!(
-            power_budget(true, 144, true, true),
+            power_budget(true, 144, true),
             (MINIMIZED_FPS, MINIMIZED_OUTPUT_MS)
         );
-        assert_eq!(power_budget(false, 144, false, true), (144, 0));
+        assert_eq!(power_budget(true, 1, true), (1, MINIMIZED_OUTPUT_MS));
+        // Power saving off: always the user's rate.
+        assert_eq!(power_budget(false, 144, true), (144, 0));
     }
 }

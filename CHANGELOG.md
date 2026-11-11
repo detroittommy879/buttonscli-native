@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Power saving only when minimized**: a visible window that is not focused
+  (a second monitor used as a screensaver) keeps its full animation rate.
+  Minimized still drops to about one frame a second.
 - **Name a generated theme before saving**: the Shaders tab's "Keep it" section
   has a Name box for the new theme, so you do not have to scroll up to rename it.
 - **Shuffle** goes through its whole list before any theme repeats, and a
