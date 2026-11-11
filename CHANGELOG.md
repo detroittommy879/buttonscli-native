@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Seed word for Random ideas**: a small box next to "Random ideas" takes an
+  optional word or phrase. The shader model may take it as a loose spark, ignore
+  it, flip it, or drift from it. Empty means no change.
 - New version notice: at startup ButtonsCLI asks GitHub which release is the
   latest, and when it is newer a green **⬆ vX.Y.Z available** link shows in
   the status bar and opens the release page. Nothing is downloaded or

@@ -642,14 +642,35 @@ Write each idea in one to three sentences under 300 characters: what you see, ho
 /// Most ideas one "Random ideas" request asks for (one per version).
 pub(crate) const MAX_IDEAS: usize = DIRECTIONS.len();
 
-/// The request for `count` ideas, with loose subject/style sparks.
-fn ideas_prompt(count: usize, sparks: &[String]) -> String {
+/// Longest seed phrase sent with "Random ideas", in characters.
+pub(crate) const MAX_SEED_CHARS: usize = 60;
+
+/// The user's seed word or phrase, on one line and capped. Empty when unused.
+pub(crate) fn clean_seed(seed: &str) -> String {
+    let joined = seed
+        .split_whitespace()
+        .map(|word| word.replace('"', "'"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    truncate(&joined, MAX_SEED_CHARS).trim_end().to_owned()
+}
+
+/// The request for `count` ideas, with loose subject/style sparks and an
+/// optional seed phrase the model may follow, twist or ignore.
+fn ideas_prompt(count: usize, sparks: &[String], seed: &str) -> String {
     let tags = (1..=count)
         .map(|index| format!("<idea{index}>...</idea{index}>"))
         .collect::<Vec<_>>()
         .join("\n");
+    let seed_line = if seed.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " Seed phrase: \"{seed}\". Loosely see it: it may inspire an idea directly, be ignored, be flipped to its opposite, or drift to something vaguely similar. It sparks ideas; it is not a subject to copy."
+        )
+    };
     format!(
-        "Suggest {count} different idea{} for animated backgrounds. Loose sparks, to use, twist, combine or ignore: {}.\n\nReply with exactly these tags and nothing else:\n{tags}",
+        "Suggest {count} different idea{} for animated backgrounds. Loose sparks, to use, twist, combine or ignore: {}.{seed_line}\n\nReply with exactly these tags and nothing else:\n{tags}",
         if count == 1 { "" } else { "s" },
         sparks.join("; ")
     )
@@ -679,6 +700,7 @@ pub(crate) fn random_ideas(
     writers: &[ProviderProfile],
     load_key: &mut KeyLoader<'_>,
     count: usize,
+    seed: &str,
     cancelled: &AtomicBool,
 ) -> Result<Vec<String>, String> {
     if writers.is_empty() {
@@ -694,7 +716,7 @@ pub(crate) fn random_ideas(
         writers,
         load_key,
         IDEAS,
-        &ideas_prompt(count, &sparks),
+        &ideas_prompt(count, &sparks, &clean_seed(seed)),
         &[],
         cancelled,
         &mut |_| {},
@@ -1239,10 +1261,20 @@ mod tests {
 
     #[test]
     fn ideas_come_back_numbered_in_one_reply() {
-        let prompt = ideas_prompt(3, &["comets (neon)".into(), "snowfall (eerie)".into()]);
+        let sparks = ["comets (neon)".to_owned(), "snowfall (eerie)".to_owned()];
+        let prompt = ideas_prompt(3, &sparks, "");
         assert!(prompt.starts_with("Suggest 3 different ideas"));
         assert!(prompt.contains("comets (neon); snowfall (eerie)"));
         assert!(prompt.contains("<idea3>...</idea3>") && !prompt.contains("<idea4>"));
+        assert!(
+            !prompt.contains("Seed phrase"),
+            "an empty seed changes nothing"
+        );
+        assert!(ideas_prompt(1, &sparks, &clean_seed("rain\non \"glass\""))
+            .contains("Seed phrase: \"rain on 'glass'\". Loosely see it"));
+        assert_eq!(clean_seed("  rain\n\ton   glass  "), "rain on glass");
+        assert_eq!(clean_seed(&"x".repeat(200)).chars().count(), MAX_SEED_CHARS);
+        assert!(ideas_prompt(2, &sparks, "neon").contains("Seed phrase: \"neon\""));
         assert!(IDEAS.contains("WGSL") && IDEAS.contains("about half should be simple"));
         let reply = "Sure!\n<idea1> \"Ink drops bloom\" </idea1>\n<idea2>Petals</idea2>\n<idea3>Petals</idea3><idea4>extra</idea4>";
         assert_eq!(parse_ideas(reply, 3), ["Ink drops bloom", "Petals"]);
@@ -1478,6 +1510,7 @@ mod tests {
                     .map_err(|_| crate::assistant::client::ClientError::Credential)
             },
             4,
+            "",
             &AtomicBool::new(false),
         );
         println!("--- random ideas: {ideas:#?}");

@@ -1030,6 +1030,8 @@ struct ShaderAiState {
     idea_busy: bool,
     /// The last "Random ideas" list; "One version per idea" writes them all.
     ideas: Vec<String>,
+    /// Optional seed word or phrase for "Random ideas" (not saved).
+    idea_seed: String,
     lanes: Vec<ShaderLane>,
     generation: u64,
     cancel: Option<Arc<AtomicBool>>,
@@ -1056,6 +1058,7 @@ impl Default for ShaderAiState {
             ai_colors: true,
             idea_busy: false,
             ideas: Vec::new(),
+            idea_seed: String::new(),
             lanes: Vec::new(),
             generation: 0,
             cancel: None,
@@ -9515,6 +9518,13 @@ impl ButtonsApp {
                     {
                         self.start_random_shader_idea(ui.ctx());
                     }
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.shader_ai.idea_seed)
+                            .hint_text("seed word (optional)")
+                            .desired_width(180.0)
+                            .char_limit(crate::shader_ai::MAX_SEED_CHARS),
+                    )
+                    .on_hover_text("Optional. Random ideas loosely see this word or phrase: it may inspire, be ignored, or be flipped.");
                 });
                 egui::CollapsingHeader::new("Options")
                     .id_salt("shader-ai-options")
@@ -11709,6 +11719,7 @@ impl ButtonsApp {
         let session = Arc::clone(&self.credential_session);
         let sender = self.shader_ai.tx.clone();
         let context = ctx.clone();
+        let seed = self.shader_ai.idea_seed.clone();
         std::thread::spawn(move || {
             let result = crate::shader_ai::random_ideas(
                 &crate::assistant::transport::ReqwestTransport,
@@ -11719,6 +11730,7 @@ impl ButtonsApp {
                         .map_err(|_| crate::assistant::client::ClientError::Credential)
                 },
                 count,
+                &seed,
                 &AtomicBool::new(false),
             );
             let _ = sender.send(ShaderAiEvent::Ideas(result));
