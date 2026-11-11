@@ -5,7 +5,7 @@ export const REPO_URL = 'https://github.com/detroittommy879/buttonscli-native';
 
 /** Sidebar groups, in order. `section` picks the accent in looks that color sections. */
 export const GROUPS = [
-	{ key: 'start', section: 'start', pages: ['index', 'getting-started', 'workspace'] },
+	{ key: 'start', section: 'start', pages: ['index', 'getting-started', 'workspace', 'easier-than-a-terminal'] },
 	{ key: 'looks', section: 'themes', pages: ['themes', 'theme-bundles', 'theme-gallery'] },
 	{ key: 'shaders', section: 'shaders', pages: ['shaders', 'shader-code'] },
 	{ key: 'ai', section: 'ai', pages: ['ai-setup', 'ai-shaders', 'ai-themes'] },

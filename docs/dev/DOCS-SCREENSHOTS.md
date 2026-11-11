@@ -62,6 +62,10 @@ docs/guide/images/colors-row.png   (the site shows it in place of the marker)
   a release-like UI (debug tools hidden). Shader time is frozen
   (`FROZEN_TIME`), the real mouse and keyboard are ignored, and the window is
   resized before the app is built. Two runs in a row rewrite nothing.
+- **Looks.** The hero and the first shader shots use the newest built-in
+  bundle in `assets/library/bundles.json` whose first four looks all show a
+  shader (Strength above 0.05); the next shot uses the one before it. New saves are appended to that file, so each run steps back through the
+  looks saved most recently. The capture never reads your own profile.
 - **Writing.** PNG for UI, JPG (quality 85) for shader-heavy shots, chosen by
   the file extension. The new picture is encoded first; identical bytes mean
   unchanged. Otherwise both files are decoded and the file is rewritten when
@@ -98,3 +102,22 @@ text (`setup::PANES`).
   guide against labels in `src/`) are planned.
 
 The probe runs on Windows only and can't run in CI yet, which has no GPU.
+
+## Showcase looks (for a web demo later)
+
+Looks the owner wants for a web showcase or new screenshots. Use the exact
+bundle names:
+
+| Bundle | Where it is |
+| --- | --- |
+| `rain-snow-thunder` | `assets/library/bundles.json` |
+| `thunder & water` | `assets/library/bundles.json` |
+| `Water-Desert-Landscapes` | `assets/library/bundles.json` |
+| `Bubbles, Fish, Thunderstorm, Coral R` | `assets/library/bundles.json` |
+
+Names are matched exactly; check the library file before relying on one.
+
+Single shaders and themes for the showcase are picked in **Settings → Gallery**
+(debug tools). Each pick in `<profile>/gallery-picks.json` has the WGSL, the
+full program, knob values, the five colors and the background, so a plain web
+page can draw it without the app.

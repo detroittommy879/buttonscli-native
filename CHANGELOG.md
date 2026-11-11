@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- **New app icon**: the rainbow "bu" made of buttons, on the window, the
+  taskbar, Settings and AI Help windows, and the Windows exe (Explorer,
+  pinned taskbar buttons, shortcuts). Linux and macOS packages use it too.
+- **More built-in looks**: new themes and shaders, and the bundles
+  *Water-Desert-Landscapes*, *Bubbles, Fish, Thunderstorm, Coral R* and
+  *bluevisions, highres*.
+- **Power saving only when minimized**: a visible window that is not focused
+  (a second monitor used as a screensaver) keeps its full animation rate.
+  Minimized still drops to about one frame a second.
+- **Name a generated theme before saving**: the Shaders tab's "Keep it" section
+  has Theme name and Shader name boxes, so you do not have to scroll up to rename them.
+- **Idle glow** (pane menu → Idle glow): a terminal that has been quiet for a
+  while ramps its shader up to a High strength, and output brings it back to
+  Low. Set Low, High, the quiet time and the ramp under ◐ Look → Idle glow.
+  It is turned on per pane and is not kept across restarts.
+- **Shuffle → Shaders only**: change only each theme's shader and keep the
+  current colors. Shuffle's theme list is unchanged: it already goes through
+  every theme before any repeats. The count under "From" shows how many themes
+  the chosen list has.
+- **Seed word for Random ideas**: a small box next to "Random ideas" takes an
+  optional word or phrase. The shader model may take it as a loose spark, ignore
+  it, flip it, or drift from it. Empty means no change.
 - New version notice: at startup ButtonsCLI asks GitHub which release is the
   latest, and when it is newer a green **⬆ vX.Y.Z available** link shows in
   the status bar and opens the release page. Nothing is downloaded or

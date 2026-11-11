@@ -1,0 +1,223 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#e8a0b8",
+        "#8fb7d9",
+        "#f2c879",
+        "#7d5fa8",
+        "#9ed8b0"
+      ],
+      "custom": {
+        "expression": "var col = mix(bg, c4 * 0.12, smoothstep(-0.5, 0.5, p.y));\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let s = 2.5 + 2.2 * k;\n    let g = vec2<f32>(p.x * s + t * (0.03 + 0.05 * k) + k * 3.7, p.y * s);\n    let cell = floor(g);\n    let seed = hash(cell + vec2<f32>(k * 11.0, 2.0));\n    let here = step(1.0 - density, seed);\n    let bob = 0.06 * sin(t * (0.3 + 0.2 * seed) + seed * 6.28);\n    let q = (fract(g) - 0.5 - vec2<f32>(0.0, bob)) / pet_size;\n    let m = 0.5 + 0.5 * sin(t * morph_speed + seed * 6.28 + k);\n    let ear = min(sd_circle(q - vec2<f32>(-0.08, 0.09), 0.045), sd_circle(q - vec2<f32>(0.08, 0.09), 0.045));\n    let cat = smin(sd_circle(q, 0.11), ear, 0.03);\n    let oval = length(q * vec2<f32>(1.0, 1.7)) - 0.12;\n    let pc = polar(q);\n    let flower = pc.x - (0.11 + 0.025 * cos(pc.y * 31.4159));\n    let d = mix(mix(cat, oval, smoothstep(0.2, 0.45, m)), flower, smoothstep(0.6, 0.85, m));\n    let tint = mix(c1, c3, hash(cell + vec2<f32>(5.0, k)));\n    let layer = mix(0.4, 1.0, k / 2.0);\n    let body = 1.0 - smoothstep(-0.01, 0.01, d);\n    col += (tint * body * 0.8 + tint * halo(d, 0.05) * 0.35) * here * layer;\n}\nreturn mix(bg, tonemap(col), strength);",
+        "name": "Flying Whiskers",
+        "variables": [
+          {
+            "max": 1.600000023841858,
+            "min": 0.6000000238418579,
+            "name": "pet_size",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "morph_speed",
+            "value": 1.2999999523162842
+          },
+          {
+            "max": 8.0,
+            "min": 3.0,
+            "name": "density",
+            "value": 5.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 1.5,
+      "speed": 4.599999904632568,
+      "strength": 0.33000001311302185,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Calm dusky plum and rose theme with soft flying-pet silhouettes over a warm near-black terminal.",
+    "id": "flying-whiskers",
+    "name": "Flying Whiskers",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:flying-whiskers",
+    "updatedAt": "2026-11-11T15:43:30.770Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#f4bfd0",
+        "background": "#1f1816",
+        "buttonBackground": "#554e3a",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#1f1816"
+      },
+      "shell": {
+        "accent": "#e8a0b8",
+        "accentHover": "#f4bfd0",
+        "background": "#15100e",
+        "backgroundSecondary": "#1f1816",
+        "border": "#3a2d2a",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#e8a0b8",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#c9b8ad",
+        "textMain": "#f5ebe4"
+      },
+      "statusBar": {
+        "background": "#1f1816",
+        "border": "#3a2d2a",
+        "text": "#c9b8ad",
+        "warning": "#f2c879"
+      },
+      "tabs": {
+        "activeBackground": "#15100e",
+        "activeBorder": "#e8a0b8",
+        "background": "#1f1816",
+        "idleBackground": "#1f1816"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#15100e",
+        "blue": "#8fb7d9",
+        "brightBlack": "#94837c",
+        "brightBlue": "#b3d4ee",
+        "brightCyan": "#b5ecea",
+        "brightGreen": "#c2ecd0",
+        "brightMagenta": "#d2bdf0",
+        "brightRed": "#f0a0aa",
+        "brightWhite": "#fbf4ee",
+        "brightYellow": "#ffe1a0",
+        "cyan": "#8ed8d6",
+        "green": "#9ed8b0",
+        "magenta": "#b59ad9",
+        "red": "#e07a86",
+        "white": "#d9c9bf",
+        "yellow": "#f2c879"
+      },
+      "background": "#0d0b0a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f5ebe4",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#16110f",
+        "#6b4f8f",
+        "#e8a0b8",
+        "#f2c879"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

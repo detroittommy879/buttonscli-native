@@ -1,0 +1,221 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#d4a853",
+        "#f4ead0",
+        "#14264f",
+        "#8a6a32",
+        "#1d3a70"
+      ],
+      "custom": {
+        "expression": "let base = mix(c3 * 0.25, c5 * 0.5, smoothstep(-0.5, 0.5, p.y));\nlet col_g = p.x * 9.0;\nlet col = floor(col_g);\nlet colseed = hash(vec2<f32>(col, 3.0));\nlet fall = (0.1 + 0.12 * colseed) * fall_speed;\nlet g = vec2<f32>(col_g, p.y * 6.0 + t * fall + colseed * 7.0);\nlet cell = floor(g);\nlet seed = hash(cell);\nlet jitter = (hash2(cell) - 0.5) * 0.3;\nlet sway = vec2<f32>(0.08 * sin(t * 0.5 + colseed * 6.28), 0.0);\nlet local = fract(g) - 0.5 - jitter - sway;\nlet arms = abs(local.x) + abs(local.y);\nlet size = (0.1 + 0.08 * seed) * flake_size;\nlet diamond = arms - size;\nlet cross_d = max(min(abs(local.x), abs(local.y)) - 0.012, arms - size * 1.5);\nlet lit = step(0.35, seed);\nlet twinkle = 0.65 + 0.35 * sin(t * (0.6 + seed) + seed * 9.0);\nlet rim = stroke(diamond, 0.018);\nlet core = fill(diamond + size * 0.5);\nlet spark = fill(cross_d);\nlet flakes = (mix(c1, c2, core) * max(rim, spark * 0.7) + c1 * halo(diamond, 0.05) * 0.3) * lit * twinkle;\nlet color = base + flakes * 1.2;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Deco Snowfall",
+        "variables": [
+          {
+            "max": 1.600000023841858,
+            "min": 0.6000000238418579,
+            "name": "flake_size",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "fall_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7000000476837158,
+      "speed": 3.0999999046325684,
+      "strength": 0.27000001072883606,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T23:50:38.127Z",
+    "description": "Dark charred charcoal with ember orange and warm cream, like a backyard grill at dusk.",
+    "id": "summer-embers",
+    "name": "Summer Embers",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:summer-embers",
+    "updatedAt": "2026-11-11T14:54:30.627Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#f28d4a",
+        "background": "#1f1915",
+        "buttonBackground": "#554e3a",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#1f1915"
+      },
+      "shell": {
+        "accent": "#e8702a",
+        "accentHover": "#f28d4a",
+        "background": "#14100d",
+        "backgroundSecondary": "#1f1915",
+        "border": "#3d2e24",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#e8702a",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#b5a18a",
+        "textMain": "#f5e6c8"
+      },
+      "statusBar": {
+        "background": "#1f1915",
+        "border": "#3d2e24",
+        "text": "#b5a18a",
+        "warning": "#f2b84b"
+      },
+      "tabs": {
+        "activeBackground": "#14100d",
+        "activeBorder": "#e8702a",
+        "background": "#1f1915",
+        "idleBackground": "#1f1915"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1412",
+        "blue": "#6f8fb0",
+        "brightBlack": "#6e5c4e",
+        "brightBlue": "#8fb0cc",
+        "brightCyan": "#9fd0c3",
+        "brightGreen": "#a9bd62",
+        "brightMagenta": "#d083a8",
+        "brightRed": "#f0785a",
+        "brightWhite": "#fff6e4",
+        "brightYellow": "#ffd27a",
+        "cyan": "#7fb3a6",
+        "green": "#8fa34a",
+        "magenta": "#b5608a",
+        "red": "#d9553a",
+        "white": "#e8d8bb",
+        "yellow": "#f2b84b"
+      },
+      "background": "#0d0b0a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f5e6c8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0d0b0a",
+        "#8c2f1e",
+        "#e8702a",
+        "#f2b84b"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

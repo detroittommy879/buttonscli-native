@@ -9,10 +9,37 @@
     "scanlinesStrength": 0.0,
     "shaderBackground": {
       "animated": true,
+      "colors": [
+        "#ffb08a",
+        "#2a9d9a",
+        "#8b6fd6",
+        "#0a2634",
+        "#ff7a7a"
+      ],
+      "custom": {
+        "expression": "let w = vec2<f32>(fbm(p * 2.0 + vec2<f32>(t * 0.03, 0.0)), fbm(p * 2.0 + vec2<f32>(5.2, 1.3) + vec2<f32>(0.0, t * 0.02)));\nlet far_n = fbm(p * 2.2 + 2.0 * w + vec2<f32>(0.0, t * 0.02));\nlet near_n = fbm(p * 3.8 + 2.5 * w + vec2<f32>(t * 0.05, 0.0));\nlet ground = 1.0 - smoothstep(-0.3, 0.1, p.y);\nlet far_mask = smoothstep(density, density + 0.12, far_n) * ground;\nlet near_mask = smoothstep(density + 0.05, density + 0.15, near_n) * (1.0 - smoothstep(-0.4, 0.0, p.y));\nlet sky = mix(c4 * 0.9, c2 * 0.6, smoothstep(-0.5, 0.5, p.y));\nlet far_col = mix(c3, c2, far_n) * far_mask * 0.75;\nlet near_col = mix(c5, c1, w.y) * near_mask;\nlet rays = pow(0.5 + 0.5 * sin(p.x * 16.0 + w.x * 5.0 + t * 0.4), 4.0) * (1.0 - smoothstep(-0.1, 0.5, p.y));\nlet beams = c1 * rays * beam;\nlet color = sky + far_col + near_col + beams;\nreturn mix(bg, tonemap(color * 1.25), strength);",
+        "name": "Coral Drift",
+        "variables": [
+          {
+            "max": 0.6000000238418579,
+            "min": 0.4000000059604645,
+            "name": "density",
+            "value": 0.5
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "beam",
+            "value": 0.6000000238418579
+          }
+        ],
+        "y_up": true
+      },
       "preset": "nebula",
       "scale": 2.700000047683716,
       "speed": 2.0,
       "strength": 0.3499999940395355,
+      "theme_colors": false,
       "version": 1
     },
     "simpleNoiseAmount": 11.0,
@@ -39,7 +66,7 @@
     "name": "default4 v1",
     "nativeThemeVersion": 1,
     "releasePickFrom": "personal:imported-default-da364bab3a22:default4-v1",
-    "updatedAt": "2026-10-11T21:52:41.180Z"
+    "updatedAt": "2026-11-11T16:27:01.590Z"
   },
   "nativeAppearance": {
     "advanced_effects": true,

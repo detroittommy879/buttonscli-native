@@ -1,0 +1,193 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff3d7f",
+        "#20e3ff",
+        "#ffd60a",
+        "#6a00ff",
+        "#3dff8a"
+      ],
+      "custom": {
+        "expression": "let bgwash = mix(c4 * 0.45, c2 * 0.12, smoothstep(-0.5, 0.5, p.y));\nvar acc = vec3<f32>(0.0);\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let scale = 7.0 - k * 2.0;\n    let speed = 0.05 + 0.08 * k;\n    let g = p * scale + vec2<f32>(t * speed, 0.2 * sin(t * 0.3 + k));\n    let cell = floor(g);\n    let seed = hash(cell + vec2<f32>(k * 17.0, 3.0));\n    let dir = select(-1.0, 1.0, seed > 0.5);\n    let ang = seed * 6.28 + t * (0.3 + seed) * dir;\n    let q = rotate(fract(g) - 0.5, ang);\n    let morph = 0.5 + 0.5 * sin(t * morph_speed + seed * 12.0);\n    let r = 0.12 + 0.07 * hash(cell * 1.7);\n    let oval = length(q * vec2<f32>(1.0, 1.6 + 0.8 * morph)) - r;\n    let corner = min(sd_segment(q, vec2<f32>(-r, -r), vec2<f32>(r, -r)), sd_segment(q, vec2<f32>(-r, -r), vec2<f32>(-r, r))) - 0.02;\n    let dotline = min(sd_circle(q - vec2<f32>(-r * 1.2, 0.0), r * 0.35), sd_segment(q, vec2<f32>(-r * 0.6, 0.0), vec2<f32>(r * 1.4, 0.0)) - 0.02);\n    let wave = abs(q.y - 0.12 * cos(q.x * 18.0 + t * 2.0 + seed * 6.28)) - 0.02;\n    let d1 = mix(oval, corner, morph);\n    let d2 = mix(dotline, wave, 1.0 - morph);\n    let d = mix(d1, d2, smoothstep(0.4, 0.6, hash(cell + vec2<f32>(5.0, 1.0))));\n    let tint = mix(mix(c1, c2, hash(cell * 3.1)), c5, step(0.85, seed));\n    let glow = fill(d) * c3 * 0.6 + halo(d, 0.04) * tint * 0.5;\n    acc += (tint * fill(d) + glow) * (0.5 + 0.3 * k);\n}\nreturn mix(bg, tonemap(bgwash + acc), strength);",
+        "name": "Orbit Sigils",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "morph_speed",
+            "value": 0.800000011920929
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "caustics",
+      "scale": 1.0,
+      "speed": 0.4000000059604645,
+      "strength": 0.6200000047683716,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T20:05:00.656Z",
+    "description": "Animated background example. Enable GPU shader backgrounds in Themes > Shaders; solid/gradient fallback is available.",
+    "id": "shader-water-caustics-v1",
+    "name": "Shader Water Caustics v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:shader-water-caustics-v1",
+    "updatedAt": "2026-11-11T20:05:13.079Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#5aded9",
+        "background": "#101525",
+        "buttonBackground": "#101525",
+        "buttonHover": "#37486c",
+        "buttonText": "#e4ecff"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#5aded9",
+        "accentHover": "#5aded9",
+        "background": "#06121d",
+        "backgroundSecondary": "#101525",
+        "border": "#37486c",
+        "buttonBackground": "#101525",
+        "paneDivider": {
+          "color": "#5aded9",
+          "thickness": 2.0
+        },
+        "textDim": "#7e8eaa",
+        "textMain": "#e4ecff"
+      },
+      "statusBar": {
+        "background": "#101525",
+        "border": "#101525",
+        "text": "#7e8eaa",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#06121d",
+        "activeBorder": "#5aded9",
+        "background": "#101525",
+        "idleBackground": "#101525"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#697386",
+        "blue": "#83bff1",
+        "brightBlack": "#95a4bb",
+        "brightBlue": "#acd9ff",
+        "brightCyan": "#a4efea",
+        "brightGreen": "#bcea9e",
+        "brightMagenta": "#e9c6ff",
+        "brightRed": "#ffa1ae",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe0a3",
+        "cyan": "#81d8d6",
+        "green": "#9fd586",
+        "magenta": "#d7a2f6",
+        "red": "#ff7c91",
+        "white": "#e4ecff",
+        "yellow": "#ffd27c"
+      },
+      "background": "#06121d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#e4ecff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#06121d",
+        "#137c98",
+        "#36b6b2",
+        "#166380"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -549,6 +549,13 @@ pub struct ButtonsApp {
     /// Look → Shuffle: the timer, this round's themes and the fade.
     #[cfg(not(target_arch = "wasm32"))]
     shuffle: shuffle::ShuffleState,
+    /// Idle glow: the panes that turned it on, each with the time it went on
+    /// (ms). Not saved; a pane's quiet time counts from here or its last output.
+    #[cfg(not(target_arch = "wasm32"))]
+    idle_glow_panes: std::collections::BTreeMap<u64, u64>,
+    /// Settings → Gallery (debug tools).
+    #[cfg(not(target_arch = "wasm32"))]
+    gallery: gallery::GalleryState,
     /// The startup release check, until it answers.
     #[cfg(not(target_arch = "wasm32"))]
     update_rx: Option<Receiver<crate::update_check::Update>>,
@@ -783,6 +790,9 @@ enum SettingsTab {
     ReleasePicks,
     #[cfg(not(target_arch = "wasm32"))]
     Debug,
+    /// Debug tools: shaders four at a time with picks for a showcase.
+    #[cfg(not(target_arch = "wasm32"))]
+    Gallery,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1030,6 +1040,8 @@ struct ShaderAiState {
     idea_busy: bool,
     /// The last "Random ideas" list; "One version per idea" writes them all.
     ideas: Vec<String>,
+    /// Optional seed word or phrase for "Random ideas" (not saved).
+    idea_seed: String,
     lanes: Vec<ShaderLane>,
     generation: u64,
     cancel: Option<Arc<AtomicBool>>,
@@ -1056,6 +1068,7 @@ impl Default for ShaderAiState {
             ai_colors: true,
             idea_busy: false,
             ideas: Vec::new(),
+            idea_seed: String::new(),
             lanes: Vec::new(),
             generation: 0,
             cancel: None,
@@ -1215,6 +1228,8 @@ enum PaneAction {
     Paste,
     /// Turn off mouse reporting a program left on (clicks typing `0;12;5M`).
     ResetMouseMode,
+    /// Turn idle glow on or off for this pane.
+    ToggleIdleGlow,
     SelectAll,
     Clear,
     Rename,
@@ -1646,6 +1661,10 @@ impl ButtonsApp {
             motion_clock_at: None,
             #[cfg(not(target_arch = "wasm32"))]
             shuffle: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            idle_glow_panes: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            gallery: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             update_rx: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2183,6 +2202,11 @@ impl ButtonsApp {
         // Resolve the old profile's preview and draft before its files stop being the target.
         #[cfg(not(target_arch = "wasm32"))]
         self.discard_theme_editor_session();
+        // Gallery picks belong to a profile folder: read the new one's next time.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.gallery = Default::default();
+        }
         preferences.normalize_theme_sources();
         self.themes = ThemeCatalog::load();
         self.theme_load_warnings = self
@@ -2389,6 +2413,7 @@ impl ButtonsApp {
                 ctx.request_repaint();
             }
             PaneAction::ResetMouseMode => self.tabs[index].backend.reset_mouse_modes(),
+            PaneAction::ToggleIdleGlow => self.toggle_idle_glow(id),
             PaneAction::SelectAll => self.tabs[index].backend.select_all(),
             PaneAction::Clear => self.tabs[index].backend.clear_screen(),
             PaneAction::Rename => self.open_tab_rename(index),
@@ -2400,6 +2425,13 @@ impl ButtonsApp {
                 self.focused = index;
                 self.settings_tab = SettingsTab::Themes;
                 self.show_settings = true;
+            }
+            // The pane shows the glow's ramped Strength; saving it would bake
+            // the glow into the pane's look.
+            PaneAction::ShaderStrength(_) if self.idle_glow_panes.contains_key(&id) => {
+                self.notice = Some(
+                    "Idle glow sets Strength on this pane. Turn Idle glow off to edit it.".into(),
+                );
             }
             PaneAction::ShaderStrength(value) => self.edit_pane_look(index, |document| {
                 if document["effects"]["shaderBackground"].is_object() {
@@ -3560,10 +3592,19 @@ impl ButtonsApp {
                 // Mid-fade every pane has its own look (from its old one).
                 self.theme_overrides.contains_key(&tab.id)
                     || self.shuffle.fade.is_some()
+                    || self.idle_glow_panes.contains_key(&tab.id)
                     || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
                 let mut theme = self.terminal_presentation_for(tab.id);
+                // Override panes sets one Strength for every pane, so it wins.
+                if let (None, Some(glow), Some(shader)) = (
+                    self.preferences.strength_override.active(),
+                    self.pane_glow(tab.id),
+                    theme.effects.shader_background.as_mut(),
+                ) {
+                    shader.strength = glow.strength;
+                }
                 theme.effects =
                     pane_effects_for_focus(&theme.effects, index == focused, focused_effects_only);
                 (tab.id, theme)
@@ -3587,6 +3628,7 @@ impl ButtonsApp {
             font_catalog: &self.font_catalog,
             theme: &theme,
             override_themes: &override_themes,
+            idle_glow_panes: &self.idle_glow_panes,
             divider_style,
             clicked: &mut clicked,
             latest_activity_at_ms,
@@ -5403,9 +5445,9 @@ impl ButtonsApp {
                             }
                             let shader_button = ui.spaced_menu_button("✦ Shader", |ui| {
                                 ui.set_max_width(340.0);
-                                if let Some((_, title, theme)) = &focused_pane {
+                                if let Some((id, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
-                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), &mut shader_action);
+                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), self.idle_glow_panes.contains_key(id), &mut shader_action);
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
@@ -5702,6 +5744,10 @@ impl ButtonsApp {
             .with_title(title.clone())
             .with_inner_size(layout.size)
             .with_min_inner_size([720.0, 520.0]);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            builder = builder.with_icon(crate::app_icon());
+        }
         if let Some(position) = layout.position {
             builder = builder.with_position(position);
         }
@@ -5936,6 +5982,11 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 if power::debug_tools_available() {
                     ui.spaced_selectable_value(&mut self.settings_tab, SettingsTab::Debug, "Debug");
+                    ui.spaced_selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::Gallery,
+                        "Gallery",
+                    );
                 }
             });
         });
@@ -6012,6 +6063,8 @@ impl ButtonsApp {
                 SettingsTab::ReleasePicks => self.release_picks_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Debug => self.debug_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Gallery => self.gallery_settings(ui),
             });
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_editor_preview(ctx);
@@ -9515,6 +9568,13 @@ impl ButtonsApp {
                     {
                         self.start_random_shader_idea(ui.ctx());
                     }
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.shader_ai.idea_seed)
+                            .hint_text("seed word (optional)")
+                            .desired_width(180.0)
+                            .char_limit(crate::shader_ai::MAX_SEED_CHARS),
+                    )
+                    .on_hover_text("Optional. Random ideas loosely see this word or phrase: it may inspire, be ignored, or be flipped.");
                 });
                 egui::CollapsingHeader::new("Options")
                     .id_salt("shader-ai-options")
@@ -9815,6 +9875,47 @@ impl ButtonsApp {
             ui.spaced_label(RichText::new("Keep it").strong());
             use_everywhere |= self.look_target_hint(ui);
             self.theme_apply_controls(ui);
+            // The draft's display name: the file name and id stay as they are,
+            // so renaming here never breaks a reference to the theme.
+            if let Some(document) = self.theme_editor_document.as_mut() {
+                let mut name = document["metadata"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned();
+                // The shader's name is the same value as the Style section's
+                // Name box; the shader is re-read from the draft each frame.
+                let has_shader = document["effects"]["shaderBackground"]["custom"].is_object();
+                let mut shader_name = document["effects"]["shaderBackground"]["custom"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned();
+                wrapping_row(ui, |ui| {
+                    ui.spaced_label("Theme name");
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut name)
+                            .hint_text("theme name")
+                            .desired_width(200.0)
+                            .char_limit(80),
+                    );
+                    // An empty name would save as nothing, so keep the last one.
+                    if response.changed() && !name.trim().is_empty() {
+                        document["metadata"]["name"] = json!(name);
+                    }
+                    if has_shader {
+                        ui.spaced_label("Shader name");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut shader_name)
+                                .hint_text("shader name")
+                                .desired_width(200.0)
+                                .char_limit(80),
+                        );
+                        if response.changed() {
+                            document["effects"]["shaderBackground"]["custom"]["name"] =
+                                json!(shader_name);
+                        }
+                    }
+                });
+            }
             wrapping_row(ui, |ui| {
                 if ui.spaced_button("Preview on terminals").clicked() {
                     self.preferences.theme_apply.effects = true;
@@ -11709,6 +11810,7 @@ impl ButtonsApp {
         let session = Arc::clone(&self.credential_session);
         let sender = self.shader_ai.tx.clone();
         let context = ctx.clone();
+        let seed = self.shader_ai.idea_seed.clone();
         std::thread::spawn(move || {
             let result = crate::shader_ai::random_ideas(
                 &crate::assistant::transport::ReqwestTransport,
@@ -11719,6 +11821,7 @@ impl ButtonsApp {
                         .map_err(|_| crate::assistant::client::ClientError::Credential)
                 },
                 count,
+                &seed,
                 &AtomicBool::new(false),
             );
             let _ = sender.send(ShaderAiEvent::Ideas(result));
@@ -15580,6 +15683,8 @@ struct PaneRenderState<'a> {
     font_catalog: &'a fonts::FontCatalog,
     theme: &'a ThemeDefinition,
     override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
+    /// Panes with idle glow on (for their menus).
+    idle_glow_panes: &'a std::collections::BTreeMap<u64, u64>,
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
     latest_activity_at_ms: u64,
@@ -15702,6 +15807,7 @@ fn render_pane_tree(
                                     state.favorites,
                                     state.auto_tile.includes(tab.id),
                                     tab.backend.scrollback_state().mouse_reporting,
+                                    state.idle_glow_panes.contains_key(&tab.id),
                                     &mut action,
                                 );
                                 ui.separator();
@@ -15717,6 +15823,7 @@ fn render_pane_tree(
                                         state.shader_choices,
                                         state.saved_shader_count,
                                         state.strength_override,
+                                        state.idle_glow_panes.contains_key(&tab.id),
                                         &mut action,
                                     );
                                 });
@@ -16181,6 +16288,7 @@ fn pane_shader_menu(
     choices: &[crate::theme::SavedShader],
     saved_count: usize,
     strength_override: Option<f32>,
+    idle_glow: bool,
     action: &mut Option<PaneAction>,
 ) {
     let shader = theme.effects.shader_background.as_ref();
@@ -16192,6 +16300,15 @@ fn pane_shader_menu(
                 .text("Strength"),
         );
         ui.spaced_small("Set for every pane: ◐ Look → Override panes.");
+    } else if let (true, Some(shader)) = (idle_glow, shader) {
+        // The theme here may carry the glow's ramped value; never save it.
+        let mut shown = shader.strength;
+        ui.add_enabled(
+            false,
+            egui::Slider::new(&mut shown, crate::theme::ShaderBackground::STRENGTH)
+                .text("Strength"),
+        );
+        ui.spaced_small("Idle glow sets Strength on this pane. Turn Idle glow off to edit it.");
     } else if let Some(shader) = shader {
         let mut strength = shader.strength;
         if ui
@@ -16258,6 +16375,7 @@ fn pane_action_menu(
     favorites: &[(String, String)],
     included: bool,
     mouse_reporting: bool,
+    glow_on: bool,
     action: &mut Option<PaneAction>,
 ) {
     egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -16291,6 +16409,15 @@ fn pane_action_menu(
             .clicked()
     {
         *action = Some(PaneAction::ResetMouseMode);
+        ui.close_menu();
+    }
+    let mut glow = glow_on;
+    if ui
+        .spaced_checkbox(&mut glow, crate::i18n::literal(locale, "Idle glow"))
+        .on_hover_text("When this terminal has been quiet for a while, its shader ramps up to the High strength under Look → Idle glow.")
+        .changed()
+    {
+        *action = Some(PaneAction::ToggleIdleGlow);
         ui.close_menu();
     }
     let mut include = included;
@@ -17191,6 +17318,10 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
 mod docs_capture;
+#[cfg(not(target_arch = "wasm32"))]
+mod gallery;
+#[cfg(not(target_arch = "wasm32"))]
+mod idle_glow;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
@@ -17275,6 +17406,8 @@ impl eframe::App for ButtonsApp {
         self.update_power_status(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_shuffle(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.tick_idle_glow(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_startup_commands(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -19877,6 +20010,7 @@ Start-Sleep -Seconds 300
                                 "basic2",
                                 &favorites,
                                 true,
+                                false,
                                 false,
                                 &mut action,
                             )
@@ -23016,6 +23150,37 @@ Start-Sleep -Seconds 300
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
+    fn a_typed_draft_name_is_the_name_autosave_keeps() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-draft-name-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        let pane = app.tabs[0].id;
+        app.sync_theme_editor_to_current();
+        app.theme_editor_pane = Some(pane);
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["metadata"]["name"] = json!("Typed Name Check");
+        app.theme_editor_document = Some(draft);
+        let saved = app.autosave_theme_draft().unwrap().unwrap();
+        assert_eq!(saved, "Typed Name Check");
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
     fn pane_edits_save_with_numbered_names_and_never_touch_other_panes() {
         let base = std::env::temp_dir().join(format!(
             "buttonscli-pane-autosave-{}-{}",
@@ -23247,16 +23412,22 @@ Start-Sleep -Seconds 300
         );
         let mut rows = std::collections::BTreeSet::new();
         let mut found = 0;
+        // The tab row is painted first. Later text with the same words (the
+        // Library's "Fonts" checkbox) belongs to the page, not to a tab.
+        let mut seen = std::collections::BTreeSet::new();
         for clipped in &output.shapes {
             if let egui::Shape::Text(text) = &clipped.shape {
+                if !seen.insert(text.galley.job.text.clone()) {
+                    continue;
+                }
                 if [
                     "Themes",
                     "Fonts",
-                    "Commands",
+                    "Pre-typed commands",
                     "Workspace",
                     "Keyboard",
                     "Shortcuts",
-                    "Import from original",
+                    "Import from original ButtonsCLI",
                 ]
                 .contains(&text.galley.job.text.as_str())
                 {

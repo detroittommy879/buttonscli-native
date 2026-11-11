@@ -1,6 +1,18 @@
 /// Cargo version, plus `+<commit>` for non-release builds (see build.rs).
 pub const BUILD_VERSION: &str = env!("BUTTONSCLI_BUILD_VERSION");
 
+/// Window and taskbar icon for every native window (decoded once).
+/// `packaging/icon-256.png`; the exe icon is `packaging/icon.ico` (build.rs).
+#[cfg(not(target_arch = "wasm32"))]
+pub fn app_icon() -> std::sync::Arc<egui::IconData> {
+    static ICON: std::sync::OnceLock<std::sync::Arc<egui::IconData>> = std::sync::OnceLock::new();
+    ICON.get_or_init(|| {
+        let png = include_bytes!("../packaging/icon-256.png");
+        std::sync::Arc::new(eframe::icon_data::from_png_bytes(png).unwrap_or_default())
+    })
+    .clone()
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 mod account;
 #[cfg(not(target_arch = "wasm32"))]

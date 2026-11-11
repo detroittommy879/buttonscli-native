@@ -272,8 +272,8 @@ pub(crate) struct Preferences {
     pub(crate) notice_seconds: u32,
     /// Look for a newer GitHub release at startup (a status bar link only).
     pub(crate) check_for_updates: bool,
-    /// Fewer frames while the window is in the background or minimized
-    /// (Settings → Debug). On by default.
+    /// Fewer frames while the window is minimized (Settings → Debug). A
+    /// visible window, even unfocused, keeps its full rate. On by default.
     pub(crate) power_saving: bool,
     /// Experiments with shader generation and the shader rules
     /// (Settings → Debug). Only read while the debug tools are on.
@@ -283,6 +283,8 @@ pub(crate) struct Preferences {
     /// Status bar → Look → Override panes: one shader Strength for every
     /// pane. Changes only what is drawn; no theme is edited.
     pub(crate) strength_override: StrengthOverride,
+    /// Status bar → Look → Idle glow: the ramp used by panes that turn it on.
+    pub(crate) idle_glow: IdleGlow,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -358,6 +360,7 @@ impl Default for Preferences {
             shader_lab: ShaderLab::default(),
             shuffle: Shuffle::default(),
             strength_override: StrengthOverride::default(),
+            idle_glow: IdleGlow::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -578,6 +581,54 @@ impl StrengthOverride {
     }
 }
 
+/// Status bar → Look → Idle glow. A pane whose terminal has been quiet for a
+/// while ramps its shader Strength from `low` up to `high`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct IdleGlow {
+    pub(crate) low: f32,
+    pub(crate) high: f32,
+    /// Quiet time before the ramp starts, in seconds.
+    pub(crate) delay_seconds: f32,
+    /// Seconds the ramp takes from `low` to `high`.
+    pub(crate) ramp_seconds: f32,
+}
+
+impl Default for IdleGlow {
+    fn default() -> Self {
+        Self {
+            low: 0.35,
+            high: 1.0,
+            delay_seconds: 30.0,
+            ramp_seconds: 20.0,
+        }
+    }
+}
+
+impl IdleGlow {
+    pub(crate) const DELAY: std::ops::RangeInclusive<f32> = 0.0..=600.0;
+    pub(crate) const RAMP: std::ops::RangeInclusive<f32> = 1.0..=600.0;
+
+    pub(crate) fn normalize(&mut self) {
+        let defaults = Self::default();
+        let clamp = |value: f32, range: &std::ops::RangeInclusive<f32>, fallback: f32| {
+            if value.is_finite() {
+                value.clamp(*range.start(), *range.end())
+            } else {
+                fallback
+            }
+        };
+        let strength = crate::theme::ShaderBackground::STRENGTH;
+        self.low = clamp(self.low, &strength, defaults.low);
+        self.high = clamp(self.high, &strength, defaults.high);
+        if self.high < self.low {
+            std::mem::swap(&mut self.low, &mut self.high);
+        }
+        self.delay_seconds = clamp(self.delay_seconds, &Self::DELAY, defaults.delay_seconds);
+        self.ramp_seconds = clamp(self.ramp_seconds, &Self::RAMP, defaults.ramp_seconds);
+    }
+}
+
 /// Status bar → Look → Shuffle.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -592,6 +643,8 @@ pub(crate) struct Shuffle {
     pub(crate) every_pane: bool,
     /// Also take each theme's fonts (resizes the terminals).
     pub(crate) fonts: bool,
+    /// Change only the shader; the current colors stay.
+    pub(crate) shader_only: bool,
 }
 
 impl Shuffle {
@@ -620,6 +673,7 @@ impl Default for Shuffle {
             fade_seconds: 2.5,
             every_pane: false,
             fonts: false,
+            shader_only: false,
         }
     }
 }
@@ -781,6 +835,7 @@ impl Preferences {
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
         self.shuffle.normalize();
         self.strength_override.normalize();
+        self.idle_glow.normalize();
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

@@ -653,5 +653,158 @@
     "layout": "grid",
     "visible_panes": 3,
     "row_banding_brightness": 0
+  },
+  {
+    "name": "Water-Desert-Landscapes",
+    "theme_id": "gravity-arcade-v1",
+    "app_theme_id": "gravity-arcade-v1",
+    "terminal_theme_id": "gravity-arcade-v1",
+    "gradient_theme_id": "gravity-arcade-v1",
+    "effects_theme_id": "gravity-arcade-v1",
+    "panes": [
+      {
+        "theme_id": "dune-sunburst-v1",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v4",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v3",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v5",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v6",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v7",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 6,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Bubbles, Fish, Thunderstorm, Coral R",
+    "theme_id": "candy-cosmos",
+    "app_theme_id": "candy-cosmos",
+    "terminal_theme_id": "candy-cosmos",
+    "gradient_theme_id": "candy-cosmos",
+    "effects_theme_id": "candy-cosmos",
+    "panes": [
+      {
+        "theme_id": "autumn-to-winter-v4",
+        "font": {
+          "zone": {
+            "family": "Daddy Time Mono Bundled",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v6",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "autumn-to-winter-v11",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "bubble-parade-v1",
+        "font": null
+      },
+      {
+        "theme_id": "hollow-transit",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "default4-v1",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 6,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "bluevisions, highres",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v3",
+        "font": null
+      },
+      {
+        "theme_id": "winter-rain-parallax-v4",
+        "font": null
+      },
+      {
+        "theme_id": "midnight-v6",
+        "font": {
+          "zone": {
+            "family": "Space Mono (System)",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
   }
 ]

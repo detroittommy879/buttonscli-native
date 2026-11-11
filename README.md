@@ -15,6 +15,8 @@ A fast terminal app for people who'd rather use a mouse: click buttons instead o
 
 ![Three stacked terminals with animated shader backgrounds and a command dock, next to Settings showing four AI-generated shader versions](docs/images/main.png)
 
+*Some shaders in this picture are saved with a higher Strength than the default (0.35), so their motion shows. Strength fades a shader toward the background color, which keeps text readable; lower it any time.*
+
 ## AI features and other things to save time
 
 - **The buttons**, obviously. All they do is paste long commands. You make a

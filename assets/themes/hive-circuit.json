@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff9f1c",
+        "#ff2bd6",
+        "#00e5ff",
+        "#2a0f3d",
+        "#ffe066"
+      ],
+      "custom": {
+        "expression": "let q = p * density;\nlet r = vec2<f32>(1.0, 1.7320508);\nlet h = r * 0.5;\nlet ga = (fract(q / r) - 0.5) * r;\nlet gb = (fract((q - h) / r) - 0.5) * r;\nlet gv = select(gb, ga, length(ga) < length(gb));\nlet cell = q - gv;\nlet e = abs(gv);\nlet hd = max(dot(e, vec2<f32>(0.5, 0.8660254)), e.x);\nlet edge = max(0.5 - hd, 0.0);\nlet idh = hash(cell);\nlet on = step(0.45, idh);\nlet lane = hash(vec2<f32>(floor(cell.y * 0.5), 7.0)) * 3.0;\nlet front = fract(cell.x * 0.12 - t * pulse_speed + lane);\nlet pk = exp(-front * 12.0) * on;\nlet body = mix(c4, c2 * 0.25, idh * 0.6) * (0.6 + 0.4 * on);\nlet edge_col = mix(c1, c2, hash(cell + vec2<f32>(3.1, 7.7)));\nlet line_glow = exp(-edge * 60.0) + exp(-edge * 12.0) * 0.3 * glow_amount;\nlet packet = c5 * pk * 1.4 + c1 * pk * 0.4 * (0.5 + idh);\nlet color = body + edge_col * line_glow * (0.5 + 0.5 * on) + packet;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Hive Circuit",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "pulse_speed",
+            "value": 0.8600000143051147
+          },
+          {
+            "max": 16.0,
+            "min": 6.0,
+            "name": "density",
+            "value": 14.699999809265137
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "glow_amount",
+            "value": 1.600000023841858
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 1.100000023841858,
+      "speed": 2.700000047683716,
+      "strength": 0.15000000596046448,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T02:43:59.930Z",
+    "description": "Neon amber and magenta hex grid on near-black, with data packets pulsing along the cells.",
+    "id": "hive-circuit",
+    "name": "Hive Circuit",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hive-circuit",
+    "updatedAt": "2026-11-11T02:45:07.422Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff6ae3",
+        "background": "#140a24",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#140a24"
+      },
+      "shell": {
+        "accent": "#ff2bd6",
+        "accentHover": "#ff6ae3",
+        "background": "#0a0614",
+        "backgroundSecondary": "#140a24",
+        "border": "#3d1f5c",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#ff2bd6",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#b9a6d6",
+        "textMain": "#f4eaff"
+      },
+      "statusBar": {
+        "background": "#140a24",
+        "border": "#3d1f5c",
+        "text": "#b9a6d6",
+        "warning": "#ff9f1c"
+      },
+      "tabs": {
+        "activeBackground": "#0a0614",
+        "activeBorder": "#ff2bd6",
+        "background": "#140a24",
+        "idleBackground": "#140a24"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#07040d",
+        "blue": "#4d7cff",
+        "brightBlack": "#5a4a78",
+        "brightBlue": "#8fb0ff",
+        "brightCyan": "#7af3ff",
+        "brightGreen": "#9dffc4",
+        "brightMagenta": "#ff7ae9",
+        "brightRed": "#ff7a99",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe066",
+        "cyan": "#00e5ff",
+        "green": "#5cff9e",
+        "magenta": "#ff2bd6",
+        "red": "#ff3d6e",
+        "white": "#e8dcff",
+        "yellow": "#ff9f1c"
+      },
+      "background": "#07040d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffe9d6",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0830",
+        "#ff9f1c",
+        "#ff2bd6",
+        "#00e5ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.3
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 200,
+        "letterSpacing": 1.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

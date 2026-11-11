@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff3fb4",
+        "#22e0ff",
+        "#7a4dff",
+        "#d8fbff",
+        "#2a1a4e"
+      ],
+      "custom": {
+        "expression": "let dir = normalize(vec2<f32>(0.82, -0.57));\nlet perp = vec2<f32>(-dir.y, dir.x);\nlet tex = ridged(vec2<f32>(dot(p, perp) * 8.0, dot(p, dir) * 2.0 - t * 1.8));\nvar acc = vec3<f32>(0.0);\n\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i);\n    let s1 = hash(vec2<f32>(k, 2.3));\n    let s2 = hash(vec2<f32>(k, 9.1));\n    let ph = fract(t * (0.20 + 0.22 * s2) * comet_speed + s1);\n    let lane = -0.75 + 1.5 * s2 + 0.08 * sin(t * 0.4 + k * 1.9);\n    let head = perp * lane + dir * (ph * 3.8 - 1.9);\n    let rel = p - head;\n    let along = dot(rel, dir);\n    let acr = dot(rel, perp);\n    let w = 0.011 + 0.010 * s1;\n    let tlen = tail_length * (0.8 + 0.7 * s2);\n    let acn = acr / w;\n    let back = max(-along, 0.0);\n    let body = exp(-acn * acn) * exp(-back * 2.3 / tlen) * exp(-max(along, 0.0) * 26.0);\n    let hot = exp(-dot(rel, rel) * 85.0);\n    let u = clamp(back / tlen, 0.0, 1.0);\n    let tint = mix(mix(c4, c1, smoothstep(0.0, 0.25, u)), c2, smoothstep(0.25, 1.0, u));\n    acc += tint * (body + hot * 2.0);\n}\n\nlet pf = p * 2.0 + vec2<f32>(3.7, 1.3);\nfor (var j = 0; j < 5; j++) {\n    let m = f32(j);\n    let m1 = hash(vec2<f32>(m, 4.7));\n    let m2 = hash(vec2<f32>(m, 12.9));\n    let phb = fract(t * (0.10 + 0.12 * m2) * comet_speed + m1);\n    let lane2 = -0.85 + 1.7 * m2 + 0.06 * sin(t * 0.25 + m * 2.4);\n    let head2 = perp * lane2 + dir * (phb * 3.6 - 1.8);\n    let rel2 = pf - head2;\n    let along2 = dot(rel2, dir);\n    let acr2 = dot(rel2, perp);\n    let w2 = 0.012 + 0.008 * m1;\n    let tlen2 = tail_length * (0.6 + 0.5 * m2);\n    let acn2 = acr2 / w2;\n    let back2 = max(-along2, 0.0);\n    let body2 = exp(-acn2 * acn2) * exp(-back2 * 2.6 / tlen2) * exp(-max(along2, 0.0) * 26.0);\n    let hot2 = exp(-dot(rel2, rel2) * 110.0);\n    let u2 = clamp(back2 / tlen2, 0.0, 1.0);\n    let tint2 = mix(mix(c3, c2, smoothstep(0.0, 0.6, u2)), c5 * 1.8, smoothstep(0.5, 1.0, u2));\n    acc += tint2 * body2 * 0.65 + c2 * hot2 * 0.7;\n}\n\nlet veil = mix(c3, c2, tex) * tex * tex * 0.55;\nlet wash = mix(c3 * 0.14, c2 * 0.07, smoothstep(-0.5, 0.5, p.y));\nlet sharp = 0.55 + 0.85 * tex;\nlet vign = 0.78 + 0.22 * (1.0 - smoothstep(0.45, 1.15, length(p)));\nlet scene = (wash + veil + acc * sharp * glow) * vign;\nreturn mix(bg, tonemap(scene * 1.45), strength);",
+        "name": "neon comets",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "comet_speed",
+            "value": 1.0
+          },
+          {
+            "max": 1.2000000476837158,
+            "min": 0.15000000596046448,
+            "name": "tail_length",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 2.5,
+            "min": 0.20000000298023224,
+            "name": "glow",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 2.299999952316284,
+      "speed": 2.4000000953674316,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T00:44:37.407Z",
+    "description": "Deep teal reef with scrambled ANSI colors: red is green, green is blue, blue is amber.",
+    "id": "glitch-reef",
+    "name": "Glitch Reef",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:glitch-reef",
+    "updatedAt": "2026-11-11T01:40:36.296Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff8ff7",
+        "background": "#0d2a2f",
+        "buttonBackground": "#170f10",
+        "buttonHover": "#482327",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#0d2a2f"
+      },
+      "shell": {
+        "accent": "#ff3df0",
+        "accentHover": "#ff8ff7",
+        "background": "#06191c",
+        "backgroundSecondary": "#0d2a2f",
+        "border": "#1f5257",
+        "buttonBackground": "#170f10",
+        "paneDivider": {
+          "color": "#ff3df0",
+          "thickness": 2.0
+        },
+        "textDim": "#9fd6c8",
+        "textMain": "#f0fff4"
+      },
+      "statusBar": {
+        "background": "#0d2a2f",
+        "border": "#1f5257",
+        "text": "#9fd6c8",
+        "warning": "#ff3df0"
+      },
+      "tabs": {
+        "activeBackground": "#06191c",
+        "activeBorder": "#ff3df0",
+        "background": "#0d2a2f",
+        "idleBackground": "#0d2a2f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#ff5ea8",
+        "blue": "#ffb020",
+        "brightBlack": "#ffd166",
+        "brightBlue": "#ffc86b",
+        "brightCyan": "#ff7a5c",
+        "brightGreen": "#8fb8ff",
+        "brightMagenta": "#7bf0ff",
+        "brightRed": "#9dff6a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ff8fe8",
+        "cyan": "#ff4d2e",
+        "green": "#6aa8ff",
+        "magenta": "#00d9ff",
+        "red": "#3dff7a",
+        "white": "#c9f7e6",
+        "yellow": "#ff3df0"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f0fff4",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0b2a2e",
+        "#ff3df0",
+        "#ffb020",
+        "#00d9ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Noto Sans KR Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Code New Roman Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

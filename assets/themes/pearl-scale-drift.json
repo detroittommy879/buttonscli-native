@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#4a6a8a",
+        "#2f7a6e",
+        "#d9e4ea",
+        "#0a1420",
+        "#aebfcc"
+      ],
+      "custom": {
+        "expression": "let warp = 0.025 * vec2<f32>(sin(p.y * 5.0 + t * 0.12), cos(p.x * 4.0 - t * 0.09));\nlet g0 = (p + warp) * scale_density;\nlet row = floor(g0.y);\nlet g = vec2<f32>(g0.x + 0.5 * row, g0.y);\nlet cell = floor(g);\nlet q = fract(g) - vec2<f32>(0.5, 0.5);\nlet seed = hash(cell);\nlet ctr = vec2<f32>(0.0, 0.08);\nlet v = q - ctr;\nlet d = sd_circle(v, 0.42);\nlet body = fill(d);\nlet rim = stroke(d, 0.025);\nlet dir = normalize(v + vec2<f32>(0.0001, 0.0001));\nlet light = normalize(vec2<f32>(cos(t * 0.05), 0.8 + 0.4 * sin(t * 0.031)));\nlet facing = max(dot(dir, light), 0.0);\nlet band = 0.5 + 0.5 * sin(p.x * 2.0 + p.y * 1.2 - t * 0.11);\nlet glint = pow(facing, 8.0) * rim * glint_gain * (0.6 + 0.4 * band);\nlet tone = mix(c1, c2, smoothstep(-0.5, 0.5, q.y));\nlet base = mix(c4, tone, 0.55 + 0.25 * seed);\nlet shade = 0.7 + 0.5 * clamp(-d * 2.0, 0.0, 1.0);\nlet scale_col = base * shade;\nlet gap = mix(c4, c2, 0.15) * 0.6;\nlet surface = mix(gap, scale_col, body);\nlet color = surface + c3 * glint * 0.9 + c5 * rim * 0.15;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Pearl Scale Drift",
+        "variables": [
+          {
+            "max": 12.0,
+            "min": 4.0,
+            "name": "scale_density",
+            "value": 7.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glint_gain",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 6.0,
+      "speed": 5.199999809265137,
+      "strength": 0.25999999046325684,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T00:44:37.407Z",
+    "description": "Slate blue and sea-green scales with a slow pearl glint on a deep black ground.",
+    "id": "pearl-scale-drift",
+    "name": "Pearl Scale Drift",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pearl-scale-drift",
+    "updatedAt": "2026-11-11T00:44:37.407Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#5fb8a6",
+        "background": "#0a1218",
+        "buttonBackground": "#170f10",
+        "buttonHover": "#482327",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#0a1218"
+      },
+      "shell": {
+        "accent": "#3f9a8a",
+        "accentHover": "#5fb8a6",
+        "background": "#05090c",
+        "backgroundSecondary": "#0a1218",
+        "border": "#1c2c36",
+        "buttonBackground": "#170f10",
+        "paneDivider": {
+          "color": "#3f9a8a",
+          "thickness": 2.0
+        },
+        "textDim": "#8fa3b0",
+        "textMain": "#e2ecf2"
+      },
+      "statusBar": {
+        "background": "#0a1218",
+        "border": "#1c2c36",
+        "text": "#8fa3b0",
+        "warning": "#c9c08a"
+      },
+      "tabs": {
+        "activeBackground": "#05090c",
+        "activeBorder": "#3f9a8a",
+        "background": "#0a1218",
+        "idleBackground": "#0a1218"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#0a1420",
+        "blue": "#4a6a8a",
+        "brightBlack": "#4d6470",
+        "brightBlue": "#6f8fb0",
+        "brightCyan": "#6cc2c4",
+        "brightGreen": "#7cc4aa",
+        "brightMagenta": "#a598c6",
+        "brightRed": "#d88e9a",
+        "brightWhite": "#d9e4ea",
+        "brightYellow": "#e2dba8",
+        "cyan": "#3f9aa0",
+        "green": "#4fa08a",
+        "magenta": "#7e72a0",
+        "red": "#b86a78",
+        "white": "#aebfcc",
+        "yellow": "#c9c08a"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 400,
+      "foreground": "#d4e2ea",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a1420",
+        "#4a6a8a",
+        "#2f7a6e",
+        "#d9e4ea"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.3
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

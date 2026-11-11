@@ -262,6 +262,8 @@ impl ButtonsApp {
                 changed |= self.strength_override_row(ui);
                 ui.separator();
                 changed |= self.shuffle_menu(ui);
+                ui.separator();
+                changed |= self.idle_glow_menu(ui);
             })
             .response
             .on_hover_text(

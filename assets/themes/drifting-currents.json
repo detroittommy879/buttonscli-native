@@ -1,0 +1,223 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#2fd6c0",
+        "#8a6cf0",
+        "#ff8fb1",
+        "#0b1d2e",
+        "#ffd27a"
+      ],
+      "custom": {
+        "expression": "let phase = t * drift_speed;\nlet wash = mix(c4 * 0.8, c2 * 0.15, smoothstep(-0.5, 0.5, p.y));\nvar col = vec3<f32>(0.0);\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let depth = 1.0 + k * 0.6;\n    let q = p * depth + vec2<f32>(phase / depth + k * 0.37, k * 0.21);\n    let cx = floor(q.x * wave_freq);\n    let wq = (cx + 0.5) / wave_freq;\n    let wl = 0.12 * sin(q.x * wave_freq * 0.8 + t * 0.7 + k * 2.1) + 0.05 * sin(q.x * wave_freq * 2.1 - t * 0.5);\n    let wc = 0.12 * sin(wq * wave_freq * 0.8 + t * 0.7 + k * 2.1) + 0.05 * sin(wq * wave_freq * 2.1 - t * 0.5);\n    let line = smoothstep(0.035, 0.0, abs(q.y - wl));\n    let gate = step(0.45, hash(vec2<f32>(cx, k)));\n    let pt = smoothstep(0.04, 0.012, length(q - vec2<f32>(wq, wc + 0.2))) * gate;\n    let ac = vec2<f32>(fract(phase * 0.25 + k * 0.33) * 2.4 - 1.2, 0.3 * sin(t * 0.5 + k * 2.0));\n    let s = alien_size / depth;\n    let alien = smin(sd_circle(p - ac, s), sd_circle(p - ac - vec2<f32>(0.0, s * 0.9), s * 0.5), s * 0.5);\n    let sp = vec2<f32>(0.7 * cos(phase * 0.6 + k * 2.0), 0.25 * sin(phase * 0.9 + k));\n    let r = rotate(p - sp, t * 0.4 * (k + 1.0));\n    let sym = smoothstep(0.006, -0.006, sd_box(r, vec2<f32>(0.02, 0.004)));\n    let lc = mix(c2, c3, k * 0.5);\n    let ec = mix(c5, c1, k * 0.5);\n    col += lc * (line * 0.7 + pt) / depth;\n    col += ec * (smoothstep(0.005, -0.005, alien) + halo(alien, s) * 0.4) / depth;\n    col += c1 * sym * 0.6 / depth;\n}\nreturn mix(bg, tonemap(wash + col), strength);",
+        "name": "Drifting Currents",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "drift_speed",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 10.0,
+            "min": 3.0,
+            "name": "wave_freq",
+            "value": 6.0
+          },
+          {
+            "max": 0.10000000149011612,
+            "min": 0.019999999552965164,
+            "name": "alien_size",
+            "value": 0.05000000074505806
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 2.700000047683716,
+      "speed": 2.0,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 11.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 64.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-11T21:52:41.180Z",
+    "description": "Dark teal and violet currents with drifting amber accents, calm and organic.",
+    "id": "drifting-currents",
+    "name": "Drifting Currents",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:drifting-currents",
+    "updatedAt": "2026-11-11T16:44:04.955Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": true,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#4fb9a6",
+        "background": "#0d1420",
+        "buttonBackground": "#000000",
+        "buttonHover": "#c2aeae",
+        "buttonText": "#cccccc"
+      },
+      "settings": {
+        "background": "#0d1420"
+      },
+      "shell": {
+        "accent": "#7fe7d0",
+        "accentHover": "#4fb9a6",
+        "background": "#07090f",
+        "backgroundSecondary": "#0d1420",
+        "border": "#1c2a3a",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#7fe7d0",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#7d8ea3",
+        "textMain": "#d8e4f0"
+      },
+      "statusBar": {
+        "background": "#0d1420",
+        "border": "#1c2a3a",
+        "text": "#7d8ea3",
+        "warning": "#ffd27a"
+      },
+      "tabs": {
+        "activeBackground": "#07090f",
+        "activeBorder": "#7fe7d0",
+        "background": "#0d1420",
+        "idleBackground": "#0d1420"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a2030",
+        "blue": "#6aa8ff",
+        "brightBlack": "#4b5870",
+        "brightBlue": "#9cc8ff",
+        "brightCyan": "#9ff3ff",
+        "brightGreen": "#9ff5cf",
+        "brightMagenta": "#dcb4ff",
+        "brightRed": "#ff9bb2",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe6a6",
+        "cyan": "#5fe3f0",
+        "green": "#6ee7b7",
+        "magenta": "#c58bff",
+        "red": "#ff6b8a",
+        "white": "#d9e6f2",
+        "yellow": "#ffd27a"
+      },
+      "background": "#03050b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 400,
+      "foreground": "#d9e6f2",
+      "gradientAngle": 45.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0b1d2e",
+        "#2fd6c0",
+        "#8a6cf0",
+        "#ff8fb1"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.3
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -56,6 +56,8 @@ colors fading into the next theme's:
   blend; a different shader fades out and the new one fades in.
 - **A different theme in each pane** gives every pane its own pick. Panes
   keep their last pick when Shuffle stops.
+- **Shaders only** changes just the shared shader and keeps your colors.
+  Panes with a theme of their own keep their own shader.
 - **Fonts too** also takes each theme's fonts. Off by default: a font change
   resizes the terminals. Panes you zoomed keep their size.
 

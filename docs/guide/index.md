@@ -14,6 +14,8 @@ The shaders can be written for you by AI.
      and shader, command dock visible. Use a built-in bundle, not a real host. | alt: Four terminals in a grid, each with its own animated shader background from a built-in bundle, under the tab bar and command dock -->
 ![Four terminals in a grid, each with its own animated shader background from a built-in bundle, under the tab bar and command dock](images/hero.jpg)
 
+*Some looks here are saved with a higher Strength than the default (0.35), so their motion shows in the picture.* Strength fades a shader toward the background color, which keeps text readable. Nothing is stuck at this level: lower it any time.
+
 ## Start here
 
 | If you want to… | Read |

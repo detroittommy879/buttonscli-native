@@ -78,6 +78,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `power::debug_tools_available()`: debug builds, or `"debug": true` /
   `"enable_all": true` in `~/.buttonscli-native/feature-flags.json`. Put new
   diagnostics and test toggles there instead of inventing another gate.
+  Settings → Gallery (`src/app/gallery.rs`, same gate) pages shaders/themes
+  four at a time; picks go to `<profile>/gallery-picks.json` (`pick_entry`:
+  WGSL, program, knobs, c1–c5, background) for a future web showcase.
 
 ## Pane and input rules
 
@@ -178,8 +181,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   after the frame. `animation_match_display` is read-only migration.
   FPS is never part of a theme: keep it out of `NATIVE_APPEARANCE_FIELDS`
   (theme copies used to reset it on apply). Use
-  `effective_animation_fps()` for repaint pacing: it lowers FPS in the background
-  or minimized (`power_saving`); output repaints are capped via
+  `effective_animation_fps()` for repaint pacing: it lowers FPS only while
+  minimized (`power_saving`; an unfocused visible window keeps full rate, egui
+  0.31 has no occlusion flag); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar
   shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
   Changing another pane's theme must call `settle_pane_draft` (autosave), never a
@@ -196,6 +200,12 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - Isolated app runs (USERPROFILE scratch): the first run shows a language/look
   dialog, and its look sets `preferences.pane_looks`, which override
   `theme_id`. Stop only the PID you started; never stop every `buttonscli`.
+
+- App icon: `packaging/icon.png` (1024, Linux/macOS packages), `icon.ico`
+  (embedded in the Windows exe by `build.rs` via `winresource`, with the
+  build version) and `icon-256.png` (`buttonscli::app_icon()`, every native
+  viewport; detached viewports don't inherit it). Source art is in
+  `.private/icons/` (gitignored): never `include_bytes!` from there.
 
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.

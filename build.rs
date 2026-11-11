@@ -28,15 +28,46 @@ fn main() {
     let output = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bundled_themes.rs");
     fs::write(output, generated).expect("write generated theme catalog");
 
-    build_version();
+    let version = build_version();
+    windows_resources(&version);
 }
+
+/// Exe icon (Explorer, pinned taskbar buttons, shortcuts) and file version.
+/// The running window's icon is set separately (`buttonscli::app_icon`).
+#[cfg(windows)]
+fn windows_resources(version: &str) {
+    println!("cargo:rerun-if-changed=packaging/icon.ico");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    let mut resource = winresource::WindowsResource::new();
+    resource
+        .set_icon("packaging/icon.ico")
+        .set("ProductName", "ButtonsCLI")
+        .set("FileDescription", "ButtonsCLI")
+        .set("ProductVersion", version)
+        .set("FileVersion", version);
+    // The numeric version too, or Windows shows the Cargo.toml floor.
+    if let Some((major, minor, patch)) = parse_version(version) {
+        let number = (major << 48) | (minor << 32) | (patch << 16);
+        resource
+            .set_version_info(winresource::VersionInfo::FILEVERSION, number)
+            .set_version_info(winresource::VersionInfo::PRODUCTVERSION, number);
+    }
+    if let Err(error) = resource.compile() {
+        println!("cargo:warning=exe icon not embedded: {error}");
+    }
+}
+
+#[cfg(not(windows))]
+fn windows_resources(_version: &str) {}
 
 /// `BUTTONSCLI_BUILD_VERSION`. Release builds: the Cargo version, which the
 /// release workflow sets (`scripts/release-version.sh`) together with
 /// `BUTTONSCLI_RELEASE_BUILD=1`. Other builds: the newer of the Cargo version
 /// and the newest release tag behind this commit, plus `+<short commit>`
 /// (SemVer build metadata), so bug reports name the exact build.
-fn build_version() {
+fn build_version() -> String {
     println!("cargo:rerun-if-env-changed=BUTTONSCLI_RELEASE_BUILD");
     let mut version = env::var("CARGO_PKG_VERSION").unwrap();
     let release = env::var("BUTTONSCLI_RELEASE_BUILD").is_ok_and(|value| value == "1");
@@ -97,6 +128,7 @@ fn build_version() {
         None => version,
     };
     println!("cargo:rustc-env=BUTTONSCLI_BUILD_VERSION={full}");
+    full
 }
 
 /// `X.Y.Z` (ignoring any `-pre`/`+build` suffix) as numbers, for comparing.

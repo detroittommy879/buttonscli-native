@@ -192,6 +192,42 @@ pub(super) fn fade_theme(
     to
 }
 
+/// What a Shuffle change applies: the whole theme, or only its shader
+/// (effects) when "Shaders only" is on, so the colors stay as they are.
+fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeApplyScopes {
+    if shuffle.shader_only {
+        crate::settings::ThemeApplyScopes {
+            app: false,
+            terminal: false,
+            fonts: false,
+            gradient: false,
+            effects: true,
+        }
+    } else {
+        crate::settings::ThemeApplyScopes {
+            fonts: shuffle.fonts,
+            ..Default::default()
+        }
+    }
+}
+
+/// Takes the next id from a shuffled deck. Every id in `pool` comes once in
+/// random order before any repeats; a new deck starts with an id other than
+/// `avoid` when there is a choice.
+fn deck_next(queue: &mut Vec<String>, pool: Vec<String>, avoid: &str) -> Option<String> {
+    queue.retain(|id| pool.contains(id));
+    if queue.is_empty() {
+        *queue = pool;
+        fastrand::shuffle(queue);
+    }
+    if queue.len() > 1 {
+        if let Some(index) = queue.iter().position(|id| id != avoid) {
+            return Some(queue.remove(index));
+        }
+    }
+    queue.pop()
+}
+
 /// Smooth start and end.
 fn ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
@@ -227,22 +263,17 @@ impl ButtonsApp {
     /// again; never the one on screen when there is a choice.
     fn next_shuffle_theme(&mut self, avoid: &str) -> Option<String> {
         let pool = self.shuffle_pool();
-        self.shuffle.queue.retain(|id| pool.contains(id));
-        if self.shuffle.queue.is_empty() {
-            self.shuffle.queue = pool;
-            fastrand::shuffle(&mut self.shuffle.queue);
-        }
-        if self.shuffle.queue.len() > 1 {
-            if let Some(index) = self.shuffle.queue.iter().position(|id| id != avoid) {
-                return Some(self.shuffle.queue.remove(index));
-            }
-        }
-        self.shuffle.queue.pop()
+        deck_next(&mut self.shuffle.queue, pool, avoid)
     }
 
     /// Changes to the next theme now, fading from what is on screen.
     pub(super) fn shuffle_now(&mut self, now: f64) {
-        let current = self.preferences.theme_id.clone();
+        // Shaders only changes just the effects source, so that is what is on screen.
+        let current = if self.preferences.shuffle.shader_only {
+            self.preferences.effects_theme_id.clone()
+        } else {
+            self.preferences.theme_id.clone()
+        };
         let Some(id) = self.next_shuffle_theme(&current) else {
             self.notice = Some(format!(
                 "Shuffle has no themes to use: {} is empty.",
@@ -267,18 +298,21 @@ impl ButtonsApp {
         // The whole-app path of the status bar's Random theme, with fonts
         // only when asked: a font change resizes every terminal.
         let theme = self.themes.get(&id).clone();
-        let scopes = std::mem::replace(
-            &mut self.preferences.theme_apply,
-            crate::settings::ThemeApplyScopes {
-                fonts: shuffle.fonts,
-                ..Default::default()
-            },
-        );
-        self.set_theme_all(&id);
+        let scopes = std::mem::replace(&mut self.preferences.theme_apply, shuffle_scopes(&shuffle));
         let calm = self.preferences.calm_mode;
-        self.apply_theme_sources(theme, calm);
+        if shuffle.shader_only {
+            // `set_theme_all` sets every source and clears pane themes, so
+            // only the effects source moves here; the shared theme stays.
+            let shared = self.preferences.theme_id.clone();
+            self.apply_theme_sources(theme, calm);
+            self.preferences.theme_id = shared;
+        } else {
+            self.set_theme_all(&id);
+            self.apply_theme_sources(theme, calm);
+        }
         self.preferences.theme_apply = scopes;
-        if shuffle.every_pane {
+        // Shaders only keeps every pane's colors, so per-pane themes are skipped.
+        if shuffle.every_pane && !shuffle.shader_only {
             for index in 0..self.tabs.len() {
                 if let Some(pick) = self.next_shuffle_theme(&id) {
                     self.set_theme_for_tab(index, &pick);
@@ -392,8 +426,13 @@ impl ButtonsApp {
             egui::Slider::new(&mut shuffle.fade_seconds, crate::settings::Shuffle::FADE)
                 .text("Fade seconds"),
         );
-        ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
-            .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
+        ui.spaced_checkbox(&mut shuffle.shader_only, "Shaders only")
+            .on_hover_text("Changes only the shared shader and keeps the current colors. Panes with a theme of their own keep their own shader. Pick the pool \"Themes with a shader\" to use only themes that have one.");
+        ui.add_enabled_ui(!shuffle.shader_only, |ui| {
+            ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
+        })
+        .inner
+        .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
         ui.spaced_checkbox(&mut shuffle.fonts, "Fonts too")
             .on_hover_text("Also use each theme's fonts. A font change resizes the terminals.");
         let count = self.shuffle_pool().len();
@@ -422,6 +461,52 @@ impl ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deck_goes_through_every_theme_before_any_repeat() {
+        let pool: Vec<String> = (0..6).map(|index| format!("theme-{index}")).collect();
+        let mut queue = Vec::new();
+        let mut avoid = String::new();
+        let mut picks = Vec::new();
+        for _ in 0..3 {
+            let mut round = Vec::new();
+            for _ in 0..pool.len() {
+                let id = deck_next(&mut queue, pool.clone(), &avoid).unwrap();
+                assert_ne!(id, avoid, "a new pick never repeats the one on screen");
+                avoid = id.clone();
+                round.push(id);
+            }
+            let mut distinct = round.clone();
+            distinct.sort();
+            distinct.dedup();
+            assert_eq!(
+                distinct.len(),
+                pool.len(),
+                "six picks from six are all different"
+            );
+            picks.extend(round);
+        }
+        assert_eq!(picks.len(), 18);
+    }
+
+    #[test]
+    fn deck_drops_themes_that_left_the_pool() {
+        let mut queue = vec!["gone".to_owned(), "keep".to_owned()];
+        let pick = deck_next(&mut queue, vec!["keep".to_owned()], "").unwrap();
+        assert_eq!(pick, "keep");
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn shader_only_shuffle_applies_just_the_effects() {
+        let mut shuffle = crate::settings::Shuffle::default();
+        let whole = shuffle_scopes(&shuffle);
+        assert!(whole.app && whole.terminal && whole.gradient && whole.effects);
+        shuffle.shader_only = true;
+        let shader = shuffle_scopes(&shuffle);
+        assert!(!shader.app && !shader.terminal && !shader.gradient && !shader.fonts);
+        assert!(shader.effects);
+    }
 
     fn theme_with(app: Color32, background: &str, strength: f32, code: &str) -> ThemeDefinition {
         let mut theme = ButtonsApp::empty(Preferences::default()).themes.all()[0].clone();
@@ -661,6 +746,44 @@ mod tests {
             serde_json::from_str(r#"{"strength_override":{"enabled":true,"strength":7}}"#).unwrap();
         saved.normalize_theme_sources();
         assert_eq!(saved.strength_override.strength, 1.0);
+    }
+
+    #[test]
+    fn shaders_only_shuffle_moves_just_the_effects_source() {
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        for _ in 0..2 {
+            app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        }
+        // Pane 2 has a theme of its own.
+        let own = app
+            .shuffle_pool()
+            .into_iter()
+            .find(|id| id != &app.preferences.theme_id)
+            .unwrap();
+        app.set_theme_for_tab(1, &own);
+        let overrides = app.theme_overrides.clone();
+        assert!(!overrides.is_empty());
+        app.preferences.shuffle.shader_only = true;
+        let sources = |app: &ButtonsApp| {
+            let p = &app.preferences;
+            (
+                p.theme_id.clone(),
+                p.app_theme_id.clone(),
+                p.terminal_theme_id.clone(),
+                p.gradient_theme_id.clone(),
+            )
+        };
+        let before = sources(&app);
+        let effects = app.preferences.effects_theme_id.clone();
+
+        app.shuffle_now(0.0);
+        assert_eq!(sources(&app), before, "colors and the shared theme stay");
+        assert_eq!(app.theme_overrides, overrides, "pane themes stay");
+        assert_ne!(
+            app.preferences.effects_theme_id, effects,
+            "the shader moved"
+        );
     }
 
     #[test]

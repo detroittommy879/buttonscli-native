@@ -1,0 +1,181 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff6b4a",
+        "#3fd0c9",
+        "#ffc857",
+        "#7b5cff",
+        "#e8f7a0"
+      ],
+      "custom": {
+        "expression": "let g1 = p * 4.0 + vec2<f32>(t * 0.08, t * 0.03);\nlet tile1 = floor(g1);\nlet s1 = hash(tile1);\nlet r1 = rotate(fract(g1) - 0.5, t * 0.35 + s1 * 6.2832);\nlet m1 = 0.5 + 0.5 * sin(t * 0.6 + s1 * 9.0);\nlet d1 = mix(sd_circle(r1 * vec2<f32>(1.5, 1.0), 0.13), sd_box(r1, vec2<f32>(0.11, 0.11)), m1);\nlet sh1 = stroke(d1, 0.012) * step(0.5, s1);\nlet g2 = p * 2.5 + vec2<f32>(t * 0.04, 0.0);\nlet tile2 = floor(g2);\nlet s2 = hash(tile2);\nlet r2 = rotate(fract(g2) - 0.5, t * 0.2 + s2 * 6.2832);\nlet corner = sd_segment(r2, vec2<f32>(0.0, -0.12), vec2<f32>(0.0, 0.12));\nlet arm = sd_segment(r2, vec2<f32>(0.0, -0.12), vec2<f32>(0.14, -0.12));\nlet ell = stroke(min(corner, arm), 0.01);\nlet dot2 = halo(sd_circle(r2 - vec2<f32>(-0.18, 0.12), 0.02), 0.05);\nlet far = (ell + dot2) * step(0.55, s2);\nlet wave = 0.2 * cos(p.x * 7.0 + t * 0.6) + 0.05 * sin(p.x * 15.0 - t);\nlet wline = stroke(p.y - wave, 0.008) * (1.0 - smoothstep(0.2, 0.9, abs(p.x)));\nlet base = bg + c4 * 0.12 * smoothstep(-0.5, 0.5, p.y);\nlet color = base + mix(c1, c2, s1) * sh1 * 0.9 + c4 * far * 0.7 + c3 * wline * 0.8;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "dancing sine wave symbols",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 1.2000000476837158,
+      "speed": 2.0,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T19:45:41.078Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "midnight-v6",
+    "name": "Midnight v6",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:midnight-v6",
+    "updatedAt": "2026-11-11T19:57:12.770Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -18,6 +18,8 @@ Open **Settings → Themes → Shaders**.
      Style section with Pattern picker, Colors row with c1–c5 swatches. | alt: Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row -->
 ![Settings, Themes, Shaders for Pane 1: the live preview, then Pattern, Strength, Scale, Speed and the Colors row](images/shaders-page.png)
 
+*Some looks here are saved with a higher Strength than the default (0.35), so their motion shows in the picture.* Strength fades a shader toward the background color, which keeps text readable. Nothing is stuck at this level: lower it any time.
+
 ## The page, top to bottom
 
 1. **Edit for** — which pane you are changing (only shown with 2+ panes).
@@ -109,6 +111,14 @@ switch panes, close Settings or quit.
 once, whatever each theme says; moving its slider turns it on. Nothing is
 saved into the themes, so unticking it puts each pane's own Strength back.
 While it is on, the pane Strength sliders are greyed out.
+
+**Idle glow** makes a quiet terminal stand out. Turn it on for one pane in
+its right-click menu. While the terminal prints, its shader sits at **Low**;
+after it has been quiet for a while, the shader ramps up to **High**, and new
+output brings it back down. Set Low, High, the quiet time and the ramp time
+under **◐ Look → Idle glow**. While it is on, that pane's Strength slider is
+greyed out, and **Override panes** wins over it. It is not kept when you
+restart the app.
 
 <!-- IMAGE: status-shader-menu.png — the ✦ Shader menu open: Strength,
      Background color, Use a shader list and the FPS limit. | alt: The status bar's Shader menu: Strength, Background color, Use a shader, Shader settings and the FPS limit -->
