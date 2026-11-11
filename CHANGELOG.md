@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Shuffle** goes through its whole list before any theme repeats, and a
+  new round starts when Shuffle is turned back on. Check the count under
+  "From" if it seems short: the list is only the themes you picked.
 - **Seed word for Random ideas**: a small box next to "Random ideas" takes an
   optional word or phrase. The shader model may take it as a loose spark, ignore
   it, flip it, or drift from it. Empty means no change.

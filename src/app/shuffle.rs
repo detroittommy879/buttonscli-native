@@ -192,6 +192,23 @@ pub(super) fn fade_theme(
     to
 }
 
+/// Takes the next id from a shuffled deck. Every id in `pool` comes once in
+/// random order before any repeats; a new deck starts with an id other than
+/// `avoid` when there is a choice.
+fn deck_next(queue: &mut Vec<String>, pool: Vec<String>, avoid: &str) -> Option<String> {
+    queue.retain(|id| pool.contains(id));
+    if queue.is_empty() {
+        *queue = pool;
+        fastrand::shuffle(queue);
+    }
+    if queue.len() > 1 {
+        if let Some(index) = queue.iter().position(|id| id != avoid) {
+            return Some(queue.remove(index));
+        }
+    }
+    queue.pop()
+}
+
 /// Smooth start and end.
 fn ease(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
@@ -227,17 +244,7 @@ impl ButtonsApp {
     /// again; never the one on screen when there is a choice.
     fn next_shuffle_theme(&mut self, avoid: &str) -> Option<String> {
         let pool = self.shuffle_pool();
-        self.shuffle.queue.retain(|id| pool.contains(id));
-        if self.shuffle.queue.is_empty() {
-            self.shuffle.queue = pool;
-            fastrand::shuffle(&mut self.shuffle.queue);
-        }
-        if self.shuffle.queue.len() > 1 {
-            if let Some(index) = self.shuffle.queue.iter().position(|id| id != avoid) {
-                return Some(self.shuffle.queue.remove(index));
-            }
-        }
-        self.shuffle.queue.pop()
+        deck_next(&mut self.shuffle.queue, pool, avoid)
     }
 
     /// Changes to the next theme now, fading from what is on screen.
@@ -327,7 +334,9 @@ impl ButtonsApp {
             self.apply_style(ctx);
         }
         if !self.preferences.shuffle.enabled {
+            // Turning Shuffle off ends the deck: the next run starts a fresh one.
             self.shuffle.next_at = None;
+            self.shuffle.queue.clear();
             return;
         }
         let interval = f64::from(self.preferences.shuffle.minutes) * 60.0;
@@ -422,6 +431,41 @@ impl ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deck_goes_through_every_theme_before_any_repeat() {
+        let pool: Vec<String> = (0..6).map(|index| format!("theme-{index}")).collect();
+        let mut queue = Vec::new();
+        let mut avoid = String::new();
+        let mut picks = Vec::new();
+        for _ in 0..3 {
+            let mut round = Vec::new();
+            for _ in 0..pool.len() {
+                let id = deck_next(&mut queue, pool.clone(), &avoid).unwrap();
+                assert_ne!(id, avoid, "a new pick never repeats the one on screen");
+                avoid = id.clone();
+                round.push(id);
+            }
+            let mut distinct = round.clone();
+            distinct.sort();
+            distinct.dedup();
+            assert_eq!(
+                distinct.len(),
+                pool.len(),
+                "six picks from six are all different"
+            );
+            picks.extend(round);
+        }
+        assert_eq!(picks.len(), 18);
+    }
+
+    #[test]
+    fn deck_drops_themes_that_left_the_pool() {
+        let mut queue = vec!["gone".to_owned(), "keep".to_owned()];
+        let pick = deck_next(&mut queue, vec!["keep".to_owned()], "").unwrap();
+        assert_eq!(pick, "keep");
+        assert!(queue.is_empty());
+    }
 
     fn theme_with(app: Color32, background: &str, strength: f32, code: &str) -> ThemeDefinition {
         let mut theme = ButtonsApp::empty(Preferences::default()).themes.all()[0].clone();
