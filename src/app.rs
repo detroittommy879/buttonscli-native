@@ -1953,6 +1953,10 @@ impl ButtonsApp {
     /// when frames arrive a little early or late (vsync, timers).
     #[cfg(not(target_arch = "wasm32"))]
     fn advance_motion_clock(&mut self, now: f64) {
+        if docs_capture::capturing() {
+            // Docs screenshots hold one shader frame so reruns match.
+            return;
+        }
         let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
         let Some(last) = self.motion_clock_at else {
             self.motion_clock_at = Some(now);
@@ -3450,6 +3454,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn terminal_workspace(&mut self, ui: &mut egui::Ui, context: &egui::Context) {
+        docs_capture::anchor(ui, "workspace", ui.max_rect());
         if self.tabs.is_empty() {
             ui.centered_and_justified(|ui| {
                 if ui
@@ -5396,7 +5401,7 @@ impl ButtonsApp {
                                 .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
-                            ui.spaced_menu_button("✦ Shader", |ui| {
+                            let shader_button = ui.spaced_menu_button("✦ Shader", |ui| {
                                 ui.set_max_width(340.0);
                                 if let Some((_, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
@@ -5404,9 +5409,11 @@ impl ButtonsApp {
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
+                                docs_capture::anchor(ui, "status-shader-menu", ui.min_rect());
                             })
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
+                            docs_capture::anchor(ui, "status-shader-button", shader_button.rect);
                         if let Some(action) = action { self.perform_global_theme_action(action); }
                         self.preferences.animation_fps = fps;
                         if fps_done {
@@ -5729,7 +5736,7 @@ impl ButtonsApp {
                 let settings_colors = self.colors();
                 if class == egui::ViewportClass::Embedded {
                     let mut window_open = true;
-                    egui::Window::new(title.clone())
+                    let window = egui::Window::new(title.clone())
                         .open(&mut window_open)
                         .default_size(layout.size)
                         .min_width(720.0)
@@ -5743,6 +5750,9 @@ impl ButtonsApp {
                         .show(child_ctx, |ui| {
                             self.settings_contents(ui, child_ctx, &mut close_action);
                         });
+                    if let Some(window) = window {
+                        docs_capture::anchor_at(child_ctx, "settings-window", window.response.rect);
+                    }
                     if close_action.is_some() {
                         window_open = false;
                     }
@@ -9012,7 +9022,7 @@ impl ButtonsApp {
             let mut pick_saved = None;
             wrapping_row(ui, |ui| {
                 ui.spaced_label("Pattern");
-                egui::ComboBox::from_id_salt("shader-preset")
+                let combo = egui::ComboBox::from_id_salt("shader-preset")
                     .selected_text(selected)
                     .show_ui(ui, |ui| {
                         if ui
@@ -9070,7 +9080,11 @@ impl ButtonsApp {
                                 }
                             }
                         }
+                        let shown = ui.min_rect().intersect(ui.clip_rect());
+                        docs_capture::anchor(ui, "shader-pattern-popup", shown);
                     });
+                docs_capture::anchor(ui, "shader-pattern", combo.response.rect);
+                docs_capture::anchor(ui, "shader-pattern-row", ui.min_rect());
             });
             let listed = |custom: &crate::theme::CustomShader| {
                 saved
@@ -9251,6 +9265,7 @@ impl ButtonsApp {
                 {
                     copy_theme = true;
                 }
+                docs_capture::anchor(ui, "shader-colors-row", ui.min_rect());
             });
             if edited.is_some() && follow_theme {
                 // Editing a theme color starts the shader's own palette from the theme's.
@@ -13254,6 +13269,7 @@ impl ButtonsApp {
                     focus = Some(index);
                 }
             }
+            docs_capture::anchor(ui, "edit-for-row", ui.min_rect());
         });
         if let Some(index) = focus {
             self.activate_tab(index);
@@ -13853,7 +13869,7 @@ impl ButtonsApp {
         } else {
             format!("Add {} preset", self.preset_editor_collection.label())
         };
-        egui::Window::new(title)
+        let window = egui::Window::new(title)
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -13908,6 +13924,9 @@ impl ButtonsApp {
                     }
                 });
             });
+        if let Some(window) = window {
+            docs_capture::anchor_at(ctx, "preset-editor", window.response.rect);
+        }
         if save && self.save_preset_draft() {
             open = false;
         }
@@ -14976,6 +14995,9 @@ const ANIMATION_TICK_SLACK: f64 = 0.002;
 /// (the panes use the motion clock, which steps the same way).
 #[cfg(not(target_arch = "wasm32"))]
 fn animation_clock(time: f64, fps: u32) -> f32 {
+    if docs_capture::capturing() {
+        return docs_capture::FROZEN_TIME as f32;
+    }
     let step = 1.0 / f64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
     ((time / step).floor() * step) as f32
 }
@@ -17168,6 +17190,7 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
+mod docs_capture;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;

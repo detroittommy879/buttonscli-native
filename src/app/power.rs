@@ -56,7 +56,9 @@ pub(super) fn power_budget(
 }
 
 pub(super) fn debug_tools_available() -> bool {
-    cfg!(debug_assertions) || crate::features::local::debug_enabled()
+    // Docs screenshots show what a release build shows.
+    (cfg!(debug_assertions) && !super::docs_capture::capturing())
+        || crate::features::local::debug_enabled()
 }
 
 impl ButtonsApp {
