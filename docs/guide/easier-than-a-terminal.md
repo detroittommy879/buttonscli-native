@@ -32,8 +32,8 @@ the keyboard. This page lists what it does today and what it does not do yet.
   color. See [Shader backgrounds](shaders.md).
 - **Moving focus without a mouse.** `F6` moves focus from the terminal to the
   app's own controls, and back. See [Getting started](getting-started.md).
-- **Help in plain words.** AI Help answers questions about the app. It needs
-  an AI provider you set up yourself; see [AI setup](ai-setup.md).
+- **A chat for help.** AI Help is a chat inside the app. It needs an AI
+  provider you set up yourself; see [AI setup](ai-setup.md).
 
 ## What it does not do yet
 
