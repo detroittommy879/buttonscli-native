@@ -192,6 +192,25 @@ pub(super) fn fade_theme(
     to
 }
 
+/// What a Shuffle change applies: the whole theme, or only its shader
+/// (effects) when "Shaders only" is on, so the colors stay as they are.
+fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeApplyScopes {
+    if shuffle.shader_only {
+        crate::settings::ThemeApplyScopes {
+            app: false,
+            terminal: false,
+            fonts: false,
+            gradient: false,
+            effects: true,
+        }
+    } else {
+        crate::settings::ThemeApplyScopes {
+            fonts: shuffle.fonts,
+            ..Default::default()
+        }
+    }
+}
+
 /// Takes the next id from a shuffled deck. Every id in `pool` comes once in
 /// random order before any repeats; a new deck starts with an id other than
 /// `avoid` when there is a choice.
@@ -274,18 +293,13 @@ impl ButtonsApp {
         // The whole-app path of the status bar's Random theme, with fonts
         // only when asked: a font change resizes every terminal.
         let theme = self.themes.get(&id).clone();
-        let scopes = std::mem::replace(
-            &mut self.preferences.theme_apply,
-            crate::settings::ThemeApplyScopes {
-                fonts: shuffle.fonts,
-                ..Default::default()
-            },
-        );
+        let scopes = std::mem::replace(&mut self.preferences.theme_apply, shuffle_scopes(&shuffle));
         self.set_theme_all(&id);
         let calm = self.preferences.calm_mode;
         self.apply_theme_sources(theme, calm);
         self.preferences.theme_apply = scopes;
-        if shuffle.every_pane {
+        // Shaders only keeps every pane's colors, so per-pane themes are skipped.
+        if shuffle.every_pane && !shuffle.shader_only {
             for index in 0..self.tabs.len() {
                 if let Some(pick) = self.next_shuffle_theme(&id) {
                     self.set_theme_for_tab(index, &pick);
@@ -334,9 +348,7 @@ impl ButtonsApp {
             self.apply_style(ctx);
         }
         if !self.preferences.shuffle.enabled {
-            // Turning Shuffle off ends the deck: the next run starts a fresh one.
             self.shuffle.next_at = None;
-            self.shuffle.queue.clear();
             return;
         }
         let interval = f64::from(self.preferences.shuffle.minutes) * 60.0;
@@ -401,8 +413,13 @@ impl ButtonsApp {
             egui::Slider::new(&mut shuffle.fade_seconds, crate::settings::Shuffle::FADE)
                 .text("Fade seconds"),
         );
-        ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
-            .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
+        ui.spaced_checkbox(&mut shuffle.shader_only, "Shaders only")
+            .on_hover_text("Changes only each theme's shader and keeps the current colors. Pick the pool \"Themes with a shader\" to use only themes that have one.");
+        ui.add_enabled_ui(!shuffle.shader_only, |ui| {
+            ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
+        })
+        .inner
+        .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
         ui.spaced_checkbox(&mut shuffle.fonts, "Fonts too")
             .on_hover_text("Also use each theme's fonts. A font change resizes the terminals.");
         let count = self.shuffle_pool().len();
@@ -465,6 +482,17 @@ mod tests {
         let pick = deck_next(&mut queue, vec!["keep".to_owned()], "").unwrap();
         assert_eq!(pick, "keep");
         assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn shader_only_shuffle_applies_just_the_effects() {
+        let mut shuffle = crate::settings::Shuffle::default();
+        let whole = shuffle_scopes(&shuffle);
+        assert!(whole.app && whole.terminal && whole.gradient && whole.effects);
+        shuffle.shader_only = true;
+        let shader = shuffle_scopes(&shuffle);
+        assert!(!shader.app && !shader.terminal && !shader.gradient && !shader.fonts);
+        assert!(shader.effects);
     }
 
     fn theme_with(app: Color32, background: &str, strength: f32, code: &str) -> ThemeDefinition {

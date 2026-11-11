@@ -592,6 +592,8 @@ pub(crate) struct Shuffle {
     pub(crate) every_pane: bool,
     /// Also take each theme's fonts (resizes the terminals).
     pub(crate) fonts: bool,
+    /// Change only the shader; the current colors stay.
+    pub(crate) shader_only: bool,
 }
 
 impl Shuffle {
@@ -620,6 +622,7 @@ impl Default for Shuffle {
             fade_seconds: 2.5,
             every_pane: false,
             fonts: false,
+            shader_only: false,
         }
     }
 }
