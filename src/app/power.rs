@@ -21,6 +21,8 @@ pub(super) struct PowerStatus {
     pub(super) minimized: bool,
     /// Frame start times in the last second, for the Debug readout.
     frames: VecDeque<f64>,
+    /// Animation ticks (frames where shaders moved) in the last second.
+    pub(super) ticks: VecDeque<f64>,
 }
 
 impl Default for PowerStatus {
@@ -29,6 +31,7 @@ impl Default for PowerStatus {
             focused: true,
             minimized: false,
             frames: VecDeque::new(),
+            ticks: VecDeque::new(),
         }
     }
 }
@@ -91,7 +94,7 @@ impl ButtonsApp {
     pub(super) fn power_budget(&self) -> (u32, u64) {
         power_budget(
             self.preferences.power_saving,
-            self.preferences.animation_fps_limit(),
+            self.preferences.animation_fps,
             self.power.focused,
             self.power.minimized,
         )
@@ -229,14 +232,18 @@ impl ButtonsApp {
                 ui.spaced_label(state);
                 ui.end_row();
                 ui.spaced_label("Animation FPS now");
+                ui.spaced_label(format!("{fps} (limit {})", self.preferences.animation_fps));
+                ui.end_row();
+                ui.spaced_label("Animation frames in the last second")
+                    .on_hover_text("How many times shaders and effects actually moved. With a shader animating it should be close to the FPS above; lower means the GPU or the window can't keep up.");
+                let now = ui.input(|input| input.time);
                 ui.spaced_label(
-                    if self.preferences.animation_fps_limit() >= crate::settings::MAX_ANIMATION_FPS
-                        && fps >= crate::settings::MAX_ANIMATION_FPS
-                    {
-                        "display refresh rate (no limit)".to_owned()
-                    } else {
-                        format!("{fps} (limit {})", self.preferences.animation_fps)
-                    },
+                    self.power
+                        .ticks
+                        .iter()
+                        .filter(|tick| now - **tick <= 1.0)
+                        .count()
+                        .to_string(),
                 );
                 ui.end_row();
                 ui.spaced_label("Output repaint");
@@ -246,7 +253,8 @@ impl ButtonsApp {
                     format!("at most every {output_ms} ms")
                 });
                 ui.end_row();
-                ui.spaced_label("Frames in the last second");
+                ui.spaced_label("Redraws in the last second")
+                    .on_hover_text("Every window redraw, for any reason (typing, output, the mouse, Settings), counted across all windows. Not the animation rate.");
                 ui.spaced_label(self.power.frames.len().to_string());
                 ui.end_row();
                 ui.spaced_label("Build");

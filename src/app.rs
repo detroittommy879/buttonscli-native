@@ -1932,15 +1932,43 @@ impl ButtonsApp {
         colors
     }
 
-    /// Adds the real time since the last frame, times `motion_speed`.
+    /// Moves the motion clock on by one animation tick when one is due.
+    /// Ticks follow real time at the FPS limit, so shaders change `fps`
+    /// times a second at any Motion speed; Motion only scales how far each
+    /// tick moves. Each tick moves exactly one step, so motion stays even
+    /// when frames arrive a little early or late (vsync, timers).
     #[cfg(not(target_arch = "wasm32"))]
     fn advance_motion_clock(&mut self, now: f64) {
-        if let Some(last) = self.motion_clock_at {
-            let elapsed = (now - last).clamp(0.0, 1.0);
-            self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
-            self.motion_time %= 3600.0 * 24.0;
+        let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
+        let Some(last) = self.motion_clock_at else {
+            self.motion_clock_at = Some(now);
+            return;
+        };
+        if now < last + step - ANIMATION_TICK_SLACK.min(step * 0.5) {
+            return;
         }
-        self.motion_clock_at = Some(now);
+        // Behind by more than a step (idle, a slow frame): start again from now.
+        let tick = if now - (last + step) > step {
+            now
+        } else {
+            last + step
+        };
+        let elapsed = (tick - last).clamp(0.0, 1.0);
+        self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
+        self.motion_time %= 3600.0 * 24.0;
+        self.motion_clock_at = Some(tick);
+        self.power.ticks.push_back(now);
+        while self.power.ticks.len() > 2 * crate::settings::MAX_ANIMATION_FPS as usize {
+            self.power.ticks.pop_front();
+        }
+    }
+
+    /// How long until the next animation tick is due, for repaint requests.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn animation_delay(&self, now: f64) -> std::time::Duration {
+        let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
+        let due = self.motion_clock_at.map_or(now, |last| last + step);
+        std::time::Duration::from_secs_f64((due - now).clamp(0.001, step))
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -3512,6 +3540,7 @@ impl ButtonsApp {
         let (shader_choices, saved_shader_count) = shader_choices(&self.preferences.saved_shaders);
         ui.allocate_rect(rect, egui::Sense::hover());
         let animation_fps = self.effective_animation_fps();
+        let animation_delay = self.animation_delay(ui.input(|input| input.time));
         let mut render_state = PaneRenderState {
             shader_choices: &shader_choices,
             saved_shader_count,
@@ -3543,6 +3572,7 @@ impl ButtonsApp {
             keyboard: &self.preferences.keyboard,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps,
+            animation_delay,
             motion: (self.motion_time, self.preferences.motion_speed),
             keyboard_navigation: self.keyboard_navigation,
         };
@@ -5324,10 +5354,7 @@ impl ButtonsApp {
                             .map(|tab| (tab.id, tab.title.clone(), self.terminal_presentation_for(tab.id)));
                         let (choices, saved_count) = shader_choices(&self.preferences.saved_shaders);
                         let mut shader_action = None;
-                        let mut fps = (
-                            self.preferences.animation_match_display.unwrap_or(true),
-                            self.preferences.animation_fps,
-                        );
+                        let mut fps = self.preferences.animation_fps;
                         let mut fps_done = false;
                         // Keep each control in the outer wrapping row.
                             ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
@@ -5344,13 +5371,12 @@ impl ButtonsApp {
                                     pane_shader_menu(ui, theme, &choices, saved_count, &mut shader_action);
                                 }
                                 ui.separator();
-                                fps_done = animation_fps_slider(ui, &mut fps.0, &mut fps.1);
+                                fps_done = animation_fps_slider(ui, &mut fps);
                             })
                             .response
                             .on_hover_text("Strength, background and shader of the focused pane, and the FPS limit for all panes.");
                         if let Some(action) = action { self.perform_global_theme_action(action); }
-                        self.preferences.animation_match_display = Some(fps.0);
-                        self.preferences.animation_fps = fps.1;
+                        self.preferences.animation_fps = fps;
                         if fps_done {
                             self.persist_native_preferences();
                         }
@@ -9133,9 +9159,7 @@ impl ButtonsApp {
                         .on_hover_text("Positive y is the top of the pane, as most shader code expects. Turn off if this shader looks upside down.");
                 }
             });
-            let mut matched = self.preferences.animation_match_display.unwrap_or(true);
-            if animation_fps_slider(ui, &mut matched, &mut self.preferences.animation_fps) {
-                self.preferences.animation_match_display = Some(matched);
+            if animation_fps_slider(ui, &mut self.preferences.animation_fps) {
                 self.persist_native_preferences();
             }
 
@@ -9796,10 +9820,8 @@ impl ButtonsApp {
         ) {
             ui.painter().add(egui::Shape::Callback(callback));
             if shader.animated && shader.speed > 0.0 {
-                ui.ctx()
-                    .request_repaint_after(std::time::Duration::from_millis(
-                        animation_interval_ms(self.effective_animation_fps()),
-                    ));
+                let now = ui.input(|input| input.time);
+                ui.ctx().request_repaint_after(self.animation_delay(now));
             }
         }
     }
@@ -13157,20 +13179,13 @@ impl ButtonsApp {
         use crate::i18n::{text, MessageKey as M};
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Workspace"));
         ui.spaced_label("Rendering updates when input or terminal output changes. Animated effects request their own frames.");
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let mut matched = self.preferences.animation_match_display.unwrap_or(true);
-            animation_fps_slider(ui, &mut matched, &mut self.preferences.animation_fps);
-            self.preferences.animation_match_display = Some(matched);
-        }
-        #[cfg(target_arch = "wasm32")]
         ui.add(
             egui::Slider::new(
                 &mut self.preferences.animation_fps,
                 1..=crate::settings::MAX_ANIMATION_FPS,
             )
             .logarithmic(true)
-            .text("Animation FPS limit (shaders and effects, all panes)"),
+            .text("Animation FPS (shaders and effects, all panes, any Motion speed)"),
         );
         ui.add(
             egui::Slider::new(
@@ -14788,52 +14803,32 @@ fn parse_terminal_swatch(value: &str) -> Color32 {
 #[cfg(not(target_arch = "wasm32"))]
 const SIMPLE_NOISE_HIDDEN: bool = true;
 
-/// The animation clock, stepped to the FPS limit. Typing, output and mouse
-/// moves redraw more often than the limit; a stepped clock keeps shaders and
-/// effects changing only `fps` times a second however often frames come.
-/// At `MAX_ANIMATION_FPS` (Match display) it is not stepped: frames come at
-/// the refresh rate, and stepping to another rate would make motion judder.
+/// How early a frame may come and still count as the next animation tick:
+/// timers and vsync wake a little early or late, and a fixed grid would then
+/// drop or double frames.
+#[cfg(not(target_arch = "wasm32"))]
+const ANIMATION_TICK_SLACK: f64 = 0.002;
+
+/// Real time stepped to the FPS limit, for previews outside the panes
+/// (the panes use the motion clock, which steps the same way).
 #[cfg(not(target_arch = "wasm32"))]
 fn animation_clock(time: f64, fps: u32) -> f32 {
-    if fps >= crate::settings::MAX_ANIMATION_FPS {
-        return time as f32;
-    }
-    let step = 1.0 / f64::from(fps.max(1));
+    let step = 1.0 / f64::from(fps.clamp(1, crate::settings::MAX_ANIMATION_FPS));
     ((time / step).floor() * step) as f32
 }
 
 /// The app-wide FPS limit slider. True once a change is finished (drag
 /// released or a click), so callers save it once rather than every frame.
 #[cfg(not(target_arch = "wasm32"))]
-fn animation_fps_slider(ui: &mut egui::Ui, match_display: &mut bool, fps: &mut u32) -> bool {
-    let mut done = false;
-    wrapping_row(ui, |ui| {
-        done |= ui
-            .spaced_checkbox(match_display, "Match display")
-            .on_hover_text("Shaders and effects change once per screen refresh (60, 75, 144 Hz…), the smoothest motion. Turn off to set a lower limit.")
-            .changed();
-        let response = ui
-            .add_enabled(
-                !*match_display,
-                egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
-                    .logarithmic(true)
-                    .text("FPS limit (all panes)"),
-            )
-            .on_hover_text("How often shaders and effects change, in every pane, while Match display is off. Lower it to save GPU, for example while recording.");
-        done |= response.drag_stopped() || (response.changed() && !response.dragged());
-    });
-    done
-}
-
-/// Milliseconds between animation frames at the FPS limit.
-#[cfg(not(target_arch = "wasm32"))]
-/// 0 at `MAX_ANIMATION_FPS` (Match display): repaint at once, and vsync
-/// paces frames to the display.
-fn animation_interval_ms(fps: u32) -> u64 {
-    if fps >= crate::settings::MAX_ANIMATION_FPS {
-        return 0;
-    }
-    1000_u64.div_ceil(u64::from(fps.max(1)))
+fn animation_fps_slider(ui: &mut egui::Ui, fps: &mut u32) -> bool {
+    let response = ui
+        .add(
+            egui::Slider::new(fps, 1..=crate::settings::MAX_ANIMATION_FPS)
+                .logarithmic(true)
+                .text("FPS (all panes)"),
+        )
+        .on_hover_text("How many times a second shaders and effects change, in every pane, at any Motion speed. Settings → Debug shows how many frames really came. Lower it to save GPU, for example while recording.");
+    response.drag_stopped() || (response.changed() && !response.dragged())
 }
 
 /// The terminal background, then c1–c5: c1–c3 as before (gradient, or accent,
@@ -14899,6 +14894,7 @@ struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    animation_delay: std::time::Duration,
     /// The motion clock and the global speed; speed 0 holds every frame.
     motion: (f64, f32),
     focused: bool,
@@ -14923,7 +14919,8 @@ fn terminal_surface(
     });
     let (motion_time, motion_speed) = interaction.motion;
     let moving = motion_speed > 0.0;
-    let time = animation_clock(motion_time, interaction.animation_fps);
+    // Already stepped: the motion clock only moves on animation ticks.
+    let time = motion_time as f32;
     let gradient = theme
         .effects
         .gradient
@@ -14998,10 +14995,7 @@ fn terminal_surface(
         && background_callback.is_some()
         && shader.is_some_and(|s| s.animated && s.speed > 0.0)
     {
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(animation_interval_ms(
-                interaction.animation_fps,
-            )));
+        ui.ctx().request_repaint_after(interaction.animation_delay);
     }
     let terminal = TerminalView::new(ui, &mut tab.backend)
         .set_focus(interaction.focused)
@@ -15234,8 +15228,8 @@ fn paint_terminal_effects(
     }
     if let Some(delay) = repaint_after_ms {
         ui.ctx()
-            .request_repaint_after(std::time::Duration::from_millis(
-                delay.max(animation_interval_ms(animation_fps)),
+            .request_repaint_after(std::time::Duration::from_millis(delay).max(
+                std::time::Duration::from_secs_f64(1.0 / f64::from(animation_fps.max(1))),
             ));
     }
 }
@@ -15386,6 +15380,8 @@ struct PaneRenderState<'a> {
     keyboard: &'a crate::settings::KeyboardPreferences,
     row_brightness: u8,
     animation_fps: u32,
+    /// Time until the next animation tick.
+    animation_delay: std::time::Duration,
     motion: (f64, f32),
     right_click_copies_selection: bool,
     advanced_effects: bool,
@@ -15446,6 +15442,7 @@ fn render_pane_tree(
                     keyboard: state.keyboard.clone(),
                     row_brightness: state.row_brightness,
                     animation_fps: state.animation_fps,
+                    animation_delay: state.animation_delay,
                     motion: state.motion,
                     focused: state.focused == *index
                         && !state.modal_open
@@ -22962,12 +22959,7 @@ Start-Sleep -Seconds 300
     fn animation_clock_steps_at_the_fps_limit() {
         assert!((animation_clock(1.26, 10) - 1.2).abs() < 1e-6);
         assert_eq!(animation_clock(1.26, 10), animation_clock(1.29, 10));
-        // Match display: the clock is not stepped, and frames come at once.
-        assert_eq!(animation_clock(1.26, 240), 1.26);
         assert_ne!(animation_clock(1.26, 120), animation_clock(1.29, 120));
-        assert_eq!(animation_interval_ms(240), 0);
-        assert_eq!(animation_interval_ms(120), 9);
-        assert_eq!(animation_interval_ms(0), 1000);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

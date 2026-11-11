@@ -19,10 +19,12 @@
   be too heavy for laptop graphics, a shader the graphics driver refuses is
   skipped with a message instead of closing the app, and a comment that
   mentions `strength` no longer switches off the Strength slider.
-- Shaders and effects now match the display's refresh rate (60, 75, 120,
-  144 Hz…) by default, so motion is smooth without skipped or doubled frames.
-  Untick **Match display** next to the FPS limit to set a lower cap; profiles
-  whose limit was lowered below 30 keep it.
+- Shaders and effects really run at the FPS setting (60 by default, one
+  setting for all panes). Before, a lower **Motion** also lowered the frame
+  rate (Motion 50% gave 30 frames a second), and each frame waited a full
+  interval after the last one finished, so the real rate stayed well below
+  the setting. Motion now only changes speed. Settings → Debug shows how many
+  animation frames really came in the last second.
 - Fixed: applying a saved theme no longer changes the FPS limit. Theme copies
   used to store the FPS they were saved at and put it back when applied.
 - Longer shaders compile: the size limit is four times higher, and a shader

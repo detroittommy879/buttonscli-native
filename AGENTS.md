@@ -162,9 +162,12 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `settled_presentation_for`); read colors through those, not
   `active_app_theme().colors`, or chrome jumps mid-fade.
 - Shader/effect time goes through `animation_clock` (stepped to the app-wide
-  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Match display
-  (`animation_match_display`, default) is `animation_fps_limit()` =
-  `MAX_ANIMATION_FPS`: an unstepped clock and repaint at once (vsync paces).
+  `animation_fps`, 1–240); repaint requests alone don't cap FPS. Panes use
+  the motion clock: `advance_motion_clock` ticks on real time (fixed steps,
+  `ANIMATION_TICK_SLACK`), Motion only scales each step; never step
+  `motion_time` itself (that made Motion lower the frame rate). Repaint with
+  `animation_delay(now)` (time to the next tick), not a fixed interval
+  after the frame. `animation_match_display` is read-only migration.
   FPS is never part of a theme: keep it out of `NATIVE_APPEARANCE_FIELDS`
   (theme copies used to reset it on apply). Use
   `effective_animation_fps()` for repaint pacing: it lowers FPS in the background

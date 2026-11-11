@@ -272,6 +272,38 @@ mod tests {
     }
 
     #[test]
+    fn animation_ticks_follow_real_time_at_any_motion_speed() {
+        // A 144 Hz display at the 60 FPS default, and a 60 Hz one whose
+        // frames come up to 1.5 ms early or late.
+        for (display_hz, jitter) in [(144.0, 0.0), (60.0, 0.0015)] {
+            for speed in [1.0_f32, 0.5, 0.1] {
+                let mut app = ButtonsApp::empty(Preferences::default());
+                assert_eq!(app.preferences.animation_fps, 60);
+                app.preferences.motion_speed = speed;
+                let mut times = Vec::new();
+                let frames = (display_hz * 2.0) as usize;
+                for frame in 0..=frames {
+                    let wobble = if frame % 2 == 0 { jitter } else { -jitter };
+                    app.advance_motion_clock(10.0 + frame as f64 / display_hz + wobble);
+                    if times.last() != Some(&app.motion_time) {
+                        times.push(app.motion_time);
+                    }
+                }
+                let per_second = (times.len() - 1) as f64 / 2.0;
+                assert!(
+                    (58.0..=61.0).contains(&per_second),
+                    "{display_hz} Hz, Motion {speed}: {per_second} ticks a second"
+                );
+                // Every tick moves the same distance: even motion.
+                let step = f64::from(speed) / 60.0;
+                for pair in times.windows(2) {
+                    assert!(((pair[1] - pair[0]) - step).abs() < 1e-6, "{display_hz} Hz");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn motion_speed_is_clamped_and_old_profiles_default_to_full_speed() {
         let mut prefs: Preferences = serde_json::from_str(r#"{"motion_speed": 9.0}"#).unwrap();
         prefs.normalize_theme_sources();

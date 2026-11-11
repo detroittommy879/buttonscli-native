@@ -57,12 +57,12 @@ Picking a preset sets your code aside; pick **Your code** to get it back.
 - **Animate** and **Speed** — untick Animate for a still picture.
 - **Y up** (custom code only) — on by default. Shader code usually treats "up"
   as up; turn it off if an older shader now looks upside down.
-- **Match display** and **FPS limit (all panes)** — how many times a second
-  shaders and effects change, for every pane at once. **Match display** (on
-  by default) draws once per screen refresh, whatever the monitor runs at
-  (60, 75, 144 Hz…), which is the smoothest. Untick it to set a limit of
-  1–240, for example to save GPU while recording with OBS. The limit is a
-  real cap: typing and mouse moves don't make shaders run faster.
+- **FPS (all panes)** — how many times a second shaders and effects change,
+  for every pane at once (1–240, default 60). **Motion** in the status bar
+  changes only their speed, never the frame rate. Lower FPS to save GPU, for
+  example while recording with OBS. It's a real cap: typing and mouse moves
+  don't make shaders run faster. Settings → Debug shows how many animation
+  frames really came in the last second.
 
 ### Colors: c1 to c5
 
@@ -126,8 +126,8 @@ your shader list or a [theme bundle](theme-bundles.md).
 
 ## Performance
 
-Shaders run on the GPU once per screen refresh (or at the FPS limit), and
-hidden panes don't draw. If your machine struggles, lower the number of animated panes, untick
+Shaders run on the GPU at the FPS setting (60 by default), and hidden panes
+don't draw. If your machine struggles, lower the number of animated panes, untick
 **Animate**, or use **Calm** in the Library.
 
 **Motion N%** in the status bar speeds up or slows down every pane's shader

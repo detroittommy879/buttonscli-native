@@ -25,14 +25,13 @@ Toggle **Y up** under Style. New and AI shaders expect it on; very old ones
 may need it off.
 
 **My GPU is busy (recording, games).**
-Untick **Match display** and lower **FPS limit (all panes)** under
-**✦ Shader** in the status bar, or on the Shaders tab. 15–30 is plenty for
-slow shaders.
+Lower **FPS (all panes)** under **✦ Shader** in the status bar, or on the
+Shaders tab. 15–30 is plenty for slow shaders.
 
 **Motion looks choppy.**
-Tick **Match display** next to the FPS limit: shaders then draw once per
-screen refresh. A limit that doesn't divide your refresh rate (60 on a 75 Hz
-or 144 Hz screen) repeats some frames.
+Settings → Debug → **Animation frames in the last second** shows the real
+rate. Close to the FPS setting: raise FPS. Much lower: the graphics card
+can't keep up; use fewer animated panes or lighter shaders.
 
 **It stopped moving.**
 Check **Animate**, Speed above 0, **Motion** in the status bar above 0%, and
