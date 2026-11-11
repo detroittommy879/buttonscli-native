@@ -58,6 +58,14 @@ keyboard focus.
 - Pasted text has control characters removed, so a paste can't run hidden
   commands. Line breaks and tabs are kept.
 
+## New versions
+
+When a newer ButtonsCLI release is out on GitHub, a green **⬆ vX.Y.Z
+available** link appears in the status bar next to SHELL READY. Clicking it
+opens the release page in your browser; nothing is downloaded or installed
+for you. The app asks GitHub once each time it starts. To stop that, untick
+**Check GitHub for a new release at startup** in Settings → Workspace.
+
 ## Settings while you work
 
 Open Settings detached (its own window) and you can keep typing in the

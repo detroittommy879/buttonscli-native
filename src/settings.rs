@@ -270,6 +270,8 @@ pub(crate) struct Preferences {
     /// Seconds a workspace message stays before fading; 0 keeps it until
     /// dismissed or replaced.
     pub(crate) notice_seconds: u32,
+    /// Look for a newer GitHub release at startup (a status bar link only).
+    pub(crate) check_for_updates: bool,
     /// Fewer frames while the window is in the background or minimized
     /// (Settings → Debug). On by default.
     pub(crate) power_saving: bool,
@@ -351,6 +353,7 @@ impl Default for Preferences {
             animation_fps: 60,
             animation_match_display: None,
             notice_seconds: 5,
+            check_for_updates: true,
             power_saving: true,
             shader_lab: ShaderLab::default(),
             shuffle: Shuffle::default(),

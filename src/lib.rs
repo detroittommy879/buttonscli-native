@@ -52,6 +52,8 @@ mod theme_files;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_generation;
 mod ui_text;
+#[cfg(not(target_arch = "wasm32"))]
+mod update_check;
 #[cfg(any(target_arch = "wasm32", test))]
 mod web_showcase;
 mod window_opacity;

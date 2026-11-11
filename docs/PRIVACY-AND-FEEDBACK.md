@@ -33,4 +33,11 @@ its production path is currently disabled. Account sign-in and AI provider
 requests are separate flows. Saved account sessions are revalidated at startup
 and periodically; provider requests begin only through their explicit controls.
 
+At startup the app asks GitHub's public API
+(`api.github.com`) which ButtonsCLI release is the latest, to show a link in
+the status bar when a newer one exists. The request carries no account,
+terminal or profile data; GitHub sees the usual connection data such as the
+IP address. Untick **Check GitHub for a new release at startup** in
+Settings → Workspace, or set `BUTTONSCLI_NO_UPDATE_CHECK=1`, to skip it.
+
 Feedback is a free feature.

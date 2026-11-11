@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- New version notice: at startup ButtonsCLI asks GitHub which release is the
+  latest, and when it is newer a green **⬆ vX.Y.Z available** link shows in
+  the status bar and opens the release page. Nothing is downloaded or
+  installed. Turn it off in Settings → Workspace.
 - **Shuffle** (status bar → ◐ Look): change the theme every few minutes from
   your favorites, your own themes, themes with a shader or all themes, with
   the colors fading into the next one and shaders fading out and in. It can

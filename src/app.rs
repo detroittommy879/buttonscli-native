@@ -549,6 +549,12 @@ pub struct ButtonsApp {
     /// Look → Shuffle: the timer, this round's themes and the fade.
     #[cfg(not(target_arch = "wasm32"))]
     shuffle: shuffle::ShuffleState,
+    /// The startup release check, until it answers.
+    #[cfg(not(target_arch = "wasm32"))]
+    update_rx: Option<Receiver<crate::update_check::Update>>,
+    /// A newer release, shown as a green status bar link.
+    #[cfg(not(target_arch = "wasm32"))]
+    update_available: Option<crate::update_check::Update>,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1423,6 +1429,10 @@ impl ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
+        if app.preferences.check_for_updates {
+            app.update_rx = crate::update_check::spawn(cc.egui_ctx.clone());
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(error) = storage_error {
             app.notice = Some(format!("Native settings could not load: {error}"));
         }
@@ -1636,6 +1646,10 @@ impl ButtonsApp {
             motion_clock_at: None,
             #[cfg(not(target_arch = "wasm32"))]
             shuffle: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            update_rx: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            update_available: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -5336,6 +5350,8 @@ impl ButtonsApp {
                     if let Some(last) = self.notice.as_ref().or(self.last_notice.as_ref()) {
                         status.on_hover_text(format!("Last message: {last}"));
                     }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    self.update_link(ui);
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -13322,6 +13338,21 @@ impl ButtonsApp {
             .text("Seconds before messages fade (0 = keep until dismissed)"),
         )
         .on_hover_text("Workspace messages such as \"Applied theme bundle\" float over the terminals, then fade. The last one stays on the status bar's SHELL READY hover.");
+        #[cfg(not(target_arch = "wasm32"))]
+        if ui
+            .spaced_checkbox(
+                &mut self.preferences.check_for_updates,
+                "Check GitHub for a new release at startup",
+            )
+            .on_hover_text("Asks GitHub once per start which ButtonsCLI release is the latest. Nothing is downloaded or installed: a newer one shows a green link in the status bar.")
+            .changed()
+        {
+            if !self.preferences.check_for_updates {
+                self.update_rx = None;
+                self.update_available = None;
+            }
+            self.persist_native_preferences();
+        }
         ui.push_id("settings-workspace", |ui| {
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
@@ -17149,6 +17180,8 @@ mod status_bar_tests;
 mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
+#[cfg(not(target_arch = "wasm32"))]
+mod updates;
 
 impl eframe::App for ButtonsApp {
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
