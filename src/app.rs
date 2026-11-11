@@ -9832,16 +9832,37 @@ impl ButtonsApp {
                     .as_str()
                     .unwrap_or_default()
                     .to_owned();
+                // The shader's name is the same value as the Style section's
+                // Name box; the shader is re-read from the draft each frame.
+                let has_shader = document["effects"]["shaderBackground"]["custom"].is_object();
+                let mut shader_name = document["effects"]["shaderBackground"]["custom"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned();
                 wrapping_row(ui, |ui| {
-                    ui.spaced_label("Name");
+                    ui.spaced_label("Theme name");
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut name)
                             .hint_text("theme name")
-                            .desired_width(220.0)
+                            .desired_width(200.0)
                             .char_limit(80),
                     );
-                    if response.changed() {
+                    // An empty name would save as nothing, so keep the last one.
+                    if response.changed() && !name.trim().is_empty() {
                         document["metadata"]["name"] = json!(name);
+                    }
+                    if has_shader {
+                        ui.spaced_label("Shader name");
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut shader_name)
+                                .hint_text("shader name")
+                                .desired_width(200.0)
+                                .char_limit(80),
+                        );
+                        if response.changed() {
+                            document["effects"]["shaderBackground"]["custom"]["name"] =
+                                json!(shader_name);
+                        }
                     }
                 });
             }
@@ -23043,6 +23064,37 @@ Start-Sleep -Seconds 300
         app.perform_pane_action(second, PaneAction::Theme(other.clone()), &ctx);
         assert_eq!(shader_of(&app, first).as_deref(), Some("E"));
         assert_eq!(app.theme_overrides[&second], other);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn a_typed_draft_name_is_the_name_autosave_keeps() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-draft-name-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
+        let pane = app.tabs[0].id;
+        app.sync_theme_editor_to_current();
+        app.theme_editor_pane = Some(pane);
+        let mut draft = app.theme_editor_document.clone().unwrap();
+        draft["metadata"]["name"] = json!("Typed Name Check");
+        app.theme_editor_document = Some(draft);
+        let saved = app.autosave_theme_draft().unwrap().unwrap();
+        assert_eq!(saved, "Typed Name Check");
         std::fs::remove_dir_all(base).unwrap();
     }
 
