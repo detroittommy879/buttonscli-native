@@ -113,7 +113,7 @@ example the cost and the limit). **Fix with AI** can repair them.
 
 ## Previous frame (experiment)
 
-With **Settings → Debug → Shader experiments → Feedback** on, code can call
+With **Shaders → Create with AI → Options → Feedback** on, code can call
 `prev(q)`: the color this shader drew at position `q` last frame, as a
 `vec3<f32>`. That makes trails, ripples, smears and slow build-up possible:
 
@@ -135,8 +135,7 @@ return max(new_color, prev(p) * 0.96);
 - `prev` costs 2. Each pane (and AI result card) that uses it keeps two
   extra frame-sized images on the GPU; all of them together are capped at
   about two 4K screens' worth (around 265 MB), oldest dropped first.
-- Settings → Debug is shown in debug builds, or with `"debug": true` in
-  `feature-flags.json` ([local feature flags](../dev/LOCAL-FEATURE-FLAGS.md)).
+- Feedback is available in every native build and stays off until you enable it.
   With the switch off, code that calls `prev` does not draw and its error says
   how to turn it on. Create with AI is told about `prev` only while it is on.
 

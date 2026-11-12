@@ -87,11 +87,7 @@ fn ai_help_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_agent_available() -> bool {
-    (crate::features::local::enabled()
-        || (cfg!(debug_assertions)
-            && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_AGENT").is_ok_and(|value| value == "1")))
-        && ai_help_available()
-        && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
+    ai_help_available() && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -562,6 +558,8 @@ pub struct ButtonsApp {
     /// A newer release, shown as a green status bar link.
     #[cfg(not(target_arch = "wasm32"))]
     update_available: Option<crate::update_check::Update>,
+    #[cfg(not(target_arch = "wasm32"))]
+    announcements: announcements::NoticeState,
     #[cfg(not(target_arch = "wasm32"))]
     import_preview: Option<ImportPreview>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1670,6 +1668,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             update_available: None,
             #[cfg(not(target_arch = "wasm32"))]
+            announcements: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             import_preview: None,
             #[cfg(not(target_arch = "wasm32"))]
             import_busy: false,
@@ -2216,6 +2216,7 @@ impl ButtonsApp {
             log::warn!("personal theme: {warning}");
         }
         self.preferences = preferences;
+        self.announcements = Default::default();
         self.refresh_locale();
         self.theme_overrides.clear();
         self.pending_pane_looks = None;
@@ -5399,6 +5400,8 @@ impl ButtonsApp {
                     }
                     #[cfg(not(target_arch = "wasm32"))]
                     self.update_link(ui);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    self.announcement_status(ui);
                     ui.separator();
                     ui.spaced_label(
                         RichText::new({
@@ -5649,9 +5652,14 @@ impl ButtonsApp {
     }
 
     fn restore_settings_snapshot(&mut self, snapshot: SettingsSnapshot) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let announcement_history = self.preferences.announcements.clone();
         self.preferences = snapshot.preferences;
         #[cfg(not(target_arch = "wasm32"))]
         {
+            self.preferences
+                .announcements
+                .retain_history_from(&announcement_history);
             self.theme_overrides = snapshot.theme_overrides;
             self.pane_fonts = snapshot.pane_fonts;
             self.appearance_baseline = snapshot.appearance_baseline;
@@ -6233,6 +6241,9 @@ impl ButtonsApp {
                     ));
                     looks::look_slider(ui, &mut first_run_look);
                     ui.spaced_small(crate::i18n::literal(&self.locale, first_run_look.description()));
+                    ui.separator();
+                    ui.checkbox(&mut self.preferences.announcements.enabled, "Receive signed developer notices");
+                    ui.add(egui::Label::new(RichText::new("Optional security notices and product news from the ButtonsCLI developer. Checks buttonscli.com at startup and every six hours; the host sees your IP. Promotions are off unless enabled in Settings → Workspace. No terminal content is sent.").small()).wrap());
                 }
                 ui.add_space(8.0);
                 confirmed = ui.spaced_button(crate::i18n::literal(&self.locale, "Continue")).clicked();
@@ -10160,7 +10171,7 @@ impl ButtonsApp {
         if !available {
             ui.spaced_label(crate::i18n::literal(
                 &locale,
-                "Pro feature. Theme generation remains locked until entitlement integration is available.",
+                "Theme generation is disabled by the current feature settings.",
             ));
         } else if self
             .preferences
@@ -10871,7 +10882,7 @@ impl ButtonsApp {
         if !theme_generation_available() {
             self.theme_generation_message = Some(crate::i18n::literal(
                 &self.locale,
-                "Theme generation is locked until Pro access is available.",
+                "Theme generation is disabled by the current feature settings.",
             ));
             return;
         }
@@ -13479,6 +13490,8 @@ impl ButtonsApp {
             self.persist_native_preferences();
         }
         ui.push_id("settings-workspace", |ui| {
+            #[cfg(not(target_arch = "wasm32"))]
+            self.announcement_settings(ui);
             ui.horizontal(|ui| {
                 let label = ui.spaced_label("Left panel name");
                 ui.add(egui::TextEdit::singleline(&mut self.preferences.dock_title).char_limit(60)).labelled_by(label.id);
@@ -17317,6 +17330,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod ai_help;
+#[cfg(not(target_arch = "wasm32"))]
+mod announcements;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
 mod gallery;
@@ -17387,6 +17402,8 @@ impl eframe::App for ButtonsApp {
         self.process_theme_generation_events();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_shader_ai_events();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.poll_announcements(ctx);
 
         #[cfg(not(target_arch = "wasm32"))]
         self.process_quick_secrets_events();
@@ -17510,6 +17527,8 @@ impl eframe::App for ButtonsApp {
         self.terminal_reader_window(ctx);
         self.about_window(ctx);
         self.localization_onboarding(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.announcement_popup(ctx);
         self.refresh_locale();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_simulated_terminals(ctx);
@@ -20280,6 +20299,72 @@ Start-Sleep -Seconds 300
         assert!(!round_trip.advanced_effects);
     }
 
+    #[test]
+    #[ignore = "run alone in release mode to verify access without process-global fixture flags"]
+    fn public_features_work_without_local_flags() {
+        let root = std::env::temp_dir().join(format!(
+            "buttonscli-public-access-{:032x}",
+            fastrand::u128(..)
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        crate::features::local::initialize(&root);
+        std::fs::remove_dir(&root).unwrap();
+        // Run alone with --release to also cover production gates without a flags file.
+        assert!(!crate::features::local::enabled());
+        assert!(ai_help_available());
+        assert!(ai_agent_available());
+        assert!(theme_generation_available());
+        assert!(shader_ai_available());
+        assert!(quick_secrets_available());
+        assert!(remote_control_available());
+        let mut app = ButtonsApp::empty(Preferences::default());
+        assert!(!app.shader_lab().feedback);
+        app.preferences.shader_lab.feedback = true;
+        assert!(
+            app.shader_lab().feedback,
+            "Feedback must work without debug tools"
+        );
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, options: bool| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 1000.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        if options {
+                            app.shader_options(ui);
+                        } else {
+                            app.settings_contents(ui, ctx, &mut None);
+                        }
+                    });
+                },
+            )
+        };
+        let options = render(&mut app, true);
+        assert!(text_position(
+            &options,
+            "Feedback: shader code may call `prev(p)` for the color it drew there last frame"
+        )
+        .is_some());
+        if !cfg!(debug_assertions) {
+            let settings = render(&mut app, false);
+            for label in ["Debug", "Gallery", "Release picks"] {
+                assert!(
+                    text_position(&settings, label).is_none(),
+                    "{label} is developer-only"
+                );
+            }
+            assert!(!power::debug_tools_available()); // Also gates Gallery.
+            assert!(!release_picks::available());
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     #[ignore = "uses test-owned ConPTY sessions and a Node loopback provider; run explicitly with one test thread"]
@@ -21982,11 +22067,12 @@ Start-Sleep -Seconds 300
             &ctx,
             eframe::wgpu::TextureFormat::Bgra8Unorm,
         );
+        // Full-page rendering: Create with AI is now visible without fixture flags.
         let output = ctx.run(
             egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(
                     egui::Pos2::ZERO,
-                    egui::vec2(1000.0, 900.0),
+                    egui::vec2(1000.0, 2600.0),
                 )),
                 ..Default::default()
             },

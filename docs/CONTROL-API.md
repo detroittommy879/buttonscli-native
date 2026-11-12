@@ -5,11 +5,9 @@ scripts and coding agents. It listens only on `127.0.0.1` and uses a random port
 and token for each app run. The API serves terminal state and actions from the
 native app's session dispatcher.
 
-The feature is `automationRemoteControl` (Pro). The
-[local JSON override](dev/LOCAL-FEATURE-FLAGS.md) enables it in both debug and release
-builds; ordinary release access remains locked. A debug build can also exercise
-it when launched with
-`BUTTONSCLI_NATIVE_DEV_REMOTE_CONTROL=1`.
+Local CLI/MCP control is free and available in debug and release builds without
+a feature flag or account grant. The service starts with the app; requests still
+require its per-instance token and use the existing terminal action checks.
 
 ## Copy the exact instance handoff
 

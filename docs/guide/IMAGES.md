@@ -42,10 +42,9 @@ alt text as a sentence for someone who can't see the picture.
 | `shaders-page.png` | shaders | Whole Shaders tab: preview, Style, Colors row |
 | `pattern-picker.png` | shaders | Pattern dropdown open with all five groups |
 | `colors-row.png` | shaders | Colors row: Theme's / This shader's and c1–c5 |
-| `create-with-ai.png` | ai-shaders | Create with AI with four finished versions and their flowcharts |
+| `create-with-ai.png` | ai-shaders, ai-themes | Create with AI: Theme + shader picked, a prompt, versions and Options |
 | `random-ideas.png` | ai-shaders | Ideas list with **Write one version per idea (4)** |
-| `generate-tab.png` | ai-themes | Generate tab mid-run with the progress line |
-| `chatgpt-signin.png` | ai-setup | AI providers with a connected ChatGPT plan |
+| `chatgpt-signin.png` | ai-setup | AI providers: the Add connection menu and a connected ChatGPT plan |
 | `status-shader-menu.png` | shaders | The status bar's ✦ Shader menu open |
 
 Short animated clips (GIF/WebM, a few seconds) would suit the hero, the shader
@@ -79,9 +78,13 @@ Automated now: `hero.jpg`, `window-tour.png`, `layouts.png`,
 `button-editor.png`, `theme-library.png`, `edit-for-row.png`,
 `theme-editor.png`, `bundle-applied.jpg`, `shaders-page.png`,
 `pattern-picker.png`, `colors-row.png` and `status-shader-menu.png`. The AI
-shots (`create-with-ai.png`, `random-ideas.png`, `generate-tab.png`,
-`chatgpt-signin.png`) still need a person; `cargo test` fails when a new
-marker is neither automated nor listed as manual.
+shots (`create-with-ai.png`, `random-ideas.png`, `chatgpt-signin.png`) are
+taken by hand: black out account names and keys before saving them.
+`random-ideas.png` is still missing. `cargo test` fails when a new marker is
+neither automated nor listed as manual.
+
+ai-setup also shows `chatgpt-choose-model.png` and `ai-models-main.png`, added
+as plain Markdown images without a marker.
 
 Translated runs show English for labels that have no translation in
 `src/i18n/` yet (Shaders, Library, Create with AI…).

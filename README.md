@@ -132,9 +132,10 @@ CLI/MCP helpers. See [building notes](docs/dev/BUILDING.md) for Linux packages a
 the separate browser demo. Distribution is currently from source: downloadable
 desktop releases, signing and automatic updates are still unfinished.
 
-To test gated features with your normal saved setup, use the
-[local JSON feature flag](docs/dev/LOCAL-FEATURE-FLAGS.md) and launch the executable
-directly. This enables AI Help and other implemented gates in release builds.
+All implemented features are free without a flag file. To show developer tools
+(Debug, Gallery and Release picks), use the
+[local JSON feature flag](docs/dev/LOCAL-FEATURE-FLAGS.md). Launch the executable
+directly to use your normal saved profile.
 
 **Open three PowerShell tabs and run a command in the first:**
 
@@ -175,10 +176,10 @@ test pass rates or reliability measurements. Updated October 28, 2026.
 | **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
 | **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are planned but not done; old feedback/runtime-config services are disabled. |
 
-AI Help, AI theme generation and CLI/MCP control require an explicit
-[local feature flag](docs/dev/LOCAL-FEATURE-FLAGS.md) for release testing. The core
-terminal workspace does not need these features enabled. Agent Mode is a
-separate unfinished prototype.
+AI Help, AI theme/shader generation, Quick Secrets, profiles and CLI/MCP control
+are free without local feature flags or account grants. AI uses your configured
+provider, with its own usage limits and costs. Agent Mode is an optional,
+unfinished preview; select it explicitly to allow terminal execution.
 
 ### Can an agent control it yet?
 

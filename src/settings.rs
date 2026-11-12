@@ -272,6 +272,8 @@ pub(crate) struct Preferences {
     pub(crate) notice_seconds: u32,
     /// Look for a newer GitHub release at startup (a status bar link only).
     pub(crate) check_for_updates: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) announcements: crate::announcements::Preferences,
     /// Fewer frames while the window is minimized (Settings → Debug). A
     /// visible window, even unfocused, keeps its full rate. On by default.
     pub(crate) power_saving: bool,
@@ -356,6 +358,8 @@ impl Default for Preferences {
             animation_match_display: None,
             notice_seconds: 5,
             check_for_updates: true,
+            #[cfg(not(target_arch = "wasm32"))]
+            announcements: Default::default(),
             power_saving: true,
             shader_lab: ShaderLab::default(),
             shuffle: Shuffle::default(),
@@ -692,7 +696,7 @@ pub(crate) enum JudgeMode {
 }
 
 /// Shader generation and shader rule options (Create with AI → Options).
-/// `feedback` is still an experiment and only applies with the debug tools.
+/// Feedback is opt-in and available without debug tools.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct ShaderLab {

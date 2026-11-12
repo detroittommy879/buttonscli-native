@@ -94,5 +94,7 @@ if you like. Set `RUST_LOG=buttonscli=debug` before starting the app for more
 detail.
 
 **A feature from these docs is missing in my build.**
-Some AI features need the local feature flag in release builds; see
-[Local feature flags](../dev/LOCAL-FEATURE-FLAGS.md).
+AI Help, Agent Mode, AI themes/shaders, Quick Secrets and CLI/MCP control are free
+without a flag file. Check that your build is current and an AI provider is set up.
+Only developer tools (Debug, Gallery and Release picks) need
+[local feature flags](../dev/LOCAL-FEATURE-FLAGS.md) in release builds.

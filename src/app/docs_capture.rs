@@ -292,10 +292,9 @@ pub(super) const SHOTS: &[Shot] = &[
 pub(super) const MANUAL: &[(&str, &str)] = &[
     (
         "create-with-ai.png",
-        "needs four finished AI versions and their flowcharts",
+        "needs a real AI provider for the prompt and options",
     ),
     ("random-ideas.png", "needs an AI-written ideas list"),
-    ("generate-tab.png", "needs a theme generation in progress"),
     ("chatgpt-signin.png", "needs a signed-in ChatGPT provider"),
 ];
 
@@ -420,7 +419,7 @@ mod setup {
                         .panes
                         .iter()
                         .take(panes)
-                        .all(|look| look.theme_id.as_deref().is_some_and(&shows))
+                        .all(|look| look.theme_id.as_deref().is_some_and(shows))
             })
             .nth(back)
             .unwrap_or_else(|| {

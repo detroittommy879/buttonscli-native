@@ -98,12 +98,9 @@ impl ButtonsApp {
         self.power_budget().0
     }
 
-    /// The shader options in effect. Feedback is still an experiment, so it
-    /// only applies while the debug tools are on.
+    /// The user's shader options, available in every native build.
     pub(super) fn shader_lab(&self) -> crate::settings::ShaderLab {
-        let mut lab = self.preferences.shader_lab.clone();
-        lab.feedback &= debug_tools_available();
-        lab
+        self.preferences.shader_lab.clone()
     }
 
     /// Hands the shader rules to the checker every shader goes through.
@@ -168,6 +165,12 @@ impl ButtonsApp {
                 format!("about {} fbm or {} flow calls", lab.cost_limit / 20, lab.cost_limit / 44)
             });
         });
+        ui
+            .spaced_checkbox(
+                &mut lab.feedback,
+                "Feedback: shader code may call `prev(p)` for the color it drew there last frame",
+            )
+            .on_hover_text("For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off.");
         if *lab != before {
             self.apply_shader_lab();
             self.persist_native_preferences();
@@ -183,19 +186,6 @@ impl ButtonsApp {
             .small()
             .color(self.colors().muted),
         );
-        ui.separator();
-        ui.spaced_heading("Shader experiments");
-        if ui
-            .spaced_checkbox(
-                &mut self.preferences.shader_lab.feedback,
-                "Feedback: shader code may call `prev(p)` for the color it drew there last frame",
-            )
-            .on_hover_text("For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off.")
-            .changed()
-        {
-            self.apply_shader_lab();
-            self.persist_native_preferences();
-        }
         ui.separator();
         if ui
             .spaced_checkbox(

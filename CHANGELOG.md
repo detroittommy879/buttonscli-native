@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Free features without a flag file**: Agent Mode, AI theme/shader generation,
+  Quick Secrets and local CLI/MCP control are available to everyone without a
+  ButtonsCLI account grant. AI still uses your own provider. Shader Feedback is
+  now an optional switch under Create with AI → Options. Debug, Gallery and
+  Release picks stay hidden in release builds unless enabled locally.
+
+- **Signed developer notices**: optional status-bar messages and closeable popups
+  for security notices and product news, authenticated with embedded Ed25519 keys.
+  Opt in during setup or Settings → Workspace; promotions have a separate switch.
+  Expiry, replay protection and content limits apply. No automatic installs.
 - **New app icon**: the rainbow "bu" made of buttons, on the window, the
   taskbar, Settings and AI Help windows, and the Windows exe (Explorer,
   pinned taskbar buttons, shortcuts). Linux and macOS packages use it too.

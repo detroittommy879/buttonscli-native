@@ -511,7 +511,7 @@ fn validate(source: &str, rules: Rules) -> Result<(), String> {
     // them plus the one generated function is rejected below.
     let code = source.strip_prefix(HEADER).unwrap_or(source);
     if !rules.feedback && uses_feedback(code) {
-        return Err("`prev()` (last frame's color) is an experiment: switch on Feedback in Settings → Debug to use it.".into());
+        return Err("`prev()` (last frame's color) is an experiment: switch on Feedback in Shaders → Create with AI → Options to use it.".into());
     }
     let helper_count = naga::front::wgsl::parse_str(HELPERS)
         .map(|module| module.functions.len())
@@ -832,7 +832,7 @@ mod tests {
             ..off
         };
         let error = function_with(&trail, off).unwrap_err();
-        assert!(error.contains("Settings → Debug"), "{error}");
+        assert!(error.contains("Create with AI → Options"), "{error}");
         let source = function_with(&trail, on).unwrap();
         let program = combine(&source, true);
         assert!(program.contains("var prev_frame: texture_2d<f32>"));

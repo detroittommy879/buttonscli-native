@@ -45,8 +45,8 @@ export default defineConfig({
 			title: 'ButtonsCLI',
 			description:
 				'A fast native terminal with command buttons, per-pane themes, GPU shader backgrounds and AI-made looks.',
-			logo: { src: './src/assets/logo.svg' },
-			favicon: '/favicon.svg',
+			logo: { src: './src/assets/logo.png' },
+			favicon: '/favicon.png',
 			social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
 			defaultLocale: 'root',
 			locales: {

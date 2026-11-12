@@ -69,6 +69,21 @@ for you. The app asks GitHub once each time it starts. To stop that, untick
 
 ## Settings while you work
 
+### Developer notices
+
+You can opt in to **Receive signed developer notices** during setup or in
+Settings → Workspace. These are short status-bar messages or closeable windows
+from the ButtonsCLI developer, for security notices and product news. Promotions
+and paid feature offers have a separate switch and start off disabled.
+
+Notices are checked at startup and every six hours while the app is open.
+Only messages signed with a trusted developer key are shown. You can dismiss each
+message, turn the channel off, or set `BUTTONSCLI_NO_ANNOUNCEMENTS=1`.
+Links open only when clicked; nothing is installed. The host at buttonscli.com
+sees your IP address, but receives no terminal content or profile identifiers.
+
+### Detached Settings
+
 Open Settings detached (its own window) and you can keep typing in the
 terminals. Changes preview live. **Revert and Close** undoes everything since
 you opened it.
