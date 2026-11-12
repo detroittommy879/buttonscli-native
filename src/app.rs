@@ -1136,7 +1136,7 @@ struct AiHelpWindowState {
     target: Option<(u64, String)>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum PresetCollection {
     Commands,
     Ssh,
@@ -2279,7 +2279,7 @@ impl ButtonsApp {
             crate::i18n::literal(&self.locale, "Profile:"),
             store.profile_name()
         );
-        let response = ui.spaced_menu_button(label, |ui| {
+        let response = ui.solo_menu_button("status-profile", label, |ui| {
             let profiles = self
                 .native_profiles
                 .get_or_insert_with(|| store.list_profiles());
@@ -4360,7 +4360,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         self.tab_group_menu(ui, ctx);
                         #[cfg(not(target_arch = "wasm32"))]
-                        self.theme_bundle_menu(ui, ctx, "Apply theme bundle");
+                        self.theme_bundle_menu(ui, ctx, "Apply theme bundle", false);
                         ui.separator();
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
@@ -4961,7 +4961,7 @@ impl ButtonsApp {
                             );
                         });
                         if self.preferences.show_action_buttons {
-                            ui.spaced_menu_button("⋮", |ui| {
+                            ui.solo_menu_button(("tab-actions", tab.id), "⋮", |ui| {
                                 tab_action_menu(
                                     ui,
                                     &self.locale,
@@ -4974,7 +4974,7 @@ impl ButtonsApp {
                         }
                     }
                     let options = self.shell_menu_options();
-                    ui.spaced_menu_button(RichText::new("+").color(colors.accent), |ui| {
+                    ui.solo_menu_button("new-tab", RichText::new("+").color(colors.accent), |ui| {
                         for (id, label, detail) in options {
                             if ui.spaced_button(label).on_hover_text(detail).clicked() {
                                 add = Some(id);
@@ -5439,14 +5439,14 @@ impl ButtonsApp {
                         let mut fps = self.preferences.animation_fps;
                         let mut fps_done = false;
                         // Keep each control in the outer wrapping row.
-                            ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
+                            ui.solo_menu_button("status-favorites", crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
                             if ui.spaced_button(crate::i18n::literal(&self.locale, "Random theme"))
                                 .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
-                            let shader_button = ui.spaced_menu_button("✦ Shader", |ui| {
+                            let shader_button = ui.solo_menu_button("status-shader", "✦ Shader", |ui| {
                                 ui.set_max_width(340.0);
                                 if let Some((id, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
@@ -5467,7 +5467,7 @@ impl ButtonsApp {
                         if let (Some(action), Some((id, _, _))) = (shader_action, &focused_pane) {
                             self.perform_pane_action(*id, action, ctx);
                         }
-                        self.theme_bundle_menu(ui, ctx, "◆ Bundles");
+                        self.theme_bundle_menu(ui, ctx, "◆ Bundles", true);
                         ui.separator();
                         self.profile_menu(ui, ctx);
                         ui.separator();
@@ -5734,8 +5734,18 @@ impl ButtonsApp {
     }
 
     fn settings_window(&mut self, ctx: &egui::Context) {
+        // Place the detached window once per opening. Passing the saved
+        // position/size every frame made egui re-send OuterPosition/InnerSize
+        // from last frame's rect, which fought the user's drag (worst across
+        // monitors with different scaling, where points differ per monitor).
+        let placed_id = egui::Id::new("buttonscli-settings-placed");
         if !self.show_settings {
+            ctx.data_mut(|data| data.remove::<bool>(placed_id));
             return;
+        }
+        let place = !ctx.data(|data| data.get_temp::<bool>(placed_id).unwrap_or(false));
+        if place {
+            ctx.data_mut(|data| data.insert_temp(placed_id, true));
         }
         if self.settings_snapshot.is_none() {
             #[cfg(not(target_arch = "wasm32"))]
@@ -5750,13 +5760,15 @@ impl ButtonsApp {
         let layout = self.preferences.settings_layout.clone();
         let mut builder = egui::ViewportBuilder::default()
             .with_title(title.clone())
-            .with_inner_size(layout.size)
             .with_min_inner_size([720.0, 520.0]);
+        if place {
+            builder = builder.with_inner_size(layout.size);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         {
             builder = builder.with_icon(crate::app_icon());
         }
-        if let Some(position) = layout.position {
+        if let Some(position) = layout.position.filter(|_| place) {
             builder = builder.with_position(position);
         }
         ctx.show_viewport_immediate(
@@ -13580,6 +13592,11 @@ impl ButtonsApp {
                 );
             }
             #[cfg(not(target_arch = "wasm32"))]
+            {
+                ui.add_space(8.0);
+                self.ui_scale_settings(ui);
+            }
+            #[cfg(not(target_arch = "wasm32"))]
             if window_transparency_available() {
                 ui.add_space(8.0);
                 if crate::window_opacity::is_supported() {
@@ -16860,7 +16877,7 @@ fn preset_button_menu(
 ) {
     response.context_menu(|ui| preset_action_menu(ui, locale, collection, index, action));
     if show_button {
-        ui.spaced_menu_button("⋮", |ui| {
+        ui.solo_menu_button(("preset-actions", collection, index), "⋮", |ui| {
             preset_action_menu(ui, locale, collection, index, action)
         });
     }
@@ -17356,6 +17373,8 @@ mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
 #[cfg(not(target_arch = "wasm32"))]
+mod ui_scale;
+#[cfg(not(target_arch = "wasm32"))]
 mod updates;
 
 impl eframe::App for ButtonsApp {
@@ -17382,6 +17401,8 @@ impl eframe::App for ButtonsApp {
         #[cfg(target_arch = "wasm32")]
         let _ = frame;
         self.refresh_locale();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.apply_ui_scale(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.apply_window_opacity(frame);
         #[cfg(not(target_arch = "wasm32"))]

@@ -58,6 +58,10 @@ impl TerminalFont {
             )
         });
 
-        Size::new(width, height)
+        // Cells are whole points. Rounding the row height down (17.9 -> 17)
+        // drew each line taller than its cell, so the next row's background
+        // covered part of it; how much depended on the font and display
+        // scale. Round up instead; widths keep Alacritty's floor.
+        Size::new(width, height.ceil())
     }
 }
