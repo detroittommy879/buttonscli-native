@@ -952,8 +952,9 @@ impl ButtonsApp {
                             continue;
                         }
                         if state.agent_mode && !ai_agent_available() {
-                            state.error =
-                                Some("Agent Mode is not available for this account.".into());
+                            state.error = Some(
+                                "Agent Mode is disabled by the current feature settings.".into(),
+                            );
                             continue;
                         }
                         if state.agent_mode

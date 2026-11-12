@@ -285,7 +285,8 @@ cargo build --locked --release --bin buttonscli
 - Shader options (`Preferences::shader_lab`, UI in `power.rs::shader_options`,
   shown under Create with AI → Options for everyone): judge mode (default
   FixOnly), picture check, loops (default on), work limit, `design_theme`.
-  Only `feedback` stays debug-gated (`shader_lab()` masks it; Settings → Debug).
+  Feedback is also an ordinary opt-in option there; `shader_lab()` must not mask
+  it behind debug tools. Debug/Gallery and Release picks remain developer-only.
   Rules reach the checker through the global `shader_expression::set_rules`;
   tests must call `function_with(custom, rules)` so parallel tests do not share
   it. The check cache key is `(source, loops, cost_limit, feedback)`: a new rule
@@ -310,7 +311,13 @@ cargo build --locked --release --bin buttonscli
 - AI shader generation: `src/shader_ai.rs`; workers/editor: `src/app.rs`.
   Shared admission checks: `src/plugins/effects/shader_expression.rs`; GPU calls:
   `shader_background.rs`. `scripts/theme-eval.py` evaluates palettes, not shaders.
-- Ordinary AI Help is active with your own provider; Agent Mode/control still have access gates.
+- All implemented catalog features are active/free without flags or account grants.
+  Agent Mode also checks `ai_agent_available()` separately: keep it available by
+  default. GuidedOnboarding and the absent legacy ShaderLab are planned placeholders.
+  Verify production defaults in isolation (app tests otherwise install global flags):
+  `cargo test --locked --release --lib public_features_work_without_local_flags --
+  --ignored --test-threads=1`.
+  Ordinary AI Help uses your own provider; Agent Mode is an explicit execution choice.
   Chat UI/routing: `src/app/ai_help.rs`; tests: `src/app/ai_help_tests.rs`.
   `selected_target` is for the next question; `target` pins existing suggestions. Never
   fall back to the focused tab for queued requests, previews or delivery. Preview workers

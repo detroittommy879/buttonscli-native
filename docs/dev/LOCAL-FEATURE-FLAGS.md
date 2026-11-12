@@ -1,6 +1,18 @@
-# Local feature access
+# Local developer tools
 
-For ordinary native-app testing, create `~/.buttonscli-native/feature-flags.json`:
+All implemented native features are free and available without a flag file or
+ButtonsCLI account: AI Help, Agent Mode, AI themes and shaders, Quick Secrets,
+profile management and local CLI/MCP control. AI needs your own provider or
+connection; its usage limits and costs still apply. Agent Mode is a preview and
+only runs when explicitly selected and started. CLI/MCP retains its loopback
+binding and per-instance token authentication.
+
+`~/.buttonscli-native/feature-flags.json` is only needed for developer tools.
+On Windows this is normally `%USERPROFILE%\.buttonscli-native\feature-flags.json`.
+The app reads it once at startup in debug and optimized builds. Restart after
+editing it. Missing, invalid or oversized files leave ordinary features available
+and do not enable developer tools. Invalid files produce a startup log warning;
+the size limit is 16 KiB.
 
 ```json
 {
@@ -8,48 +20,30 @@ For ordinary native-app testing, create `~/.buttonscli-native/feature-flags.json
 }
 ```
 
-On Windows this is normally `%USERPROFILE%\.buttonscli-native\feature-flags.json`.
-The app reads it once at startup in both debug and optimized release builds.
-Restart after editing it. Set `enable_all` to `false` or delete the file to
-restore ordinary access. Missing, invalid or oversized files do not grant access;
-invalid files produce a startup log warning. The size limit is 16 KiB.
+This existing override keeps **Settings → Debug**, **Gallery** and **Release
+picks** visible in optimized builds. Without it, all three stay hidden there.
+Debug builds show them automatically. Individual flags are also supported:
 
-`"debug": true` only adds Settings → Debug (power saving toggle, frame
-readout and **Shader experiments**) to an optimized build; debug builds
-always show it.
+- `"debug": true` shows Debug and Gallery (which shares the debug gate).
+- `"release_picks": true` shows Release picks, which copies chosen themes,
+  saved shaders and bundles into a source checkout's `assets/` for the next build.
 
-Shader experiments has one switch, **Feedback**: shader code may call
-`prev(q)` for last frame's color (see `docs/guide/shader-code.md`). It is
-saved in the profile (`shader_lab.feedback`) but only applies while the debug
-tools are on; otherwise the checker refuses `prev` with a message saying how
-to switch it on. The other shader switches (judge mode, picture check, loops,
-work limit) are ordinary options under Create with AI → Options and apply in
-every build.
+Release picks writes themes to `assets/themes/` and shaders/bundles to
+`assets/library/`. The file is only read from the native settings root, never
+from next to the executable. It applies to every native profile and does not
+modify the original Tauri app's settings.
 
-This explicit local flag overrides catalog rollout, account/Pro requirements,
-internal feature restrictions and runtime kill switches. AI theme generation,
-Quick Secrets, local CLI/MCP control and the existing unfinished
-Agent Mode prototype become available. It does not implement absent features
-such as Shader Lab or deploy disabled hosted services. Ordinary AI Help still
-is available without this flag and requires you to review and choose terminal actions; Agent Mode is a separate
-choice with terminal execution. No requests or agent runs start from this flag
-alone. CLI/MCP retains its loopback binding and instance-token authentication.
+Shader **Feedback** (`prev(q)`) is an optional switch under **Shaders → Create
+with AI → Options** in every native build. It stays off until enabled in the
+profile and does not require debug tools. Judge mode, picture check, loops and
+work limit are ordinary options there too. Debug only contains diagnostics and
+the power-saving test toggle.
 
-Build with `cargo build --release --locked --bin buttonscli`, then open
-`target/release/buttonscli.exe` directly on Windows. No launcher or environment
-variables are needed. It loads the normal native active profile, including
-saved buttons, fonts, themes and providers. The fake-provider PowerShell launcher
-intentionally uses a temporary profile and is only for isolated fixture tests.
-This file is independent of profile settings and applies to all native profiles.
+The local override still bypasses catalog rollout and runtime kill switches for
+development. It does not implement the missing legacy Shader Lab or deploy
+disabled hosted services. Ordinary access no longer needs this override.
 
-`"release_picks": true` (or `"enable_all": true`) shows **Settings → Release
-picks** in optimized builds (debug builds always show it). The file is only read
-from `~/.buttonscli-native/`, never from next to the executable. It copies chosen personal themes, saved shaders
-and theme bundles into a source checkout's `assets/` so the next build ships
-them: themes go to `assets/themes/`, shaders and bundles to `assets/library/`.
-The original Tauri app's settings are not modified. To bring original settings
-across, use **Settings → Import from original ButtonsCLI** and review its preview.
-
-Open **Settings → AI providers** to select your real provider and saved key,
-then **Help → AI Help** to chat. Provider setup and key handling are described in
-[AI Help](../AI-HELP.md). Provider settings display when the local override is active.
+Build with `cargo build --release --locked --bin buttonscli` and open
+`target/release/buttonscli.exe` directly on Windows. It loads your normal native
+active profile. Open **Settings → AI providers** to select your connection, then
+**Help → AI Help** to chat. See [AI Help](../AI-HELP.md).

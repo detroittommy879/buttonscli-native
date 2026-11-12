@@ -696,7 +696,7 @@ pub(crate) enum JudgeMode {
 }
 
 /// Shader generation and shader rule options (Create with AI → Options).
-/// `feedback` is still an experiment and only applies with the debug tools.
+/// Feedback is opt-in and available without debug tools.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct ShaderLab {

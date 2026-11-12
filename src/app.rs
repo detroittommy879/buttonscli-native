@@ -87,11 +87,7 @@ fn ai_help_available() -> bool {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn ai_agent_available() -> bool {
-    (crate::features::local::enabled()
-        || (cfg!(debug_assertions)
-            && std::env::var("BUTTONSCLI_NATIVE_DEV_AI_AGENT").is_ok_and(|value| value == "1")))
-        && ai_help_available()
-        && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
+    ai_help_available() && ai_feature_available(crate::features::catalog::FeatureKey::AiAgent)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -10175,7 +10171,7 @@ impl ButtonsApp {
         if !available {
             ui.spaced_label(crate::i18n::literal(
                 &locale,
-                "Pro feature. Theme generation remains locked until entitlement integration is available.",
+                "Theme generation is disabled by the current feature settings.",
             ));
         } else if self
             .preferences
@@ -10886,7 +10882,7 @@ impl ButtonsApp {
         if !theme_generation_available() {
             self.theme_generation_message = Some(crate::i18n::literal(
                 &self.locale,
-                "Theme generation is locked until Pro access is available.",
+                "Theme generation is disabled by the current feature settings.",
             ));
             return;
         }
@@ -20303,6 +20299,72 @@ Start-Sleep -Seconds 300
         assert!(!round_trip.advanced_effects);
     }
 
+    #[test]
+    #[ignore = "run alone in release mode to verify access without process-global fixture flags"]
+    fn public_features_work_without_local_flags() {
+        let root = std::env::temp_dir().join(format!(
+            "buttonscli-public-access-{:032x}",
+            fastrand::u128(..)
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        crate::features::local::initialize(&root);
+        std::fs::remove_dir(&root).unwrap();
+        // Run alone with --release to also cover production gates without a flags file.
+        assert!(!crate::features::local::enabled());
+        assert!(ai_help_available());
+        assert!(ai_agent_available());
+        assert!(theme_generation_available());
+        assert!(shader_ai_available());
+        assert!(quick_secrets_available());
+        assert!(remote_control_available());
+        let mut app = ButtonsApp::empty(Preferences::default());
+        assert!(!app.shader_lab().feedback);
+        app.preferences.shader_lab.feedback = true;
+        assert!(
+            app.shader_lab().feedback,
+            "Feedback must work without debug tools"
+        );
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let render = |app: &mut ButtonsApp, options: bool| {
+            ctx.run(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 1000.0),
+                    )),
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        if options {
+                            app.shader_options(ui);
+                        } else {
+                            app.settings_contents(ui, ctx, &mut None);
+                        }
+                    });
+                },
+            )
+        };
+        let options = render(&mut app, true);
+        assert!(text_position(
+            &options,
+            "Feedback: shader code may call `prev(p)` for the color it drew there last frame"
+        )
+        .is_some());
+        if !cfg!(debug_assertions) {
+            let settings = render(&mut app, false);
+            for label in ["Debug", "Gallery", "Release picks"] {
+                assert!(
+                    text_position(&settings, label).is_none(),
+                    "{label} is developer-only"
+                );
+            }
+            assert!(!power::debug_tools_available()); // Also gates Gallery.
+            assert!(!release_picks::available());
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     #[ignore = "uses test-owned ConPTY sessions and a Node loopback provider; run explicitly with one test thread"]
@@ -22005,11 +22067,12 @@ Start-Sleep -Seconds 300
             &ctx,
             eframe::wgpu::TextureFormat::Bgra8Unorm,
         );
+        // Full-page rendering: Create with AI is now visible without fixture flags.
         let output = ctx.run(
             egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(
                     egui::Pos2::ZERO,
-                    egui::vec2(1000.0, 900.0),
+                    egui::vec2(1000.0, 2600.0),
                 )),
                 ..Default::default()
             },

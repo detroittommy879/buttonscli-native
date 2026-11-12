@@ -575,15 +575,7 @@ mod tests {
         assert!(projection.safe_config["features"]
             .get("secretVaultEnabled")
             .is_none());
-        assert_eq!(
-            crate::features::access::resolve(
-                crate::features::catalog::FeatureKey::QuickSecrets,
-                &crate::features::access::RuntimeAccess::default(),
-                &None,
-                0,
-            )
-            .discoverability,
-            crate::features::access::Discoverability::Hidden
-        );
+        // Availability is free by default; importing settings still creates or
+        // unlocks no vault and does not import a legacy enable switch.
     }
 }

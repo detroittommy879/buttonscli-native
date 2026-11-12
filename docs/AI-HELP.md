@@ -1,9 +1,9 @@
 # AI provider settings
 
-Ordinary AI Help works with your configured provider in native debug and release
-builds, without a Pro grant or local feature override. Open the release executable
-directly to use your normal native active profile. Agent Mode remains a separately
-gated prototype; [local feature flags](dev/LOCAL-FEATURE-FLAGS.md) are for testing it.
+AI Help and Agent Mode are free with your configured provider in native debug
+and release builds, without an account grant or local feature override. Open the
+release executable directly to use your normal native active profile. Agent Mode
+is an optional preview; select it explicitly when you want terminal execution.
 
 For local testing on Windows, run `pwsh -NoProfile -File scripts/start-ai-help-test.ps1`.
 This builds and opens an isolated debug workspace with a loopback fake provider
@@ -90,12 +90,9 @@ and custom styling tags are not interpreted. **Send** explains why it is disable
 **Ctrl/Cmd+Enter** sends when ready. Ordinary chat works about simulated terminals;
 Agent Mode execution in simulations is not yet available.
 
-The draft migration branch preserves an unfinished Agent Mode prototype outside
-the core migration scope. The local `enable_all` JSON override makes it available
-in debug and release builds. Without that override, it requires both
-`BUTTONSCLI_NATIVE_DEV_AI_HELP=1` and `BUTTONSCLI_NATIVE_DEV_AI_AGENT=1` in a debug
-build. Its terminal execution is
-not part of ordinary AI Help, and its live provider/GUI acceptance is pending.
+Agent Mode is an unfinished preview available in every native build. Its terminal
+execution is separate from ordinary AI Help, and broader live provider/GUI
+acceptance is pending. Enabling access starts no requests or terminal actions.
 
 Agent Mode checks the current interpreter with an echo-only probe before sending
 task commands. This also works after entering SSH/WSL or another supported shell;
@@ -105,6 +102,6 @@ waits for a completion marker and a UI update before the next step. Unknown shel
 other input, cancellation or missing completion/update stop the task. A command
 already sent may still be running; inspect its terminal before trying again.
 
-Ordinary AI Help uses the active free `aiHelp` feature with your own provider. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. Agent Mode and other unfinished features retain their separate rollout gates. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
+Ordinary AI Help uses the active free `aiHelp` feature with your own provider. The old metrics-hosted rollout-config fetch and feedback sender are disabled pending a separate native service. Optional email-code sign-in uses the separate auth service in **Settings → Account**. The app checks server grants at sign-in, startup, and every five minutes. AI Help, Agent Mode, AI generation and local CLI/MCP control do not require server grants. Debug builds can also exercise AI Help with `BUTTONSCLI_NATIVE_DEV_AI_HELP=1`; that environment override alone has no effect in release builds.
 
 An isolated Windows debug-build GUI pass confirmed the separate AI Help window, local model discovery, streamed fake-provider response, review-first command display, and explicit **Insert + Enter** delivery to a test terminal. This is partial M4 evidence; a later 2026-09-30 Windows pass also exercised context preview/transmission, cancellation, retry and window close/reopen using a loopback provider. Native theme selection and stable streaming control placement were repaired. Target switching, broader focus/DPI checks and cross-platform acceptance remain open. No real provider was contacted. Linux and macOS are not certified.

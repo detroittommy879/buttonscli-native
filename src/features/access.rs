@@ -165,27 +165,39 @@ mod tests {
             assert!(decision.available, "{}", key.as_str());
             assert_eq!(decision.reason, AccessReason::LocalOverride);
         }
-        assert!(!resolve(FeatureKey::AiAgent, &RuntimeAccess::default(), &None, 100).available);
+        assert!(
+            resolve_feature(
+                FeatureKey::AiAgent.definition(),
+                &RuntimeAccess::default(),
+                &None,
+                100
+            )
+            .available
+        );
     }
 
     #[test]
-    fn free_and_internal_have_distinct_default_access() {
+    fn implemented_features_are_free_without_flags_accounts_or_grants() {
         let runtime = RuntimeAccess::default();
-        assert!(resolve(FeatureKey::PaneLayout, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::KeyboardShortcuts, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::TerminalSearch, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::WorkspaceControls, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::LocalizationSettings, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::ShellProfiles, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::PersonalThemeEditor, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::CustomFonts, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::CoolStuffInstallers, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::WindowTransparency, &runtime, &None, 100).available);
-        assert!(resolve(FeatureKey::AccountSignIn, &runtime, &None, 100).available);
-        assert_eq!(
-            resolve(FeatureKey::QuickSecrets, &runtime, &None, 100).discoverability,
-            Discoverability::Hidden
-        );
+        for key in FeatureKey::ALL {
+            let feature = key.definition();
+            let decision = resolve_feature(feature, &runtime, &None, 100);
+            if matches!(key, FeatureKey::GuidedOnboarding | FeatureKey::ShaderLab) {
+                assert_eq!(
+                    decision.reason,
+                    AccessReason::Unreleased,
+                    "{}",
+                    key.as_str()
+                );
+                assert_eq!(decision.discoverability, Discoverability::Hidden);
+            } else {
+                assert_eq!(feature.tier, FeatureTier::Free, "{}", key.as_str());
+                assert!(!feature.runtime_flag, "{}", key.as_str());
+                assert_eq!(decision.reason, AccessReason::Available, "{}", key.as_str());
+                assert_eq!(decision.discoverability, Discoverability::Visible);
+                assert!(decision.available);
+            }
+        }
     }
 
     #[test]
@@ -194,6 +206,12 @@ mod tests {
             pro_enabled: true,
             ..Default::default()
         };
+        let feature = FeatureDefinition {
+            tier: FeatureTier::Pro,
+            enabled: false,
+            rollout: Rollout::Planned,
+            ..FeatureKey::AiAgent.definition()
+        };
         let grant = Some(Entitlement {
             plan: Plan::Pro,
             source: GrantSource::OfflineCache,
@@ -201,19 +219,19 @@ mod tests {
             active_features: Vec::new(),
         });
         assert_eq!(
-            resolve(FeatureKey::AiAgent, &runtime, &grant, 100).reason,
+            resolve_feature(feature, &runtime, &grant, 100).reason,
             AccessReason::Unreleased
         );
         runtime.development_overrides.insert(FeatureKey::AiAgent);
         assert_eq!(
-            resolve(FeatureKey::AiAgent, &runtime, &None, 100).reason,
+            resolve_feature(feature, &runtime, &None, 100).reason,
             AccessReason::DevelopmentOverride
         );
         runtime.development_overrides.clear();
         runtime.killed.insert(FeatureKey::AiAgent);
         runtime.development_overrides.insert(FeatureKey::AiAgent);
         assert_eq!(
-            resolve(FeatureKey::AiAgent, &runtime, &grant, 100).reason,
+            resolve_feature(feature, &runtime, &grant, 100).reason,
             AccessReason::KillSwitch
         );
     }
@@ -225,6 +243,7 @@ mod tests {
             ..Default::default()
         };
         let feature = FeatureDefinition {
+            tier: FeatureTier::Pro,
             enabled: true,
             rollout: Rollout::Active,
             ..FeatureKey::AiAgent.definition()
@@ -259,6 +278,7 @@ mod tests {
             ..Default::default()
         };
         let feature = FeatureDefinition {
+            tier: FeatureTier::Pro,
             enabled: true,
             rollout: Rollout::Active,
             ..FeatureKey::AiAgent.definition()
