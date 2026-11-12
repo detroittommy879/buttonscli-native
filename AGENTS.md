@@ -239,6 +239,8 @@ cargo build --locked --release --bin buttonscli
   even with `truncate()`; use a nonwrapping label/picker row with the remaining width.
 - CI uses newer stable Rust than some local installs. Write explicit `f32` literals
   for `Stroke::new` widths; Rust 1.97 rejects float fallback under strict Clippy.
+  Pass Copy closures directly to generic helpers (`is_some_and(shows)`, without
+  `&shows`); newer Clippy rejects that needless borrow in screenshot helpers.
 - Explicit Windows probes: `cargo test --locked --lib <name> -- --ignored --test-threads=1`.
   Useful names: `tab_clicks_replace_focused_pane_and_keep_keyboard_input`,
   `three_panes_select_copy_scroll_and_route_keyboard_independently`,

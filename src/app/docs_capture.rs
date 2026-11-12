@@ -419,7 +419,7 @@ mod setup {
                         .panes
                         .iter()
                         .take(panes)
-                        .all(|look| look.theme_id.as_deref().is_some_and(&shows))
+                        .all(|look| look.theme_id.as_deref().is_some_and(shows))
             })
             .nth(back)
             .unwrap_or_else(|| {
