@@ -303,6 +303,7 @@ pub(crate) struct Preferences {
     /// whatever the themes say. Shaders are not affected. Never part of a
     /// theme, so applying one cannot turn these back on.
     pub(crate) classic_effects: bool,
+    pub(crate) text_backing: TextBacking,
     /// Mouse wheel speed in Settings and other app lists (1 = egui's own).
     pub(crate) ui_scroll_speed: f32,
     /// Terminal lines moved by one wheel step.
@@ -390,6 +391,7 @@ impl Default for Preferences {
             pane_hover_label: PaneHoverLabel::default(),
             calm_mode: false,
             classic_effects: true,
+            text_backing: TextBacking::default(),
             ui_scroll_speed: DEFAULT_UI_SCROLL_SPEED,
             terminal_scroll_lines: 3,
             dock_navigation: DockNavigation::default(),
@@ -759,6 +761,29 @@ impl Default for ShaderLab {
 pub(crate) const DEFAULT_UI_SCROLL_SPEED: f32 = 2.5;
 pub(crate) const MAX_UI_SCROLL_SPEED: f32 = 8.0;
 pub(crate) const MAX_TERMINAL_SCROLL_LINES: u8 = 20;
+
+/// Global readability controls; never imported from themes.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct TextBacking {
+    pub(crate) available: bool,
+    pub(crate) enabled: bool,
+    pub(crate) opacity: u8,
+    pub(crate) feather: u8,
+    pub(crate) whole_line: bool,
+}
+
+impl Default for TextBacking {
+    fn default() -> Self {
+        Self {
+            available: true,
+            enabled: false,
+            opacity: 75,
+            feather: 6,
+            whole_line: false,
+        }
+    }
+}
 
 /// Experimental: folder navigation buttons in the left panel.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

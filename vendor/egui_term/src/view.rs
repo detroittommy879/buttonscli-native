@@ -52,6 +52,7 @@ pub struct TerminalView<'a> {
     background_gradient: Option<BackgroundGradient>,
     background_callback: Option<egui::PaintCallback>,
     row_banding_color: Option<Color32>,
+    text_backing: Option<crate::TextBacking>,
     row_brightness: u8,
     ctrl_c_copies_selection: bool,
     copy_on_selection: bool,
@@ -134,6 +135,7 @@ impl<'a> TerminalView<'a> {
             background_gradient: None,
             background_callback: None,
             row_banding_color: None,
+            text_backing: None,
             row_brightness: 0,
             ctrl_c_copies_selection: true,
             copy_on_selection: false,
@@ -172,8 +174,17 @@ impl<'a> TerminalView<'a> {
         self
     }
 
-    /// Add a translucent tint to every second terminal row. The band pitch
-    /// comes from the measured terminal cell height, not a font-size guess.
+    /// Soften procedural backgrounds behind occupied text runs or rows.
+    #[inline]
+    pub fn set_text_backing(
+        mut self,
+        backing: Option<crate::TextBacking>,
+    ) -> Self {
+        self.text_backing = backing;
+        self
+    }
+
+    /// Add a translucent tint to every second terminal row at the measured cell pitch.
     #[inline]
     pub fn set_row_banding(mut self, color: Option<Color32>) -> Self {
         self.row_banding_color = color;
@@ -586,6 +597,47 @@ impl<'a> TerminalView<'a> {
                 global_bg,
                 self.row_brightness,
                 self.background_gradient,
+            ));
+        }
+
+        if let Some(backing) = self.text_backing {
+            let cells = content
+                .cells
+                .iter()
+                .filter(|c| {
+                    !c.flags.intersects(
+                        cell::Flags::HIDDEN | cell::Flags::WIDE_CHAR_SPACER,
+                    ) && c.c != ' '
+                        && c.c != '\t'
+                })
+                .map(|c| {
+                    let origin = layout_min
+                        + egui::vec2(
+                            cell_width * c.point.column.0 as f32,
+                            cell_height
+                                * (c.point.line.0
+                                    + content.display_offset as i32)
+                                    as f32,
+                        );
+                    Rect::from_min_size(
+                        origin,
+                        egui::vec2(
+                            cell_width
+                                * if c.flags.contains(cell::Flags::WIDE_CHAR) {
+                                    2.0
+                                } else {
+                                    1.0
+                                },
+                            cell_height,
+                        ),
+                    )
+                });
+            shapes.extend(crate::text_backing::shapes(
+                cells,
+                layout.rect,
+                cell_width,
+                global_bg,
+                backing,
             ));
         }
 
@@ -2034,6 +2086,14 @@ mod render_parity_tests {
     const SCREEN: Vec2 = Vec2::new(400.0, 160.0);
 
     fn render(bytes: &[u8], focused: bool) -> (Vec<Shape>, Vec2) {
+        render_backing(bytes, focused, None)
+    }
+
+    fn render_backing(
+        bytes: &[u8],
+        focused: bool,
+        backing: Option<crate::TextBacking>,
+    ) -> (Vec<Shape>, Vec2) {
         let ctx = egui::Context::default();
         let mut backend = TerminalBackend::new_virtual(1, Arc::new(|_| {}));
         let paint = |backend: &mut TerminalBackend| {
@@ -2047,7 +2107,8 @@ mod render_parity_tests {
                     |ui| {
                         let view = TerminalView::new(ui, backend)
                             .set_size(SCREEN)
-                            .set_focus(focused);
+                            .set_focus(focused)
+                            .set_text_backing(backing);
                         ui.add(view);
                     },
                 );
@@ -2067,6 +2128,39 @@ mod render_parity_tests {
                 .collect(),
             cell,
         )
+    }
+
+    #[test]
+    fn text_backing_respects_hidden_wide_text_and_foreground_order() {
+        let input = "\x1b[?25lA\x1b[8msecret\x1b[0m  界".as_bytes();
+        let (plain, _) = render(input, true);
+        let (backed, cell) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 0.8,
+                feather: 4.0,
+                whole_line: false,
+            }),
+        );
+        assert_eq!(texts(&plain), texts(&backed));
+        let index = backed
+            .iter()
+            .position(|s| matches!(s, Shape::Mesh(_)))
+            .unwrap();
+        assert!(backed[..index].iter().all(|s| !matches!(s, Shape::Text(_))));
+        let Shape::Mesh(mesh) = &backed[index] else {
+            unreachable!()
+        };
+        assert_eq!(
+            mesh.vertices.len(),
+            32,
+            "two runs; hidden text has no backing"
+        );
+        assert_eq!(
+            mesh.vertices[22].pos.x - mesh.vertices[21].pos.x,
+            cell.x * 2.0
+        );
     }
 
     fn texts(shapes: &[Shape]) -> Vec<(String, Pos2, Color32)> {

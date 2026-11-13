@@ -3690,6 +3690,7 @@ impl ButtonsApp {
             keyboard: &self.preferences.keyboard,
             scroll_lines: self.preferences.terminal_scroll_lines,
             row_brightness: self.preferences.row_banding_brightness,
+            text_backing: self.preferences.text_backing,
             animation_fps,
             animation_delay,
             motion: (self.motion_time, self.preferences.motion_speed),
@@ -5514,6 +5515,7 @@ impl ButtonsApp {
                         ui.separator();
                         self.profile_menu(ui, ctx);
                         ui.separator();
+                        self.text_backing_controls(ui);
                         ui.spaced_label("Row banding");
                         let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text("For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls.");
                         // Save when a drag ends or a typed value lands, like Motion.
@@ -15432,6 +15434,7 @@ struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
     scroll_lines: u8,
     row_brightness: u8,
+    text_backing: crate::settings::TextBacking,
     animation_fps: u32,
     animation_delay: std::time::Duration,
     /// The motion clock and the global speed; speed 0 holds every frame.
@@ -15560,6 +15563,17 @@ fn terminal_surface(
         } else {
             None
         })
+        .set_text_backing(
+            if interaction.text_backing.available && interaction.text_backing.enabled {
+                Some(egui_term::TextBacking {
+                    opacity: interaction.text_backing.opacity.min(100) as f32 / 100.0,
+                    feather: interaction.text_backing.feather.min(20) as f32,
+                    whole_line: interaction.text_backing.whole_line,
+                })
+            } else {
+                None
+            },
+        )
         .set_draw_bold_bright(draw_bold_bright)
         .set_size(egui::vec2(
             (available.x - scrollbar_width).max(1.0),
@@ -15920,6 +15934,7 @@ struct PaneRenderState<'a> {
     keyboard: &'a crate::settings::KeyboardPreferences,
     scroll_lines: u8,
     row_brightness: u8,
+    text_backing: crate::settings::TextBacking,
     animation_fps: u32,
     /// Time until the next animation tick.
     animation_delay: std::time::Duration,
@@ -15986,6 +16001,7 @@ fn render_pane_tree(
                     keyboard: state.keyboard.clone(),
                     scroll_lines: state.scroll_lines,
                     row_brightness: state.row_brightness,
+                    text_backing: state.text_backing,
                     animation_fps: state.animation_fps,
                     animation_delay: state.animation_delay,
                     motion: state.motion,
@@ -17605,6 +17621,8 @@ mod shuffle;
 mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
+#[cfg(not(target_arch = "wasm32"))]
+mod text_backing;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
 #[cfg(not(target_arch = "wasm32"))]

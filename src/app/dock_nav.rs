@@ -211,8 +211,14 @@ impl ButtonsApp {
     /// Settings → Experimental.
     pub(super) fn experimental_settings(&mut self, ui: &mut egui::Ui) {
         ui.spaced_heading("Experimental");
-        ui.spaced_label("Features still being tried out. Each one is off until you turn it on here, and may change or go away.");
+        ui.spaced_label("Features still being tried out. Enable or disable them here; they may change or go away.");
         ui.add_space(6.0);
+        if ui.spaced_checkbox(&mut self.preferences.text_backing.available, "Enable text backing controls")
+            .on_hover_text("Allows soft backing behind terminal text. Off removes the backing and hides its status-bar controls; your adjustments are kept.").changed() {
+            self.persist_native_preferences();
+        }
+        self.text_backing_controls(ui);
+        ui.separator();
         ui.spaced_label(RichText::new("Folder navigation in the left panel").strong());
         let navigation = &mut self.preferences.dock_navigation;
         let mut changed = ui

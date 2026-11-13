@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Optional text backing softens shader/gradient backgrounds behind text runs or whole
+  occupied lines. Status-bar controls adjust opacity and feathering; Settings →
+  Experimental can disable the feature entirely. Off by default.
+
 - The browser playground starts with a randomly selected featured bundle and
   softens shader and theme changes with a short fade.
 - **Standalone shader playground**: a static browser preview with terminal panes,

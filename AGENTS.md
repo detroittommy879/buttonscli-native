@@ -107,6 +107,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `pane_looks`; unused slots wait in `pending_pane_looks` for new tabs.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
+- Text backing: `src/app/text_backing.rs`, global `Preferences::text_backing`;
+  renderer `vendor/egui_term/src/text_backing.rs`. Paint once after background
+  callbacks, before all cell backgrounds/glyphs (per-cell feathering covers neighbors).
+  Keep it out of theme import scopes. Experimental `available` is the kill switch.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
   geometry use the outer rectangle. Let the widget handle cell/input coordinates.
 - The adapter locks arrows/Tab/Escape to the terminal. Repeated `request_focus` resets
