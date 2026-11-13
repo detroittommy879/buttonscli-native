@@ -782,7 +782,7 @@ impl Default for TextBacking {
     fn default() -> Self {
         Self {
             available: true,
-            enabled: false,
+            enabled: true,
             opacity: 75,
             feather: 6,
             whole_line: false,
