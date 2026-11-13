@@ -238,6 +238,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
+- Standalone HTML/WebGPU playground: `shader-playground/` (independent of paused
+  WASM). Refresh its public-only catalog with `python scripts/export-shader-playground.py`;
+  serves on localhost/HTTPS. Native `shaderBackground` can be JSON null; exporters
+  must handle it. WGSL uniform layout and custom strength behavior mirror native.
   WASM uses WGPU/WebGPU and the shared shader renderer. Eframe 0.31 needs
   a direct `egui-wgpu` fragile-send-sync feature and direct Naga for WGSL checks. Config visibility changes
   need a reload only; Rust changes need `scripts/build-web.ps1` to refresh pkg/ and

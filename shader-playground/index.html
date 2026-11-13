@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-type="software">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ButtonsCLI · Shader playground</title>
+<meta name="description" content="Explore real ButtonsCLI shaders in a terminal-style playground. Change colors, motion and each shader’s controls.">
+<meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#110d1e">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#controls">Skip to shader controls</a>
+<header class="titlebar"><span>▦ ButtonsCLI</span><span>Shader playground</span><button id="fullscreen" aria-label="Toggle fullscreen">□</button></header>
+<div class="menubar"><strong><b>B</b> BUTTONSCLI</strong><button id="dock-toggle">View</button><button id="shuffle">Random shaders</button><button id="help">Help</button><span class="right muted">BROWSER PREVIEW · NO SHELL</span></div>
+<nav id="tabs" aria-label="Terminal panes"></nav>
+<div class="commandbar"><span>Clear</span><span>Dir</span><span>Git Status</span><span>Git Log</span><span>PWD</span><span>htop</span><span>docker ps</span><span>print ANSI colors</span><label class="right"><input type="checkbox" id="text" checked> Terminal text</label></div>
+<main>
+<aside id="controls">
+<div class="aside-title">shader controls <span id="target">P1</span></div>
+<label class="field">Find a shader<input id="search" type="search" placeholder="Search shaders…"></label>
+<div class="picker"><button id="prev" aria-label="Previous shader">‹</button><select id="shader" aria-label="Shader"></select><button id="next" aria-label="Next shader">›</button></div>
+<p id="count" class="muted"></p>
+<label class="field">Theme bundles<select id="bundle"><option value="">Choose a bundle…</option></select></label>
+<hr><h2>Motion & appearance</h2><div id="common"></div>
+<hr><h2>Shader sliders</h2><div id="knobs"></div>
+<hr><h2>Colors</h2><div id="colors"></div>
+<button id="reset" class="wide">Reset this pane</button>
+<p class="hint">Click a pane to edit its shader. Use ‹ › to browse. Every change stays in this preview.</p>
+</aside>
+<div id="workspace" class="grid" aria-label="Shader terminal preview"></div>
+</main>
+<footer><span id="status">STARTING GPU</span><span class="separator">ButtonsCLI shaders</span><button id="settings">⚙ Shader controls</button><button id="pause">Pause motion</button><span class="separator">Panes</span><button data-layout="one">1</button><button data-layout="col">COL</button><button data-layout="row">ROW</button><button data-layout="grid" class="active">GRID</button><label>Brightness <input id="brightness" type="range" min="0.1" max="1" step="0.01" value="1"></label><span id="total" class="muted right"></span></footer>
+<dialog id="help-dialog"><h2>ButtonsCLI shader playground</h2><p>These are the app’s actual shaders. Select a pane, choose a shader or bundle, then adjust its sliders and colors.</p><p>The terminal text and command strip are decorative. No commands run. WebGPU requires a supported browser on HTTPS or localhost.</p><button id="close-help">Close</button></dialog>
+<script type="module" src="app.js"></script>
+</body></html>
