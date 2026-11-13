@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **One-command install**: `curl -fsSL https://buttonscli.com/install.sh | sh`
+  (Linux/macOS), `irm https://buttonscli.com/install.ps1 | iex` (PowerShell)
+  or `install.cmd` (Command Prompt). Per-user, checksum-verified, adds a
+  launcher/Start Menu entry; on Linux it finds missing window libraries and
+  offers to install them (`--deps`). `--uninstall` keeps settings.
+- **Idle glow for all panes**: Look → Idle glow → All panes turns it on for
+  every pane, new tabs included (a pane's menu can still opt out). Quiet and
+  ramp times now go down to 0.1 s on a log slider, with quick presets.
+- **Text backing is on by default** for new installs, so text stays readable
+  over any shader without dimming it. Turn it off in the status bar.
+- Translations can now be added one language at a time
+  (`scripts/i18n-work.py`, `src/i18n/overlay.json`), with a generated
+  progress table in `docs/dev/TRANSLATION-STATUS.md`.
 - Text backing can swap text/backing colors for a light-text-strip look over any
   shader. The website playground now offers backing, inversion, whole lines,
   opacity and feather controls too.
@@ -9,7 +22,7 @@
 
 - Optional text backing softens shader/gradient backgrounds behind text runs or whole
   occupied lines. Status-bar controls adjust opacity and feathering; Settings →
-  Experimental can disable the feature entirely. Off by default.
+  Experimental can disable the feature entirely.
 
 - The browser playground starts with a randomly selected featured bundle and
   softens shader and theme changes with a short fade.

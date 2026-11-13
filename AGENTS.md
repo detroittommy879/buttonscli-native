@@ -243,6 +243,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   viewport; detached viewports don't inherit it). Source art is in
   `.private/icons/` (gitignored): never `include_bytes!` from there.
 
+- One-line installers: `packaging/install/install.{sh,ps1,cmd}`, served at
+  `https://buttonscli.com/install.*` (copy them to the amp web root after edits).
+  They resolve the version from the `releases/latest` redirect and depend on the
+  release asset names in `release.yml`: rename assets only together. Linux test
+  harness (disposable podman, six distros + a real window check):
+  `/home/tom/isolated-apps/tests/buttonscli-installer/{run,gui}.sh` in FedoraDesktop
+  WSL; run via `wsl.exe -d FedoraDesktop -u tom --exec sh …` from PowerShell
+  (Git Bash rewrites the path). wuu73.org/vibe's `vibes.ps1` and
+  `vibes-ubuntu-v2.sh` offer ButtonsCLI as a menu item that calls them.
+- Translations: `python scripts/i18n-work.py status|next|apply`
+  (`docs/dev/TRANSLATIONS.md`). Batches land in `src/i18n/overlay.json`
+  (partial locales allowed, wins over the catalogs); never hand-edit the
+  full catalogs for that. One agent per locale writing only scratch files;
+  you run `apply`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
