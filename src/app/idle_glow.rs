@@ -19,7 +19,7 @@ pub(crate) struct GlowStep {
 /// The glow for a pane that has been quiet for `quiet_ms`.
 pub(crate) fn glow_step(setting: &IdleGlow, quiet_ms: u64) -> GlowStep {
     let delay_ms = (setting.delay_seconds.max(0.0) * 1000.0) as u64;
-    let ramp_ms = (setting.ramp_seconds.max(1.0) * 1000.0) as u64;
+    let ramp_ms = ((setting.ramp_seconds.max(0.1) * 1000.0) as u64).max(1);
     if quiet_ms < delay_ms {
         return GlowStep {
             strength: setting.low,
@@ -38,10 +38,50 @@ pub(crate) fn glow_step(setting: &IdleGlow, quiet_ms: u64) -> GlowStep {
 impl ButtonsApp {
     /// Turns idle glow on or off for one pane.
     pub(super) fn toggle_idle_glow(&mut self, id: u64) {
-        if self.idle_glow_panes.remove(&id).is_none() {
+        if self.idle_glow_on(id) {
+            self.idle_glow_panes.remove(&id);
+            if self.preferences.idle_glow.all_panes {
+                self.idle_glow_off.insert(id);
+            }
+        } else {
+            self.idle_glow_off.remove(&id);
             self.idle_glow_panes
                 .insert(id, crate::session::output::now_ms());
         }
+    }
+
+    /// Look → Idle glow → All panes. Turning it off also clears the panes
+    /// turned on one by one, so the switch really means "none".
+    pub(super) fn set_idle_glow_all(&mut self, on: bool) {
+        self.preferences.idle_glow.all_panes = on;
+        self.idle_glow_off.clear();
+        self.idle_glow_panes.clear();
+        if on {
+            self.idle_glow_all_since = crate::session::output::now_ms();
+        }
+    }
+
+    /// When this pane's glow went on, or `None` when it is off.
+    fn glow_since(&self, id: u64) -> Option<u64> {
+        if let Some(since) = self.idle_glow_panes.get(&id) {
+            return Some(*since);
+        }
+        (self.preferences.idle_glow.all_panes && !self.idle_glow_off.contains(&id))
+            .then_some(self.idle_glow_all_since)
+    }
+
+    /// True when this pane has idle glow on (one by one or via All panes).
+    pub(super) fn idle_glow_on(&self, id: u64) -> bool {
+        self.glow_since(id).is_some()
+    }
+
+    /// The open panes with idle glow on (for their menus).
+    pub(super) fn idle_glow_ids(&self) -> std::collections::BTreeSet<u64> {
+        self.tabs
+            .iter()
+            .map(|tab| tab.id)
+            .filter(|id| self.idle_glow_on(*id))
+            .collect()
     }
 
     /// Milliseconds since this pane last produced output (or since its glow
@@ -59,7 +99,7 @@ impl ButtonsApp {
         if self.preferences.calm_mode {
             return None;
         }
-        let since = *self.idle_glow_panes.get(&id)?;
+        let since = self.glow_since(id)?;
         let quiet = self.quiet_ms(id, since)?;
         Some(glow_step(&self.preferences.idle_glow, quiet))
     }
@@ -69,7 +109,9 @@ impl ButtonsApp {
         let tabs = &self.tabs;
         self.idle_glow_panes
             .retain(|id, _| tabs.iter().any(|tab| tab.id == *id));
-        let ids: Vec<u64> = self.idle_glow_panes.keys().copied().collect();
+        self.idle_glow_off
+            .retain(|id| tabs.iter().any(|tab| tab.id == *id));
+        let ids = self.idle_glow_ids();
         let mut ramping = false;
         let mut wake: Option<u64> = None;
         for id in ids {
@@ -94,19 +136,54 @@ impl ButtonsApp {
         let before = self.preferences.idle_glow.clone();
         ui.spaced_strong("Idle glow");
         ui.spaced_small(
-            "Turn it on for a pane from its menu. Its shader ramps from Low to High after the terminal has been quiet.",
+            "Turn it on here for every pane, or for one pane from its menu. Its shader ramps from Low to High after the terminal has been quiet.",
         );
+        let mut all = self.preferences.idle_glow.all_panes;
+        if ui
+            .spaced_checkbox(&mut all, "All panes")
+            .on_hover_text("Every pane glows when quiet, new tabs too. A pane's menu can still turn it off for that pane.")
+            .changed()
+        {
+            self.set_idle_glow_all(all);
+        }
         let glow = &mut self.preferences.idle_glow;
         let strength = crate::theme::ShaderBackground::STRENGTH;
         ui.add(egui::Slider::new(&mut glow.low, strength.clone()).text("Low"));
         ui.add(egui::Slider::new(&mut glow.high, strength).text("High"));
+        // Logarithmic with 0.1 s steps, so 1.4 s is as easy to pick as 5 min.
+        // The number can also be clicked and typed.
         ui.add(
             egui::Slider::new(&mut glow.delay_seconds, IdleGlow::DELAY)
-                .text("Quiet seconds before it starts"),
+                .logarithmic(true)
+                .smallest_positive(0.1)
+                .step_by(0.1)
+                .max_decimals(1)
+                .suffix(" s")
+                .text("Quiet before it starts"),
         );
         ui.add(
-            egui::Slider::new(&mut glow.ramp_seconds, IdleGlow::RAMP).text("Seconds to reach High"),
+            egui::Slider::new(&mut glow.ramp_seconds, IdleGlow::RAMP)
+                .logarithmic(true)
+                .smallest_positive(0.1)
+                .step_by(0.1)
+                .max_decimals(1)
+                .suffix(" s")
+                .text("Time to reach High"),
         );
+        wrapping_row(ui, |ui| {
+            ui.small("Quick:");
+            for (label, delay, ramp) in [
+                ("Snappy", 1.4, 1.0),
+                ("5 s", 5.0, 3.0),
+                ("30 s", 30.0, 20.0),
+                ("2 min", 120.0, 30.0),
+            ] {
+                if ui.small_button(label).clicked() {
+                    glow.delay_seconds = delay;
+                    glow.ramp_seconds = ramp;
+                }
+            }
+        });
         self.preferences.idle_glow.normalize();
         self.preferences.idle_glow != before
     }
@@ -122,7 +199,47 @@ mod tests {
             high: 0.9,
             delay_seconds: 10.0,
             ramp_seconds: 4.0,
+            all_panes: false,
         }
+    }
+
+    #[test]
+    fn sub_second_times_ramp_quickly() {
+        let quick = IdleGlow {
+            delay_seconds: 1.4,
+            ramp_seconds: 0.5,
+            ..setting()
+        };
+        assert_eq!(glow_step(&quick, 1_000).wake_in_ms, Some(400));
+        let half = glow_step(&quick, 1_650).strength;
+        assert!((half - 0.55).abs() < 1e-5, "{half}");
+        assert_eq!(glow_step(&quick, 1_900).strength, 0.9);
+    }
+
+    #[test]
+    fn all_panes_covers_new_tabs_and_a_pane_can_opt_out() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let ctx = egui::Context::default();
+        let profile = crate::assistant::virtual_terminal::PROFILE_ID;
+        app.open_tab_with_profile(ctx.clone(), profile);
+        let first = app.tabs[0].id;
+        app.set_idle_glow_all(true);
+        assert!(app.idle_glow_on(first));
+        app.open_tab_with_profile(ctx, profile);
+        let second = app.tabs[1].id;
+        assert!(app.idle_glow_on(second), "new tabs glow too");
+
+        // A pane's menu turns just that pane off, and back on.
+        app.toggle_idle_glow(first);
+        assert!(!app.idle_glow_on(first));
+        assert!(app.idle_glow_on(second));
+        assert_eq!(app.idle_glow_ids().len(), 1);
+        app.toggle_idle_glow(first);
+        assert!(app.idle_glow_on(first));
+
+        // Off means none, even panes turned on one by one.
+        app.set_idle_glow_all(false);
+        assert!(app.idle_glow_ids().is_empty());
     }
 
     #[test]
@@ -158,6 +275,7 @@ mod tests {
             high: f32::NAN,
             delay_seconds: -5.0,
             ramp_seconds: 1e9,
+            all_panes: true,
         };
         odd.normalize();
         assert!(odd.low <= odd.high, "{odd:?}");

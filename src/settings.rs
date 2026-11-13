@@ -620,6 +620,9 @@ pub(crate) struct IdleGlow {
     pub(crate) delay_seconds: f32,
     /// Seconds the ramp takes from `low` to `high`.
     pub(crate) ramp_seconds: f32,
+    /// Every pane glows, including new tabs (a pane's menu can still turn
+    /// one off for this run).
+    pub(crate) all_panes: bool,
 }
 
 impl Default for IdleGlow {
@@ -629,13 +632,14 @@ impl Default for IdleGlow {
             high: 1.0,
             delay_seconds: 30.0,
             ramp_seconds: 20.0,
+            all_panes: false,
         }
     }
 }
 
 impl IdleGlow {
     pub(crate) const DELAY: std::ops::RangeInclusive<f32> = 0.0..=600.0;
-    pub(crate) const RAMP: std::ops::RangeInclusive<f32> = 1.0..=600.0;
+    pub(crate) const RAMP: std::ops::RangeInclusive<f32> = 0.1..=600.0;
 
     pub(crate) fn normalize(&mut self) {
         let defaults = Self::default();

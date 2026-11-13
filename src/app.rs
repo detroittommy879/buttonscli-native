@@ -561,6 +561,12 @@ pub struct ButtonsApp {
     /// (ms). Not saved; a pane's quiet time counts from here or its last output.
     #[cfg(not(target_arch = "wasm32"))]
     idle_glow_panes: std::collections::BTreeMap<u64, u64>,
+    /// Idle glow → All panes: panes the user turned off while it is on.
+    #[cfg(not(target_arch = "wasm32"))]
+    idle_glow_off: std::collections::BTreeSet<u64>,
+    /// When Idle glow → All panes last went on (ms); 0 at startup.
+    #[cfg(not(target_arch = "wasm32"))]
+    idle_glow_all_since: u64,
     /// Settings → Gallery (debug tools).
     #[cfg(not(target_arch = "wasm32"))]
     gallery: gallery::GalleryState,
@@ -1679,6 +1685,10 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             idle_glow_panes: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
+            idle_glow_off: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            idle_glow_all_since: 0,
+            #[cfg(not(target_arch = "wasm32"))]
             gallery: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             update_rx: None,
@@ -2459,7 +2469,7 @@ impl ButtonsApp {
             }
             // The pane shows the glow's ramped Strength; saving it would bake
             // the glow into the pane's look.
-            PaneAction::ShaderStrength(_) if self.idle_glow_panes.contains_key(&id) => {
+            PaneAction::ShaderStrength(_) if self.idle_glow_on(id) => {
                 self.notice = Some(
                     "Idle glow sets Strength on this pane. Turn Idle glow off to edit it.".into(),
                 );
@@ -3633,7 +3643,7 @@ impl ButtonsApp {
                 // Mid-fade every pane has its own look (from its old one).
                 self.theme_overrides.contains_key(&tab.id)
                     || self.shuffle.fade.is_some()
-                    || self.idle_glow_panes.contains_key(&tab.id)
+                    || self.idle_glow_on(tab.id)
                     || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
@@ -3657,6 +3667,7 @@ impl ButtonsApp {
         ui.allocate_rect(rect, egui::Sense::hover());
         let animation_fps = self.effective_animation_fps();
         let animation_delay = self.animation_delay(ui.input(|input| input.time));
+        let glowing_panes = self.idle_glow_ids();
         let mut render_state = PaneRenderState {
             shader_choices: &shader_choices,
             saved_shader_count,
@@ -3669,7 +3680,7 @@ impl ButtonsApp {
             font_catalog: &self.font_catalog,
             theme: &theme,
             override_themes: &override_themes,
-            idle_glow_panes: &self.idle_glow_panes,
+            idle_glow_panes: &glowing_panes,
             divider_style,
             clicked: &mut clicked,
             latest_activity_at_ms,
@@ -5494,7 +5505,7 @@ impl ButtonsApp {
                                 ui.set_max_width(340.0);
                                 if let Some((id, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
-                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), self.idle_glow_panes.contains_key(id), &mut shader_action);
+                                    pane_shader_menu(ui, theme, &choices, saved_count, self.preferences.strength_override.active(), self.idle_glow_on(*id), &mut shader_action);
                                 }
                                 ui.separator();
                                 fps_done = animation_fps_slider(ui, &mut fps);
@@ -15953,7 +15964,7 @@ struct PaneRenderState<'a> {
     theme: &'a ThemeDefinition,
     override_themes: &'a std::collections::BTreeMap<u64, ThemeDefinition>,
     /// Panes with idle glow on (for their menus).
-    idle_glow_panes: &'a std::collections::BTreeMap<u64, u64>,
+    idle_glow_panes: &'a std::collections::BTreeSet<u64>,
     divider_style: PaneDividerTheme,
     clicked: &'a mut Option<usize>,
     latest_activity_at_ms: u64,
@@ -16078,7 +16089,7 @@ fn render_pane_tree(
                                     state.favorites,
                                     state.auto_tile.includes(tab.id),
                                     tab.backend.scrollback_state().mouse_reporting,
-                                    state.idle_glow_panes.contains_key(&tab.id),
+                                    state.idle_glow_panes.contains(&tab.id),
                                     &mut action,
                                 );
                                 ui.separator();
@@ -16094,7 +16105,7 @@ fn render_pane_tree(
                                         state.shader_choices,
                                         state.saved_shader_count,
                                         state.strength_override,
-                                        state.idle_glow_panes.contains_key(&tab.id),
+                                        state.idle_glow_panes.contains(&tab.id),
                                         &mut action,
                                     );
                                 });
