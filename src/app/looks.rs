@@ -218,11 +218,9 @@ impl ButtonsApp {
             self.persist_native_preferences();
         }
         let calm_label = crate::i18n::text(&self.locale, crate::i18n::MessageKey::CalmMode, &[]);
-        let title = if self.preferences.calm_mode {
-            format!("◐ {calm_label}")
-        } else {
-            "◐ Look".to_owned()
-        };
+        // Always "Look": the button used to rename itself to "Calm effects"
+        // while Calm was on, which read as a different control.
+        let title = "◐ Look";
         let mut chosen = None;
         let mut changed = false;
         {
@@ -248,6 +246,13 @@ impl ButtonsApp {
                         &mut self.preferences.shader_backgrounds_enabled,
                         "GPU shader backgrounds",
                     )
+                    .changed();
+                changed |= ui
+                    .spaced_checkbox(
+                        &mut self.preferences.classic_effects,
+                        "Classic effects (static, scanlines)",
+                    )
+                    .on_hover_text("TV static, scanlines and moving gradients from themes. Off: no pane shows them, and applying a theme never turns them back on. Shaders are not affected.")
                     .changed();
                 ui.horizontal(|ui| {
                     if motion_speed_drag(ui, &mut self.preferences.motion_speed) {
@@ -339,6 +344,80 @@ mod tests {
         assert_eq!(prefs.motion_speed, crate::settings::MAX_MOTION_SPEED);
         let prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert_eq!(prefs.motion_speed, 1.0);
+    }
+
+    #[test]
+    fn classic_effects_switch_removes_static_scanlines_and_gradient_motion() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let old_style = |effects: &crate::theme::TerminalEffects| {
+            effects.gradient_animation
+                || effects.scanlines_strength > 0.0
+                || effects.static_opacity > 0.0
+        };
+        let id = app
+            .themes
+            .all()
+            .iter()
+            .find(|theme| old_style(&theme.effects) && !theme.effects.master_disabled)
+            .expect("a built-in theme with classic effects")
+            .id
+            .clone();
+        app.preferences.gradient_theme_id = id.clone();
+        app.preferences.effects_theme_id = id.clone();
+        app.theme_overrides.insert(7, id);
+        assert!(old_style(&app.terminal_presentation().effects));
+        assert!(old_style(&app.terminal_presentation_for(7).effects));
+
+        app.preferences.classic_effects = false;
+        assert!(!old_style(&app.terminal_presentation().effects), "shared");
+        assert!(
+            !old_style(&app.terminal_presentation_for(7).effects),
+            "pane"
+        );
+        // Old profiles keep what they had.
+        let prefs: Preferences = serde_json::from_str("{}").unwrap();
+        assert!(prefs.classic_effects);
+    }
+
+    #[test]
+    fn programs_copy_with_osc_52_unless_turned_off() {
+        let ctx = egui::Context::default();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.open_tab_with_profile(ctx, crate::assistant::virtual_terminal::PROFILE_ID);
+        let id = app.tabs[0].id;
+        let send = |app: &mut ButtonsApp, kind, text: &str| {
+            app.events_tx
+                .send((id, PtyEvent::ClipboardStore(kind, text.into())))
+                .unwrap();
+            app.process_terminal_events();
+            app.program_clipboard.take()
+        };
+        use egui_term::ClipboardType::{Clipboard, Selection};
+        assert_eq!(
+            send(&mut app, Clipboard, "hi"),
+            None,
+            "simulated tabs never copy"
+        );
+        app.tabs[0].simulated = None;
+        assert_eq!(send(&mut app, Clipboard, "hi").as_deref(), Some("hi"));
+        assert_eq!(send(&mut app, Selection, "hi"), None);
+        app.preferences.keyboard.programs_copy = false;
+        assert_eq!(send(&mut app, Clipboard, "hi"), None);
+    }
+
+    #[test]
+    fn folded_settings_sections_are_remembered() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        assert!(app.section_open("shader-style"));
+        app.toggle_section("shader-style", true);
+        assert!(!app.section_open("shader-style"));
+        let saved = serde_json::to_string(&app.preferences).unwrap();
+        let restored: Preferences = serde_json::from_str(&saved).unwrap();
+        assert!(restored.settings_layout.folded.contains("shader-style"));
+        app.toggle_section("shader-style", false);
+        assert!(!app.section_open("shader-style"));
+        app.toggle_section("shader-style", true);
+        assert!(app.section_open("shader-style"));
     }
 
     #[test]

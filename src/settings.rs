@@ -299,6 +299,16 @@ pub(crate) struct Preferences {
     pub(crate) theme_browser_collection: crate::theme_browser::ThemeCollection,
     pub(crate) pane_hover_label: PaneHoverLabel,
     pub(crate) calm_mode: bool,
+    /// Off: no TV static, scanlines or moving gradients in any pane,
+    /// whatever the themes say. Shaders are not affected. Never part of a
+    /// theme, so applying one cannot turn these back on.
+    pub(crate) classic_effects: bool,
+    pub(crate) text_backing: TextBacking,
+    /// Mouse wheel speed in Settings and other app lists (1 = egui's own).
+    pub(crate) ui_scroll_speed: f32,
+    /// Terminal lines moved by one wheel step.
+    pub(crate) terminal_scroll_lines: u8,
+    pub(crate) dock_navigation: DockNavigation,
     /// Multiplies every pane's shader and gradient motion: 0 stops it,
     /// 1 is each theme's own speed, 2 doubles it.
     pub(crate) motion_speed: f32,
@@ -380,6 +390,11 @@ impl Default for Preferences {
             theme_browser_collection: Default::default(),
             pane_hover_label: PaneHoverLabel::default(),
             calm_mode: false,
+            classic_effects: true,
+            text_backing: TextBacking::default(),
+            ui_scroll_speed: DEFAULT_UI_SCROLL_SPEED,
+            terminal_scroll_lines: 3,
+            dock_navigation: DockNavigation::default(),
             motion_speed: 1.0,
             effects_focused_pane_only: false,
             typography: Typography::default(),
@@ -517,6 +532,8 @@ pub(crate) struct SettingsLayout {
     pub(crate) size: [f32; 2],
     pub(crate) position: Option<[f32; 2]>,
     pub(crate) section_heights: std::collections::BTreeMap<String, f32>,
+    /// Settings sections the user folded shut (by section key).
+    pub(crate) folded: std::collections::BTreeSet<String>,
 }
 
 impl Default for SettingsLayout {
@@ -525,6 +542,7 @@ impl Default for SettingsLayout {
             size: [980.0, 760.0],
             position: None,
             section_heights: Default::default(),
+            folded: Default::default(),
         }
     }
 }
@@ -740,11 +758,52 @@ impl Default for ShaderLab {
     }
 }
 
+pub(crate) const DEFAULT_UI_SCROLL_SPEED: f32 = 2.5;
+pub(crate) const MAX_UI_SCROLL_SPEED: f32 = 8.0;
+pub(crate) const MAX_TERMINAL_SCROLL_LINES: u8 = 20;
+
+/// Global readability controls; never imported from themes.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct TextBacking {
+    pub(crate) available: bool,
+    pub(crate) enabled: bool,
+    pub(crate) opacity: u8,
+    pub(crate) feather: u8,
+    pub(crate) whole_line: bool,
+    pub(crate) invert: bool,
+}
+
+impl Default for TextBacking {
+    fn default() -> Self {
+        Self {
+            available: true,
+            enabled: false,
+            opacity: 75,
+            feather: 6,
+            whole_line: false,
+            invert: false,
+        }
+    }
+}
+
+/// Experimental: folder navigation buttons in the left panel.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct DockNavigation {
+    /// Up / Back / Home buttons.
+    pub(crate) buttons: bool,
+    /// A button for each folder in the focused terminal's last listing.
+    pub(crate) folders: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct KeyboardPreferences {
     pub(crate) ctrl_c_copies_selection: bool,
     pub(crate) copy_on_selection: bool,
+    /// Programs may put text on the clipboard (OSC 52). Reading it is never allowed.
+    pub(crate) programs_copy: bool,
     pub(crate) bracketed_paste: bool,
     pub(crate) option_as_meta: bool,
 }
@@ -754,6 +813,7 @@ impl Default for KeyboardPreferences {
         Self {
             ctrl_c_copies_selection: true,
             copy_on_selection: true,
+            programs_copy: true,
             bracketed_paste: true,
             option_as_meta: false,
         }
@@ -843,6 +903,14 @@ impl Preferences {
         }
         self.notice_seconds = self.notice_seconds.min(MAX_NOTICE_SECONDS);
         self.shader_lab.cost_limit = self.shader_lab.cost_limit.min(ShaderLab::MAX_COST_LIMIT);
+        self.ui_scroll_speed = if self.ui_scroll_speed.is_finite() {
+            self.ui_scroll_speed.clamp(0.5, MAX_UI_SCROLL_SPEED)
+        } else {
+            DEFAULT_UI_SCROLL_SPEED
+        };
+        self.terminal_scroll_lines = self
+            .terminal_scroll_lines
+            .clamp(1, MAX_TERMINAL_SCROLL_LINES);
         self.shuffle.normalize();
         self.strength_override.normalize();
         self.idle_glow.normalize();

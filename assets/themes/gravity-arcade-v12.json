@@ -1,0 +1,206 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#1fa3a8",
+        "#0d5c6e",
+        "#f2b880",
+        "#06161e",
+        "#8ee6d8"
+      ],
+      "custom": {
+        "expression": "let hz = 0.04;\nlet sky_t = clamp((p.y - hz) / 0.46, 0.0, 1.0);\nlet sky_base = mix(c2 * 0.6, c4 * 0.8, sky_t);\nlet sun = c3 * halo(sd_circle(p - vec2<f32>(0.42, 0.16), 0.05), 0.28);\nlet sky_col = sky_base + c3 * smoothstep(0.2, 0.0, p.y - hz) * 0.45 + sun;\nvar birds = 0.0;\nfor (var i = 0; i < 5; i++) {\n    let kb = f32(i);\n    let bx = fract(t * 0.03 * bird_speed + kb * 0.19) * 2.0 - 1.0;\n    let by = 0.22 + 0.06 * sin(t * 0.4 + kb * 2.1) + 0.03 * kb;\n    let qb = p - vec2<f32>(bx, by);\n    let flap = 0.012 * sin(t * 7.0 * bird_speed + kb * 1.7);\n    let db = min(sd_segment(qb, vec2<f32>(-0.03, flap), vec2<f32>(0.0, 0.0)), sd_segment(qb, vec2<f32>(0.0, 0.0), vec2<f32>(0.03, flap))) - 0.002;\n    birds = birds + (1.0 - smoothstep(0.0, 0.002, db));\n}\nlet below = max(hz - p.y, 0.03);\nlet depth = 0.12 / below;\nlet wx = p.x * depth;\nlet wz = depth;\nlet far_w = sin(wx * 0.7 + sin(wz * 0.4 - t * 0.25 * wave_speed) * 1.5);\nlet mid_w = sin(wx * 1.1 + sin(wz * 0.7 - t * 0.4 * wave_speed) * 1.8 + 1.3);\nlet near_w = sin(wx * 1.9 + sin(wz * 1.1 - t * 0.6 * wave_speed) * 2.0 + 2.7);\nlet foam = clamp((smoothstep(0.75, 0.98, near_w) * 0.9 + smoothstep(0.8, 0.99, mid_w) * 0.4) * wave_height, 0.0, 1.0);\nlet base = mix(c2 * 0.9, c4 * 1.3, clamp(below * 2.0, 0.0, 1.0));\nlet tinted = base + c1 * (smoothstep(0.2, 1.0, far_w) * 0.25 + smoothstep(0.3, 1.0, mid_w) * 0.3) * wave_height;\nlet refl = exp(-abs(p.x - 0.42) * 6.0) * exp(-below * 5.0);\nlet lit = tinted + c3 * refl * (0.6 + 0.4 * near_w) * 0.5;\nlet ocean_foam = mix(lit, c5, foam * 0.8);\nlet haze = smoothstep(0.12, 0.0, below);\nlet ocean_haze = mix(ocean_foam, c3 * 0.6 + c2 * 0.4, haze * 0.6);\nvar fish = 0.0;\nfor (var j = 0; j < 4; j++) {\n    let kf = f32(j);\n    let fx = fract(t * 0.025 * fish_speed + kf * 0.31) * 2.2 - 1.1;\n    let fy = -0.12 - 0.09 * fract(kf * 0.53) + 0.01 * sin(t * 3.0 + kf);\n    let qf = p - vec2<f32>(fx, fy);\n    let body = sd_circle(vec2<f32>(qf.x * 0.5, qf.y), 0.022);\n    let tail = sd_segment(qf, vec2<f32>(-0.02, 0.0), vec2<f32>(-0.034, 0.012 * sin(t * 6.0 + kf * 2.0))) - 0.004;\n    fish = fish + (1.0 - smoothstep(0.0, 0.003, min(body, tail)));\n}\nlet ocean_col = mix(ocean_haze, c4 * 0.5, min(fish, 1.0) * 0.85);\nlet sky_final = mix(sky_col, c4 * 0.2, min(birds, 1.0) * 0.9);\nlet scene = mix(ocean_col, sky_final, step(hz, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Tidewater Parallax",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "wave_height",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "bird_speed",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "fish_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 0.75,
+      "speed": 3.5,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:38:51.777Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "gravity-arcade-v12",
+    "name": "Gravity Arcade v12",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gravity-arcade-v12",
+    "updatedAt": "2026-11-12T05:52:15.428Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#17002e",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

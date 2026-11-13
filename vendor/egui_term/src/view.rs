@@ -52,9 +52,11 @@ pub struct TerminalView<'a> {
     background_gradient: Option<BackgroundGradient>,
     background_callback: Option<egui::PaintCallback>,
     row_banding_color: Option<Color32>,
+    text_backing: Option<crate::TextBacking>,
     row_brightness: u8,
     ctrl_c_copies_selection: bool,
     copy_on_selection: bool,
+    scroll_lines: i32,
     bracketed_paste: bool,
     option_as_meta: bool,
     draw_bold_bright: bool,
@@ -133,9 +135,11 @@ impl<'a> TerminalView<'a> {
             background_gradient: None,
             background_callback: None,
             row_banding_color: None,
+            text_backing: None,
             row_brightness: 0,
             ctrl_c_copies_selection: true,
             copy_on_selection: false,
+            scroll_lines: DEFAULT_SCROLL_LINES,
             bracketed_paste: true,
             option_as_meta: false,
             draw_bold_bright: false,
@@ -170,8 +174,17 @@ impl<'a> TerminalView<'a> {
         self
     }
 
-    /// Add a translucent tint to every second terminal row. The band pitch
-    /// comes from the measured terminal cell height, not a font-size guess.
+    /// Soften procedural backgrounds behind occupied text runs or rows.
+    #[inline]
+    pub fn set_text_backing(
+        mut self,
+        backing: Option<crate::TextBacking>,
+    ) -> Self {
+        self.text_backing = backing;
+        self
+    }
+
+    /// Add a translucent tint to every second terminal row at the measured cell pitch.
     #[inline]
     pub fn set_row_banding(mut self, color: Option<Color32>) -> Self {
         self.row_banding_color = color;
@@ -194,6 +207,12 @@ impl<'a> TerminalView<'a> {
         self.copy_on_selection = auto_copy;
         self.bracketed_paste = bracketed;
         self.option_as_meta = option_meta;
+        self
+    }
+
+    /// Lines the local view moves per mouse wheel step.
+    pub fn set_scroll_lines(mut self, lines: u8) -> Self {
+        self.scroll_lines = i32::from(lines.max(1));
         self
     }
 
@@ -398,6 +417,7 @@ impl<'a> TerminalView<'a> {
                         self.backend.last_content().terminal_mode,
                         state.current_mouse_position_on_grid,
                         modifiers,
+                        self.scroll_lines,
                     ));
                     // Scrolling with a stationary pointer must extend the
                     // selection to the newly visible line as well.
@@ -580,6 +600,70 @@ impl<'a> TerminalView<'a> {
             ));
         }
 
+        if let Some(backing) = self.text_backing {
+            let cells = content
+                .cells
+                .iter()
+                .filter(|c| {
+                    !c.flags.intersects(
+                        cell::Flags::HIDDEN | cell::Flags::WIDE_CHAR_SPACER,
+                    ) && c.c != ' '
+                        && c.c != '\t'
+                })
+                .map(|c| {
+                    let origin = layout_min
+                        + egui::vec2(
+                            cell_width * c.point.column.0 as f32,
+                            cell_height
+                                * (c.point.line.0
+                                    + content.display_offset as i32)
+                                    as f32,
+                        );
+                    let rect = Rect::from_min_size(
+                        origin,
+                        egui::vec2(
+                            cell_width
+                                * if c.flags.contains(cell::Flags::WIDE_CHAR) {
+                                    2.0
+                                } else {
+                                    1.0
+                                },
+                            cell_height,
+                        ),
+                    );
+                    let color = if backing.invert {
+                        if backing.whole_line {
+                            self.theme
+                                .get_color(Color::Named(NamedColor::Foreground))
+                        } else {
+                            let mut fg = if self.draw_bold_bright
+                                && c.flags.intersects(
+                                    cell::Flags::BOLD | cell::Flags::DIM_BOLD,
+                                ) {
+                                self.theme.get_bold_color(c.fg)
+                            } else {
+                                self.theme.get_color(c.fg)
+                            };
+                            if c.flags.intersects(
+                                cell::Flags::DIM | cell::Flags::DIM_BOLD,
+                            ) {
+                                fg = fg.linear_multiply(0.7);
+                            }
+                            fg
+                        }
+                    } else {
+                        global_bg
+                    };
+                    (rect, color)
+                });
+            shapes.extend(crate::text_backing::shapes(
+                cells,
+                layout.rect,
+                cell_width,
+                backing,
+            ));
+        }
+
         // TUIs hide the cursor (DECTCEM) while they draw their own.
         let cursor_visible =
             content.terminal_mode.contains(TermMode::SHOW_CURSOR)
@@ -665,6 +749,19 @@ impl<'a> TerminalView<'a> {
                     CornerRadius::ZERO,
                     bg,
                 )));
+            }
+
+            // Inversion is presentation-only and never changes TUI/selection backgrounds.
+            if self
+                .text_backing
+                .is_some_and(|b| b.invert && b.opacity > 0.0)
+                && matches!(indexed.bg, Color::Named(NamedColor::Background))
+                && !is_inverse
+                && !is_selected
+                && !is_search_match
+                && !is_current_search_match
+            {
+                fg = global_bg;
             }
 
             // Handle hovered hyperlink underline
@@ -1539,21 +1636,22 @@ fn process_mouse_wheel(
 /// expect wheel buttons 64/65, as Alacritty, WezTerm and par-term send.
 /// Scrolling our own view or sending arrow keys instead moves their prompt
 /// history. Shift keeps the local scroll, like Alacritty.
-/// Local scrolling (and alt-screen arrow keys) moves `SCROLL_MULTIPLIER`
-/// lines per wheel line, Alacritty's `scrolling.multiplier` default; mouse
+/// Local scrolling (and alt-screen arrow keys) moves `multiplier` lines per
+/// wheel line (default 3, Alacritty's `scrolling.multiplier`); mouse
 /// reports stay one per line, as in Alacritty.
 fn wheel_reports(
     scroll: InputAction,
     mode: TermMode,
     point: TerminalGridPoint,
     modifiers: Modifiers,
+    multiplier: i32,
 ) -> Vec<InputAction> {
     let InputAction::BackendCall(BackendCommand::Scroll(lines)) = scroll else {
         return vec![scroll];
     };
     if !mode.intersects(TermMode::MOUSE_MODE) || modifiers.shift {
         return vec![InputAction::BackendCall(BackendCommand::Scroll(
-            lines.saturating_mul(SCROLL_MULTIPLIER),
+            lines.saturating_mul(multiplier),
         ))];
     }
     let button = if lines > 0 {
@@ -1574,7 +1672,7 @@ fn wheel_reports(
         .collect()
 }
 
-const SCROLL_MULTIPLIER: i32 = 3;
+const DEFAULT_SCROLL_LINES: i32 = 3;
 
 fn selection_edge_scroll(rect: Rect, pointer: Pos2, cell_height: f32) -> i32 {
     let edge = cell_height.clamp(8.0, 24.0);
@@ -1820,6 +1918,7 @@ mod background_gradient_tests {
                 mode,
                 point,
                 modifiers,
+                DEFAULT_SCROLL_LINES,
             )
             .into_iter()
             .map(|action| match action {
@@ -1851,9 +1950,22 @@ mod background_gradient_tests {
                 TermMode::empty(),
                 point,
                 Modifiers::NONE,
+                DEFAULT_SCROLL_LINES,
             )
             .as_slice(),
             [InputAction::BackendCall(BackendCommand::Scroll(-6))]
+        ));
+        // The wheel step is a setting; mouse reports stay one per line.
+        assert!(matches!(
+            wheel_reports(
+                InputAction::BackendCall(BackendCommand::Scroll(2)),
+                TermMode::empty(),
+                point,
+                Modifiers::NONE,
+                1,
+            )
+            .as_slice(),
+            [InputAction::BackendCall(BackendCommand::Scroll(2))]
         ));
     }
 
@@ -2010,6 +2122,14 @@ mod render_parity_tests {
     const SCREEN: Vec2 = Vec2::new(400.0, 160.0);
 
     fn render(bytes: &[u8], focused: bool) -> (Vec<Shape>, Vec2) {
+        render_backing(bytes, focused, None)
+    }
+
+    fn render_backing(
+        bytes: &[u8],
+        focused: bool,
+        backing: Option<crate::TextBacking>,
+    ) -> (Vec<Shape>, Vec2) {
         let ctx = egui::Context::default();
         let mut backend = TerminalBackend::new_virtual(1, Arc::new(|_| {}));
         let paint = |backend: &mut TerminalBackend| {
@@ -2023,7 +2143,8 @@ mod render_parity_tests {
                     |ui| {
                         let view = TerminalView::new(ui, backend)
                             .set_size(SCREEN)
-                            .set_focus(focused);
+                            .set_focus(focused)
+                            .set_text_backing(backing);
                         ui.add(view);
                     },
                 );
@@ -2043,6 +2164,86 @@ mod render_parity_tests {
                 .collect(),
             cell,
         )
+    }
+
+    #[test]
+    fn text_backing_respects_hidden_wide_text_and_foreground_order() {
+        let input = "\x1b[?25lA\x1b[8msecret\x1b[0m  界".as_bytes();
+        let (plain, _) = render(input, true);
+        let (backed, cell) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 0.8,
+                feather: 4.0,
+                whole_line: false,
+                invert: false,
+            }),
+        );
+        assert_eq!(texts(&plain), texts(&backed));
+        let index = backed
+            .iter()
+            .position(|s| matches!(s, Shape::Mesh(_)))
+            .unwrap();
+        assert!(backed[..index].iter().all(|s| !matches!(s, Shape::Text(_))));
+        let Shape::Mesh(mesh) = &backed[index] else {
+            unreachable!()
+        };
+        assert_eq!(
+            mesh.vertices.len(),
+            32,
+            "two runs; hidden text has no backing"
+        );
+        assert_eq!(
+            mesh.vertices[22].pos.x - mesh.vertices[21].pos.x,
+            cell.x * 2.0
+        );
+    }
+
+    #[test]
+    fn inverted_backing_swaps_run_colors_but_preserves_explicit_backgrounds() {
+        let input = b"\x1b[?25lA\x1b[31mB\x1b[0;44mC";
+        let (plain, _) = render(input, true);
+        let (backed, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 1.0,
+                feather: 0.0,
+                whole_line: false,
+                invert: true,
+            }),
+        );
+        let original = texts(&plain);
+        let inverted = texts(&backed);
+        let bg = TerminalTheme::default()
+            .get_color(Color::Named(NamedColor::Background));
+        assert_eq!(inverted[0].2, bg);
+        assert_eq!(inverted[1].2, bg);
+        assert_eq!(inverted[2], original[2]);
+        let mesh = backed
+            .iter()
+            .find_map(|s| {
+                if let Shape::Mesh(m) = s {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        assert_eq!(mesh.vertices[5].color, original[0].2);
+        assert_eq!(mesh.vertices[21].color, original[1].2);
+        let (zero, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 0.0,
+                feather: 0.0,
+                whole_line: false,
+                invert: true,
+            }),
+        );
+        assert_eq!(texts(&zero), original);
     }
 
     fn texts(shapes: &[Shape]) -> Vec<(String, Pos2, Color32)> {

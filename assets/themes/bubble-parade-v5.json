@@ -1,0 +1,218 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff8fb1",
+        "#7fd8ff",
+        "#ffd166",
+        "#9b7bff",
+        "#6ee7b7"
+      ],
+      "custom": {
+        "expression": "var col = mix(c4 * 0.3, c1 * 0.15, smoothstep(-0.5, 0.5, p.y));\nlet r = cat_size;\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let scale = 3.0 + k * 2.5;\n    let speed = drift_speed * (1.0 - 0.25 * k);\n    let g = p * scale + vec2<f32>(t * speed * (1.0 + k), 0.1 * sin(t * 0.2 + k));\n    let cell = floor(g);\n    let seed = hash(cell + vec2<f32>(k * 13.0, 7.0));\n    let spin = 0.5 * (seed - 0.5) * sin(t * 0.6 + seed * 6.28);\n    let bob = vec2<f32>(0.0, 0.04 * sin(t * 1.5 + seed * 6.28));\n    let q = rotate(fract(g) - 0.5 - bob, spin);\n    let morph = 0.85 + 0.2 * sin(t * 0.9 + seed * 9.0);\n    let head = sd_circle(vec2<f32>(q.x, q.y * morph), r);\n    let ears = min(sd_circle(q - vec2<f32>(0.7 * r, 0.8 * r), 0.4 * r), sd_circle(q - vec2<f32>(-0.7 * r, 0.8 * r), 0.4 * r));\n    let body = smin(head, ears, 0.04 * r);\n    let blink = 1.0 - 0.9 * step(0.96, fract(t * 0.35 + seed));\n    let eyes = min(sd_circle(q - vec2<f32>(0.35 * r, 0.1 * r), 0.1 * r * blink), sd_circle(q - vec2<f32>(-0.35 * r, 0.1 * r), 0.1 * r * blink));\n    let present = step(0.45, seed);\n    let tint = mix(c1, c2, seed);\n    let ink = stroke(body, 0.035) + fill(eyes);\n    let face = fill(body) * 0.2;\n    let layer_col = (mix(tint * face, c3, fill(eyes)) + tint * ink) * present * (1.0 - 0.25 * k);\n    col += layer_col;\n}\nlet wave = wave_height * cos(p.x * 6.0 + t * 0.8);\nlet line_glow = halo(abs(p.y - wave), 0.03) * c5 * 0.6;\nlet dot_x = 0.6 * sin(t * 0.25);\nlet dot_pos = vec2<f32>(dot_x, wave_height * cos(dot_x * 6.0 + t * 0.8));\nlet dot = halo(sd_circle(p - dot_pos, 0.02), 0.04) * c3;\nlet corner = vec2<f32>(0.55, -0.25);\nlet rp = rotate(p - corner, t * 0.2);\nlet angle = min(sd_segment(rp, vec2<f32>(0.0, 0.0), vec2<f32>(0.0, 0.12)), sd_segment(rp, vec2<f32>(0.0, 0.0), vec2<f32>(0.12, 0.0)));\nlet corner_glow = stroke(angle, 0.008) * c4 * 1.2;\ncol += line_glow + dot + corner_glow;\nreturn mix(bg, tonemap(col), strength);",
+        "name": "Paw Parade Parallax",
+        "variables": [
+          {
+            "max": 0.30000001192092896,
+            "min": 0.10000000149011612,
+            "name": "cat_size",
+            "value": 0.18000000715255737
+          },
+          {
+            "max": 0.4000000059604645,
+            "min": 0.019999999552965164,
+            "name": "drift_speed",
+            "value": 0.119999997317791
+          },
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "wave_height",
+            "value": 0.119999997317791
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 4.5,
+      "speed": 2.0,
+      "strength": 0.10999999940395357,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "bubble-parade-v5",
+    "name": "Bubble Parade v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:bubble-parade-v5",
+    "updatedAt": "2026-11-13T05:16:39.508Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#231800",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

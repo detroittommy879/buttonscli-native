@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+- Text backing can swap text/backing colors for a light-text-strip look over any
+  shader. The website playground now offers backing, inversion, whole lines,
+  opacity and feather controls too.
+- Packaged additional personal release-picked themes, shaders and bundles.
+
+- Optional text backing softens shader/gradient backgrounds behind text runs or whole
+  occupied lines. Status-bar controls adjust opacity and feathering; Settings →
+  Experimental can disable the feature entirely. Off by default.
+
+- The browser playground starts with a randomly selected featured bundle and
+  softens shader and theme changes with a short fade.
+- **Standalone shader playground**: a static browser preview with terminal panes,
+  shader/bundle browsing, colors and live sliders; export new library picks without
+  rebuilding Rust/WASM. Requires WebGPU; runs no shell commands.
+- Playground themes now color the surrounding UI; animation has a 1–120 FPS
+  slider (default 30). An iframe helper supports configurable width/height and
+  suspends offscreen drawing. Older three/four-color palettes use native fallbacks.
+- **Save a bundle from the status bar**: the ◆ Bundles menu has a name box and
+  Save, so the looks on screen can be kept without opening Settings.
+- **Classic effects switch**: Look → Classic effects (also Settings →
+  Workspace) turns TV static, scanlines and moving gradients off in every
+  pane, whatever the themes say. Shaders are not affected.
+- **Applying a theme no longer changes Calm, GPU shaders or the effect
+  switches**: a theme saved while Calm was on used to turn Calm back on. The
+  status bar button is always called Look.
+- **Programs can copy to the clipboard** (OSC 52): programs that capture the
+  mouse, such as some AI CLIs, vim and tmux, now reach the clipboard when they
+  copy their own selection. Settings → Keyboard turns it off. Programs can
+  never read the clipboard.
+- **Scroll speed settings**: Settings → Workspace sets the terminal lines per
+  mouse wheel step and the wheel speed in Settings and other lists (now 2.5×
+  faster by default).
+- **Shader editor sections fold**: click a section title in Settings → Themes →
+  Shaders to fold it away. Strength and the shader's own sliders also appear
+  under the AI results.
+- **Experimental: folder navigation** (Settings → Experimental, off by
+  default): Up, Back, Home and ls buttons in the left panel, and a button for
+  each folder after `ls` or `dir` that changes into it.
+- The button editor has a row of symbols (arrows, star, check) to add to a
+  label.
 - **UI size**: Settings → Workspace scales text, buttons and terminals
   together. Auto picks a size from the monitor (smaller on 1080p/1440p at
   100% scaling).

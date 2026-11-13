@@ -1,0 +1,206 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#00d8cc",
+        "#0a6e8f",
+        "#ffd98a",
+        "#061a2e",
+        "#ff7a59"
+      ],
+      "custom": {
+        "expression": "let sun_p = vec2<f32>(0.42, 0.24);\nlet sky_t = smoothstep(-0.05, 0.5, p.y);\nvar col = mix(c2 * 0.7, c4, sky_t * 0.8);\ncol += c5 * 0.28 * (1.0 - smoothstep(0.0, 0.32, p.y + 0.02));\ncol += c3 * halo(sd_circle(p - sun_p, 0.1), 0.45) * sun_glow * 0.8;\ncol = mix(col, c3, fill(sd_circle(p - sun_p, 0.085)));\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i);\n    let bx = fract(t * bird_speed * 0.05 + k * 0.23) * 2.6 - 1.3;\n    let by = 0.3 + 0.12 * hash(vec2<f32>(k, 3.0)) + 0.03 * sin(t * 0.7 + k);\n    let flap = sin(t * 9.0 + k * 2.1) * 0.025;\n    let q = p - vec2<f32>(bx, by);\n    let wing = min(sd_segment(q, vec2<f32>(0.0, 0.0), vec2<f32>(-0.035, flap + 0.012)), sd_segment(q, vec2<f32>(0.0, 0.0), vec2<f32>(0.035, flap + 0.012)));\n    let bird = 1.0 - smoothstep(0.0, 0.004, wing);\n    col = mix(col, c4 * 0.3, bird);\n}\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i) / 3.0;\n    let seed = f32(i);\n    let spd = mix(0.6, 1.5, k) * wave_speed;\n    let amp = mix(0.012, 0.045, k);\n    let surface = mix(0.05, -0.24, k) + amp * sin(p.x * mix(5.0, 2.0, k) + t * spd + seed * 1.9) + amp * 0.5 * sin(p.x * mix(13.0, 6.0, k) - t * spd * 1.7);\n    let edge = smoothstep(-0.003, 0.003, p.y - surface);\n    let water = 1.0 - edge;\n    let deep = mix(c1, c2, k);\n    let wcol = mix(deep, c5, 0.15 * (1.0 - k));\n    let foam = (1.0 - smoothstep(0.0, 0.008, abs(p.y - surface))) * mix(0.5, 0.9, k);\n    col = mix(col, wcol, water);\n    col = mix(col, c3, foam * 0.8 * water);\n    let fx = fract(t * fish_speed * 0.06 * mix(1.0, 0.7, k) + hash(vec2<f32>(seed, 7.0))) * 2.8 - 1.4;\n    let fy = surface - 0.09 - 0.04 * hash(vec2<f32>(seed, 2.0));\n    let fq = p - vec2<f32>(fx, fy);\n    let body = sd_circle(vec2<f32>(fq.x * 2.2, fq.y * 6.0), 0.1);\n    let tail = sd_circle(vec2<f32>((fq.x + 0.042) * 2.5, fq.y * 5.0), 0.1);\n    let fish = 1.0 - smoothstep(0.0, 0.003, min(body, tail));\n    col = mix(col, c4 * 0.3, fish * water);\n}\nreturn mix(bg, tonemap(col), strength);",
+        "name": "Parallax Surf",
+        "variables": [
+          {
+            "max": 2.5,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.0
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "bird_speed",
+            "value": 1.0
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "fish_speed",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "sun_glow",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ink",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.17000000178813934,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 9.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 46.0,
+    "staticDensity": 1.0,
+    "staticEnabled": false,
+    "staticIntensity": 63.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-12T04:42:40.830Z",
+    "description": "A festive collision of Halloween and Christmas",
+    "id": "hallowmas-copy-copy-v5",
+    "name": "Hallowmas Copy Copy v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hallowmas-copy-copy-v5",
+    "updatedAt": "2026-11-12T04:42:40.830Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#1a1a1a",
+        "buttonBackground": "#3f2f26",
+        "buttonHover": "#593521",
+        "buttonText": "#ffffff"
+      },
+      "settings": {
+        "background": "#1a1a1a"
+      },
+      "shell": {
+        "accent": "#ff5e00",
+        "accentHover": "#ff7b2e",
+        "background": "#1a1a1a",
+        "backgroundSecondary": "#2a2a2a",
+        "border": "#562c13",
+        "buttonBackground": "#2a2a2a",
+        "paneDivider": {
+          "color": "#529a13",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#989898",
+        "textMain": "#ffffff"
+      },
+      "statusBar": {
+        "background": "#6c3211",
+        "border": "#562c13",
+        "text": "#ffffff",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#0a0a0a",
+        "activeBorder": "#ff5e00",
+        "background": "#1a1a1a",
+        "idleBackground": "#2a2a2a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c1c1c",
+        "blue": "#005eff",
+        "brightBlack": "#333333",
+        "brightBlue": "#428cff",
+        "brightCyan": "#42ffff",
+        "brightGreen": "#42ffb3",
+        "brightMagenta": "#ff42ff",
+        "brightRed": "#ff8c42",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffff42",
+        "cyan": "#00ffff",
+        "green": "#00ff88",
+        "magenta": "#ff00ff",
+        "red": "#ff5e00",
+        "white": "#ffffff",
+        "yellow": "#ffff00"
+      },
+      "background": "#1b0325",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#ffffff",
+      "gradientAngle": 45.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -782,6 +782,37 @@ impl TerminalBackend {
         output
     }
 
+    /// The displayed rows, each with a flag per character: true where the
+    /// cell is drawn in ANSI blue (text or background), the color `ls
+    /// --color` and PowerShell give folders.
+    pub fn screen_rows(&self) -> Vec<(String, Vec<bool>)> {
+        let blue = |color: &Color| {
+            matches!(
+                color,
+                Color::Named(
+                    alacritty_terminal::vte::ansi::NamedColor::Blue
+                        | alacritty_terminal::vte::ansi::NamedColor::BrightBlue
+                ) | Color::Indexed(4 | 12)
+            )
+        };
+        let mut rows: Vec<(String, Vec<bool>)> = Vec::new();
+        let mut current = None;
+        for indexed in &self.last_content.cells {
+            if current != Some(indexed.point.line) {
+                current = Some(indexed.point.line);
+                rows.push(Default::default());
+            }
+            let cell = &indexed.cell;
+            if cell.flags.contains(Flags::WIDE_CHAR_SPACER) {
+                continue;
+            }
+            let row = rows.last_mut().expect("a row was pushed");
+            row.0.push(if cell.c == '\0' { ' ' } else { cell.c });
+            row.1.push(blue(&cell.fg) || blue(&cell.bg));
+        }
+        rows
+    }
+
     /// Copy a bounded plain-text tail of the retained grid. This reads only
     /// the requested rows under the parser lock; it never reads the PTY.
     pub fn plain_text_tail(&self, max_chars: usize) -> String {
@@ -1403,6 +1434,19 @@ mod virtual_backend_tests {
         );
         backend.sync();
         assert!(backend.plain_text_tail(4096).contains("virtual red"));
+        // Folder-colored (ANSI blue) cells are flagged for the app.
+        backend.feed_virtual_output(
+            b"[1;34mdocs[0m  a.txt
+",
+        );
+        backend.sync();
+        let rows = backend.screen_rows();
+        let (text, blue) = rows
+            .iter()
+            .find(|(text, _)| text.starts_with("docs"))
+            .expect("the listing row");
+        assert_eq!(text.chars().count(), blue.len());
+        assert!(blue[..4].iter().all(|on| *on) && !blue[4..].contains(&true));
         assert_eq!(backend.search_next("virtual red").unwrap(), Some((1, 1)));
         backend.select_all();
         assert!(backend.selectable_content().contains("virtual red"));

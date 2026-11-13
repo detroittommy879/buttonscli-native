@@ -154,10 +154,12 @@ impl ButtonsApp {
             name = (1..)
                 .map(|number| format!("Bundle {number}"))
                 .find(|candidate| {
+                    // Not a built-in's name either: it would hide that one.
                     !self
                         .preferences
                         .theme_bundles
                         .iter()
+                        .chain(crate::library::bundles())
                         .any(|bundle| &bundle.name == candidate)
                 })
                 .unwrap();
@@ -300,10 +302,33 @@ impl ButtonsApp {
             return;
         }
         let mut apply = None;
+        let mut save = false;
         // Inside the File menu this is a submenu; in the status bar it is a
         // standalone menu (see `ui_text::solo_menu_button`).
         let text = crate::i18n::literal(&self.locale, label);
+        let draft = &mut self.bundle_name_draft;
         let contents = |ui: &mut egui::Ui| {
+            if top_level {
+                // Save what is on screen without opening Settings.
+                ui.spaced_strong("Save current looks as a bundle");
+                ui.horizontal(|ui| {
+                    let response = ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .hint_text("Name (optional)")
+                            .desired_width(200.0),
+                    );
+                    save = response.lost_focus()
+                        && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                    save |= ui
+                        .spaced_button("Save")
+                        .on_hover_text("Each pane's theme, shader and font, plus the layout. A bundle with the same name is replaced.")
+                        .clicked();
+                });
+                if save {
+                    ui.close_menu();
+                }
+                ui.separator();
+            }
             for (name, mark) in names {
                 if ui.spaced_button(format!("{mark} {name}")).clicked() {
                     apply = Some(name);
@@ -317,7 +342,18 @@ impl ButtonsApp {
             ui.spaced_menu_button(text, contents)
         };
         menu.response
-            .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals.");
+            .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals, or save the current looks as one.");
+        if save {
+            let name = self.bundle_name_draft.trim().to_owned();
+            self.notice = Some(match self.save_theme_bundle(&name) {
+                Ok(name) => {
+                    self.bundle_name_draft.clear();
+                    format!("Saved theme bundle \"{name}\".")
+                }
+                Err(error) => error,
+            });
+            ui.close_menu();
+        }
         if let Some(name) = apply {
             self.notice = self.apply_theme_bundle(ctx, &name);
             ui.close_menu();

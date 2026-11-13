@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5b3dff",
+        "#2a6bff",
+        "#b07aff",
+        "#0d0a24",
+        "#3df5ff"
+      ],
+      "custom": {
+        "expression": "let r = length(p) * ring_density;\nlet ph = r - t * vibe_speed * 1.6;\nlet wave = (sin(ph) + 0.33 * sin(3.0 * ph)) * 0.75;\nlet swell = 0.5 + 0.5 * wave;\nlet ring_line = smoothstep(0.95, 0.995, wave);\nlet glow_body = smoothstep(0.2, 1.0, wave) * 0.25;\nlet base = mix(c4, c1, 0.35 + 0.3 * smoothstep(-0.5, 0.5, p.y));\nlet tint = mix(base, c2, smoothstep(-0.5, 0.5, p.x) * 0.5);\nlet wash = tint * (0.5 + 0.3 * swell);\nlet lines = mix(c3, c5, swell) * ring_line * 1.2;\nlet color = wash + lines + c1 * glow_body * 0.4;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Violet Vibrations",
+        "variables": [
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "vibe_speed",
+            "value": 1.0
+          },
+          {
+            "max": 20.0,
+            "min": 6.0,
+            "name": "ring_density",
+            "value": 14.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.899999976158142,
+      "speed": 0.8999999761581421,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Dark blue-violet terminal with thin resonant rings and sharp cyan highlights",
+    "id": "violet-vibrations",
+    "name": "Violet Vibrations",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:violet-vibrations",
+    "updatedAt": "2026-11-11T23:04:01.813Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#3df5ff",
+        "background": "#140f26",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#140f26"
+      },
+      "shell": {
+        "accent": "#7a4dff",
+        "accentHover": "#3df5ff",
+        "background": "#0a0816",
+        "backgroundSecondary": "#140f26",
+        "border": "#2e2262",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#7a4dff",
+          "thickness": 2.0
+        },
+        "textDim": "#a9a0cc",
+        "textMain": "#eeeaff"
+      },
+      "statusBar": {
+        "background": "#140f26",
+        "border": "#2e2262",
+        "text": "#a9a0cc",
+        "warning": "#ffd66b"
+      },
+      "tabs": {
+        "activeBackground": "#0a0816",
+        "activeBorder": "#7a4dff",
+        "background": "#140f26",
+        "idleBackground": "#140f26"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#05060b",
+        "blue": "#4d8bff",
+        "brightBlack": "#4a4470",
+        "brightBlue": "#7aa8ff",
+        "brightCyan": "#86faff",
+        "brightGreen": "#9dffd0",
+        "brightMagenta": "#d0a8ff",
+        "brightRed": "#ff7a9c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff0a8",
+        "cyan": "#3df5ff",
+        "green": "#4dffb0",
+        "magenta": "#b07aff",
+        "red": "#ff4d7a",
+        "white": "#e6e2ff",
+        "yellow": "#ffd66b"
+      },
+      "background": "#05060b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e6e2ff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0d0a24",
+        "#3a1f8f",
+        "#5b3dff",
+        "#2a6bff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff3d7f",
+        "#20e3ff",
+        "#ffd60a",
+        "#6a00ff",
+        "#3dff8a"
+      ],
+      "custom": {
+        "expression": "let sky = mix(c4 * 0.45, c4 * 0.2, step(0.0, p.y + 0.08 * sin(p.x * 4.0 + t * 0.4 * speed)));\nlet g1 = rotate(p, 0.2 * sin(t * 0.07 * speed)) * density * 0.5 + vec2<f32>(t * 0.05 * speed, 0.0);\nlet k1 = floor(g1);\nlet s1 = hash(k1);\nlet l1 = fract(g1) - 0.5;\nlet m1 = 0.5 + 0.5 * sin(t * speed * 0.6 + s1 * 6.28);\nlet a1 = sd_circle(l1 * vec2<f32>(1.0, 1.0 + 0.6 * m1), 0.26);\nlet b1 = sd_box(rotate(l1, t * 0.4 * speed + s1 * 6.28), vec2<f32>(0.2, 0.2));\nlet w1 = abs(l1.y - 0.18 * cos(l1.x * 10.0 + t * 2.0 * speed + s1 * 6.28)) - 0.03;\nlet o1 = sd_circle(l1, 0.09 + 0.04 * sin(t * 2.0 * speed + s1));\nlet d1 = select(select(w1, o1, s1 < 0.75), mix(a1, b1, m1), s1 < 0.5);\nlet col1 = mix(mix(c1, c2, step(0.33, s1)), c5, step(0.66, s1));\nlet L1 = mix(sky, col1 * 0.55, fill(d1));\nlet P1 = mix(L1, bg, stroke(d1, outline_w * 0.6));\nlet g2 = rotate(p, -0.3 * sin(t * 0.09 * speed)) * density * 0.8 + vec2<f32>(0.0, t * 0.08 * speed);\nlet k2 = floor(g2);\nlet s2 = hash(k2 + vec2<f32>(13.0, 5.0));\nlet l2 = fract(g2) - 0.5;\nlet m2 = 0.5 + 0.5 * sin(t * speed * 0.8 + s2 * 6.28);\nlet a2 = sd_circle(l2 * vec2<f32>(1.0 + 0.5 * m2, 1.0), 0.22);\nlet b2 = sd_box(rotate(l2, t * 0.6 * speed + s2 * 6.28), vec2<f32>(0.18, 0.18));\nlet w2 = abs(l2.x - 0.16 * cos(l2.y * 10.0 + t * 2.4 * speed + s2 * 6.28)) - 0.03;\nlet o2 = sd_circle(l2, 0.08 + 0.03 * sin(t * 2.5 * speed + s2));\nlet d2 = select(select(w2, o2, s2 < 0.75), mix(a2, b2, m2), s2 < 0.5);\nlet col2 = mix(c3, c2, step(0.5, s2));\nlet L2 = mix(P1, col2 * 0.8, fill(d2));\nlet P2 = mix(L2, bg, stroke(d2, outline_w * 0.8));\nlet g3 = p * density * 1.2 + vec2<f32>(t * 0.25 * speed, sin(t * 0.3 * speed) * 0.1);\nlet k3 = floor(g3);\nlet s3 = hash(k3 + vec2<f32>(29.0, 11.0));\nlet l3 = fract(g3) - 0.5;\nlet m3 = 0.5 + 0.5 * sin(t * speed * 1.1 + s3 * 6.28);\nlet a3 = sd_circle(l3 * vec2<f32>(1.0, 1.0 + 0.7 * m3), 0.28);\nlet b3 = sd_box(rotate(l3, t * 0.8 * speed + s3 * 6.28), vec2<f32>(0.21, 0.21));\nlet w3 = abs(l3.y - 0.2 * cos(l3.x * 10.0 + t * 3.0 * speed + s3 * 6.28)) - 0.035;\nlet o3 = sd_circle(l3, 0.1 + 0.04 * sin(t * 3.0 * speed + s3));\nlet d3 = select(select(w3, o3, s3 < 0.75), mix(a3, b3, m3), s3 < 0.5);\nlet col3 = mix(c5, c3, step(0.5, s3));\nlet L3 = mix(P2, col3, fill(d3));\nlet P3 = mix(L3, bg, stroke(d3, outline_w));\nreturn mix(bg, P3, strength);",
+        "name": "Pop Parallax",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "speed",
+            "value": 1.0
+          },
+          {
+            "max": 10.0,
+            "min": 2.0,
+            "name": "density",
+            "value": 5.0
+          },
+          {
+            "max": 0.07999999821186066,
+            "min": 0.009999999776482582,
+            "name": "outline_w",
+            "value": 0.03500000014901161
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:38:51.777Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "gravity-arcade-v10",
+    "name": "Gravity Arcade v10",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gravity-arcade-v10",
+    "updatedAt": "2026-11-11T22:38:57.216Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -107,6 +107,14 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `pane_looks`; unused slots wait in `pending_pane_looks` for new tabs.
 - Never put terminal cells in an outer egui `ScrollArea`: backend scrolling, selection
   and PTY sizing already handle this. Dividers need their selection dead zone.
+- Text backing: `src/app/text_backing.rs`, global `Preferences::text_backing`;
+  renderer `vendor/egui_term/src/text_backing.rs`. Paint once after background
+  callbacks, before all cell backgrounds/glyphs (per-cell feathering covers neighbors).
+  Keep it out of theme import scopes. Experimental `available` is the kill switch.
+  Inversion backs runs with their foreground (whole rows use default foreground),
+  uses background for ink, and preserves explicit TUI/selection/search colors.
+  Web backing lives in `shader-playground/text-backing.js`; layout switches must
+  preserve `backing-*` classes. Deploy the JS module along with app.js.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
   geometry use the outer rectangle. Let the widget handle cell/input coordinates.
 - The adapter locks arrows/Tab/Escape to the terminal. Repeated `request_focus` resets
@@ -209,6 +217,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   built-in catalog/library size or status-bar width; find text in a settled frame.
   Release picks can add "<name> vN" built-ins: compute expected copy names
   with `next_theme_version` over `themes.all()` before saving.
+- Live switches (`LIVE_SWITCHES`: Calm, shaders on, advanced effects, focused
+  pane only) and `classic_effects` are never applied from a theme's
+  `nativeAppearance`; `without_classic_effects` strips static, scanlines and
+  gradient motion in both presentation paths. Keep new global switches out of
+  `NATIVE_APPEARANCE_FIELDS`.
+- Foldable Settings sections: `folding_section` + `section_open` /
+  `toggle_section` (`settings_layout.folded`). The body does not run while
+  folded, so side effects (taking a worker result) must not live only there.
+- Left-panel folder buttons (`src/app/dock_nav.rs`, Settings → Experimental)
+  read the screen via `TerminalBackend::screen_rows`, never the disk. Test
+  with a long listing: the `ls` line scrolls off screen.
+- OSC 52 copy arrives as `PtyEvent::ClipboardStore` in
+  `process_terminal_events` (`program_clipboard`); reads stay denied.
+- Python edit scripts: pass `encoding='utf-8'` (the default here is cp1252).
 - Python edit scripts: write them with the Write tool and run the file; Bash
   heredocs mangle `\n` inside Python strings here.
 - Isolated app runs (USERPROFILE scratch): the first run shows a language/look
@@ -224,6 +246,16 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
+- Standalone HTML/WebGPU playground: `shader-playground/` (independent of paused
+  WASM). Refresh its public-only catalog with `python scripts/export-shader-playground.py`;
+  serves on localhost/HTTPS. Native `shaderBackground` can be JSON null; exporters
+  must handle it. WGSL uniform layout and custom strength behavior mirror native.
+  Palette export must mirror `app::shader_palette`: explicit palettes can have
+  only 3–4 colors; remaining slots inherit gradient/accent/ANSI colors. ANSI can
+  be an object or array. Chrome colors use a bundle's `app_theme_id`.
+  Production `/native/try/` is the standalone playground now, not WASM. Homepage
+  generator is mirrored in `site-src/`; its `#playground` uses `embed.js`. Keep
+  old WASM archives outside the public root; do not redeploy `web/pkg/` there.
   WASM uses WGPU/WebGPU and the shared shader renderer. Eframe 0.31 needs
   a direct `egui-wgpu` fragile-send-sync feature and direct Naga for WGSL checks. Config visibility changes
   need a reload only; Rust changes need `scripts/build-web.ps1` to refresh pkg/ and

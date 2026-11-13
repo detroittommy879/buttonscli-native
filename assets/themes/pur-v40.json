@@ -1,0 +1,222 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff3fb4",
+        "#22e0ff",
+        "#7a4dff",
+        "#d8fbff",
+        "#2a1a4e"
+      ],
+      "custom": {
+        "expression": "let dir = normalize(vec2<f32>(0.82, -0.57));\nlet perp = vec2<f32>(-dir.y, dir.x);\nlet tex = ridged(vec2<f32>(dot(p, perp) * 8.0, dot(p, dir) * 2.0 - t * 1.8));\nvar acc = vec3<f32>(0.0);\n\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i);\n    let s1 = hash(vec2<f32>(k, 2.3));\n    let s2 = hash(vec2<f32>(k, 9.1));\n    let ph = fract(t * (0.20 + 0.22 * s2) * comet_speed + s1);\n    let lane = -0.75 + 1.5 * s2 + 0.08 * sin(t * 0.4 + k * 1.9);\n    let head = perp * lane + dir * (ph * 3.8 - 1.9);\n    let rel = p - head;\n    let along = dot(rel, dir);\n    let acr = dot(rel, perp);\n    let w = 0.011 + 0.010 * s1;\n    let tlen = tail_length * (0.8 + 0.7 * s2);\n    let acn = acr / w;\n    let back = max(-along, 0.0);\n    let body = exp(-acn * acn) * exp(-back * 2.3 / tlen) * exp(-max(along, 0.0) * 26.0);\n    let hot = exp(-dot(rel, rel) * 85.0);\n    let u = clamp(back / tlen, 0.0, 1.0);\n    let tint = mix(mix(c4, c1, smoothstep(0.0, 0.25, u)), c2, smoothstep(0.25, 1.0, u));\n    acc += tint * (body + hot * 2.0);\n}\n\nlet pf = p * 2.0 + vec2<f32>(3.7, 1.3);\nfor (var j = 0; j < 5; j++) {\n    let m = f32(j);\n    let m1 = hash(vec2<f32>(m, 4.7));\n    let m2 = hash(vec2<f32>(m, 12.9));\n    let phb = fract(t * (0.10 + 0.12 * m2) * comet_speed + m1);\n    let lane2 = -0.85 + 1.7 * m2 + 0.06 * sin(t * 0.25 + m * 2.4);\n    let head2 = perp * lane2 + dir * (phb * 3.6 - 1.8);\n    let rel2 = pf - head2;\n    let along2 = dot(rel2, dir);\n    let acr2 = dot(rel2, perp);\n    let w2 = 0.012 + 0.008 * m1;\n    let tlen2 = tail_length * (0.6 + 0.5 * m2);\n    let acn2 = acr2 / w2;\n    let back2 = max(-along2, 0.0);\n    let body2 = exp(-acn2 * acn2) * exp(-back2 * 2.6 / tlen2) * exp(-max(along2, 0.0) * 26.0);\n    let hot2 = exp(-dot(rel2, rel2) * 110.0);\n    let u2 = clamp(back2 / tlen2, 0.0, 1.0);\n    let tint2 = mix(mix(c3, c2, smoothstep(0.0, 0.6, u2)), c5 * 1.8, smoothstep(0.5, 1.0, u2));\n    acc += tint2 * body2 * 0.65 + c2 * hot2 * 0.7;\n}\n\nlet veil = mix(c3, c2, tex) * tex * tex * 0.55;\nlet wash = mix(c3 * 0.14, c2 * 0.07, smoothstep(-0.5, 0.5, p.y));\nlet sharp = 0.55 + 0.85 * tex;\nlet vign = 0.78 + 0.22 * (1.0 - smoothstep(0.45, 1.15, length(p)));\nlet scene = (wash + veil + acc * sharp * glow) * vign;\nreturn mix(bg, tonemap(scene * 1.45), strength);",
+        "name": "neon comets",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "comet_speed",
+            "value": 1.0
+          },
+          {
+            "max": 1.2000000476837158,
+            "min": 0.15000000596046448,
+            "name": "tail_length",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 2.5,
+            "min": 0.20000000298023224,
+            "name": "glow",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 5.5,
+      "speed": 1.2999999523162842,
+      "strength": 0.7799999713897705,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 0.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.0,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.119999997317791
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T18:55:04.836Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "pur-v40",
+    "name": "pur v40",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pur-v40",
+    "updatedAt": "2026-11-13T06:42:40.519Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

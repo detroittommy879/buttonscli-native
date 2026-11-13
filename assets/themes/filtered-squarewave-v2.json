@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#28c8e5",
+        "#6fe7d0",
+        "#777bee",
+        "#ff709c",
+        "#f5c36a"
+      ],
+      "custom": {
+        "expression": "let x = p.x * (1.4 + amount * 0.48) - t * (0.22 + gravity * 0.16);\nlet phase = x * 3.141593;\nlet cutoff = 2.2 + 1.2 * sin(t * 0.35);\nlet h3 = exp(-3.0 / cutoff);\nlet h5 = exp(-5.0 / cutoff);\nlet h7 = exp(-7.0 / cutoff);\nlet filtered = (sin(phase) + sin(phase * 3.0) * (h3 / 3.0) + sin(phase * 5.0) * (h5 / 5.0) + sin(phase * 7.0) * (h7 / 7.0)) * 0.57;\nlet square = select(-0.57, 0.57, sin(phase) >= 0.0);\nlet edge = abs(fract(x * 0.5) - 0.5);\nlet vertical = min(edge, 0.5 - edge) * 2.0 / (1.4 + amount * 0.48);\nlet rawDistance = min(abs(p.y - square), max(vertical, abs(p.y) - 0.57));\nlet d = abs(p.y - filtered);\nlet width = 0.006 + shape_size * 0.035;\nlet line = 1.0 - smoothstep(width, width + 0.012, d);\nlet rawLine = 1.0 - smoothstep(0.004, 0.012, rawDistance);\nlet halo = exp(-d * 11.0) * glow * 0.3;\nlet water = cloud(p * vec2<f32>(1.4, 2.4) + vec2<f32>(t * 0.08, -t * 0.04));\nlet base = mix(c3, c1, water) * vec3<f32>(0.16, 0.23, 0.30);\nlet gridCoord = abs(fract(p * 4.0 + vec2<f32>(0.5)) - vec2<f32>(0.5));\nlet grid = 1.0 - smoothstep(0.008, 0.022, min(gridCoord.x, gridCoord.y));\nlet traceColor = mix(c1, c2, 0.5 + 0.5 * sin(phase * 0.3 + t * 0.4));\nlet field = base + c3 * vec3<f32>(grid * 0.065) + c4 * vec3<f32>(rawLine * 0.3) + traceColor * vec3<f32>(halo);\nlet color = mix(field, traceColor, line);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Filtered Squarewave",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 1.7000000476837158
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 2.700000047683716
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.5899999737739563
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 0.699999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 2.5999999046325684,
+      "speed": 2.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "kinda looks like when you put a strong magnet on top of an old TV",
+    "id": "filtered-squarewave-v2",
+    "name": "Filtered Squarewave v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:filtered-squarewave-v2",
+    "updatedAt": "2026-11-11T22:44:52.040Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#2a1a4a",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#2a1a4a"
+      },
+      "shell": {
+        "accent": "#ff4d4d",
+        "accentHover": "#fc6a6a",
+        "background": "#2a1a4a",
+        "backgroundSecondary": "#3a2a5a",
+        "border": "#61274b",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff4d4d",
+          "thickness": 2.0
+        },
+        "textDim": "#968ba1",
+        "textMain": "#f0f0f0"
+      },
+      "statusBar": {
+        "background": "#772c4b",
+        "border": "#61274b",
+        "text": "#f0f0f0",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#1a0033",
+        "activeBorder": "#ff4d4d",
+        "background": "#2a1a4a",
+        "idleBackground": "#3a2a5a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#4d4dff",
+        "brightBlack": "#565656",
+        "brightBlue": "#8282ff",
+        "brightCyan": "#82ffff",
+        "brightGreen": "#82ff82",
+        "brightMagenta": "#ff82ff",
+        "brightRed": "#ff8282",
+        "brightWhite": "#f5f5f5",
+        "brightYellow": "#ffff82",
+        "cyan": "#4dffff",
+        "green": "#4dff4d",
+        "magenta": "#ff4dff",
+        "red": "#ff4d4d",
+        "white": "#f0f0f0",
+        "yellow": "#ffff4d"
+      },
+      "background": "#1a0033",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Commit Mono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#f0f0f0",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0033",
+        "#2a1a4a",
+        "#3a2a5a",
+        "#005566"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 100,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

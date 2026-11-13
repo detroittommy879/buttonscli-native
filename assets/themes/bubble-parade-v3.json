@@ -1,0 +1,218 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": null,
+      "custom": {
+        "expression": "let density = 1.1 + amount * 0.13;\nlet row = floor(p.y * density);\nlet seed = hash(vec2<f32>(row, 8.7));\nlet grid = vec2<f32>(p.x * density - t * (0.22 + gravity * 0.16) * (0.7 + seed * 0.6) + seed * 4.0, p.y * density);\nlet cell = floor(grid);\nlet id = hash(cell + vec2<f32>(3.1, 9.2));\nlet q = fract(grid) - vec2<f32>(0.5, 0.5 + sin(t * (2.0 + gravity) + cell.x * 3.0 + row) * 0.045);\nlet size = shape_size * (0.65 + id * 0.18);\nlet body = (length(q / vec2<f32>(size, size * 0.56)) - 1.0) * size * 0.56;\nlet tail = max(abs(q.y + sin(t * 7.0 + id * 9.0) * 0.025) - (-q.x - size * 0.55) * 0.65, max(-q.x - size * 1.65, q.x + size * 0.7));\nlet d = min(body, tail);\nlet fish = (1.0 - smoothstep(-0.008, 0.012, d)) * smoothstep(0.0, 0.8, amount);\nlet eye = 1.0 - smoothstep(size * 0.085, size * 0.13, length(q - vec2<f32>(size * 0.55, size * 0.15)));\nlet fishColor = mix(mix(c1, c2, id) * vec3<f32>(0.75 + 0.25 * sin(q.x / size * 15.0)), vec3<f32>(0.015, 0.04, 0.09), eye);\nlet water = cloud(p * vec2<f32>(1.4, 2.4) + vec2<f32>(t * 0.08, -t * 0.04));\nlet rays = pow(0.5 + 0.5 * sin(p.x * 4.5 + p.y * 1.3 + water * 5.0 + t * 0.3), 5.0);\nlet sea = mix(vec3<f32>(0.015, 0.13, 0.24), c1 * vec3<f32>(0.32, 0.48, 0.52), water) + c2 * vec3<f32>(rays * 0.18);\nlet halo = exp(-max(d, 0.0) * 18.0) * glow * 0.16 * smoothstep(0.0, 0.8, amount);\nlet color = mix(sea + mix(c2, c3, 0.25) * vec3<f32>(halo), fishColor, fish);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Bubble Parade",
+        "variables": [
+          {
+            "max": 10.0,
+            "min": 0.0,
+            "name": "amount",
+            "value": 6.300000190734863
+          },
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "gravity",
+            "value": 1.899999976158142
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.10000000149011612,
+            "name": "shape_size",
+            "value": 0.3499999940395355
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "glow",
+            "value": 1.5
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 4.5,
+      "speed": 2.0,
+      "strength": 0.3199999928474426,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "bubble-parade-v3",
+    "name": "Bubble Parade v3",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:bubble-parade-v3",
+    "updatedAt": "2026-11-12T23:42:10.826Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

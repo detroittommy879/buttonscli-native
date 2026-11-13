@@ -19,9 +19,10 @@ every open terminal gets its look back.
 
 1. Give your panes the looks you want (see [Themes](themes.md) and
    [Shader backgrounds](shaders.md)).
-2. Open **Settings → Themes → Library → Theme bundles**.
+2. Open the **◆ Bundles** menu in the status bar (or **Settings → Themes →
+   Library → Theme bundles**).
 3. Type a name, or leave it empty for *Bundle 1, 2, …*
-4. Click **Save current looks**.
+4. Click **Save** (**Save current looks** in Settings).
 
 **Replace bundle** updates an existing bundle with what is on screen now.
 
