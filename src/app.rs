@@ -262,6 +262,18 @@ fn workspace_controls_available() -> bool {
     .available
 }
 
+/// Look → Classic effects off: no TV static, scanlines or gradient motion,
+/// whatever the theme asks for. Shaders and the still gradient stay.
+#[cfg(not(target_arch = "wasm32"))]
+fn without_classic_effects(effects: &mut TerminalEffects) {
+    effects.gradient_animation = false;
+    effects.static_opacity = 0.0;
+    effects.scanlines_strength = 0.0;
+    effects.simple_noise_enabled = false;
+    effects.simple_noise_amount = 0.0;
+    effects.simple_noise_idle_enabled = false;
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 fn effects_master_switch_available() -> bool {
     crate::features::access::resolve(
@@ -710,6 +722,9 @@ pub struct ButtonsApp {
     pending_pane_looks: Option<theme_bundles::PendingPaneLooks>,
     #[cfg(not(target_arch = "wasm32"))]
     bundle_name_draft: String,
+    /// Text a terminal program asked to copy (OSC 52), until the next frame.
+    #[cfg(not(target_arch = "wasm32"))]
+    program_clipboard: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     release_picks: release_picks::ReleasePicks,
     #[cfg(not(target_arch = "wasm32"))]
@@ -775,6 +790,8 @@ enum SettingsTab {
     Language,
     Shortcuts,
     Keyboard,
+    #[cfg(not(target_arch = "wasm32"))]
+    Experimental,
     #[cfg(not(target_arch = "wasm32"))]
     Providers,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1818,6 +1835,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             bundle_name_draft: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            program_clipboard: None,
+            #[cfg(not(target_arch = "wasm32"))]
             release_picks: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             power: Default::default(),
@@ -2062,6 +2081,9 @@ impl ButtonsApp {
             simple_noise_idle_delay_seconds: effects.simple_noise_idle_delay_seconds,
             simple_noise_idle_ramp_seconds: effects.simple_noise_idle_ramp_seconds,
         };
+        if !self.preferences.classic_effects {
+            without_classic_effects(&mut theme.effects);
+        }
         self.with_strength_override(theme)
     }
 
@@ -2102,6 +2124,9 @@ impl ButtonsApp {
                     theme.effects.static_opacity = 0.0;
                     theme.effects.scanlines_strength = 0.0;
                     theme.effects.simple_noise_enabled = false;
+                }
+                if !self.preferences.classic_effects {
+                    without_classic_effects(&mut theme.effects);
                 }
                 return self.with_strength_override(theme);
             }
@@ -3250,6 +3275,16 @@ impl ButtonsApp {
                     }
                     PtyEvent::Exit | PtyEvent::ChildExit(_) => tab.exited = true,
                     PtyEvent::ResetTitle => tab.reported_title = None,
+                    // OSC 52: the program copies text (its own selection in
+                    // mouse mode, `yank` in vim, tmux). Reads stay denied.
+                    PtyEvent::ClipboardStore(egui_term::ClipboardType::Clipboard, text)
+                        if self.preferences.keyboard.programs_copy
+                            && tab.simulated.is_none()
+                            && !text.is_empty()
+                            && text.len() <= 1_000_000 =>
+                    {
+                        self.program_clipboard = Some(text);
+                    }
                     _ => {}
                 }
             }
@@ -3653,6 +3688,7 @@ impl ButtonsApp {
             advanced_effects: self.preferences.advanced_effects,
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
             keyboard: &self.preferences.keyboard,
+            scroll_lines: self.preferences.terminal_scroll_lines,
             row_brightness: self.preferences.row_banding_brightness,
             animation_fps,
             animation_delay,
@@ -5327,6 +5363,8 @@ impl ButtonsApp {
             self.perform_preset_action(action);
         }
         ui.add_space(12.0);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.dock_navigation(ui);
         ui.separator();
         ui.spaced_label(
             RichText::new("RUN A COMMAND")
@@ -5675,6 +5713,23 @@ impl ButtonsApp {
         }
     }
 
+    /// Whether a foldable Settings section (see `folding_section`) is open.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn section_open(&self, key: &str) -> bool {
+        !self.preferences.settings_layout.folded.contains(key)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn toggle_section(&mut self, key: &str, toggled: bool) {
+        if toggled {
+            let folded = &mut self.preferences.settings_layout.folded;
+            if !folded.remove(key) {
+                folded.insert(key.to_owned());
+            }
+            self.persist_native_preferences();
+        }
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn persist_native_preferences(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -5956,6 +6011,12 @@ impl ButtonsApp {
                     SettingsTab::Keyboard,
                     "Keyboard",
                 );
+                #[cfg(not(target_arch = "wasm32"))]
+                ui.spaced_selectable_value(
+                    &mut self.settings_tab,
+                    SettingsTab::Experimental,
+                    "Experimental",
+                );
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
                     SettingsTab::Shortcuts,
@@ -6068,6 +6129,8 @@ impl ButtonsApp {
                 SettingsTab::Language => self.theme_settings(ui),
                 SettingsTab::Shortcuts => self.shortcut_settings(ui),
                 SettingsTab::Keyboard => self.keyboard_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::Experimental => self.experimental_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Providers => self.provider_settings(ui, ctx),
                 #[cfg(not(target_arch = "wasm32"))]
@@ -8997,7 +9060,8 @@ impl ButtonsApp {
         let time = animation_clock(ui.input(|i| i.time), self.effective_animation_fps());
 
         // 1. Live preview first, so every change below is visible right away.
-        settings_section(ui, base, 0, |ui| {
+        let section_open = self.section_open("shader-preview");
+        let section_toggled = folding_section(ui, base, 0, section_open, "Preview", |ui| {
             wrapping_row(ui, |ui| {
                 ui.spaced_label(
                     RichText::new(format!(
@@ -9053,6 +9117,7 @@ impl ButtonsApp {
                 );
             }
         });
+        self.toggle_section("shader-preview", section_toggled);
 
         // 2. Style: which pattern, how strong, and the options AI and code share.
         let mut sliders_note = None;
@@ -9064,8 +9129,8 @@ impl ButtonsApp {
             .iter()
             .map(|color| crate::theme::to_hex(*color))
             .collect();
-        settings_section(ui, base, 1, |ui| {
-            ui.spaced_label(RichText::new("Style").strong());
+        let section_open = self.section_open("shader-style");
+        let section_toggled = folding_section(ui, base, 1, section_open, "Style", |ui| {
             if ui
                 .spaced_checkbox(&mut enabled, "Use a shader in this theme")
                 .changed()
@@ -9415,6 +9480,7 @@ impl ButtonsApp {
                 ui.spaced_colored_label(self.colors().warning, note);
             }
         });
+        self.toggle_section("shader-style", section_toggled);
 
         // What the AI is told about the Style settings above.
         let own_palette = !shader.theme_colors && shader.colors.is_some();
@@ -9441,15 +9507,21 @@ impl ButtonsApp {
 
         // 3. Create with AI: several writers in parallel, each checked by a judge.
         if shader_ai_available() {
-            settings_section(ui, base, 2, |ui| {
-                ui.spaced_label(RichText::new("Create with AI").strong());
-                ui.spaced_label("Describe a look. Several versions are written at once by your Shader model (set in AI models); an optional Shader judge model can fix or review them (see Options). Click a result to use it.");
-                let has_code = shader.custom.as_ref().is_some_and(|c| {
-                    !c.expression.trim().is_empty() && c.expression.trim() != "return bg;"
-                });
-                wrapping_row(ui, |ui| {
-                    ui.spaced_label("Start");
-                    if ui
+            let section_open = self.section_open("shader-ai");
+            let section_toggled = folding_section(
+                ui,
+                base,
+                2,
+                section_open,
+                "Create with AI",
+                |ui| {
+                    ui.spaced_label("Describe a look. Several versions are written at once by your Shader model (set in AI models); an optional Shader judge model can fix or review them (see Options). Click a result to use it.");
+                    let has_code = shader.custom.as_ref().is_some_and(|c| {
+                        !c.expression.trim().is_empty() && c.expression.trim() != "return bg;"
+                    });
+                    wrapping_row(ui, |ui| {
+                        ui.spaced_label("Start");
+                        if ui
                         .selectable_label(self.shader_ai.fresh || !has_code, "New idea")
                         .on_hover_text(
                             "Write from scratch: the current code and its sliders are not sent.",
@@ -9458,7 +9530,7 @@ impl ButtonsApp {
                     {
                         self.shader_ai.fresh = true;
                     }
-                    if ui
+                        if ui
                         .add_enabled(
                             has_code,
                             egui::SelectableLabel::new(
@@ -9473,112 +9545,114 @@ impl ButtonsApp {
                     {
                         self.shader_ai.fresh = false;
                     }
-                });
-                let design_theme =
-                    theme_generation_available() && self.preferences.shader_lab.design_theme;
-                if theme_generation_available() {
-                    let before = self.preferences.shader_lab.design_theme;
-                    wrapping_row(ui, |ui| {
-                        ui.spaced_label("Design");
-                        if ui
-                            .selectable_label(!design_theme, "Shader only")
-                            .on_hover_text("Write only the shader; the theme stays as it is.")
-                            .clicked()
-                        {
-                            self.preferences.shader_lab.design_theme = false;
-                        }
-                        if ui
+                    });
+                    let design_theme =
+                        theme_generation_available() && self.preferences.shader_lab.design_theme;
+                    if theme_generation_available() {
+                        let before = self.preferences.shader_lab.design_theme;
+                        wrapping_row(ui, |ui| {
+                            ui.spaced_label("Design");
+                            if ui
+                                .selectable_label(!design_theme, "Shader only")
+                                .on_hover_text("Write only the shader; the theme stays as it is.")
+                                .clicked()
+                            {
+                                self.preferences.shader_lab.design_theme = false;
+                            }
+                            if ui
                             .selectable_label(design_theme, "Theme + shader")
                             .on_hover_text("Each version also designs a matching theme: app and terminal colors, ANSI colors and fonts, all from the same idea (\"halloween\" changes everything). Using a result loads both into this draft.")
                             .clicked()
                         {
                             self.preferences.shader_lab.design_theme = true;
                         }
-                    });
-                    if self.preferences.shader_lab.design_theme != before {
-                        self.persist_native_preferences();
+                        });
+                        if self.preferences.shader_lab.design_theme != before {
+                            self.persist_native_preferences();
+                        }
                     }
-                }
-                use_everywhere |= self.look_target_hint(ui);
-                if !design_theme {
-                    wrapping_row(ui, |ui| {
-                        ui.spaced_label("Colors");
-                        if ui
+                    use_everywhere |= self.look_target_hint(ui);
+                    if !design_theme {
+                        wrapping_row(ui, |ui| {
+                            ui.spaced_label("Colors");
+                            if ui
                         .selectable_label(self.shader_ai.ai_colors, "AI picks new ones")
                         .on_hover_text("Each version chooses its own c1–c5. Using a result makes them this shader's colors, which you can still change.")
                         .clicked()
                     {
                         self.shader_ai.ai_colors = true;
                     }
-                        if ui
-                            .selectable_label(
-                                !self.shader_ai.ai_colors,
-                                if own_palette {
-                                    "Keep this shader's"
-                                } else {
-                                    "Keep the theme's"
-                                },
+                            if ui
+                                .selectable_label(
+                                    !self.shader_ai.ai_colors,
+                                    if own_palette {
+                                        "Keep this shader's"
+                                    } else {
+                                        "Keep the theme's"
+                                    },
+                                )
+                                .on_hover_text("AI builds from the c1–c5 shown under Style.")
+                                .clicked()
+                            {
+                                self.shader_ai.ai_colors = false;
+                            }
+                        });
+                    }
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.shader_ai.prompt)
+                            .hint_text(
+                                "e.g. bouncing fireballs with gravity, on a dark red night sky",
                             )
-                            .on_hover_text("AI builds from the c1–c5 shown under Style.")
+                            .desired_rows(2)
+                            .desired_width(f32::INFINITY)
+                            .char_limit(2_000),
+                    );
+                    wrapping_row(ui, |ui| {
+                        ui.add(
+                            egui::Slider::new(
+                                &mut self.shader_ai.count,
+                                1..=crate::shader_ai::DIRECTIONS.len(),
+                            )
+                            .text("versions"),
+                        );
+                        if self.shader_ai.busy {
+                            ui.spinner();
+                            if ui.spaced_button("Stop").clicked() {
+                                self.cancel_shader_ai();
+                            }
+                        } else if ui
+                            .add_enabled(
+                                !self.shader_ai.prompt.trim().is_empty(),
+                                egui::Button::new("Generate"),
+                            )
                             .clicked()
                         {
-                            self.shader_ai.ai_colors = false;
-                        }
-                    });
-                }
-                ui.add(
-                    egui::TextEdit::multiline(&mut self.shader_ai.prompt)
-                        .hint_text("e.g. bouncing fireballs with gravity, on a dark red night sky")
-                        .desired_rows(2)
-                        .desired_width(f32::INFINITY)
-                        .char_limit(2_000),
-                );
-                wrapping_row(ui, |ui| {
-                    ui.add(
-                        egui::Slider::new(
-                            &mut self.shader_ai.count,
-                            1..=crate::shader_ai::DIRECTIONS.len(),
-                        )
-                        .text("versions"),
-                    );
-                    if self.shader_ai.busy {
-                        ui.spinner();
-                        if ui.spaced_button("Stop").clicked() {
-                            self.cancel_shader_ai();
-                        }
-                    } else if ui
-                        .add_enabled(
-                            !self.shader_ai.prompt.trim().is_empty(),
-                            egui::Button::new("Generate"),
-                        )
-                        .clicked()
-                    {
-                        let fresh = self.shader_ai.fresh || !has_code;
-                        let mut current = if fresh {
-                            crate::theme::CustomShader {
-                                name: String::new(),
-                                expression: String::new(),
-                                variables: Vec::new(),
-                                y_up: look.y_up,
+                            let fresh = self.shader_ai.fresh || !has_code;
+                            let mut current = if fresh {
+                                crate::theme::CustomShader {
+                                    name: String::new(),
+                                    expression: String::new(),
+                                    variables: Vec::new(),
+                                    y_up: look.y_up,
+                                }
+                            } else {
+                                shader.custom.clone().unwrap_or_default()
+                            };
+                            // Sliders only carry over when they are on.
+                            if !look.sliders {
+                                current.variables.clear();
                             }
-                        } else {
-                            shader.custom.clone().unwrap_or_default()
-                        };
-                        // Sliders only carry over when they are on.
-                        if !look.sliders {
-                            current.variables.clear();
+                            self.start_shader_ai(
+                                ui.ctx(),
+                                current,
+                                None,
+                                self.shader_ai.count,
+                                look.clone(),
+                                None,
+                            );
                         }
-                        self.start_shader_ai(
-                            ui.ctx(),
-                            current,
-                            None,
-                            self.shader_ai.count,
-                            look.clone(),
-                            None,
-                        );
-                    }
-                    let count = self.shader_ai.count;
-                    if self.shader_ai.idea_busy {
+                        let count = self.shader_ai.count;
+                        if self.shader_ai.idea_busy {
                         ui.spinner();
                         ui.spaced_label(if count == 1 {
                             "Thinking of an idea…".to_owned()
@@ -9596,41 +9670,41 @@ impl ButtonsApp {
                     {
                         self.start_random_shader_idea(ui.ctx());
                     }
-                    ui.add(
+                        ui.add(
                         egui::TextEdit::singleline(&mut self.shader_ai.idea_seed)
                             .hint_text("seed word (optional)")
                             .desired_width(180.0)
                             .char_limit(crate::shader_ai::MAX_SEED_CHARS),
                     )
                     .on_hover_text("Optional. Random ideas loosely see this word or phrase: it may inspire, be ignored, or be flipped.");
-                });
-                egui::CollapsingHeader::new("Options")
-                    .id_salt("shader-ai-options")
-                    .show(ui, |ui| self.shader_options(ui));
-                if !self.shader_ai.ideas.is_empty() {
-                    let mut write_all = false;
-                    let mut clear = false;
-                    ui.spaced_label(
-                        RichText::new("Ideas — click one to put it in the box").strong(),
-                    );
-                    for (index, idea) in self.shader_ai.ideas.iter().enumerate() {
-                        let text = format!("{}. {idea}", index + 1);
-                        let text = if self.shader_ai.prompt == *idea {
-                            RichText::new(text).strong()
-                        } else {
-                            RichText::new(text)
-                        };
-                        if ui
-                            .add(egui::Label::new(text).wrap().sense(egui::Sense::click()))
-                            .on_hover_cursor(egui::CursorIcon::PointingHand)
-                            .clicked()
-                        {
-                            self.shader_ai.prompt.clone_from(idea);
-                            self.shader_ai.fresh = true;
+                    });
+                    egui::CollapsingHeader::new("Options")
+                        .id_salt("shader-ai-options")
+                        .show(ui, |ui| self.shader_options(ui));
+                    if !self.shader_ai.ideas.is_empty() {
+                        let mut write_all = false;
+                        let mut clear = false;
+                        ui.spaced_label(
+                            RichText::new("Ideas — click one to put it in the box").strong(),
+                        );
+                        for (index, idea) in self.shader_ai.ideas.iter().enumerate() {
+                            let text = format!("{}. {idea}", index + 1);
+                            let text = if self.shader_ai.prompt == *idea {
+                                RichText::new(text).strong()
+                            } else {
+                                RichText::new(text)
+                            };
+                            if ui
+                                .add(egui::Label::new(text).wrap().sense(egui::Sense::click()))
+                                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                                .clicked()
+                            {
+                                self.shader_ai.prompt.clone_from(idea);
+                                self.shader_ai.fresh = true;
+                            }
                         }
-                    }
-                    wrapping_row(ui, |ui| {
-                        write_all = ui
+                        wrapping_row(ui, |ui| {
+                            write_all = ui
                             .add_enabled(
                                 !self.shader_ai.busy,
                                 egui::Button::new(format!(
@@ -9640,71 +9714,101 @@ impl ButtonsApp {
                             )
                             .on_hover_text("Starts fresh: each version gets its own idea instead of the box above.")
                             .clicked();
-                        clear = ui.spaced_button("Clear ideas").clicked();
-                    });
-                    if write_all {
-                        let current = crate::theme::CustomShader {
-                            name: String::new(),
-                            expression: String::new(),
-                            variables: Vec::new(),
-                            y_up: look.y_up,
-                        };
-                        let ideas = self.shader_ai.ideas.clone();
-                        self.start_shader_ai(
-                            ui.ctx(),
-                            current,
-                            None,
-                            ideas.len(),
-                            look.clone(),
-                            Some(ideas),
-                        );
+                            clear = ui.spaced_button("Clear ideas").clicked();
+                        });
+                        if write_all {
+                            let current = crate::theme::CustomShader {
+                                name: String::new(),
+                                expression: String::new(),
+                                variables: Vec::new(),
+                                y_up: look.y_up,
+                            };
+                            let ideas = self.shader_ai.ideas.clone();
+                            self.start_shader_ai(
+                                ui.ctx(),
+                                current,
+                                None,
+                                ideas.len(),
+                                look.clone(),
+                                Some(ideas),
+                            );
+                        }
+                        if clear {
+                            self.shader_ai.ideas.clear();
+                        }
                     }
-                    if clear {
-                        self.shader_ai.ideas.clear();
-                    }
-                }
-                let mut notes = vec![
-                    if self.shader_ai.fresh || !has_code {
-                        "start fresh"
+                    let mut notes = vec![
+                        if self.shader_ai.fresh || !has_code {
+                            "start fresh"
+                        } else {
+                            "change the current code"
+                        },
+                        "use Strength",
+                    ];
+                    notes.push(if design_theme {
+                        "design a matching theme (colors and fonts) and pick shader colors from it"
+                    } else if look.ai_colors {
+                        "pick its own colors"
+                    } else if look.own_colors {
+                        "use this shader's colors"
                     } else {
-                        "change the current code"
-                    },
-                    "use Strength",
-                ];
-                notes.push(if design_theme {
-                    "design a matching theme (colors and fonts) and pick shader colors from it"
-                } else if look.ai_colors {
-                    "pick its own colors"
-                } else if look.own_colors {
-                    "use this shader's colors"
-                } else {
-                    "use the theme's colors"
-                });
-                if look.sliders {
-                    notes.push("add sliders");
-                }
-                if !look.animated {
-                    notes.push("make a still image");
-                }
-                ui.spaced_label(
-                    RichText::new(format!("AI is told to {}.", notes.join(", ")))
-                        .color(self.colors().muted),
-                );
-                if let Some(message) = &self.shader_ai.message {
-                    ui.spaced_label(message);
-                }
-                if let Ok(theme) = ThemeDefinition::editor_document(&document) {
-                    if let Some(candidate) = self.shader_lane_results(ui, &theme, &shader, time) {
-                        chosen = Some(candidate);
+                        "use the theme's colors"
+                    });
+                    if look.sliders {
+                        notes.push("add sliders");
                     }
-                }
-            });
+                    if !look.animated {
+                        notes.push("make a still image");
+                    }
+                    ui.spaced_label(
+                        RichText::new(format!("AI is told to {}.", notes.join(", ")))
+                            .color(self.colors().muted),
+                    );
+                    if let Some(message) = &self.shader_ai.message {
+                        ui.spaced_label(message);
+                    }
+                    if let Ok(theme) = ThemeDefinition::editor_document(&document) {
+                        if let Some(candidate) = self.shader_lane_results(ui, &theme, &shader, time)
+                        {
+                            chosen = Some(candidate);
+                        }
+                    }
+                    // Strength and the shader's own sliders again, next to the
+                    // results: trying them needs no scrolling back up to Style.
+                    if !self.shader_ai.lanes.is_empty() {
+                        ui.separator();
+                        ui.add(
+                            egui::Slider::new(
+                                &mut shader.strength,
+                                crate::theme::ShaderBackground::STRENGTH,
+                            )
+                            .text("Strength"),
+                        );
+                        if let Some(custom) = &mut shader.custom {
+                            for (index, variable) in custom.variables.iter_mut().enumerate() {
+                                if variable.min < variable.max {
+                                    ui.push_id(("shader-slider-near-results", index), |ui| {
+                                        ui.add(
+                                            egui::Slider::new(
+                                                &mut variable.value,
+                                                variable.min..=variable.max,
+                                            )
+                                            .text(&variable.name),
+                                        );
+                                    });
+                                }
+                            }
+                        }
+                    }
+                },
+            );
+            self.toggle_section("shader-ai", section_toggled);
         }
 
         // 4. Code: what AI wrote (or your own), for people who want to tweak it.
-        settings_section(ui, base, 3, |ui| {
+        let section_open = self.section_open("shader-code") || self.shader_ai.ready.is_some();
+        let section_toggled = folding_section(ui, base, 3, section_open, "Code", |ui| {
             let Some(custom) = &mut shader.custom else {
-                ui.spaced_label(RichText::new("Code").strong());
                 ui.spaced_label("This theme uses a preset. Pick \"Your code\" under Pattern, or use Create with AI, to get code you can edit here.");
                 return;
             };
@@ -9836,6 +9940,7 @@ impl ButtonsApp {
                     }
                 });
         });
+        self.toggle_section("shader-code", section_toggled);
 
         if let Some(candidate) = chosen {
             enabled = true;
@@ -9899,8 +10004,8 @@ impl ButtonsApp {
         }
 
         // 5. One place to keep or drop the result.
-        settings_section(ui, base, 4, |ui| {
-            ui.spaced_label(RichText::new("Keep it").strong());
+        let section_open = self.section_open("shader-keep");
+        let section_toggled = folding_section(ui, base, 4, section_open, "Keep it", |ui| {
             use_everywhere |= self.look_target_hint(ui);
             self.theme_apply_controls(ui);
             // The draft's display name: the file name and id stay as they are,
@@ -9970,6 +10075,7 @@ impl ButtonsApp {
                 ui.spaced_label(status);
             }
         });
+        self.toggle_section("shader-keep", section_toggled);
         if use_everywhere {
             self.use_look_everywhere();
         }
@@ -12470,6 +12576,12 @@ impl ButtonsApp {
         if let Some(document) = self.themes.personal_document(&self.preferences.theme_id) {
             let mut value = serde_json::to_value(&self.preferences).unwrap();
             for (key, scope) in NATIVE_APPEARANCE_FIELDS {
+                // Calm, shaders on/off and the effect switches are the
+                // user's live choices. A theme saved while one was on used
+                // to switch it back on every time it was applied.
+                if LIVE_SWITCHES.contains(key) {
+                    continue;
+                }
                 let enabled = match *scope {
                     "app" => self.preferences.theme_apply.app,
                     "fonts" => self.preferences.theme_apply.fonts,
@@ -13145,6 +13257,11 @@ impl ButtonsApp {
             "Copy automatically when mouse selection ends",
         );
         ui.spaced_checkbox(
+            &mut self.preferences.keyboard.programs_copy,
+            "Let terminal programs copy to the clipboard",
+        )
+        .on_hover_text("Programs that capture the mouse (some AI CLIs, vim, tmux) copy their own selection with the OSC 52 sequence. Off ignores it. Programs can never read your clipboard.");
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.bracketed_paste,
             "Use bracketed paste when the terminal application requests it",
         );
@@ -13528,6 +13645,23 @@ impl ButtonsApp {
                     self.terminal_search_status = None;
                 }
                 ui.spaced_label("Lowering the limit immediately discards older lines. Terminal → Read terminal text opens a selectable text snapshot for assistive tools.");
+                ui.horizontal(|ui| {
+                    let label = ui.spaced_label("Terminal lines per mouse wheel step");
+                    ui.add(
+                        egui::DragValue::new(&mut self.preferences.terminal_scroll_lines)
+                            .range(1..=crate::settings::MAX_TERMINAL_SCROLL_LINES),
+                    )
+                    .labelled_by(label.id);
+                });
+                ui.add(
+                    egui::Slider::new(
+                        &mut self.preferences.ui_scroll_speed,
+                        0.5..=crate::settings::MAX_UI_SCROLL_SPEED,
+                    )
+                    .step_by(0.5)
+                    .suffix("×")
+                    .text("Mouse wheel speed in Settings and lists"),
+                );
                 ui.spaced_checkbox(&mut self.preferences.terminal_history.auto_save, "Automatically save terminal text snapshots");
                 let label = ui.spaced_label("Delete saved snapshots after days");
                 ui.add(egui::DragValue::new(&mut self.preferences.terminal_history.retention_days).range(1..=365)).labelled_by(label.id);
@@ -13550,6 +13684,11 @@ impl ButtonsApp {
                     }
                 }
                 ui.spaced_checkbox(&mut self.preferences.advanced_effects, "Advanced effects (GPU Analog TV effect)");
+                ui.spaced_checkbox(
+                    &mut self.preferences.classic_effects,
+                    "Classic effects (TV static, scanlines, moving gradients)",
+                )
+                .on_hover_text("Off: no pane shows them, whatever its theme says, and applying a theme never turns them back on. Shader backgrounds are not affected. Also in the status bar's Look menu.");
                 ui.spaced_label("Turn off for standard texture-based static. Calm mode disables motion and noise.");
             }
             ui.spaced_checkbox(
@@ -14024,6 +14163,16 @@ impl ButtonsApp {
                         .hint_text(crate::i18n::literal(&self.locale, "Git status"))
                         .desired_width(f32::INFINITY),
                 );
+                // The Windows emoji panel does not reach egui text boxes.
+                wrapping_row(ui, |ui| {
+                    ui.spaced_small("Add a symbol:");
+                    for symbol in ["↑", "↓", "←", "→", "▸", "◂", "★", "✓", "✗", "●", "◆", "⋮"]
+                    {
+                        if ui.small_button(symbol).clicked() {
+                            self.preset_label_draft.push_str(symbol);
+                        }
+                    }
+                });
                 ui.add_space(8.0);
                 ui.spaced_label(crate::i18n::literal(&self.locale, "Command or text"));
                 ui.add(
@@ -14882,6 +15031,39 @@ pub(crate) fn settings_section<R>(
     result
 }
 
+/// A settings section under a title row; clicking the title folds it shut.
+/// Returns true when the title was clicked. The body is not run while folded.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn folding_section(
+    ui: &mut egui::Ui,
+    base: Color32,
+    index: usize,
+    open: bool,
+    title: &str,
+    add: impl FnOnce(&mut egui::Ui),
+) -> bool {
+    settings_section(ui, base, index, |ui| {
+        let arrow = if open { "▾" } else { "▸" };
+        let clicked = ui
+            .add(
+                egui::Label::new(RichText::new(format!("{arrow} {title}")).strong())
+                    .selectable(false)
+                    .sense(egui::Sense::click()),
+            )
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .on_hover_text(if open {
+                "Click to fold this section away"
+            } else {
+                "Click to open this section"
+            })
+            .clicked();
+        if open {
+            add(ui);
+        }
+        clicked
+    })
+}
+
 /// Write → Check → Judge → Ready, with a dashed arrow that moves into the
 /// active step while that lane is working.
 #[cfg(not(target_arch = "wasm32"))]
@@ -15248,6 +15430,7 @@ pub(crate) fn shader_palette(theme: &ThemeDefinition) -> [Color32; 6] {
 #[cfg(not(target_arch = "wasm32"))]
 struct TerminalInteraction {
     keyboard: crate::settings::KeyboardPreferences,
+    scroll_lines: u8,
     row_brightness: u8,
     animation_fps: u32,
     animation_delay: std::time::Duration,
@@ -15360,6 +15543,7 @@ fn terminal_surface(
         .set_theme(theme.terminal())
         .set_background_gradient(gradient)
         .set_background_callback(background_callback)
+        .set_scroll_lines(interaction.scroll_lines)
         .set_keyboard_options(
             interaction.keyboard.ctrl_c_copies_selection,
             interaction.keyboard.copy_on_selection,
@@ -15734,6 +15918,7 @@ fn build_pane_sequence(mut panes: Vec<PaneTree>, axis: SplitAxis, key: String) -
 #[cfg(not(target_arch = "wasm32"))]
 struct PaneRenderState<'a> {
     keyboard: &'a crate::settings::KeyboardPreferences,
+    scroll_lines: u8,
     row_brightness: u8,
     animation_fps: u32,
     /// Time until the next animation tick.
@@ -15799,6 +15984,7 @@ fn render_pane_tree(
                 tab,
                 TerminalInteraction {
                     keyboard: state.keyboard.clone(),
+                    scroll_lines: state.scroll_lines,
                     row_brightness: state.row_brightness,
                     animation_fps: state.animation_fps,
                     animation_delay: state.animation_delay,
@@ -16968,6 +17154,15 @@ const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
     ("effects_focused_pane_only", "effects"),
 ];
 
+/// Saved with a theme copy for older versions, never applied from one.
+#[cfg(not(target_arch = "wasm32"))]
+const LIVE_SWITCHES: [&str; 4] = [
+    "advanced_effects",
+    "shader_backgrounds_enabled",
+    "calm_mode",
+    "effects_focused_pane_only",
+];
+
 #[cfg(not(target_arch = "wasm32"))]
 fn merge_theme_edits(target: &mut Value, original: &Value, edited: &Value) {
     if original == edited {
@@ -17387,6 +17582,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
+#[cfg(not(target_arch = "wasm32"))]
+mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
 mod gallery;
@@ -17442,6 +17639,11 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         self.apply_ui_scale(ctx);
         #[cfg(not(target_arch = "wasm32"))]
+        ctx.options_mut(|options| {
+            // egui's own step is 40 points per wheel line.
+            options.line_scroll_speed = 40.0 * self.preferences.ui_scroll_speed;
+        });
+        #[cfg(not(target_arch = "wasm32"))]
         self.apply_window_opacity(frame);
         #[cfg(not(target_arch = "wasm32"))]
         self.publish_control_snapshot();
@@ -17475,6 +17677,10 @@ impl eframe::App for ButtonsApp {
         #[cfg(not(target_arch = "wasm32"))]
         if self.process_terminal_events() {
             ctx.request_repaint();
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(text) = self.program_clipboard.take() {
+            ctx.copy_text(text);
         }
         #[cfg(not(target_arch = "wasm32"))]
         self.deliver_menu_paste(ctx);
@@ -17783,7 +17989,10 @@ mod tests {
             .unwrap();
         app.apply_theme(index, false);
         assert_eq!(app.preferences.window_opacity, 0.8);
-        assert!(app.preferences.shader_backgrounds_enabled);
+        assert!(
+            !app.preferences.shader_backgrounds_enabled,
+            "a theme never flips the live shader switch"
+        );
         assert_eq!(
             catalog.get(&id).colors.status_background,
             crate::theme::parse_color("#345678").unwrap()
@@ -23021,7 +23230,10 @@ Start-Sleep -Seconds 300
         app.perform_global_theme_action(PaneAction::Theme("personal:default:saved-look".into()));
 
         assert!((app.preferences.window_opacity - 0.4).abs() < 1e-6);
-        assert!(!app.preferences.shader_backgrounds_enabled);
+        assert!(
+            app.preferences.shader_backgrounds_enabled,
+            "a theme never flips the live shader switch"
+        );
         assert_eq!(app.preferences.dock_background_override, None);
         assert!(app.preferences.theme_apply.app && app.preferences.theme_apply.effects);
         fs::remove_dir_all(base).unwrap();
@@ -23423,8 +23635,16 @@ Start-Sleep -Seconds 300
             ids.contains(&first_theme) && ids.contains(&second_theme),
             "{ids:?}"
         );
-        assert_eq!(app.save_theme_bundle("").unwrap(), "Bundle 1");
-        assert_eq!(app.save_theme_bundle(" ").unwrap(), "Bundle 2");
+        // Numbered names skip built-in bundles too, so the library decides them.
+        let mut free = (1..)
+            .map(|number| format!("Bundle {number}"))
+            .filter(|name| {
+                !crate::library::bundles()
+                    .iter()
+                    .any(|bundle| &bundle.name == name)
+            });
+        assert_eq!(app.save_theme_bundle("").unwrap(), free.next().unwrap());
+        assert_eq!(app.save_theme_bundle(" ").unwrap(), free.next().unwrap());
 
         // The "Edit for" row switches panes with unsaved edits instead of blocking.
         app.theme_editor_pane_mode = true;

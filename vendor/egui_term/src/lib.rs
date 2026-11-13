@@ -6,6 +6,7 @@ mod types;
 mod view;
 
 pub use alacritty_terminal::event_loop::SensitiveInput;
+pub use alacritty_terminal::term::ClipboardType;
 pub use backend::settings::BackendSettings;
 pub use backend::{
     set_output_repaint_interval, BackendCommand, ByteObserver, PtyEvent,

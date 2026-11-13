@@ -55,6 +55,7 @@ pub struct TerminalView<'a> {
     row_brightness: u8,
     ctrl_c_copies_selection: bool,
     copy_on_selection: bool,
+    scroll_lines: i32,
     bracketed_paste: bool,
     option_as_meta: bool,
     draw_bold_bright: bool,
@@ -136,6 +137,7 @@ impl<'a> TerminalView<'a> {
             row_brightness: 0,
             ctrl_c_copies_selection: true,
             copy_on_selection: false,
+            scroll_lines: DEFAULT_SCROLL_LINES,
             bracketed_paste: true,
             option_as_meta: false,
             draw_bold_bright: false,
@@ -194,6 +196,12 @@ impl<'a> TerminalView<'a> {
         self.copy_on_selection = auto_copy;
         self.bracketed_paste = bracketed;
         self.option_as_meta = option_meta;
+        self
+    }
+
+    /// Lines the local view moves per mouse wheel step.
+    pub fn set_scroll_lines(mut self, lines: u8) -> Self {
+        self.scroll_lines = i32::from(lines.max(1));
         self
     }
 
@@ -398,6 +406,7 @@ impl<'a> TerminalView<'a> {
                         self.backend.last_content().terminal_mode,
                         state.current_mouse_position_on_grid,
                         modifiers,
+                        self.scroll_lines,
                     ));
                     // Scrolling with a stationary pointer must extend the
                     // selection to the newly visible line as well.
@@ -1539,21 +1548,22 @@ fn process_mouse_wheel(
 /// expect wheel buttons 64/65, as Alacritty, WezTerm and par-term send.
 /// Scrolling our own view or sending arrow keys instead moves their prompt
 /// history. Shift keeps the local scroll, like Alacritty.
-/// Local scrolling (and alt-screen arrow keys) moves `SCROLL_MULTIPLIER`
-/// lines per wheel line, Alacritty's `scrolling.multiplier` default; mouse
+/// Local scrolling (and alt-screen arrow keys) moves `multiplier` lines per
+/// wheel line (default 3, Alacritty's `scrolling.multiplier`); mouse
 /// reports stay one per line, as in Alacritty.
 fn wheel_reports(
     scroll: InputAction,
     mode: TermMode,
     point: TerminalGridPoint,
     modifiers: Modifiers,
+    multiplier: i32,
 ) -> Vec<InputAction> {
     let InputAction::BackendCall(BackendCommand::Scroll(lines)) = scroll else {
         return vec![scroll];
     };
     if !mode.intersects(TermMode::MOUSE_MODE) || modifiers.shift {
         return vec![InputAction::BackendCall(BackendCommand::Scroll(
-            lines.saturating_mul(SCROLL_MULTIPLIER),
+            lines.saturating_mul(multiplier),
         ))];
     }
     let button = if lines > 0 {
@@ -1574,7 +1584,7 @@ fn wheel_reports(
         .collect()
 }
 
-const SCROLL_MULTIPLIER: i32 = 3;
+const DEFAULT_SCROLL_LINES: i32 = 3;
 
 fn selection_edge_scroll(rect: Rect, pointer: Pos2, cell_height: f32) -> i32 {
     let edge = cell_height.clamp(8.0, 24.0);
@@ -1820,6 +1830,7 @@ mod background_gradient_tests {
                 mode,
                 point,
                 modifiers,
+                DEFAULT_SCROLL_LINES,
             )
             .into_iter()
             .map(|action| match action {
@@ -1851,9 +1862,22 @@ mod background_gradient_tests {
                 TermMode::empty(),
                 point,
                 Modifiers::NONE,
+                DEFAULT_SCROLL_LINES,
             )
             .as_slice(),
             [InputAction::BackendCall(BackendCommand::Scroll(-6))]
+        ));
+        // The wheel step is a setting; mouse reports stay one per line.
+        assert!(matches!(
+            wheel_reports(
+                InputAction::BackendCall(BackendCommand::Scroll(2)),
+                TermMode::empty(),
+                point,
+                Modifiers::NONE,
+                1,
+            )
+            .as_slice(),
+            [InputAction::BackendCall(BackendCommand::Scroll(2))]
         ));
     }
 

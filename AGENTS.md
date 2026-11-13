@@ -209,6 +209,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   built-in catalog/library size or status-bar width; find text in a settled frame.
   Release picks can add "<name> vN" built-ins: compute expected copy names
   with `next_theme_version` over `themes.all()` before saving.
+- Live switches (`LIVE_SWITCHES`: Calm, shaders on, advanced effects, focused
+  pane only) and `classic_effects` are never applied from a theme's
+  `nativeAppearance`; `without_classic_effects` strips static, scanlines and
+  gradient motion in both presentation paths. Keep new global switches out of
+  `NATIVE_APPEARANCE_FIELDS`.
+- Foldable Settings sections: `folding_section` + `section_open` /
+  `toggle_section` (`settings_layout.folded`). The body does not run while
+  folded, so side effects (taking a worker result) must not live only there.
+- Left-panel folder buttons (`src/app/dock_nav.rs`, Settings → Experimental)
+  read the screen via `TerminalBackend::screen_rows`, never the disk. Test
+  with a long listing: the `ls` line scrolls off screen.
+- OSC 52 copy arrives as `PtyEvent::ClipboardStore` in
+  `process_terminal_events` (`program_clipboard`); reads stay denied.
+- Python edit scripts: pass `encoding='utf-8'` (the default here is cp1252).
 - Python edit scripts: write them with the Write tool and run the file; Bash
   heredocs mangle `\n` inside Python strings here.
 - Isolated app runs (USERPROFILE scratch): the first run shows a language/look
