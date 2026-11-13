@@ -1886,10 +1886,15 @@ impl ButtonsApp {
         visuals.faint_bg_color = colors.raised;
         visuals.widgets.noninteractive.bg_fill = colors.panel;
         visuals.widgets.noninteractive.fg_stroke.color = colors.text;
-        visuals.widgets.inactive.bg_fill = colors.raised;
-        visuals.widgets.inactive.weak_bg_fill = colors.raised;
+        // Idle buttons must read as boxes on the panel, even when a theme's
+        // raised and panel colors are nearly equal; the outline then needs to
+        // stand out from the button.
+        let button_fill = separated(colors.raised, colors.panel, 1.3);
+        let button_outline = separated(colors.border, button_fill, 1.6);
+        visuals.widgets.inactive.bg_fill = button_fill;
+        visuals.widgets.inactive.weak_bg_fill = button_fill;
         visuals.widgets.inactive.fg_stroke.color = colors.text;
-        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, colors.border);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, button_outline);
         // Buttons paint `weak_bg_fill`; setting only `bg_fill` left every
         // hovered button on egui's stock grey whatever the theme said.
         visuals.widgets.hovered.bg_fill = colors.accent_hover;
@@ -14779,8 +14784,7 @@ fn theme_path_action(ui: &mut egui::Ui, path: &mut String, hint: &str, action: &
     .inner
 }
 
-fn readable_on(background: Color32) -> Color32 {
-    // Pick the larger black/white contrast ratio using linear luminance.
+fn relative_luminance(color: Color32) -> f32 {
     let linear = |channel: u8| {
         let value = channel as f32 / 255.0;
         if value <= 0.04045 {
@@ -14789,14 +14793,48 @@ fn readable_on(background: Color32) -> Color32 {
             ((value + 0.055) / 1.055).powf(2.4)
         }
     };
-    let luminance = 0.2126 * linear(background.r())
-        + 0.7152 * linear(background.g())
-        + 0.0722 * linear(background.b());
-    if luminance > 0.179 {
+    0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
+}
+
+/// WCAG contrast ratio between two colors (1.0 = identical).
+fn contrast_ratio(a: Color32, b: Color32) -> f32 {
+    let (la, lb) = (relative_luminance(a), relative_luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+fn readable_on(background: Color32) -> Color32 {
+    // Pick the larger black/white contrast ratio using linear luminance.
+    if relative_luminance(background) > 0.179 {
         Color32::BLACK
     } else {
         Color32::WHITE
     }
+}
+
+/// `color`, moved toward black or white just far enough to stand out from
+/// `against`. Some themes give buttons nearly the panel's color, and then
+/// their boxes disappear.
+fn separated(color: Color32, against: Color32, min_ratio: f32) -> Color32 {
+    if contrast_ratio(color, against) >= min_ratio {
+        return color;
+    }
+    let target = if relative_luminance(against) > 0.179 {
+        Color32::BLACK
+    } else {
+        Color32::WHITE
+    };
+    let mix = |t: f32| {
+        let lerp = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
+        Color32::from_rgb(
+            lerp(color.r(), target.r()),
+            lerp(color.g(), target.g()),
+            lerp(color.b(), target.b()),
+        )
+    };
+    (1..=50)
+        .map(|step| mix(step as f32 / 50.0))
+        .find(|candidate| contrast_ratio(*candidate, against) >= min_ratio)
+        .unwrap_or(target)
 }
 
 fn settings_scroll_style() -> egui::style::ScrollStyle {
@@ -17594,6 +17632,25 @@ impl eframe::App for ButtonsApp {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn near_identical_button_colors_are_pushed_apart_from_the_panel() {
+        use super::{contrast_ratio, separated};
+        let panel = Color32::from_rgb(20, 24, 30);
+        // A theme whose raised button color is almost the panel color.
+        let raised = Color32::from_rgb(21, 25, 31);
+        assert!(contrast_ratio(raised, panel) < 1.1);
+        let fill = separated(raised, panel, 1.3);
+        assert!(contrast_ratio(fill, panel) >= 1.3, "{fill:?}");
+        // Light panels get darker buttons, dark panels lighter ones.
+        let light_panel = Color32::from_rgb(240, 240, 236);
+        let light_fill = separated(Color32::from_rgb(238, 238, 234), light_panel, 1.3);
+        assert!(contrast_ratio(light_fill, light_panel) >= 1.3);
+        assert!(light_fill.r() < 238);
+        // Colors that already stand out are left alone.
+        let clear = Color32::from_rgb(60, 70, 90);
+        assert_eq!(separated(clear, panel, 1.3), clear);
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn every_shader_editor_example_compiles() {
