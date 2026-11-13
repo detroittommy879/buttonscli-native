@@ -15,6 +15,9 @@
   fonts and display scales.
 - **Text in buttons is centered for fonts with unusual metrics** (for example
   Code New Roman, saxmono, Serious Shanns).
+- **Idle buttons stay visible on themes with close colors**: a button whose
+  fill was nearly the panel color had no visible box; it is now separated
+  from the panel.
 
 - **Free features without a flag file**: Agent Mode, AI theme/shader generation,
   Quick Secrets and local CLI/MCP control are available to everyone without a
