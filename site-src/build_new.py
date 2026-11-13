@@ -327,7 +327,7 @@ def sections(v):
       <p><a href="/native/try/" target="_blank" rel="noopener">Open the shader playground in its own tab ↗</a></p>
     </div>
     <div style="--buttonscli-x:100%;--buttonscli-y:clamp(620px,85vh,880px)">
-      <script src="/native/try/embed.js?v=20261113-chrome" data-fps="30" data-bundle="5-pane-shader-circus2"></script>
+      <script src="/native/try/embed.js?v=20261113-chrome" data-fps="30"></script>
     </div>
     <p class="muted">Requires WebGPU in a supported browser. Animation starts at 30 FPS; use the FPS slider to change it.</p>
   </div>

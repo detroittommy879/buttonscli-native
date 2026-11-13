@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The browser playground starts with a randomly selected featured bundle and
+  softens shader and theme changes with a short fade.
 - **Standalone shader playground**: a static browser preview with terminal panes,
   shader/bundle browsing, colors and live sliders; export new library picks without
   rebuilding Rust/WASM. Requires WebGPU; runs no shell commands.

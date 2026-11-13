@@ -10,6 +10,7 @@ addEventListener('message', event => {
   if (event.source === parent && event.data?.type === 'buttonscli-visibility' && typeof event.data.visible === 'boolean') embedVisible = event.data.visible;
 });
 const panes = [], pipelineCache = new Map();
+const featuredBundles = ['rain-snow-thunder','thunder & water','Water-Desert-Landscapes','bluevisions, highres','4-panes-waveforms-violet-dark','sky and night wave view','Bubbles, Fish, Thunderstorm, Coral R','Variety42','Variety-33-4panes','Variety-11-4panes','BadStormsOnMars1'];
 const rgb = (hex = '#080b16') => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
 const stripComments = code => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 const chromeKeys = new Set(['shell-background','shell-backgroundSecondary','shell-border','shell-textMain','shell-textDim','shell-accent','shell-accentHover','shell-buttonBackground','presetDock-background','presetDock-accent','presetDock-buttonBackground','presetDock-buttonHover','presetDock-buttonText','tabs-background','tabs-idleBackground','tabs-activeBackground','tabs-activeBorder','statusBar-background','statusBar-border','statusBar-text','statusBar-warning']);
@@ -73,6 +74,9 @@ async function apply(pane, index, updateChrome = true) {
     pane.bind = device.createBindGroup({layout:ready.getBindGroupLayout(0), entries:[{binding:0, resource:{buffer:pane.buffer}}]});
     pane.error.textContent = '';
     pane.dirty = true;
+    pane.canvas.classList.remove('shader-enter');
+    void pane.canvas.offsetWidth;
+    pane.canvas.classList.add('shader-enter');
   } catch (error) {
     if (revision === pane.revision) pane.error.textContent = `This shader could not render: ${error.message}`;
   }
@@ -154,7 +158,7 @@ function cycle(direction) {
   apply(panes[selected],indexes[(pos+direction+indexes.length)%indexes.length]);
 }
 async function start() {
-  const responses = await Promise.all(['data/library.json?v=20261113-3','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
+  const responses = await Promise.all(['data/library.json?v=20261113-4','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
   [library,helpers,template] = await Promise.all([responses[0].json(),responses[1].text(),responses[2].text()]);
   try {const adapter = await navigator.gpu?.requestAdapter(); device = await adapter?.requestDevice();} catch(error) {console.warn(error);}
   if(device) {
@@ -166,6 +170,12 @@ async function start() {
     const canvas = document.createElement('canvas');
     const terminal = document.createElement('div'); terminal.className = 'terminal';
     terminal.textContent = `PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo>\nPS C:\\ButtonsCLI\\demo> ▌`;
+    if (i === 0) {
+      terminal.replaceChildren();
+      for (const [line, color] of [['PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo> ', '#e3dfeb'], ['ButtonsCLI Native\n', '#55d9ad'], ['Appearance, your way.\n', '#ffe080'], ['Fine-grained control over every pane.\n', '#71caff'], ['AI shader generation, tuned over time\n', '#e9a0ef'], ['to work with affordable models.\n', '#e9a0ef'], ['PS C:\\ButtonsCLI\\demo> ▌', '#e3dfeb']]) {
+        const span = document.createElement('span'); span.textContent = line; span.style.color = color; terminal.append(span);
+      }
+    }
     const name = document.createElement('span'); name.className = 'pane-name';
     const error = document.createElement('div'); error.className = 'pane-error'; error.setAttribute('role','status');
     element.append(canvas,terminal,name,error); $('workspace').append(element);
@@ -201,7 +211,9 @@ async function start() {
   $('fullscreen').onclick = async () => {try {if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen();} catch { $('status').textContent = 'Fullscreen unavailable';}};
   document.querySelectorAll('[data-layout]').forEach(b => b.onclick = () => changeLayout(b.dataset.layout));
   focus(0); $('status').textContent = device ? 'SHADERS READY' : 'WEBGPU UNAVAILABLE'; fpsLabel();
-  const initialBundle = library.bundles.findIndex(b => b.name === params.get('bundle'));
+  const candidates = featuredBundles.map(name => library.bundles.findIndex(b => b.name === name)).filter(i => i >= 0);
+  const requestedBundle = params.get('bundle');
+  const initialBundle = requestedBundle ? library.bundles.findIndex(b => b.name === requestedBundle) : candidates[Math.floor(Math.random() * candidates.length)];
   if(initialBundle >= 0) {$('bundle').value = initialBundle; applyBundle();}
   if(['one','col','row','grid'].includes(params.get('layout'))) changeLayout(params.get('layout'));
   if(params.get('controls') === '0' || (innerWidth <= 600 && params.get('controls') !== '1')) document.body.classList.add('dock-hidden');
