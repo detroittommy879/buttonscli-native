@@ -619,7 +619,7 @@ impl<'a> TerminalView<'a> {
                                     + content.display_offset as i32)
                                     as f32,
                         );
-                    Rect::from_min_size(
+                    let rect = Rect::from_min_size(
                         origin,
                         egui::vec2(
                             cell_width
@@ -630,13 +630,36 @@ impl<'a> TerminalView<'a> {
                                 },
                             cell_height,
                         ),
-                    )
+                    );
+                    let color = if backing.invert {
+                        if backing.whole_line {
+                            self.theme
+                                .get_color(Color::Named(NamedColor::Foreground))
+                        } else {
+                            let mut fg = if self.draw_bold_bright
+                                && c.flags.intersects(
+                                    cell::Flags::BOLD | cell::Flags::DIM_BOLD,
+                                ) {
+                                self.theme.get_bold_color(c.fg)
+                            } else {
+                                self.theme.get_color(c.fg)
+                            };
+                            if c.flags.intersects(
+                                cell::Flags::DIM | cell::Flags::DIM_BOLD,
+                            ) {
+                                fg = fg.linear_multiply(0.7);
+                            }
+                            fg
+                        }
+                    } else {
+                        global_bg
+                    };
+                    (rect, color)
                 });
             shapes.extend(crate::text_backing::shapes(
                 cells,
                 layout.rect,
                 cell_width,
-                global_bg,
                 backing,
             ));
         }
@@ -726,6 +749,19 @@ impl<'a> TerminalView<'a> {
                     CornerRadius::ZERO,
                     bg,
                 )));
+            }
+
+            // Inversion is presentation-only and never changes TUI/selection backgrounds.
+            if self
+                .text_backing
+                .is_some_and(|b| b.invert && b.opacity > 0.0)
+                && matches!(indexed.bg, Color::Named(NamedColor::Background))
+                && !is_inverse
+                && !is_selected
+                && !is_search_match
+                && !is_current_search_match
+            {
+                fg = global_bg;
             }
 
             // Handle hovered hyperlink underline
@@ -2141,6 +2177,7 @@ mod render_parity_tests {
                 opacity: 0.8,
                 feather: 4.0,
                 whole_line: false,
+                invert: false,
             }),
         );
         assert_eq!(texts(&plain), texts(&backed));
@@ -2161,6 +2198,52 @@ mod render_parity_tests {
             mesh.vertices[22].pos.x - mesh.vertices[21].pos.x,
             cell.x * 2.0
         );
+    }
+
+    #[test]
+    fn inverted_backing_swaps_run_colors_but_preserves_explicit_backgrounds() {
+        let input = b"\x1b[?25lA\x1b[31mB\x1b[0;44mC";
+        let (plain, _) = render(input, true);
+        let (backed, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 1.0,
+                feather: 0.0,
+                whole_line: false,
+                invert: true,
+            }),
+        );
+        let original = texts(&plain);
+        let inverted = texts(&backed);
+        let bg = TerminalTheme::default()
+            .get_color(Color::Named(NamedColor::Background));
+        assert_eq!(inverted[0].2, bg);
+        assert_eq!(inverted[1].2, bg);
+        assert_eq!(inverted[2], original[2]);
+        let mesh = backed
+            .iter()
+            .find_map(|s| {
+                if let Shape::Mesh(m) = s {
+                    Some(m)
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        assert_eq!(mesh.vertices[5].color, original[0].2);
+        assert_eq!(mesh.vertices[21].color, original[1].2);
+        let (zero, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 0.0,
+                feather: 0.0,
+                whole_line: false,
+                invert: true,
+            }),
+        );
+        assert_eq!(texts(&zero), original);
     }
 
     fn texts(shapes: &[Shape]) -> Vec<(String, Pos2, Color32)> {

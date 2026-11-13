@@ -15569,6 +15569,7 @@ fn terminal_surface(
                     opacity: interaction.text_backing.opacity.min(100) as f32 / 100.0,
                     feather: interaction.text_backing.feather.min(20) as f32,
                     whole_line: interaction.text_backing.whole_line,
+                    invert: interaction.text_backing.invert,
                 })
             } else {
                 None

@@ -13,6 +13,18 @@ python -m http.server 8765 --bind 127.0.0.1 --directory shader-playground
 Open http://127.0.0.1:8765. WebGPU needs a supporting browser and HTTPS or localhost.
 No WebGL fallback is provided; unsupported devices get an explicit message.
 
+## Text backing
+
+Text backing starts on in this preview (native still defaults off). Toggle it in
+ the footer; Backing options opens opacity, feather, whole lines and inversion.
+Inversion swaps each text run's foreground into its backing and uses the pane's
+background as ink. Whole-line inversion uses the pane foreground for the strip.
+Zero opacity also disables inversion. Shader changes and layouts retain these
+controls. CSS backing approximates native feathering; it does not filter text.
+
+Embed/URL options: `backing=0|1`, `invert=0|1`, `lines=0|1`, `opacity=0..100`,
+`feather=0..20` (embed attributes: `data-backing`, `data-invert`, etc.).
+
 ## Updating the catalog
 
 Save/release-pick new themes and shaders into `assets/themes/` and

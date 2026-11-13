@@ -771,6 +771,7 @@ pub(crate) struct TextBacking {
     pub(crate) opacity: u8,
     pub(crate) feather: u8,
     pub(crate) whole_line: bool,
+    pub(crate) invert: bool,
 }
 
 impl Default for TextBacking {
@@ -781,6 +782,7 @@ impl Default for TextBacking {
             opacity: 75,
             feather: 6,
             whole_line: false,
+            invert: false,
         }
     }
 }

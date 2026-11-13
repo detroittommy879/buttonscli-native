@@ -5,17 +5,18 @@ pub struct TextBacking {
     pub opacity: f32,
     pub feather: f32,
     pub whole_line: bool,
+    pub invert: bool,
 }
 
 /// Join neighboring glyphs before feathering, so letters never acquire dark seams.
 fn runs(
-    cells: impl Iterator<Item = Rect>,
+    cells: impl Iterator<Item = (Rect, Color32)>,
     bounds: Rect,
     gap: f32,
     whole_line: bool,
-) -> Vec<Rect> {
-    let mut runs: Vec<Rect> = Vec::new();
-    for mut rect in cells {
+) -> Vec<(Rect, Color32)> {
+    let mut runs: Vec<(Rect, Color32)> = Vec::new();
+    for (mut rect, color) in cells {
         if !rect.intersects(bounds) {
             continue;
         }
@@ -23,22 +24,24 @@ fn runs(
             rect.min.x = bounds.left();
             rect.max.x = bounds.right();
         }
-        if let Some(last) = runs.last_mut() {
-            if last.top() == rect.top() && rect.left() <= last.right() + gap {
+        if let Some((last, last_color)) = runs.last_mut() {
+            if *last_color == color
+                && last.top() == rect.top()
+                && rect.left() <= last.right() + gap
+            {
                 *last = last.union(rect);
                 continue;
             }
         }
-        runs.push(rect);
+        runs.push((rect, color));
     }
     runs
 }
 
 pub(crate) fn shapes(
-    cells: impl Iterator<Item = Rect>,
+    cells: impl Iterator<Item = (Rect, Color32)>,
     bounds: Rect,
     cell_width: f32,
-    color: Color32,
     options: TextBacking,
 ) -> Vec<Shape> {
     if !options.opacity.is_finite() || options.opacity <= 0.0 {
@@ -49,14 +52,16 @@ pub(crate) fn shapes(
     } else {
         0.0
     };
-    let color = Color32::from_rgba_unmultiplied(
-        color.r(),
-        color.g(),
-        color.b(),
-        (options.opacity.min(1.0) * 255.0).round() as u8,
-    );
     let mut mesh = Mesh::default();
-    for rect in runs(cells, bounds, cell_width * 1.01, options.whole_line) {
+    for (rect, color) in
+        runs(cells, bounds, cell_width * 1.01, options.whole_line)
+    {
+        let color = Color32::from_rgba_unmultiplied(
+            color.r(),
+            color.g(),
+            color.b(),
+            (options.opacity.min(1.0) * 255.0).round() as u8,
+        );
         let outer = rect.expand(feather);
         let xs = [outer.left(), rect.left(), rect.right(), outer.right()];
         let ys = [outer.top(), rect.top(), rect.bottom(), outer.bottom()];
@@ -101,10 +106,24 @@ mod tests {
             rect(80.0, 0.0),
             rect(0.0, 32.0),
         ];
-        assert_eq!(runs(cells.into_iter(), bounds, 8.1, false).len(), 3);
-        let lines = runs(cells.into_iter(), bounds, 8.1, true);
+        assert_eq!(
+            runs(
+                cells.into_iter().map(|r| (r, Color32::BLACK)),
+                bounds,
+                8.1,
+                false
+            )
+            .len(),
+            3
+        );
+        let lines = runs(
+            cells.into_iter().map(|r| (r, Color32::BLACK)),
+            bounds,
+            8.1,
+            true,
+        );
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines[0].width(), 200.0);
+        assert_eq!(lines[0].0.width(), 200.0);
     }
     #[test]
     fn text_backing_feathers_to_transparent_and_zero_opacity_skips_work() {
@@ -113,12 +132,12 @@ mod tests {
             opacity: 0.75,
             feather: 6.0,
             whole_line: false,
+            invert: false,
         };
         let result = shapes(
-            [rect(0.0, 0.0)].into_iter(),
+            [(rect(0.0, 0.0), Color32::BLACK)].into_iter(),
             bounds,
             8.0,
-            Color32::BLACK,
             options,
         );
         let Shape::Mesh(mesh) = &result[0] else {
@@ -129,10 +148,9 @@ mod tests {
         assert_eq!(mesh.vertices[0].pos, egui::pos2(-6.0, -6.0));
         options.opacity = 0.0;
         assert!(shapes(
-            [rect(0.0, 0.0)].into_iter(),
+            [(rect(0.0, 0.0), Color32::BLACK)].into_iter(),
             bounds,
             8.0,
-            Color32::BLACK,
             options
         )
         .is_empty());

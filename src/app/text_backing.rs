@@ -19,8 +19,10 @@ impl ButtonsApp {
             changed |= ui
                 .spaced_checkbox(&mut backing.whole_line, "Whole lines")
                 .changed();
+            changed |= ui.spaced_checkbox(&mut backing.invert, "Invert text and backing colors")
+                .on_hover_text("Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.").changed();
             ui.spaced_label(
-                "Uses each pane's background color. Disable in Settings → Experimental.",
+                "Colors follow each pane. Disable in Settings → Experimental.",
             );
         });
         if changed {
@@ -38,11 +40,13 @@ mod tests {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert!(prefs.text_backing.available);
         assert!(!prefs.text_backing.enabled);
+        assert!(!prefs.text_backing.invert);
         prefs.text_backing.enabled = true;
         prefs.text_backing.available = false;
         prefs.text_backing.opacity = 83;
         prefs.text_backing.feather = 9;
         prefs.text_backing.whole_line = true;
+        prefs.text_backing.invert = true;
         let saved: Preferences =
             serde_json::from_str(&serde_json::to_string(&prefs).unwrap()).unwrap();
         assert_eq!(saved.text_backing, prefs.text_backing);

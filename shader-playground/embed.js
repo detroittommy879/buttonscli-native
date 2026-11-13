@@ -8,7 +8,7 @@
   };
   const url = new URL('./', script.src);
   url.searchParams.set('embed', '1');
-  for (const key of ['fps', 'bundle', 'layout', 'controls'])
+  for (const key of ['fps', 'bundle', 'layout', 'controls', 'backing', 'invert', 'lines', 'opacity', 'feather'])
     if (script.dataset[key]) url.searchParams.set(key, script.dataset[key]);
   const frame = document.createElement('iframe');
   frame.src = url.href;

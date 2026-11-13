@@ -111,6 +111,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   renderer `vendor/egui_term/src/text_backing.rs`. Paint once after background
   callbacks, before all cell backgrounds/glyphs (per-cell feathering covers neighbors).
   Keep it out of theme import scopes. Experimental `available` is the kill switch.
+  Inversion backs runs with their foreground (whole rows use default foreground),
+  uses background for ink, and preserves explicit TUI/selection/search colors.
+  Web backing lives in `shader-playground/text-backing.js`; layout switches must
+  preserve `backing-*` classes. Deploy the JS module along with app.js.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
   geometry use the outer rectangle. Let the widget handle cell/input coordinates.
 - The adapter locks arrows/Tab/Escape to the terminal. Repeated `request_focus` resets

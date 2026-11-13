@@ -15,7 +15,7 @@ html = root / 'html'
 builder = root / 'site-src/build_new.py'
 assert hashlib.sha256(builder.read_bytes()).hexdigest() == args.expected_builder_sha, 'Server source changed; inspect before deploying'
 source = args.source.resolve()
-for name in ['index.html', 'app.js', 'style.css', 'embed.js', 'data/library.json']:
+for name in ['index.html', 'app.js', 'style.css', 'embed.js', 'text-backing.js', 'data/library.json']:
     assert (source / 'shader-playground' / name).is_file(), f'Missing {name}'
 assert (source / 'site-src/build_new.py').is_file()
 stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')

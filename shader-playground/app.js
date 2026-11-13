@@ -1,3 +1,4 @@
+import {terminalLines, installBacking} from './text-backing.js?v=20261113-5';
 const $ = id => document.getElementById(id);
 const accents = ['#489cff', '#ff9c38', '#23cc78', '#ed489e'];
 let library, device, template, helpers, format, selected = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -60,7 +61,8 @@ async function apply(pane, index, updateChrome = true) {
   const shader = library.shaders[index];
   if (updateChrome && panes[selected] === pane) applyChrome(shader.chrome);
   pane.values = {speed:shader.speed, scale:shader.scale, strength:shader.strength, background:shader.background, colors:[...shader.colors], knobs:shader.variables.map(v => v.value)};
-  pane.terminal.style.color = shader.foreground;
+  pane.terminal.style.setProperty('--terminal-fg', shader.foreground);
+  pane.terminal.style.setProperty('--terminal-bg', shader.background);
   pane.time = 0;
   pane.pipeline = null;
   pane.name.textContent = shader.name;
@@ -114,13 +116,13 @@ function controls() {
   [...p.values.colors,p.values.background].forEach((value,i) => {
     const label = document.createElement('label'); label.textContent = i === 5 ? 'BG' : `C${i+1}`;
     const input = document.createElement('input'); input.type = 'color'; input.value = value;
-    input.addEventListener('input',() => {if(i === 5) p.values.background = input.value; else p.values.colors[i] = input.value; p.dirty = true;});
+    input.addEventListener('input',() => {if(i === 5) { p.values.background = input.value; p.terminal.style.setProperty('--terminal-bg', input.value); } else p.values.colors[i] = input.value; p.dirty = true;});
     label.append(input); $('colors').append(label);
   });
 }
 function changeLayout(next, count = next === 'grid' ? 4 : next === 'one' ? 1 : 2) {
   paneCount = count;
-  layout = next; $('workspace').className = next;
+  layout = next; $('workspace').classList.remove('one','col','row','grid'); $('workspace').classList.add(next);
   panes.forEach((p,i) => {p.visible = next === 'one' ? i === selected : i < paneCount; p.element.hidden = !p.visible; p.element.style.display = p.visible ? '' : 'none'; p.element.style.gridColumn = count === 3 && i === 2 ? '1 / -1' : ''; p.dirty = true;});
   if(next !== 'one' && !panes[selected].visible) focus(0);
   document.querySelectorAll('[data-layout]').forEach(b => b.classList.toggle('active', b.dataset.layout === next));
@@ -158,7 +160,7 @@ function cycle(direction) {
   apply(panes[selected],indexes[(pos+direction+indexes.length)%indexes.length]);
 }
 async function start() {
-  const responses = await Promise.all(['data/library.json?v=20261113-4','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
+  const responses = await Promise.all(['data/library.json?v=20261113-5','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
   [library,helpers,template] = await Promise.all([responses[0].json(),responses[1].text(),responses[2].text()]);
   try {const adapter = await navigator.gpu?.requestAdapter(); device = await adapter?.requestDevice();} catch(error) {console.warn(error);}
   if(device) {
@@ -169,13 +171,21 @@ async function start() {
     const element = document.createElement('section'); element.className = 'pane'; element.style.setProperty('--pane',accents[i]); element.setAttribute('aria-label',`Terminal pane ${i+1}`);
     const canvas = document.createElement('canvas');
     const terminal = document.createElement('div'); terminal.className = 'terminal';
-    terminal.textContent = `PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo>\nPS C:\\ButtonsCLI\\demo> ▌`;
-    if (i === 0) {
-      terminal.replaceChildren();
-      for (const [line, color] of [['PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo> ', '#e3dfeb'], ['ButtonsCLI Native\n', '#55d9ad'], ['Appearance, your way.\n', '#ffe080'], ['Fine-grained control over every pane.\n', '#71caff'], ['AI shader generation, tuned over time\n', '#e9a0ef'], ['to work with affordable models.\n', '#e9a0ef'], ['PS C:\\ButtonsCLI\\demo> ▌', '#e3dfeb']]) {
-        const span = document.createElement('span'); span.textContent = line; span.style.color = color; terminal.append(span);
-      }
-    }
+    const copy = i === 0 ? [
+      ['PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo> ', null],
+      ['ButtonsCLI Native\n', '#55d9ad'],
+      ['Appearance, your way.\n', '#ffe080'],
+      ['Fine-grained control over every pane.\n', '#71caff'],
+      ['AI shader generation, tuned over time\n', '#e9a0ef'],
+      ['to work with affordable models.\n\n', '#e9a0ef'],
+      ['PS C:\\ButtonsCLI\\demo> ▌', null],
+    ] : [
+      ['PowerShell 7.6.10\nPS C:\\ButtonsCLI\\demo> dir\n\n', null],
+      ['  themes/     shaders/\n', '#71caff'],
+      ['  Your colors. Your terminal.\n\n', '#55d9ad'],
+      ['PS C:\\ButtonsCLI\\demo> ▌', null],
+    ];
+    terminalLines(terminal, copy);
     const name = document.createElement('span'); name.className = 'pane-name';
     const error = document.createElement('div'); error.className = 'pane-error'; error.setAttribute('role','status');
     element.append(canvas,terminal,name,error); $('workspace').append(element);
@@ -207,9 +217,11 @@ async function start() {
   $('brightness').oninput = () => $('workspace').style.setProperty('--brightness',$('brightness').value);
   $('fps').oninput = () => {fps = Number($('fps').value); nextFrame = 0; fpsLabel();};
   $('settings').onclick = $('dock-toggle').onclick = () => document.body.classList.toggle('dock-hidden');
+  $('backing-settings').onclick = () => { document.body.classList.remove('dock-hidden'); $('backing-options').open = true; $('backing-options').scrollIntoView({block:'nearest'}); $('backing-options').querySelector('summary').focus(); };
   $('help').onclick = () => $('help-dialog').showModal(); $('close-help').onclick = () => $('help-dialog').close();
   $('fullscreen').onclick = async () => {try {if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen();} catch { $('status').textContent = 'Fullscreen unavailable';}};
   document.querySelectorAll('[data-layout]').forEach(b => b.onclick = () => changeLayout(b.dataset.layout));
+  installBacking(params);
   focus(0); $('status').textContent = device ? 'SHADERS READY' : 'WEBGPU UNAVAILABLE'; fpsLabel();
   const candidates = featuredBundles.map(name => library.bundles.findIndex(b => b.name === name)).filter(i => i >= 0);
   const requestedBundle = params.get('bundle');

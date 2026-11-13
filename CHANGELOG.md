@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Text backing can swap text/backing colors for a light-text-strip look over any
+  shader. The website playground now offers backing, inversion, whole lines,
+  opacity and feather controls too.
+- Packaged additional personal release-picked themes, shaders and bundles.
+
 - Optional text backing softens shader/gradient backgrounds behind text runs or whole
   occupied lines. Status-bar controls adjust opacity and feathering; Settings →
   Experimental can disable the feature entirely. Off by default.
