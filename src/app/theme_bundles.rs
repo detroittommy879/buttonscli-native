@@ -283,6 +283,7 @@ impl ButtonsApp {
         ui: &mut egui::Ui,
         ctx: &egui::Context,
         label: &str,
+        top_level: bool,
     ) {
         let mut names: Vec<(String, &str)> = self
             .preferences
@@ -299,16 +300,24 @@ impl ButtonsApp {
             return;
         }
         let mut apply = None;
-        ui.spaced_menu_button(crate::i18n::literal(&self.locale, label), |ui| {
+        // Inside the File menu this is a submenu; in the status bar it is a
+        // standalone menu (see `ui_text::solo_menu_button`).
+        let text = crate::i18n::literal(&self.locale, label);
+        let contents = |ui: &mut egui::Ui| {
             for (name, mark) in names {
                 if ui.spaced_button(format!("{mark} {name}")).clicked() {
                     apply = Some(name);
                     ui.close_menu();
                 }
             }
-        })
-        .response
-        .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals.");
+        };
+        let menu = if top_level {
+            ui.solo_menu_button("status-bundles", text, contents)
+        } else {
+            ui.spaced_menu_button(text, contents)
+        };
+        menu.response
+            .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals.");
         if let Some(name) = apply {
             self.notice = self.apply_theme_bundle(ctx, &name);
             ui.close_menu();

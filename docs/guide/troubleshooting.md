@@ -55,6 +55,11 @@ ButtonsCLI usually notices and fixes it itself; if not, right-click the pane
 That program has the mouse and decides what the wheel does. Hold **Shift**
 while scrolling to scroll the pane's own history.
 
+**Everything looks too big (or too small) on another monitor.**
+Change **Settings → Workspace → UI size**, or tick **Auto** so ButtonsCLI
+picks a size from the monitor. Some fonts have unusual line heights; if a
+font still looks cramped, try another one in Settings → Fonts.
+
 ## AI
 
 **"Choose a shader model in AI models first."**

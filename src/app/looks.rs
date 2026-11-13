@@ -226,7 +226,7 @@ impl ButtonsApp {
         let mut chosen = None;
         let mut changed = false;
         {
-            ui.spaced_menu_button(title, |ui| {
+            ui.solo_menu_button("status-look", title, |ui| {
                 ui.set_min_width(260.0);
                 ui.spaced_strong("Look");
                 let mut look = self.current_look().unwrap_or_default();

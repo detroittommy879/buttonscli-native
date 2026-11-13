@@ -69,6 +69,14 @@ for you. The app asks GitHub once each time it starts. To stop that, untick
 
 ## Settings while you work
 
+### UI size
+
+**Settings → Workspace → UI size** makes everything (text, buttons,
+terminals) larger or smaller together. **Auto** (the default) picks a size
+from your monitor: 100% on large workspaces such as 4K at 125% scaling, down
+to 80% on a 1080p screen at 100%. Untick Auto to choose your own size.
+Windows display scaling still applies on top.
+
 ### Developer notices
 
 You can opt in to **Receive signed developer notices** during setup or in

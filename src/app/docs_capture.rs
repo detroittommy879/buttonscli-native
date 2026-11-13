@@ -750,6 +750,8 @@ mod probe {
             preferences.localization.manual_locale = self.locale.clone();
             preferences.settings_layout.size = [1040.0, 820.0];
             preferences.settings_layout.position = None;
+            // Shots are sized in points; never let Auto UI size shrink them.
+            preferences.ui_scale = 1.0;
             // Nothing in a capture may reach a provider or the OS keychain:
             // an unknown provider id on a discard port.
             for provider in &mut preferences.provider_settings.providers {

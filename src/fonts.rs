@@ -234,6 +234,52 @@ pub(crate) struct FontCatalog {
     faces: Vec<LoadedFace>,
 }
 
+/// egui puts a font's whole line gap below the text and trusts its ascent,
+/// so fonts with unusual metrics drew text high or low in buttons and tab
+/// labels (Code New Roman sat 0.17 em high; saxmono's caps reached above
+/// its row and were clipped). Shift glyphs so capital letters sit in the
+/// middle of the row, never so far that descenders or capitals leave it.
+/// Well-behaved fonts (Roboto, JetBrains Mono) move less than 0.02 em and
+/// are left alone.
+fn centered(data: FontData) -> FontData {
+    let shift = vertical_centering(&data.font, data.index).unwrap_or(0.0);
+    if shift.abs() < 0.02 {
+        return data;
+    }
+    data.tweak(egui::FontTweak {
+        y_offset_factor: shift,
+        ..Default::default()
+    })
+}
+
+/// Downward glyph shift in em that centers capitals in egui's row box.
+fn vertical_centering(bytes: &[u8], index: u32) -> Option<f32> {
+    let face = ttf_parser::Face::parse(bytes, index).ok()?;
+    let em = f32::from(face.units_per_em());
+    let top_of = |c: char| {
+        let glyph = face.glyph_index(c)?;
+        Some(f32::from(face.glyph_bounding_box(glyph)?.y_max) / em)
+    };
+    let bottom_of = |c: char| {
+        let glyph = face.glyph_index(c)?;
+        Some(f32::from(face.glyph_bounding_box(glyph)?.y_min) / em)
+    };
+    let ascent = f32::from(face.ascender()) / em;
+    let descent = f32::from(face.descender()) / em; // negative
+    let gap = f32::from(face.line_gap()) / em;
+    let cap = top_of('H')?;
+    let low = bottom_of('g').unwrap_or(descent).min(0.0);
+    let row = ascent - descent + gap;
+    if !(row > 0.0 && cap > 0.0) {
+        return None;
+    }
+    let wanted = row / 2.0 - (ascent - cap / 2.0);
+    // Room below the lowest descender, and above the capitals.
+    let down = (row - (ascent - low)).max(0.0);
+    let up = (ascent - cap).max(0.0);
+    Some(wanted.clamp(-up, down))
+}
+
 impl FontCatalog {
     pub(crate) fn bundled() -> Self {
         Self {
@@ -245,7 +291,16 @@ impl FontCatalog {
                     file: face.file.to_owned(),
                     weight: face.weight,
                     kind: face.kind,
-                    data: Arc::new(FontData::from_static(face.bytes)),
+                    data: Arc::new({
+                        let data = FontData::from_static(face.bytes);
+                        // Fallback glyphs (★, box drawing) are already
+                        // centered against the selected font by egui.
+                        if GLYPH_FALLBACKS.contains(&face.id) {
+                            data
+                        } else {
+                            centered(data)
+                        }
+                    }),
                 })
                 .collect(),
         }
@@ -559,7 +614,7 @@ fn load_external_face(path: &Path, source: FontSource) -> Result<LoadedFace, Str
             .to_owned(),
         weight,
         kind,
-        data: Arc::new(FontData::from_owned(bytes)),
+        data: Arc::new(centered(FontData::from_owned(bytes))),
     })
 }
 
@@ -958,6 +1013,27 @@ fn nearest_face(family: &str, weight: u16) -> Option<&'static FontFace> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn odd_font_metrics_are_centered_and_normal_fonts_left_alone() {
+        let shift = |id: &str| {
+            let face = FONT_FACES.iter().find(|face| face.id == id).unwrap();
+            vertical_centering(face.bytes, 0).unwrap()
+        };
+        for id in ["roboto-400", "jetbrains-mono-400"] {
+            assert!(shift(id).abs() < 0.02, "{id}: {}", shift(id));
+        }
+        // Code New Roman puts a 0.17 em line gap under its text.
+        assert!(shift("code-new-roman") > 0.1, "{}", shift("code-new-roman"));
+        // saxmono's row is too short to center; it moves only as far as
+        // its descenders allow.
+        let sax = shift("saxmono");
+        assert!(sax > 0.05 && sax <= 0.081, "{sax}");
+        for face in FONT_FACES {
+            let value = vertical_centering(face.bytes, 0).unwrap_or(0.0);
+            assert!(value.abs() <= 0.2, "{}: {value}", face.id);
+        }
+    }
 
     fn test_path(label: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(

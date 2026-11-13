@@ -123,6 +123,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   arrow keys. `sync` turns mouse reporting off if the shell echoes our last click
   report (stale mode from an exited/disconnected TUI); the pane menu has
   "Reset mouse mode". Pastes are sanitized (`sanitize_paste`, par-term's rule).
+- Toolbar menus (status bar, tab strip, dock ⋮) use `ui.solo_menu_button`
+  (`src/ui_text.rs`): egui 0.31 `menu_button`s in one `Ui` share menubar
+  state, so hovering a sibling opened it. Keep `spaced_menu_button` for the
+  top File/View menus and for submenus (it detects menu context; solo can't).
+  egui's menu `inner` is only `Some` on the closing frame: tests record
+  what the contents drew instead.
+- UI size is `ctx.set_zoom_factor` (`src/app/ui_scale.rs`, 0 = Auto from
+  `monitor_size × zoom_factor`); egui's Ctrl +/- zoom is off. A zoom of
+  0.8 on a 125% monitor reproduces 100% scaling (ppp 1.0) for visual checks.
+  Detached viewports must not pass `with_position`/`with_inner_size` every
+  frame (egui re-sends them as commands and fights drags).
+- Fonts get a per-face `FontTweak::y_offset_factor` (`fonts::centered`) that
+  centers capitals; `GLYPH_FALLBACKS` faces are never tweaked. Terminal cell
+  height is `row_height.ceil()` (`egui_term` `font_measure`).
 - Menu Paste sends `ViewportCommand::RequestPaste`; `deliver_menu_paste` takes the
   next frame's `Event::Paste` for that PTY ID before widgets see it.
 

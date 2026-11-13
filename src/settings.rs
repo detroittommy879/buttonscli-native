@@ -315,6 +315,9 @@ pub(crate) struct Preferences {
     pub(crate) dock_auto_hide_ms: u64,
     pub(crate) dock_opacity: f32,
     pub(crate) window_opacity: f32,
+    /// Size of everything (text, buttons, terminals): 1 is 100%. 0 picks
+    /// a size from the monitor (`app::ui_scale::auto_scale`).
+    pub(crate) ui_scale: f32,
     pub(crate) dock_peek_radius: u8,
     pub(crate) presets: Vec<CommandPreset>,
     pub(crate) ssh_presets: Vec<CommandPreset>,
@@ -390,6 +393,7 @@ impl Default for Preferences {
             dock_auto_hide_ms: 4_000,
             dock_opacity: 0.35,
             window_opacity: 1.0,
+            ui_scale: 0.0,
             dock_peek_radius: 10,
             presets: default_presets(),
             ssh_presets: default_left_presets(),
@@ -416,6 +420,8 @@ pub(crate) const MAX_MOTION_SPEED: f32 = 2.0;
 
 /// Most shaders the Pattern picker keeps.
 /// Highest "Animation FPS limit" (shaders and effects, app-wide).
+pub(crate) const MIN_UI_SCALE: f32 = 0.5;
+pub(crate) const MAX_UI_SCALE: f32 = 2.0;
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 /// Longest workspace message timeout offered in Settings.
 pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
@@ -877,6 +883,11 @@ impl Preferences {
             0.35
         };
         self.window_opacity = crate::window_opacity::clamp(self.window_opacity);
+        self.ui_scale = if !self.ui_scale.is_finite() || self.ui_scale <= 0.0 {
+            0.0
+        } else {
+            self.ui_scale.clamp(MIN_UI_SCALE, MAX_UI_SCALE)
+        };
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());

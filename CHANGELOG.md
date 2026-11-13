@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **UI size**: Settings → Workspace scales text, buttons and terminals
+  together. Auto picks a size from the monitor (smaller on 1080p/1440p at
+  100% scaling).
+- **Status-bar and tab menus open only when clicked**: after one menu had
+  opened, hovering any other menu button opened it too. Status-bar menus now
+  open above their button instead of covering it.
+- **Detached Settings can be dragged between monitors**: it no longer fights
+  the drag by restoring its saved position every frame.
+- **Terminal lines are no longer clipped**: rows were rounded down to whole
+  points, so the next line's background covered part of the text with some
+  fonts and display scales.
+- **Text in buttons is centered for fonts with unusual metrics** (for example
+  Code New Roman, saxmono, Serious Shanns).
+- **Idle buttons stay visible on themes with close colors**: a button whose
+  fill was nearly the panel color had no visible box; it is now separated
+  from the panel.
+
 - **Free features without a flag file**: Agent Mode, AI theme/shader generation,
   Quick Secrets and local CLI/MCP control are available to everyone without a
   ButtonsCLI account grant. AI still uses your own provider. Shader Feedback is

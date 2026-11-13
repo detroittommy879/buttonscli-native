@@ -1136,7 +1136,7 @@ struct AiHelpWindowState {
     target: Option<(u64, String)>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum PresetCollection {
     Commands,
     Ssh,
@@ -1886,10 +1886,15 @@ impl ButtonsApp {
         visuals.faint_bg_color = colors.raised;
         visuals.widgets.noninteractive.bg_fill = colors.panel;
         visuals.widgets.noninteractive.fg_stroke.color = colors.text;
-        visuals.widgets.inactive.bg_fill = colors.raised;
-        visuals.widgets.inactive.weak_bg_fill = colors.raised;
+        // Idle buttons must read as boxes on the panel, even when a theme's
+        // raised and panel colors are nearly equal; the outline then needs to
+        // stand out from the button.
+        let button_fill = separated(colors.raised, colors.panel, 1.3);
+        let button_outline = separated(colors.border, button_fill, 1.6);
+        visuals.widgets.inactive.bg_fill = button_fill;
+        visuals.widgets.inactive.weak_bg_fill = button_fill;
         visuals.widgets.inactive.fg_stroke.color = colors.text;
-        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, colors.border);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, button_outline);
         // Buttons paint `weak_bg_fill`; setting only `bg_fill` left every
         // hovered button on egui's stock grey whatever the theme said.
         visuals.widgets.hovered.bg_fill = colors.accent_hover;
@@ -2279,7 +2284,7 @@ impl ButtonsApp {
             crate::i18n::literal(&self.locale, "Profile:"),
             store.profile_name()
         );
-        let response = ui.spaced_menu_button(label, |ui| {
+        let response = ui.solo_menu_button("status-profile", label, |ui| {
             let profiles = self
                 .native_profiles
                 .get_or_insert_with(|| store.list_profiles());
@@ -4360,7 +4365,7 @@ impl ButtonsApp {
                         #[cfg(not(target_arch = "wasm32"))]
                         self.tab_group_menu(ui, ctx);
                         #[cfg(not(target_arch = "wasm32"))]
-                        self.theme_bundle_menu(ui, ctx, "Apply theme bundle");
+                        self.theme_bundle_menu(ui, ctx, "Apply theme bundle", false);
                         ui.separator();
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, "Quit  Ctrl+Shift+Q"))
@@ -4961,7 +4966,7 @@ impl ButtonsApp {
                             );
                         });
                         if self.preferences.show_action_buttons {
-                            ui.spaced_menu_button("⋮", |ui| {
+                            ui.solo_menu_button(("tab-actions", tab.id), "⋮", |ui| {
                                 tab_action_menu(
                                     ui,
                                     &self.locale,
@@ -4974,7 +4979,7 @@ impl ButtonsApp {
                         }
                     }
                     let options = self.shell_menu_options();
-                    ui.spaced_menu_button(RichText::new("+").color(colors.accent), |ui| {
+                    ui.solo_menu_button("new-tab", RichText::new("+").color(colors.accent), |ui| {
                         for (id, label, detail) in options {
                             if ui.spaced_button(label).on_hover_text(detail).clicked() {
                                 add = Some(id);
@@ -5439,14 +5444,14 @@ impl ButtonsApp {
                         let mut fps = self.preferences.animation_fps;
                         let mut fps_done = false;
                         // Keep each control in the outer wrapping row.
-                            ui.spaced_menu_button(crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
+                            ui.solo_menu_button("status-favorites", crate::i18n::literal(&self.locale, "★ Favorites"), |ui| {
                                 favorite_theme_menu(ui, &self.locale, &current, &favorites, &mut action);
                             });
                             if ui.spaced_button(crate::i18n::literal(&self.locale, "Random theme"))
                                 .on_hover_text("Apply a random theme to the whole app and every terminal").clicked() {
                                 action = Some(PaneAction::RandomTheme);
                             }
-                            let shader_button = ui.spaced_menu_button("✦ Shader", |ui| {
+                            let shader_button = ui.solo_menu_button("status-shader", "✦ Shader", |ui| {
                                 ui.set_max_width(340.0);
                                 if let Some((id, title, theme)) = &focused_pane {
                                     ui.spaced_strong(format!("{title} · {}", theme.name));
@@ -5467,7 +5472,7 @@ impl ButtonsApp {
                         if let (Some(action), Some((id, _, _))) = (shader_action, &focused_pane) {
                             self.perform_pane_action(*id, action, ctx);
                         }
-                        self.theme_bundle_menu(ui, ctx, "◆ Bundles");
+                        self.theme_bundle_menu(ui, ctx, "◆ Bundles", true);
                         ui.separator();
                         self.profile_menu(ui, ctx);
                         ui.separator();
@@ -5734,8 +5739,18 @@ impl ButtonsApp {
     }
 
     fn settings_window(&mut self, ctx: &egui::Context) {
+        // Place the detached window once per opening. Passing the saved
+        // position/size every frame made egui re-send OuterPosition/InnerSize
+        // from last frame's rect, which fought the user's drag (worst across
+        // monitors with different scaling, where points differ per monitor).
+        let placed_id = egui::Id::new("buttonscli-settings-placed");
         if !self.show_settings {
+            ctx.data_mut(|data| data.remove::<bool>(placed_id));
             return;
+        }
+        let place = !ctx.data(|data| data.get_temp::<bool>(placed_id).unwrap_or(false));
+        if place {
+            ctx.data_mut(|data| data.insert_temp(placed_id, true));
         }
         if self.settings_snapshot.is_none() {
             #[cfg(not(target_arch = "wasm32"))]
@@ -5750,13 +5765,15 @@ impl ButtonsApp {
         let layout = self.preferences.settings_layout.clone();
         let mut builder = egui::ViewportBuilder::default()
             .with_title(title.clone())
-            .with_inner_size(layout.size)
             .with_min_inner_size([720.0, 520.0]);
+        if place {
+            builder = builder.with_inner_size(layout.size);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         {
             builder = builder.with_icon(crate::app_icon());
         }
-        if let Some(position) = layout.position {
+        if let Some(position) = layout.position.filter(|_| place) {
             builder = builder.with_position(position);
         }
         ctx.show_viewport_immediate(
@@ -13580,6 +13597,11 @@ impl ButtonsApp {
                 );
             }
             #[cfg(not(target_arch = "wasm32"))]
+            {
+                ui.add_space(8.0);
+                self.ui_scale_settings(ui);
+            }
+            #[cfg(not(target_arch = "wasm32"))]
             if window_transparency_available() {
                 ui.add_space(8.0);
                 if crate::window_opacity::is_supported() {
@@ -14762,8 +14784,7 @@ fn theme_path_action(ui: &mut egui::Ui, path: &mut String, hint: &str, action: &
     .inner
 }
 
-fn readable_on(background: Color32) -> Color32 {
-    // Pick the larger black/white contrast ratio using linear luminance.
+fn relative_luminance(color: Color32) -> f32 {
     let linear = |channel: u8| {
         let value = channel as f32 / 255.0;
         if value <= 0.04045 {
@@ -14772,14 +14793,48 @@ fn readable_on(background: Color32) -> Color32 {
             ((value + 0.055) / 1.055).powf(2.4)
         }
     };
-    let luminance = 0.2126 * linear(background.r())
-        + 0.7152 * linear(background.g())
-        + 0.0722 * linear(background.b());
-    if luminance > 0.179 {
+    0.2126 * linear(color.r()) + 0.7152 * linear(color.g()) + 0.0722 * linear(color.b())
+}
+
+/// WCAG contrast ratio between two colors (1.0 = identical).
+fn contrast_ratio(a: Color32, b: Color32) -> f32 {
+    let (la, lb) = (relative_luminance(a), relative_luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+fn readable_on(background: Color32) -> Color32 {
+    // Pick the larger black/white contrast ratio using linear luminance.
+    if relative_luminance(background) > 0.179 {
         Color32::BLACK
     } else {
         Color32::WHITE
     }
+}
+
+/// `color`, moved toward black or white just far enough to stand out from
+/// `against`. Some themes give buttons nearly the panel's color, and then
+/// their boxes disappear.
+fn separated(color: Color32, against: Color32, min_ratio: f32) -> Color32 {
+    if contrast_ratio(color, against) >= min_ratio {
+        return color;
+    }
+    let target = if relative_luminance(against) > 0.179 {
+        Color32::BLACK
+    } else {
+        Color32::WHITE
+    };
+    let mix = |t: f32| {
+        let lerp = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
+        Color32::from_rgb(
+            lerp(color.r(), target.r()),
+            lerp(color.g(), target.g()),
+            lerp(color.b(), target.b()),
+        )
+    };
+    (1..=50)
+        .map(|step| mix(step as f32 / 50.0))
+        .find(|candidate| contrast_ratio(*candidate, against) >= min_ratio)
+        .unwrap_or(target)
 }
 
 fn settings_scroll_style() -> egui::style::ScrollStyle {
@@ -16860,7 +16915,7 @@ fn preset_button_menu(
 ) {
     response.context_menu(|ui| preset_action_menu(ui, locale, collection, index, action));
     if show_button {
-        ui.spaced_menu_button("⋮", |ui| {
+        ui.solo_menu_button(("preset-actions", collection, index), "⋮", |ui| {
             preset_action_menu(ui, locale, collection, index, action)
         });
     }
@@ -17356,6 +17411,8 @@ mod tab_groups;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
 #[cfg(not(target_arch = "wasm32"))]
+mod ui_scale;
+#[cfg(not(target_arch = "wasm32"))]
 mod updates;
 
 impl eframe::App for ButtonsApp {
@@ -17382,6 +17439,8 @@ impl eframe::App for ButtonsApp {
         #[cfg(target_arch = "wasm32")]
         let _ = frame;
         self.refresh_locale();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.apply_ui_scale(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.apply_window_opacity(frame);
         #[cfg(not(target_arch = "wasm32"))]
@@ -17573,6 +17632,25 @@ impl eframe::App for ButtonsApp {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn near_identical_button_colors_are_pushed_apart_from_the_panel() {
+        use super::{contrast_ratio, separated};
+        let panel = Color32::from_rgb(20, 24, 30);
+        // A theme whose raised button color is almost the panel color.
+        let raised = Color32::from_rgb(21, 25, 31);
+        assert!(contrast_ratio(raised, panel) < 1.1);
+        let fill = separated(raised, panel, 1.3);
+        assert!(contrast_ratio(fill, panel) >= 1.3, "{fill:?}");
+        // Light panels get darker buttons, dark panels lighter ones.
+        let light_panel = Color32::from_rgb(240, 240, 236);
+        let light_fill = separated(Color32::from_rgb(238, 238, 234), light_panel, 1.3);
+        assert!(contrast_ratio(light_fill, light_panel) >= 1.3);
+        assert!(light_fill.r() < 238);
+        // Colors that already stand out are left alone.
+        let clear = Color32::from_rgb(60, 70, 90);
+        assert_eq!(separated(clear, panel, 1.3), clear);
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn every_shader_editor_example_compiles() {
