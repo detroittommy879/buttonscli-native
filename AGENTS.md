@@ -242,6 +242,12 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   WASM). Refresh its public-only catalog with `python scripts/export-shader-playground.py`;
   serves on localhost/HTTPS. Native `shaderBackground` can be JSON null; exporters
   must handle it. WGSL uniform layout and custom strength behavior mirror native.
+  Palette export must mirror `app::shader_palette`: explicit palettes can have
+  only 3–4 colors; remaining slots inherit gradient/accent/ANSI colors. ANSI can
+  be an object or array. Chrome colors use a bundle's `app_theme_id`.
+  Production `/native/try/` is the standalone playground now, not WASM. Homepage
+  generator is mirrored in `site-src/`; its `#playground` uses `embed.js`. Keep
+  old WASM archives outside the public root; do not redeploy `web/pkg/` there.
   WASM uses WGPU/WebGPU and the shared shader renderer. Eframe 0.31 needs
   a direct `egui-wgpu` fragile-send-sync feature and direct Naga for WGSL checks. Config visibility changes
   need a reload only; Rust changes need `scripts/build-web.ps1` to refresh pkg/ and

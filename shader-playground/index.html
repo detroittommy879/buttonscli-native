@@ -5,7 +5,7 @@
 <title>ButtonsCLI · Shader playground</title>
 <meta name="description" content="Explore real ButtonsCLI shaders in a terminal-style playground. Change colors, motion and each shader’s controls.">
 <meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#110d1e">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20261113-3">
 </head>
 <body>
 <a class="skip" href="#controls">Skip to shader controls</a>
@@ -21,6 +21,7 @@
 <p id="count" class="muted"></p>
 <label class="field">Theme bundles<select id="bundle"><option value="">Choose a bundle…</option></select></label>
 <hr><h2>Motion & appearance</h2><div id="common"></div>
+<label class="slider"><span>Animation FPS</span><output id="fps-value">30</output><input id="fps" type="range" min="1" max="120" step="1" value="30" aria-label="Animation FPS"></label>
 <hr><h2>Shader sliders</h2><div id="knobs"></div>
 <hr><h2>Colors</h2><div id="colors"></div>
 <button id="reset" class="wide">Reset this pane</button>
@@ -30,5 +31,5 @@
 </main>
 <footer><span id="status">STARTING GPU</span><span class="separator">ButtonsCLI shaders</span><button id="settings">⚙ Shader controls</button><button id="pause">Pause motion</button><span class="separator">Panes</span><button data-layout="one">1</button><button data-layout="col">COL</button><button data-layout="row">ROW</button><button data-layout="grid" class="active">GRID</button><label>Brightness <input id="brightness" type="range" min="0.1" max="1" step="0.01" value="1"></label><span id="total" class="muted right"></span></footer>
 <dialog id="help-dialog"><h2>ButtonsCLI shader playground</h2><p>These are the app’s actual shaders. Select a pane, choose a shader or bundle, then adjust its sliders and colors.</p><p>The terminal text and command strip are decorative. No commands run. WebGPU requires a supported browser on HTTPS or localhost.</p><button id="close-help">Close</button></dialog>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=20261113-3"></script>
 </body></html>

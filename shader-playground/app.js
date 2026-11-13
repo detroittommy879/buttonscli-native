@@ -2,9 +2,27 @@ const $ = id => document.getElementById(id);
 const accents = ['#489cff', '#ff9c38', '#23cc78', '#ed489e'];
 let library, device, template, helpers, format, selected = 0, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let layout = 'grid', paneCount = 4, lastFrame = 0, compileQueue = Promise.resolve();
+const params = new URLSearchParams(location.search);
+let fps = Math.max(1, Math.min(120, Number(params.get('fps')) || 30)), nextFrame = 0, embedVisible = true;
+fps = Math.round(fps);
+document.body.classList.toggle('embedded', params.has('embed'));
+addEventListener('message', event => {
+  if (event.source === parent && event.data?.type === 'buttonscli-visibility' && typeof event.data.visible === 'boolean') embedVisible = event.data.visible;
+});
 const panes = [], pipelineCache = new Map();
-const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+const rgb = (hex = '#080b16') => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
 const stripComments = code => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const chromeKeys = new Set(['shell-background','shell-backgroundSecondary','shell-border','shell-textMain','shell-textDim','shell-accent','shell-accentHover','shell-buttonBackground','presetDock-background','presetDock-accent','presetDock-buttonBackground','presetDock-buttonHover','presetDock-buttonText','tabs-background','tabs-idleBackground','tabs-activeBackground','tabs-activeBorder','statusBar-background','statusBar-border','statusBar-text','statusBar-warning']);
+function applyChrome(colors) {
+  if (!colors || !Object.keys(colors).length) return;
+  for (const key of chromeKeys) document.documentElement.style.removeProperty(`--${key}`);
+  for (const [key, color] of Object.entries(colors))
+    if (chromeKeys.has(key) && /^#[0-9a-f]{6}$/i.test(color)) document.documentElement.style.setProperty(`--${key}`, color);
+}
+function fpsLabel() {
+  $('fps').value = fps; $('fps-value').textContent = fps;
+  $('total').textContent = `${library.shaders.length} shaders · ${fps} fps target`;
+}
 
 function source(shader) {
   const code = stripComments(shader.expression);
@@ -35,10 +53,11 @@ function pipeline(index) {
   return pending;
 }
 
-async function apply(pane, index) {
+async function apply(pane, index, updateChrome = true) {
   const revision = ++pane.revision;
   pane.index = index;
   const shader = library.shaders[index];
+  if (updateChrome && panes[selected] === pane) applyChrome(shader.chrome);
   pane.values = {speed:shader.speed, scale:shader.scale, strength:shader.strength, background:shader.background, colors:[...shader.colors], knobs:shader.variables.map(v => v.value)};
   pane.terminal.style.color = shader.foreground;
   pane.time = 0;
@@ -104,10 +123,12 @@ function changeLayout(next, count = next === 'grid' ? 4 : next === 'one' ? 1 : 2
 }
 function draw(now) {
   requestAnimationFrame(draw);
-  const dt = Math.min((now-lastFrame)/1000,0.1);
-  if(now-lastFrame < 1000/30) return;
+  if(now + 0.5 < nextFrame) return;
+  const dt = Math.min((now-lastFrame)/1000,1);
+  const interval = 1000/fps;
+  nextFrame = Math.max(nextFrame + interval, now);
   lastFrame = now;
-  if (!device || document.hidden) return;
+  if (!device || document.hidden || !embedVisible) return;
   for (const p of panes) {
     if (!p.visible || !p.pipeline) continue;
     const rect = p.element.getBoundingClientRect(), ratio = Math.min(devicePixelRatio,1.5);
@@ -133,7 +154,7 @@ function cycle(direction) {
   apply(panes[selected],indexes[(pos+direction+indexes.length)%indexes.length]);
 }
 async function start() {
-  const responses = await Promise.all(['data/library.json','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
+  const responses = await Promise.all(['data/library.json?v=20261113-3','data/shader_helpers.wgsl','data/shader_background.wgsl'].map(url => fetch(url).then(r => {if(!r.ok) throw new Error(`Cannot load ${url}`); return r;})));
   [library,helpers,template] = await Promise.all([responses[0].json(),responses[1].text(),responses[2].text()]);
   try {const adapter = await navigator.gpu?.requestAdapter(); device = await adapter?.requestDevice();} catch(error) {console.warn(error);}
   if(device) {
@@ -157,7 +178,14 @@ async function start() {
   const preferred = ['Moonlit Swell','Filtered Squarewave','Bubble Parade','Acid Waveform'];
   await Promise.all(panes.map((p,i) => {const index = library.shaders.findIndex(s => s.name === preferred[i]); return apply(p,index < 0 ? i : index);}));
   library.bundles.forEach((b,i) => $('bundle').add(new Option(b.name,i)));
-  $('bundle').addEventListener('change',() => {if($('bundle').value === '')return; const bundle = library.bundles[Number($('bundle').value)]; bundle.panes.forEach((index,i) => apply(panes[i],index)); focus(0); changeLayout(bundle.panes.length === 1 ? 'one' : bundle.panes.length === 2 ? 'col' : 'grid',bundle.panes.length);});
+  function applyBundle() {
+    if($('bundle').value === '') return;
+    const bundle = library.bundles[Number($('bundle').value)];
+    bundle.panes.forEach((index,i) => apply(panes[i],index,false));
+    applyChrome(bundle.chrome); focus(0);
+    changeLayout(bundle.panes.length === 1 ? 'one' : bundle.panes.length === 2 ? 'col' : 'grid',bundle.panes.length);
+  }
+  $('bundle').addEventListener('change',applyBundle);
   $('shader').addEventListener('change',() => apply(panes[selected],Number($('shader').value)));
   $('search').addEventListener('input',options);
   $('prev').onclick = () => cycle(-1); $('next').onclick = () => cycle(1);
@@ -167,12 +195,16 @@ async function start() {
   $('pause').textContent = paused ? 'Resume motion' : 'Pause motion';
   $('text').onchange = () => document.body.classList.toggle('text-hidden',!$('text').checked);
   $('brightness').oninput = () => $('workspace').style.setProperty('--brightness',$('brightness').value);
+  $('fps').oninput = () => {fps = Number($('fps').value); nextFrame = 0; fpsLabel();};
   $('settings').onclick = $('dock-toggle').onclick = () => document.body.classList.toggle('dock-hidden');
   $('help').onclick = () => $('help-dialog').showModal(); $('close-help').onclick = () => $('help-dialog').close();
   $('fullscreen').onclick = async () => {try {if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen();} catch { $('status').textContent = 'Fullscreen unavailable';}};
   document.querySelectorAll('[data-layout]').forEach(b => b.onclick = () => changeLayout(b.dataset.layout));
-  focus(0); $('status').textContent = device ? 'SHADERS READY' : 'WEBGPU UNAVAILABLE'; $('total').textContent = `${library.shaders.length} shaders · 30 fps`;
-  if(innerWidth <= 600) document.body.classList.add('dock-hidden');
+  focus(0); $('status').textContent = device ? 'SHADERS READY' : 'WEBGPU UNAVAILABLE'; fpsLabel();
+  const initialBundle = library.bundles.findIndex(b => b.name === params.get('bundle'));
+  if(initialBundle >= 0) {$('bundle').value = initialBundle; applyBundle();}
+  if(['one','col','row','grid'].includes(params.get('layout'))) changeLayout(params.get('layout'));
+  if(params.get('controls') === '0' || (innerWidth <= 600 && params.get('controls') !== '1')) document.body.classList.add('dock-hidden');
   requestAnimationFrame(draw);
 }
 start().catch(error => {$('status').textContent = `Preview failed: ${error.message}`; console.error(error);});

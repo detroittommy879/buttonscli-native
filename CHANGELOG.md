@@ -5,6 +5,9 @@
 - **Standalone shader playground**: a static browser preview with terminal panes,
   shader/bundle browsing, colors and live sliders; export new library picks without
   rebuilding Rust/WASM. Requires WebGPU; runs no shell commands.
+- Playground themes now color the surrounding UI; animation has a 1–120 FPS
+  slider (default 30). An iframe helper supports configurable width/height and
+  suspends offscreen drawing. Older three/four-color palettes use native fallbacks.
 - **Save a bundle from the status bar**: the ◆ Bundles menu has a name box and
   Save, so the looks on screen can be kept without opening Settings.
 - **Classic effects switch**: Look → Classic effects (also Settings →
