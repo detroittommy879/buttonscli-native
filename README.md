@@ -101,7 +101,28 @@ examples from that workspace.</sub>
 
 ## Get started
 
-Install **current stable Rust**, Git and your platform's
+Install the newest release in one command (per user, no admin):
+
+```sh
+# Linux / macOS
+curl -fsSL https://buttonscli.com/install.sh | sh
+```
+
+```powershell
+# Windows PowerShell
+irm https://buttonscli.com/install.ps1 | iex
+```
+
+```bat
+:: Windows Command Prompt
+curl -fsSL https://buttonscli.com/install.cmd -o install.cmd && install.cmd && del install.cmd
+```
+
+The scripts are in [`packaging/install/`](packaging/install/); they verify the
+release's SHA-256 checksums. Or download a build from
+[Releases](https://github.com/detroittommy879/buttonscli-native/releases/latest).
+
+To build from source instead, install **current stable Rust**, Git and your platform's
 [build prerequisites](docs/dev/BUILDING.md). Install the recommended `main` version:
 
 ```sh
@@ -174,7 +195,7 @@ test pass rates or reliability measurements. Updated October 28, 2026.
 | **AI theme and shader generation** | **Working preview** | Palette drafts work. AI shaders write up to 12 versions in parallel; every result is compiled (and drawn once) before you see it, and an optional judge model fixes or reviews them. **Theme + shader** designs colors, fonts and an animated background together in one run. |
 | **Effects / shaders** | **Native shaders work; legacy shaders don't** | Gradients, scanlines, noise, row banding, analog static, 34 shader presets and custom WGSL shaders render natively. Old GLSL shaders from the original app, its Shader Lab and HSync warp do not run. |
 | **Linux / macOS** | **Broader validation needed** | Linux build/tests and earlier X11 desktop checks exist; current Windows interaction evidence does not certify Linux/macOS. |
-| **Accounts / installers / updates** | **Unfinished** | Git/source installation works. Downloadable releases, a Microsoft Store (MSIX) build, signing, updates and hosted accounts are planned but not done; old feedback/runtime-config services are disabled. |
+| **Accounts / installers / updates** | **Unfinished** | Unsigned release downloads, one-command installers and Git/source installation work. Package managers, a Microsoft Store (MSIX) build, signing, in-app updates and hosted accounts are planned but not done; old feedback/runtime-config services are disabled. |
 
 AI Help, AI theme/shader generation, Quick Secrets, profiles and CLI/MCP control
 are free without local feature flags or account grants. AI uses your configured
