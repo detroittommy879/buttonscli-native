@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0d1b4f",
+        "#1a7f9c",
+        "#b8f0f5",
+        "#ffb36b",
+        "#5b3fa6"
+      ],
+      "custom": {
+        "expression": "let moon_p = vec2<f32>(0.32, 0.24);\nlet md = sd_circle(p - moon_p, moon_size);\nlet moon = fill(md) * c4 * 1.1 + halo(md, 0.22) * c4 * 0.35 + halo(md, 0.05) * c3 * 0.3;\nlet warm = c4 * 0.5 * (1.0 - smoothstep(-0.08, 0.4, p.y));\nlet sky_base = mix(c5 * 0.55, c1 * 0.5, smoothstep(-0.08, 0.5, p.y));\nlet stars_l = stars(p * 26.0 * star_density, t) * smoothstep(-0.02, 0.1, p.y);\nlet sky = sky_base + warm + moon + c3 * stars_l;\nvar col = sky;\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let top = -0.08 - 0.13 * k;\n    let dd = max(top - p.y, 0.0) + 0.03;\n    let z = (0.1 + 0.08 * k) / dd;\n    let wx = p.x * z;\n    let n1 = noise(vec2<f32>(wx * 0.9 + t * 0.2, z * 0.6 - t * 0.4 + k * 3.0));\n    let n2 = noise(vec2<f32>(wx * 1.9 - t * 0.35, z * 1.4 + t * 0.7 + k * 5.0));\n    let h = n1 * 0.6 + n2 * 0.4 * wave_height;\n    let crest = smoothstep(0.55, 0.9, h);\n    let trough = 1.0 - smoothstep(0.25, 0.55, h);\n    let base = mix(c1, c2, 0.35 + 0.3 * k);\n    let body = mix(base * 0.5, base * 1.3, crest) * (1.0 - 0.3 * trough);\n    let refl_x = p.x - moon_p.x + (n2 - 0.5) * 0.15 * wave_height;\n    let streak = exp(-abs(refl_x) * 7.0) * crest;\n    let layer = body + c3 * crest * 0.25 + c4 * streak * 0.9;\n    let mask = 1.0 - smoothstep(top - 0.004, top + 0.004, p.y);\n    col = mix(col, layer, mask);\n}\nreturn mix(bg, tonemap(col * 1.15), strength);",
+        "name": "Night swim",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "wave_height",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "star_density",
+            "value": 1.0
+          },
+          {
+            "max": 0.119999997317791,
+            "min": 0.03999999910593033,
+            "name": "moon_size",
+            "value": 0.07000000029802322
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.2000000476837158,
+      "speed": 2.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Phosphor-dark oscilloscope with sharp teal traces and an amber accent",
+    "id": "scope-trace-v3",
+    "name": "Scope Trace v3",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:scope-trace-v3",
+    "updatedAt": "2026-11-13T05:42:00.890Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9dfbe8",
+        "background": "#0c1215",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#0c1215"
+      },
+      "shell": {
+        "accent": "#3fe0c5",
+        "accentHover": "#9dfbe8",
+        "background": "#050709",
+        "backgroundSecondary": "#0c1215",
+        "border": "#173a37",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#3fe0c5",
+          "thickness": 2.0
+        },
+        "textDim": "#7fa39a",
+        "textMain": "#d8f3ec"
+      },
+      "statusBar": {
+        "background": "#0c1215",
+        "border": "#173a37",
+        "text": "#7fa39a",
+        "warning": "#ffb547"
+      },
+      "tabs": {
+        "activeBackground": "#050709",
+        "activeBorder": "#3fe0c5",
+        "background": "#0c1215",
+        "idleBackground": "#0c1215"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#050709",
+        "blue": "#4f9bd9",
+        "brightBlack": "#2a4a46",
+        "brightBlue": "#7ab8f0",
+        "brightCyan": "#9dfbe8",
+        "brightGreen": "#8cf0bd",
+        "brightMagenta": "#dca3f0",
+        "brightRed": "#ff8a73",
+        "brightWhite": "#f4fffc",
+        "brightYellow": "#ffd27a",
+        "cyan": "#3fe0c5",
+        "green": "#5fd6a0",
+        "magenta": "#c07ad9",
+        "red": "#e0654f",
+        "white": "#d8f3ec",
+        "yellow": "#ffb547"
+      },
+      "background": "#050709",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#d8f3ec",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#050709",
+        "#127a70",
+        "#3fe0c5",
+        "#ffb547"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#c2ff6a",
+        "#ff3fa4",
+        "#5b1f6e",
+        "#ff709c",
+        "#5ef2d0"
+      ],
+      "custom": {
+        "expression": "let wob = wobble * (0.6 * sin(t * 0.37 + p.x * 2.3) + 0.4 * sin(t * 0.91 - p.x * 5.1));\nlet hz = 0.04 + wob;\nlet floor_mask = 1.0 - step(hz, p.y);\nlet d = max(hz - p.y, 0.015);\nlet depth = 1.0 / d;\nlet gz = depth * 0.35 + t * speed;\nlet gx = p.x * depth * 0.5;\nlet hd = abs(fract(gz + 0.5) - 0.5);\nlet vd = abs(fract(gx + 0.5) - 0.5);\nlet hl = 1.0 - smoothstep(0.0, line_w, hd);\nlet vl = 1.0 - smoothstep(0.0, line_w * 0.8, vd);\nlet row = hash(vec2<f32>(floor(gz), 3.0));\nlet flick = 0.6 + 0.4 * sin(t * 2.0 + row * 6.28);\nlet vis = smoothstep(0.015, 0.4, d);\nlet grid = max(hl, vl * 0.9) * vis * flick;\nlet glow_line = smoothstep(0.5, 0.0, hd) * 0.2 * vis;\nlet floor_col = c2 * (grid * 1.2 + glow_line) + c3 * 0.15 * vis;\nlet horizon = c2 * 0.35 * exp(-abs(p.y - hz) * 18.0);\nlet mist = noise(vec2<f32>(p.x * 3.0 + t * 0.05, p.y * 4.0)) * exp(-abs(p.y - hz) * 6.0);\nlet sky = horizon + c3 * 0.25 * mist;\nlet scene = mix(sky, floor_col, floor_mask);\nreturn mix(bg, tonemap(bg + scene), strength);",
+        "name": "Sick Grid",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "speed",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 0.119999997317791,
+            "min": 0.0,
+            "name": "wobble",
+            "value": 0.05000000074505806
+          },
+          {
+            "max": 0.20000000298023224,
+            "min": 0.019999999552965164,
+            "name": "line_w",
+            "value": 0.07000000029802322
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.2000000476837158,
+      "speed": 2.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Phosphor-dark oscilloscope with sharp teal traces and an amber accent",
+    "id": "scope-trace",
+    "name": "Scope Trace",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:scope-trace",
+    "updatedAt": "2026-11-12T07:57:19.776Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9dfbe8",
+        "background": "#0c1215",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#0c1215"
+      },
+      "shell": {
+        "accent": "#3fe0c5",
+        "accentHover": "#9dfbe8",
+        "background": "#050709",
+        "backgroundSecondary": "#0c1215",
+        "border": "#173a37",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#3fe0c5",
+          "thickness": 2.0
+        },
+        "textDim": "#7fa39a",
+        "textMain": "#d8f3ec"
+      },
+      "statusBar": {
+        "background": "#0c1215",
+        "border": "#173a37",
+        "text": "#7fa39a",
+        "warning": "#ffb547"
+      },
+      "tabs": {
+        "activeBackground": "#050709",
+        "activeBorder": "#3fe0c5",
+        "background": "#0c1215",
+        "idleBackground": "#0c1215"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#050709",
+        "blue": "#4f9bd9",
+        "brightBlack": "#2a4a46",
+        "brightBlue": "#7ab8f0",
+        "brightCyan": "#9dfbe8",
+        "brightGreen": "#8cf0bd",
+        "brightMagenta": "#dca3f0",
+        "brightRed": "#ff8a73",
+        "brightWhite": "#f4fffc",
+        "brightYellow": "#ffd27a",
+        "cyan": "#3fe0c5",
+        "green": "#5fd6a0",
+        "magenta": "#c07ad9",
+        "red": "#e0654f",
+        "white": "#d8f3ec",
+        "yellow": "#ffb547"
+      },
+      "background": "#050709",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#d8f3ec",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#050709",
+        "#127a70",
+        "#3fe0c5",
+        "#ffb547"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -10,25 +10,23 @@
     "shaderBackground": {
       "animated": true,
       "colors": [
-        "#ff487b",
-        "#36dcff",
-        "#ffc857"
+        "#ff4fd8",
+        "#39ff88",
+        "#ffd23f",
+        "#2a1450",
+        "#3ad6ff"
       ],
       "custom": {
-        "expression": "let speed = t * 0.12;\nlet uv = p * vec2<f32>(3.0, 3.0) + vec2<f32>(0.0, speed);\nlet cell = floor(uv);\nlet seed = hash(cell);\nlet local = fract(uv);\nlet q = floor(local * vec2<f32>(13.0, 11.0)) - vec2<f32>(6.0, 5.0);\nlet x = abs(q.x);\nlet y = q.y;\nlet body = select(0.0, 1.0, x <= 4.0 && y >= -1.0 && y <= 1.0);\nlet crown = select(0.0, 1.0, x <= 3.0 && y == -2.0);\nlet antenna = select(0.0, 1.0, x == 3.0 && y == -3.0);\nlet arms = select(0.0, 1.0, x == 5.0 && y >= 0.0 && y <= 2.0);\nlet dance = floor(0.5 + 0.5 * sin(t * 1.8 + seed * 6.28318));\nlet feet = select(0.0, 1.0, abs(x - (2.0 + dance)) < 0.5 && y == 2.0);\nlet eyes = select(0.0, 1.0, x == 2.0 && y == -1.0);\nlet alien = clamp(body + crown + antenna + arms + feet - eyes, 0.0, 1.0);\nlet chevron = select(0.0, 1.0, abs(q.x + 2.0 - (2.0 - abs(y))) < 0.5 && abs(y) <= 2.0);\nlet cursor = select(0.0, 1.0, q.x >= 1.0 && q.x <= 4.0 && y == 2.0) * smoothstep(-0.3, 0.3, sin(t * 2.2 + seed * 5.0));\nlet glyph = mix(chevron + cursor, alien, step(0.42, seed));\nlet pixel = smoothstep(0.05, 0.16, fract(local.x * 13.0)) * smoothstep(0.05, 0.16, fract(local.y * 11.0));\nlet tint = mix(mix(c1, c2, seed), palette(seed * 0.35 + t * 0.015 + 0.35), 0.38);\nlet wake = 0.7 + 0.3 * sin(cell.x * 1.7 + cell.y * 0.8 - t * 0.6);\nlet haze = cloud(p * vec2<f32>(1.4) + vec2<f32>(t * 0.025, 0.0));\nlet base = vec3<f32>(0.008, 0.014, 0.024) + c3 * vec3<f32>(0.025 + haze * 0.035);\nreturn clamp(base + tint * vec3<f32>(glyph * pixel * wake * (0.08 + amount * 0.017)), vec3<f32>(0.0), vec3<f32>(0.38));",
-        "variables": [
-          {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "amount",
-            "value": 7.5
-          }
-        ]
+        "expression": "let base = mix(bg, c4, smoothstep(-0.5, 0.5, p.y));\nlet g1 = p * 6.0 - vec2<f32>(0.0, t * 0.1);\nlet id1 = floor(g1);\nlet h1 = hash(id1);\nlet o1 = (hash2(id1 + vec2<f32>(4.0, 9.0)) - 0.5) * 0.3;\nlet q1 = fract(g1) - 0.5 - o1;\nlet d1 = length(q1);\nlet rr = 0.07 + 0.05 * h1;\nlet ring1 = 1.0 - smoothstep(0.0, 0.02, abs(d1 - rr));\nlet fill1 = 1.0 - smoothstep(rr - 0.01, rr, d1);\nlet far = c5 * (ring1 * 0.9 + fill1 * 0.2);\nlet g2 = p * 3.5 - vec2<f32>(t * 0.2, 0.0);\nlet id2 = floor(g2);\nlet h2 = hash(id2);\nlet bob = 0.1 * sin(t * 0.9 + h2 * 6.28);\nlet q2 = fract(g2) - 0.5 - vec2<f32>(0.0, bob);\nlet d2 = abs(q2.x) + abs(q2.y) - (0.13 + 0.05 * h2);\nlet fill2 = 1.0 - smoothstep(0.0, 0.02, d2);\nlet mid = mix(c3, c1, step(0.6, h2)) * fill2;\nlet g3 = p * 9.0 + vec2<f32>(t * 0.35, t * 0.2);\nlet id3 = floor(g3);\nlet h3 = hash(id3);\nlet o3 = (hash2(id3 + vec2<f32>(2.0, 5.0)) - 0.5) * 0.3;\nlet q3 = fract(g3) - 0.5 - o3;\nlet d3 = length(q3);\nlet tw = 0.5 + 0.5 * sin(t * 4.0 + h3 * 6.28);\nlet spark = (1.0 - smoothstep(0.0, 0.03, d3 - 0.03)) * tw * step(0.5, h3);\nlet near = mix(c2, c3, h3) * spark;\nlet color = base + far + mid + near;\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Pop Parade",
+        "variables": [],
+        "y_up": true
       },
       "preset": "silk",
       "scale": 0.6000000238418579,
       "speed": 2.0,
       "strength": 0.6499999761581421,
+      "theme_colors": false,
       "version": 1
     },
     "simpleNoiseAmount": 4.0,
@@ -55,7 +53,7 @@
     "name": "pur v9",
     "nativeThemeVersion": 1,
     "releasePickFrom": "personal:imported-default-da364bab3a22:pur-v9",
-    "updatedAt": "2026-10-29T17:35:33.499Z"
+    "updatedAt": "2026-11-11T22:39:40.596Z"
   },
   "nativeAppearance": {
     "advanced_effects": true,

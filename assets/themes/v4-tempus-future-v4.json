@@ -1,0 +1,194 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#2f8a4a",
+        "#3a6ab0",
+        "#d8eae0",
+        "#0a1a12",
+        "#b0646e"
+      ],
+      "custom": {
+        "expression": "let wash = mix(c4, c2 * 0.45, smoothstep(-0.5, 0.5, p.y));\nlet far_g = p * density * 0.5 + vec2<f32>(t * 0.05 * drift, t * 0.08 * drift);\nlet far_cell = floor(far_g);\nlet far_s = hash(far_cell);\nlet far_d = sd_circle(fract(far_g) - 0.5, 0.06 + 0.1 * far_s);\nlet far_glow = halo(far_d, 0.12) * (0.4 + 0.6 * far_s) * 0.6;\nlet shimmer = 0.5 + 0.5 * sin(t * 0.8 + far_s * 6.28);\nlet mid_g = vec2<f32>(p.x * density, p.y * density + t * 0.15 * drift);\nlet mid_cell = floor(mid_g);\nlet mid_s = hash(mid_cell + vec2<f32>(3.0, 1.0));\nlet mid_rot = rotate(fract(mid_g) - 0.5, t * 0.3 * drift * (mid_s - 0.5));\nlet mid_d = sd_box(mid_rot, vec2<f32>(0.28, 0.28));\nlet mid_line = stroke(mid_d, 0.05) * step(0.45, mid_s);\nlet near_g = vec2<f32>(p.x * density * 0.3 + t * 0.2 * drift, p.y * density * 0.3 + t * 0.25 * drift);\nlet near_cell = floor(near_g);\nlet near_s = hash(near_cell + vec2<f32>(11.0, 5.0));\nlet near_d = sd_circle(fract(near_g) - 0.5, 0.1 + 0.12 * near_s);\nlet near_orb = fill(near_d) * step(0.6, near_s);\nlet near_halo = halo(near_d, 0.2) * step(0.6, near_s);\nlet layers = c1 * far_glow * shimmer + mix(c2, c1, mid_s) * mid_line * 0.9 + mix(c3, c5, near_s) * near_orb * 0.8 + c5 * near_halo * 0.5;\nlet color = wash + layers;\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Verdant Parallax",
+        "variables": [
+          {
+            "max": 3.0,
+            "min": 0.0,
+            "name": "drift",
+            "value": 1.0
+          },
+          {
+            "max": 10.0,
+            "min": 3.0,
+            "name": "density",
+            "value": 6.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-12T23:15:06.306Z",
+    "description": "Gogh dark import from Tempus Future by Protesilaos Stavrou (https://protesilaos.com)",
+    "id": "v4-tempus-future-v4",
+    "name": "v4-Tempus Future v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:v4-tempus-future-v4",
+    "updatedAt": "2026-11-12T23:17:59.370Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#4ab2d7",
+        "background": "#080916",
+        "buttonBackground": "#080917",
+        "buttonHover": "#14273a",
+        "buttonText": "#b4abac"
+      },
+      "settings": {
+        "background": "#080916"
+      },
+      "shell": {
+        "accent": "#4ab2d7",
+        "accentHover": "#8ba7ea",
+        "background": "#090a18",
+        "backgroundSecondary": "#080916",
+        "border": "#1b394d",
+        "buttonBackground": "#080917",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#6c676e",
+        "textMain": "#b4abac"
+      },
+      "statusBar": {
+        "background": "#162c3e",
+        "border": "#1b394d",
+        "text": "#b4abac",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090a18",
+        "activeBorder": "#4ab2d7",
+        "background": "#080916",
+        "idleBackground": "#080917"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#090a18",
+        "blue": "#4ab2d7",
+        "brightBlack": "#2b1329",
+        "brightBlue": "#8ba7ea",
+        "brightCyan": "#2cbab6",
+        "brightGreen": "#60ba80",
+        "brightMagenta": "#e08bd6",
+        "brightRed": "#f78e2f",
+        "brightWhite": "#b4abac",
+        "brightYellow": "#de9b1d",
+        "cyan": "#2ab7bb",
+        "green": "#6aba39",
+        "magenta": "#e58f84",
+        "red": "#ff7e8f",
+        "white": "#a7a2c4",
+        "yellow": "#bfa51a"
+      },
+      "background": "#090a18",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#b4abac",
+      "gradientAngle": 141.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

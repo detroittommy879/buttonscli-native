@@ -9,22 +9,37 @@
     "scanlinesStrength": 0.0,
     "shaderBackground": {
       "animated": true,
-      "colors": null,
+      "colors": [
+        "#ff4d8d",
+        "#2ee6d6",
+        "#ffc83d",
+        "#7a5cff",
+        "#b6ff5c"
+      ],
       "custom": {
-        "expression": "let power = clamp(amount / 10.0, 0.0, 1.0);\nlet uv = p * vec2<f32>(2.0) + vec2<f32>(t * 0.035, -t * 0.025);\nlet cell = floor(uv);\nlet seed = hash(cell);\nlet local = (fract(uv) - vec2<f32>(0.5)) * vec2<f32>(2.0);\nlet angle = t * 0.16 * select(-1.0, 1.0, seed > 0.5) + seed * 6.28318;\nlet q = vec2<f32>(local.x * cos(angle) - local.y * sin(angle), local.x * sin(angle) + local.y * cos(angle));\nlet bounce = 0.93 + 0.07 * sin(t * 1.4 + seed * 12.0);\nlet v = q / vec2<f32>(bounce);\nlet a = abs(v);\nlet hex = max(a.y, a.x * 0.866025 + a.y * 0.5) - 0.59;\nlet outline = 1.0 - smoothstep(0.007, 0.023, abs(hex));\nlet halo = exp(-abs(hex) * 24.0);\nlet inside = 1.0 - smoothstep(-0.015, 0.005, hex);\nlet spokes = min(abs(v.y), min(abs(v.y * 0.5 + v.x * 0.866025), abs(v.y * 0.5 - v.x * 0.866025)));\nlet ribs = (1.0 - smoothstep(0.005, 0.016, spokes)) * inside;\nlet radius = length(v);\nlet hub = 1.0 - smoothstep(0.04, 0.055, radius);\nlet hubRing = 1.0 - smoothstep(0.006, 0.018, abs(radius - 0.095));\nlet sector = floor((atan2(v.y, v.x) + 3.141593) / 1.047198);\nlet hue = fract(seed * 0.8 + sector / 6.0 + t * 0.015);\nlet candy = mix(hsv(hue, 0.82, 1.0), clamp(c1, vec3<f32>(0.0), vec3<f32>(1.0)), 0.12);\nlet rim = hsv(fract(seed + t * 0.025), 0.63, 1.0);\nlet facet = inside * (0.025 + 0.025 * fract(sector * 0.37 + seed));\nlet brightness = 0.55 + power * 0.35;\nlet lines = rim * vec3<f32>((outline * 0.66 + halo * 0.065 + hubRing * 0.32) * brightness);\nlet panels = candy * vec3<f32>(facet + ribs * 0.28 * brightness);\nlet center = mix(c2, vec3<f32>(0.7, 0.9, 1.0), 0.6) * vec3<f32>(hub * 0.42);\nlet grid = abs(fract(uv) - vec2<f32>(0.5));\nlet peg = exp(-dot(grid, grid) * 800.0);\nlet base = vec3<f32>(0.006, 0.009, 0.02) + c3 * vec3<f32>(0.012 + peg * 0.06);\nlet vignette = 1.0 / (1.0 + dot(p, p) * 0.1);\nreturn clamp((base + lines + panels + center) * vec3<f32>(vignette), vec3<f32>(0.0), vec3<f32>(0.8));",
+        "expression": "var col = vec3<f32>(0.0);\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let sc = density * (1.6 - 0.3 * k);\n    let g = p * sc + vec2<f32>(t * (0.03 + 0.04 * k), t * 0.01 * k);\n    let cell = floor(g);\n    let seed = hash(cell + vec2<f32>(k * 13.0, k * 7.0));\n    let dir = select(-1.0, 1.0, seed > 0.5);\n    let r = rotate(fract(g) - 0.5, t * (0.2 + 0.5 * seed) * dir);\n    let morph = 0.5 + 0.5 * sin(t * morph_rate * (0.8 + seed) + seed * 6.28);\n    let oval = length(r * vec2<f32>(1.0, 1.0 + 0.6 * morph)) - 0.18;\n    let morphs = mix(oval, sd_box(r, vec2<f32>(0.15, 0.15)), morph);\n    let lshape = min(sd_segment(r, vec2<f32>(-0.2, -0.2), vec2<f32>(0.2, -0.2)), sd_segment(r, vec2<f32>(-0.2, -0.2), vec2<f32>(-0.2, 0.2))) - 0.015;\n    let dotline = min(sd_circle(r - vec2<f32>(0.2, 0.0), 0.05), sd_segment(r, vec2<f32>(-0.3, 0.0), vec2<f32>(0.1, 0.0)) - 0.01);\n    let pickA = 1.0 - step(0.333, seed);\n    let pickB = step(0.333, seed) * (1.0 - step(0.666, seed));\n    let pickC = step(0.666, seed);\n    let d = pickA * morphs + pickB * lshape + pickC * dotline;\n    let edge = 1.0 - smoothstep(0.0, 0.012, abs(d));\n    let fillv = smoothstep(0.01, -0.01, d) * 0.2;\n    let tint = mix(mix(c1, c2, seed), c3, step(0.85, seed));\n    col += tint * (edge + fillv) * (0.35 + 0.3 * k);\n}\nlet band_d = abs(p.y + 0.28 - 0.05 * cos(p.x * 10.0 - t * 1.2)) - 0.004;\nlet band = (1.0 - smoothstep(0.0, 0.01, band_d)) * c5;\nlet haze = c4 * 0.12 * clamp(1.0 - length(p) * 1.4, 0.0, 1.0);\nlet lit = tonemap(col + band * 0.9 + haze);\nreturn mix(bg, clamp(bg + lit, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Prism Drift",
         "variables": [
           {
             "max": 10.0,
-            "min": 0.0,
-            "name": "amount",
-            "value": 7.5
+            "min": 3.0,
+            "name": "density",
+            "value": 5.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "morph_rate",
+            "value": 0.699999988079071
           }
-        ]
+        ],
+        "y_up": true
       },
       "preset": "silk",
       "scale": 0.8999999761581421,
       "speed": 6.0,
-      "strength": 1.0,
+      "strength": 0.15000000596046448,
+      "theme_colors": false,
       "version": 1
     },
     "simpleNoiseAmount": 4.0,
@@ -51,7 +66,7 @@
     "name": "pur v25",
     "nativeThemeVersion": 1,
     "releasePickFrom": "personal:imported-default-da364bab3a22:pur-v25",
-    "updatedAt": "2026-10-30T00:30:07.583Z"
+    "updatedAt": "2026-11-11T22:38:51.605Z"
   },
   "nativeAppearance": {
     "advanced_effects": true,
@@ -137,7 +152,7 @@
         "white": "#888888",
         "yellow": "#0000ff"
       },
-      "background": "#060a09",
+      "background": "#000000",
       "drawBoldTextInBrightColors": true,
       "fontFamily": "saxmono Bundled",
       "fontSize": 13.0,

@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0a2a3d",
+        "#1b6b80",
+        "#8fe3e0",
+        "#ffe6b0",
+        "#2a4a7a"
+      ],
+      "custom": {
+        "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nvar hgt = 0.0;\nvar grad = vec2<f32>(0.0, 0.0);\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i);\n    let dir = normalize(vec2<f32>(sin(k * 2.1 + 0.6), 1.0 + 0.3 * k));\n    let freq = (1.2 + k * 1.1) * 0.35;\n    let amp = 1.0 / (1.0 + k * 0.7);\n    let phase = dot(dir, vec2<f32>(px, depth)) * freq + t * wave_speed * (0.5 + 0.2 * k);\n    hgt += sin(phase) * amp;\n    grad += cos(phase) * amp * freq * dir;\n}\nlet fine = noise(vec2<f32>(px * 2.5 - t * 0.4 * wave_speed, depth * 3.0 + t * 0.6 * wave_speed));\nlet shade = clamp(0.5 + 0.25 * hgt * wave_height + 0.2 * (fine - 0.5), 0.0, 1.0);\nlet crest = smoothstep(0.6, 0.95, shade);\nlet sway = clamp(grad.x * wave_height * 0.03 * min(depth, 20.0), -0.2, 0.2);\nlet glint_x = p.x - 0.42 - sway;\nlet glint = smoothstep(0.06, 0.0, abs(glint_x)) * (0.4 + 0.6 * crest) * (0.3 + 0.7 * fog);\nlet body = mix(c1 * 0.6, c2, 0.3 + 0.7 * shade);\nlet reflect_sky = c5 * smoothstep(0.4, 0.0, below) * 0.5;\nlet water = body * (0.45 + 0.55 * fog) + c3 * crest * 0.35 * (0.4 + 0.6 * fog) + reflect_sky + c4 * glint * sun_glint * 0.8;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c5 * 0.45, c1 * 0.3, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = smoothstep(0.02, 0.0, abs(p.y - hz)) * (0.4 + 0.6 * shade) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Moonlit Swell",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.75
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "wave_height",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "sun_glint",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 0.699999988079071,
+      "speed": 3.900000095367432,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T16:05:32.310Z",
+    "description": "Deep night ocean with teal swells, foam crests and a warm moon glint",
+    "id": "moonlit-swell",
+    "name": "Moonlit Swell",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:moonlit-swell",
+    "updatedAt": "2026-11-13T03:09:19.897Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9ff0e6",
+        "background": "#0c1f2b",
+        "buttonBackground": "#552a12",
+        "buttonHover": "#ffd23f",
+        "buttonText": "#fff3e6"
+      },
+      "settings": {
+        "background": "#0c1f2b"
+      },
+      "shell": {
+        "accent": "#5fd3d0",
+        "accentHover": "#9ff0e6",
+        "background": "#07141c",
+        "backgroundSecondary": "#0c1f2b",
+        "border": "#1d3a4a",
+        "buttonBackground": "#3d1e0f",
+        "paneDivider": {
+          "color": "#5fd3d0",
+          "thickness": 2.0
+        },
+        "textDim": "#8fb3c2",
+        "textMain": "#e4f1f5"
+      },
+      "statusBar": {
+        "background": "#0c1f2b",
+        "border": "#1d3a4a",
+        "text": "#8fb3c2",
+        "warning": "#ffd98a"
+      },
+      "tabs": {
+        "activeBackground": "#07141c",
+        "activeBorder": "#5fd3d0",
+        "background": "#0c1f2b",
+        "idleBackground": "#0c1f2b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#05121b",
+        "blue": "#6aa8e8",
+        "brightBlack": "#4a6a7a",
+        "brightBlue": "#8fc4f5",
+        "brightCyan": "#8fe3e0",
+        "brightGreen": "#9ff0c8",
+        "brightMagenta": "#d8b8ff",
+        "brightRed": "#ff9e9e",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe6b0",
+        "cyan": "#5fd3d0",
+        "green": "#7fe0b0",
+        "magenta": "#c39bff",
+        "red": "#ff7a7a",
+        "white": "#d7ebf2",
+        "yellow": "#ffd98a"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#d7ebf2",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#03101a",
+        "#1b6b80",
+        "#8fe3e0",
+        "#ffe0a0"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

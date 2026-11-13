@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff2e88",
+        "#00e5ff",
+        "#ffe14d",
+        "#1a0630",
+        "#7cff4a"
+      ],
+      "custom": {
+        "expression": "var glow = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let n = f32(i);\n    let f = 2.0 + n * 0.7;\n    let ph = n * 1.3 + t * wave_speed * (0.6 + 0.15 * n);\n    let env = 0.6 + 0.4 * sin(p.x * 1.7 - t * 0.3 + n);\n    let y = wave_amp * sin(p.x * f * 3.0 + ph) * env + (n - 2.5) * 0.09;\n    let d = abs(p.y - y);\n    let core = 1.0 - smoothstep(0.0, line_width, d);\n    let glowv = halo(d, 0.05) * 0.35;\n    let pick = fract(n * 0.2 + p.y * 0.3);\n    let shade = mix(mix(c1, c2, pick), mix(c3, c5, pick), n / 5.0);\n    glow += shade * (core * 1.2 + glowv);\n}\nlet scan = 0.5 + 0.5 * sin(p.y * 220.0);\nlet base = c4 * (0.7 + 0.3 * scan) * (1.2 - abs(p.x) * 0.4);\nlet total = base + glow;\nreturn mix(bg, tonemap(total * 1.3), strength);",
+        "name": "Oscilloscope Fever",
+        "variables": [
+          {
+            "max": 0.3499999940395355,
+            "min": 0.05000000074505806,
+            "name": "wave_amp",
+            "value": 0.3149999976158142
+          },
+          {
+            "max": 1.5,
+            "min": 0.10000000149011612,
+            "name": "wave_speed",
+            "value": 0.8299999833106995
+          },
+          {
+            "max": 0.019999999552965164,
+            "min": 0.0020000000949949026,
+            "name": "line_width",
+            "value": 0.019999999552965164
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 3.0,
+      "speed": 2.200000047683716,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Hot magenta and cyan traces on a near-black violet ink, high-energy and high contrast.",
+    "id": "oscilloscope-fever-v4",
+    "name": "Oscilloscope Fever v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:oscilloscope-fever-v4",
+    "updatedAt": "2026-11-13T00:07:54.373Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#00e5ff",
+        "background": "#120c1f",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#120c1f"
+      },
+      "shell": {
+        "accent": "#ff2e88",
+        "accentHover": "#00e5ff",
+        "background": "#07050d",
+        "backgroundSecondary": "#120c1f",
+        "border": "#3a1f57",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#9a93b8",
+        "textMain": "#eef0ff"
+      },
+      "statusBar": {
+        "background": "#120c1f",
+        "border": "#3a1f57",
+        "text": "#9a93b8",
+        "warning": "#ffe14d"
+      },
+      "tabs": {
+        "activeBackground": "#07050d",
+        "activeBorder": "#ff2e88",
+        "background": "#120c1f",
+        "idleBackground": "#120c1f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#05060b",
+        "blue": "#3d7bff",
+        "brightBlack": "#4a3f66",
+        "brightBlue": "#7aa6ff",
+        "brightCyan": "#7af5ff",
+        "brightGreen": "#9dffb8",
+        "brightMagenta": "#ff6fb1",
+        "brightRed": "#ff7a9c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff08a",
+        "cyan": "#00e5ff",
+        "green": "#5cff8a",
+        "magenta": "#ff2e88",
+        "red": "#ff3b6b",
+        "white": "#e8ecff",
+        "yellow": "#ffe14d"
+      },
+      "background": "#05060b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e8ecff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a0418",
+        "#ff2e88",
+        "#00e5ff",
+        "#ffe14d"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

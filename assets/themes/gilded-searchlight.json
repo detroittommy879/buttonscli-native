@@ -1,0 +1,193 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#d4af37",
+        "#f5ecd7",
+        "#b8860b",
+        "#14110c",
+        "#ffd76a"
+      ],
+      "custom": {
+        "expression": "let depth = 0.75 - p.y;\nlet fl = vec2<f32>(p.x / depth, 1.0 / depth) * 0.9 + vec2<f32>(0.0, t * 0.15);\nlet cell = floor(fl);\nlet local = fract(fl) - 0.5;\nlet frame = max(abs(local.x), abs(local.y));\nlet tile_in = 1.0 - smoothstep(0.40, 0.42, frame);\nlet gold_rim = smoothstep(0.38, 0.41, frame) * (1.0 - smoothstep(0.44, 0.47, frame));\nlet beam_x = 0.8 * sin(t * 0.45) + 0.3 * p.y;\nlet dist_b = abs(p.x - beam_x);\nlet beam = exp(-(dist_b * dist_b) / (beam_width * (0.006 + 0.02 * depth)));\nlet hue = hash(cell + vec2<f32>(3.1, 7.7));\nlet tint = hsv(hue, 0.55, 0.95);\nlet flash = clamp(beam * (0.7 + 0.3 * hash(cell)) * 1.5, 0.0, 1.0);\nlet tile = mix(c4 * 1.4, tint, 0.3 + 0.7 * flash) * tile_in;\nlet rim = mix(c1, c5, beam) * gold_rim * (0.5 + 0.8 * beam);\nlet beam_glow = c2 * beam * 0.3;\nlet fade = clamp(1.3 - depth * 0.6, 0.0, 1.0);\nlet color = tonemap((tile + rim + beam_glow) * fade);\nreturn mix(bg, color, strength);",
+        "name": "Gilded Searchlight",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "beam_width",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.2000000476837158,
+      "speed": 2.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Black lacquer floors lit by gold searchlights, cream and gold accents in art deco style",
+    "id": "gilded-searchlight",
+    "name": "Gilded Searchlight",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gilded-searchlight",
+    "updatedAt": "2026-11-11T22:49:34.103Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffd76a",
+        "background": "#1c160c",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#1c160c"
+      },
+      "shell": {
+        "accent": "#d4af37",
+        "accentHover": "#ffd76a",
+        "background": "#0d0a06",
+        "backgroundSecondary": "#1c160c",
+        "border": "#5c4a1e",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#d4af37",
+          "thickness": 2.0
+        },
+        "textDim": "#a89a7a",
+        "textMain": "#f5ecd7"
+      },
+      "statusBar": {
+        "background": "#1c160c",
+        "border": "#5c4a1e",
+        "text": "#a89a7a",
+        "warning": "#d4af37"
+      },
+      "tabs": {
+        "activeBackground": "#0d0a06",
+        "activeBorder": "#d4af37",
+        "background": "#1c160c",
+        "idleBackground": "#1c160c"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#0a0805",
+        "blue": "#4a6b8a",
+        "brightBlack": "#5c4a1e",
+        "brightBlue": "#6a8bab",
+        "brightCyan": "#8ababa",
+        "brightGreen": "#9ab87a",
+        "brightMagenta": "#b86a8a",
+        "brightRed": "#d9725a",
+        "brightWhite": "#fff8e7",
+        "brightYellow": "#ffd76a",
+        "cyan": "#6a9a9a",
+        "green": "#7a9a5a",
+        "magenta": "#9a4a6a",
+        "red": "#b5543a",
+        "white": "#f5ecd7",
+        "yellow": "#d4af37"
+      },
+      "background": "#0a0805",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 300,
+      "fontWeightBold": 400,
+      "foreground": "#f5ecd7",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a0805",
+        "#8a6a1e",
+        "#d4af37",
+        "#f5ecd7"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 18.0,
+        "fontWeight": 100,
+        "letterSpacing": 4.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 1.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "statusBar": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 2.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 3.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

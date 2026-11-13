@@ -1,0 +1,188 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#1d7f96",
+        "#4fc3d4",
+        "#9ff0e6",
+        "#0b3a4d",
+        "#2bb5a0"
+      ],
+      "custom": {
+        "expression": "let wave_a = 0.28 + 0.03 * sin(p.x * 4.0 + t * 0.5);\nlet wave_b = 0.02 + 0.04 * sin(p.x * 3.0 - t * 0.35 + 1.3);\nlet wave_c = -0.24 + 0.05 * sin(p.x * 2.2 + t * 0.25 + 2.0);\nlet edge_a = smoothstep(-0.02, 0.02, p.y - wave_a);\nlet edge_b = smoothstep(-0.02, 0.02, p.y - wave_b);\nlet edge_c = smoothstep(-0.02, 0.02, p.y - wave_c);\nlet deep = mix(c4 * 0.5, c4 * 0.9, clamp(p.y + 0.5, 0.0, 1.0));\nlet body = mix(deep, c1 * 0.45, edge_c);\nlet body2 = mix(body, c1 * 0.7, edge_b);\nlet water = mix(body2, c2 * 0.5, edge_a);\nlet crest = stroke(abs(p.y - wave_a), 0.015) * 0.5 + stroke(abs(p.y - wave_b), 0.012) * 0.35;\nlet rays = pow(abs(sin(p.x * 5.0 + sin(t * 0.3) * 2.0 + p.y)), 14.0) * smoothstep(-0.2, 0.4, p.y) * 0.15;\nlet g1 = p * 5.0 + vec2<f32>(0.0, -t * 0.35);\nlet cell1 = floor(g1);\nlet on1 = step(1.0 - 0.5 * bubble_density, hash(cell1));\nlet r1 = 0.12 + 0.06 * hash(cell1 + vec2<f32>(3.1, 7.7));\nlet d1 = sd_circle(fract(g1) - 0.5 - (hash2(cell1) - 0.5) * 0.5, r1);\nlet b1 = (stroke(d1, 0.025) * 0.9 + fill(d1) * 0.12) * on1;\nlet g2 = p * 10.0 + vec2<f32>(0.0, -t * 0.22);\nlet cell2 = floor(g2);\nlet on2 = step(1.0 - 0.5 * bubble_density, hash(cell2 + vec2<f32>(11.0, 2.0)));\nlet r2 = 0.10 + 0.05 * hash(cell2 + vec2<f32>(5.3, 1.9));\nlet d2 = sd_circle(fract(g2) - 0.5 - (hash2(cell2) - 0.5) * 0.5, r2);\nlet b2 = (stroke(d2, 0.03) * 0.7 + fill(d2) * 0.1) * on2;\nlet g3 = p * 18.0 + vec2<f32>(0.0, -t * 0.12);\nlet cell3 = floor(g3);\nlet on3 = step(1.0 - 0.5 * bubble_density, hash(cell3 + vec2<f32>(4.0, 9.0)));\nlet r3 = 0.08 + 0.04 * hash(cell3 + vec2<f32>(8.2, 3.3));\nlet d3 = sd_circle(fract(g3) - 0.5 - (hash2(cell3) - 0.5) * 0.5, r3);\nlet b3 = (stroke(d3, 0.04) * 0.5 + fill(d3) * 0.08) * on3;\nlet scene = water + c3 * crest + c3 * rays + c3 * b1 * 0.5 + c3 * b2 * 0.35 + c2 * b3 * 0.3;\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Deep Current",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.30000001192092896,
+            "name": "bubble_density",
+            "value": 0.6000000238418579
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ink",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.17000000178813934,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 9.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 46.0,
+    "staticDensity": 1.0,
+    "staticEnabled": false,
+    "staticIntensity": 63.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:42:30.496Z",
+    "description": "A festive collision of Halloween and Christmas",
+    "id": "hallowmas-copy-copy-v4",
+    "name": "Hallowmas Copy Copy v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:hallowmas-copy-copy-v4",
+    "updatedAt": "2026-11-11T22:42:30.496Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#1a1a1a",
+        "buttonBackground": "#3f2f26",
+        "buttonHover": "#593521",
+        "buttonText": "#ffffff"
+      },
+      "settings": {
+        "background": "#1a1a1a"
+      },
+      "shell": {
+        "accent": "#ff5e00",
+        "accentHover": "#ff7b2e",
+        "background": "#1a1a1a",
+        "backgroundSecondary": "#2a2a2a",
+        "border": "#562c13",
+        "buttonBackground": "#2a2a2a",
+        "paneDivider": {
+          "color": "#529a13",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#989898",
+        "textMain": "#ffffff"
+      },
+      "statusBar": {
+        "background": "#141313",
+        "border": "#562c13",
+        "text": "#ffffff",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#0a0a0a",
+        "activeBorder": "#ff5e00",
+        "background": "#1a1a1a",
+        "idleBackground": "#2a2a2a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c1c1c",
+        "blue": "#005eff",
+        "brightBlack": "#333333",
+        "brightBlue": "#428cff",
+        "brightCyan": "#42ffff",
+        "brightGreen": "#42ffb3",
+        "brightMagenta": "#ff42ff",
+        "brightRed": "#ff8c42",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffff42",
+        "cyan": "#00ffff",
+        "green": "#00ff88",
+        "magenta": "#ff00ff",
+        "red": "#ff5e00",
+        "white": "#ffffff",
+        "yellow": "#ffff00"
+      },
+      "background": "#0a0a0a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#ffffff",
+      "gradientAngle": 45.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

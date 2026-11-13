@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff2e88",
+        "#c6ff00",
+        "#00e5ff",
+        "#7b2cff",
+        "#ff7a00"
+      ],
+      "custom": {
+        "expression": "let wobble = sin(p.x * 3.0 + t * 0.4) * 0.05;\nvar acc = vec3<f32>(0.0, 0.0, 0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let f = k / 5.0;\n    let phase = k * 0.9 + t * wave_speed * (0.6 + 0.15 * k);\n    let amp = wave_amp * 0.25 * (1.0 - 0.12 * k);\n    let y = (f - 0.5) * 0.8 + amp * sin(p.x * wave_density * (1.0 + 0.25 * k) + phase) + wobble * f;\n    let d = abs(p.y - y);\n    let trace = 1.0 - smoothstep(0.0, 0.008, d);\n    let halo_glow = exp(-d * 26.0) * 0.5;\n    let col = select(mix(c1, c3, f * 2.0), mix(c3, c2, f * 2.0 - 1.0), f > 0.5);\n    acc += col * (trace * 1.3 + halo_glow);\n}\nlet scan = 0.12 * smoothstep(0.6, 1.0, 0.5 + 0.5 * sin(p.y * 140.0));\nlet haze = c4 * (0.5 + 0.5 * sin(p.x * 4.0 + t * 0.5)) * 0.6;\nlet color = tonemap(acc + haze + c5 * scan);\nreturn mix(bg, color, strength);",
+        "name": "Acid Waveform",
+        "variables": [
+          {
+            "max": 1.2000000476837158,
+            "min": 0.20000000298023224,
+            "name": "wave_amp",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "wave_speed",
+            "value": 0.7699999809265137
+          },
+          {
+            "max": 12.0,
+            "min": 2.0,
+            "name": "wave_density",
+            "value": 6.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.600000023841858,
+      "speed": 4.099999904632568,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Neon acid circus: sharp waveforms in hot magenta, lime and cyan on a deep night background.",
+    "id": "acid-waveform",
+    "name": "Acid Waveform",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:acid-waveform",
+    "updatedAt": "2026-11-11T22:56:37.218Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e4ff66",
+        "background": "#1a0f24",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#1a0f24"
+      },
+      "shell": {
+        "accent": "#c6ff00",
+        "accentHover": "#e4ff66",
+        "background": "#0c0612",
+        "backgroundSecondary": "#1a0f24",
+        "border": "#3d1f5c",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#c6ff00",
+          "thickness": 2.0
+        },
+        "textDim": "#b9a8d4",
+        "textMain": "#f7f0ff"
+      },
+      "statusBar": {
+        "background": "#1a0f24",
+        "border": "#3d1f5c",
+        "text": "#b9a8d4",
+        "warning": "#ffd60a"
+      },
+      "tabs": {
+        "activeBackground": "#0c0612",
+        "activeBorder": "#c6ff00",
+        "background": "#1a0f24",
+        "idleBackground": "#1a0f24"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#0a0805",
+        "blue": "#3d7dff",
+        "brightBlack": "#7d6a94",
+        "brightBlue": "#7fb0ff",
+        "brightCyan": "#8ff7ff",
+        "brightGreen": "#e4ff66",
+        "brightMagenta": "#e88bff",
+        "brightRed": "#ff6fa8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff27a",
+        "cyan": "#00e5ff",
+        "green": "#c6ff00",
+        "magenta": "#d04bff",
+        "red": "#ff2e88",
+        "white": "#e8dcf5",
+        "yellow": "#ffd60a"
+      },
+      "background": "#0a0805",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Daddy Time Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f7f0ff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#14060f",
+        "#ff2e88",
+        "#c6ff00",
+        "#00e5ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 2.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "monof56 Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

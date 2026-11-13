@@ -1,0 +1,193 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff9a3c",
+        "#ff3d7f",
+        "#7b5cff",
+        "#2a1a6b",
+        "#ffe066"
+      ],
+      "custom": {
+        "expression": "let drift_t = t * drift;\nlet sun_p = vec2<f32>(0.25, 0.2);\nlet sun_d = length(p - sun_p);\nlet sun = fill(sun_d - 0.085);\nlet glow = halo(sun_d - 0.085, 0.4);\nlet n1 = noise(vec2<f32>(p.x * 2.5 + drift_t * 0.04, 1.0));\nlet n2 = noise(vec2<f32>(p.x * 3.5 - drift_t * 0.06, 5.0));\nlet n3 = noise(vec2<f32>(p.x * 2.0 + drift_t * 0.03, 9.0));\nlet h1 = -0.14 + 0.07 * sin(p.x * 3.0 + drift_t * 0.12) + 0.05 * (n1 - 0.5);\nlet h2 = -0.03 + 0.06 * sin(p.x * 4.5 - drift_t * 0.09 + 1.3) + 0.05 * (n2 - 0.5);\nlet h3 = 0.07 + 0.05 * sin(p.x * 6.0 + drift_t * 0.07 + 2.6) + 0.04 * (n3 - 0.5);\nlet haze_col = mix(c5, c1, 0.4);\nlet sky = mix(c4 * 0.6, c2 * 0.55, smoothstep(-0.5, 0.5, p.y)) + haze_col * (glow * 0.45 + sun * 0.7);\nvar scene = sky + c5 * sun;\nscene = mix(scene, mix(c3 * 0.85, haze_col, 0.35), fill(p.y - h3));\nscene = mix(scene, c2 * 0.95, fill(p.y - h2));\nscene = mix(scene, c4 * 0.8, fill(p.y - h1));\nlet crest = stroke(p.y - h2, 0.008) * c1 * 0.8 + stroke(p.y - h1, 0.006) * c1 * 0.5;\n\nvar birds = 0.0;\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let seed = hash(vec2<f32>(k * 3.1, 7.0));\n    let fr = fract(t * (0.03 + 0.02 * seed) + seed);\n    let on = 1.0 - step(0.2, fr);\n    let lx = fr * 5.0;\n    let bpos = vec2<f32>(-1.2 + 2.4 * lx, 0.3 + 0.08 * k + 0.02 * sin(t * 1.5 + k));\n    let q = p - bpos;\n    let flap = 0.03 * sin(t * 9.0 + k * 2.0);\n    let wing = min(sd_segment(q, vec2<f32>(0.0, 0.0), vec2<f32>(0.035, 0.012 + flap)), sd_segment(q, vec2<f32>(0.0, 0.0), vec2<f32>(-0.035, 0.012 + flap)));\n    birds += (1.0 - smoothstep(0.0015, 0.0045, wing)) * on;\n}\n\nlet fr2 = fract(t * 0.035 + 0.5);\nlet fon = 1.0 - step(0.12, fr2);\nlet fl = fr2 / 0.12;\nlet fpos = vec2<f32>(mix(0.1, 0.5, fl), -0.04 + 1.28 * fl * (1.0 - fl));\nlet ang = atan2(1.28 * (1.0 - 2.0 * fl), 0.4);\nlet fq = rotate(p - fpos, -ang);\nlet body = sd_segment(fq, vec2<f32>(-0.022, 0.0), vec2<f32>(0.018, 0.0)) - 0.008;\nlet tail = sd_segment(fq, vec2<f32>(0.016, 0.0), vec2<f32>(0.034, 0.011)) - 0.003;\nlet fish = (1.0 - smoothstep(0.0, 0.003, min(body, tail))) * fon;\n\nlet color = tonemap(scene + crest + c5 * birds * 0.9 + mix(c2, c5, 0.5) * fish * 1.3);\nreturn mix(bg, color, strength);",
+        "name": "Sunset Ridge Wildlife",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "drift",
+            "value": 1.899999976158142
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 2.0,
+      "speed": 3.5999999046325684,
+      "strength": 0.8999999761581421,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T16:10:26.019Z",
+    "description": "Bold dusk palette with hot pink and gold over deep indigo ridges",
+    "id": "sunset-ridge-wildlife",
+    "name": "Sunset Ridge Wildlife",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:sunset-ridge-wildlife",
+    "updatedAt": "2026-11-12T23:56:31.996Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff6b9c",
+        "background": "#121a2e",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#121a2e"
+      },
+      "shell": {
+        "accent": "#ff3d7f",
+        "accentHover": "#ff6b9c",
+        "background": "#090c16",
+        "backgroundSecondary": "#121a2e",
+        "border": "#3a2f66",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#ff3d7f",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#a9a3c9",
+        "textMain": "#f5f0ff"
+      },
+      "statusBar": {
+        "background": "#121a2e",
+        "border": "#3a2f66",
+        "text": "#a9a3c9",
+        "warning": "#ffe066"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#ff3d7f",
+        "background": "#121a2e",
+        "idleBackground": "#121a2e"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1a2e",
+        "blue": "#7b8cff",
+        "brightBlack": "#6b6494",
+        "brightBlue": "#a3b0ff",
+        "brightCyan": "#9ff5f8",
+        "brightGreen": "#a6f5a0",
+        "brightMagenta": "#ff7ab0",
+        "brightRed": "#ff7a94",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff09a",
+        "cyan": "#5ee6eb",
+        "green": "#7ee787",
+        "magenta": "#ff3d7f",
+        "red": "#ff4d6d",
+        "white": "#d8d2e8",
+        "yellow": "#ffe066"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f2ead8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1040",
+        "#ff3d7f",
+        "#ff9a3c",
+        "#7b5cff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.3
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff2bd6",
+        "#22f0ff",
+        "#ffe81f",
+        "#3d1f5c",
+        "#b6ff3b"
+      ],
+      "custom": {
+        "expression": "let wash = mix(c4 * 0.35, c5 * 0.12, smoothstep(-0.5, 0.5, p.y));\nvar acc = vec3<f32>(0.0, 0.0, 0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let freq = 3.0 + k * 1.7;\n    let ph = t * wave_speed * (0.6 + 0.25 * k) + k * 1.3;\n    let y = wave_amp * sin(p.x * freq + ph) + 0.12 * sin(p.x * freq * 0.37 - ph * 0.7) + (k - 2.5) * 0.12;\n    let d = abs(p.y - y);\n    let line = 1.0 - smoothstep(0.0, 0.006, d);\n    let halo_v = exp(-d * 22.0);\n    let col = mix(mix(c1, c2, k * 0.2), c3, step(3.5, k));\n    acc += col * (line * 1.2 + halo_v * 0.35 * glow_amount);\n}\nlet color = tonemap(wash + acc * glow_amount);\nreturn mix(bg, color, strength);",
+        "name": "Acid Circus Waves",
+        "variables": [
+          {
+            "max": 0.3499999940395355,
+            "min": 0.05000000074505806,
+            "name": "wave_amp",
+            "value": 0.34700000286102295
+          },
+          {
+            "max": 1.5,
+            "min": 0.10000000149011612,
+            "name": "wave_speed",
+            "value": 1.2000000476837158
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "glow_amount",
+            "value": 1.100000023841858
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.600000023841858,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Neon big-top night: acid magenta, cyan and lime on deep violet black, with sharp waveform light.",
+    "id": "acid-circus-waves",
+    "name": "Acid Circus Waves",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:acid-circus-waves",
+    "updatedAt": "2026-11-11T22:57:35.611Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#b6ff3b",
+        "background": "#170c26",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#170c26"
+      },
+      "shell": {
+        "accent": "#ff2bd6",
+        "accentHover": "#b6ff3b",
+        "background": "#0b0614",
+        "backgroundSecondary": "#170c26",
+        "border": "#3d1f5c",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff2bd6",
+          "thickness": 2.0
+        },
+        "textDim": "#a99bc4",
+        "textMain": "#f4ecff"
+      },
+      "statusBar": {
+        "background": "#170c26",
+        "border": "#3d1f5c",
+        "text": "#a99bc4",
+        "warning": "#ffe81f"
+      },
+      "tabs": {
+        "activeBackground": "#0b0614",
+        "activeBorder": "#ff2bd6",
+        "background": "#170c26",
+        "idleBackground": "#170c26"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#07040d",
+        "blue": "#3b8dff",
+        "brightBlack": "#5a4a7a",
+        "brightBlue": "#7ab4ff",
+        "brightCyan": "#7af7ff",
+        "brightGreen": "#d4ff7a",
+        "brightMagenta": "#ff7ae8",
+        "brightRed": "#ff7a9a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff47a",
+        "cyan": "#22f0ff",
+        "green": "#b6ff3b",
+        "magenta": "#ff2bd6",
+        "red": "#ff3b6b",
+        "white": "#e9dcff",
+        "yellow": "#ffe81f"
+      },
+      "background": "#07040d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f4ecff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#07040d",
+        "#ff2bd6",
+        "#22f0ff",
+        "#b6ff3b"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "presetDock": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 1.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 200,
+        "letterSpacing": 1.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

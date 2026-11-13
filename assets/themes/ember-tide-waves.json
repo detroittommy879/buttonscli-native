@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff7a45",
+        "#ffb347",
+        "#7a2e8e",
+        "#1a0f2e",
+        "#ffe9c7"
+      ],
+      "custom": {
+        "expression": "let warp = noise(vec2<f32>(p.x * 2.0 + t * 0.1, p.y * 1.5)) - 0.5;\nvar acc = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let phase = k * 0.9 + warp * 2.0;\n    let freq = 2.0 + 0.4 * k;\n    let base = (k - 2.5) * 0.09;\n    let wave_y = base + wave_amp * sin(p.x * freq + t * (wave_speed + 0.05 * k) + phase) * (1.0 - 0.1 * k);\n    let dist = abs(p.y - wave_y - warp * 0.05);\n    let crisp = 1.0 - smoothstep(0.0, line_width * (1.0 + 0.3 * k), dist);\n    let glow_band = exp(-dist * 28.0) * 0.35;\n    let tint = mix(mix(c3, c2, k / 5.0), c5, step(4.0, k));\n    acc += tint * (crisp + glow_band) * (0.6 + 0.4 * k / 5.0);\n}\nlet wash = mix(c4 * 0.6, c3 * 0.35, smoothstep(-0.5, 0.5, p.y));\nlet color = wash + acc * mix(c1, c2, 0.5);\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Ember Tide Waves",
+        "variables": [
+          {
+            "max": 0.25,
+            "min": 0.019999999552965164,
+            "name": "wave_amp",
+            "value": 0.09000000357627869
+          },
+          {
+            "max": 2.5,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 0.8999999761581421
+          },
+          {
+            "max": 0.009999999776482582,
+            "min": 0.0010000000474974513,
+            "name": "line_width",
+            "value": 0.0035000001080334187
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.2000000476837158,
+      "speed": 2.5999999046325684,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Deep indigo night with ember-orange and plum waves, high contrast and crisp.",
+    "id": "ember-tide-waves",
+    "name": "Ember Tide Waves",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ember-tide-waves",
+    "updatedAt": "2026-11-11T22:50:04.751Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb347",
+        "background": "#171327",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#171327"
+      },
+      "shell": {
+        "accent": "#ff7a45",
+        "accentHover": "#ffb347",
+        "background": "#0b0912",
+        "backgroundSecondary": "#171327",
+        "border": "#3a2d55",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff7a45",
+          "thickness": 2.0
+        },
+        "textDim": "#a99bb8",
+        "textMain": "#f3e9dc"
+      },
+      "statusBar": {
+        "background": "#171327",
+        "border": "#3a2d55",
+        "text": "#a99bb8",
+        "warning": "#ffb347"
+      },
+      "tabs": {
+        "activeBackground": "#0b0912",
+        "activeBorder": "#ff7a45",
+        "background": "#171327",
+        "idleBackground": "#171327"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#07060d",
+        "blue": "#5a7cff",
+        "brightBlack": "#4b4166",
+        "brightBlue": "#8aa6ff",
+        "brightCyan": "#8ff0e6",
+        "brightGreen": "#b5e89a",
+        "brightMagenta": "#e0a0ff",
+        "brightRed": "#ff8a7a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffd08a",
+        "cyan": "#4fd1c5",
+        "green": "#8fcf7a",
+        "magenta": "#c46bff",
+        "red": "#ff5a4e",
+        "white": "#f3e9dc",
+        "yellow": "#ffb347"
+      },
+      "background": "#07060d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f3e9dc",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#07060d",
+        "#ff7a45",
+        "#7a2e8e",
+        "#ffb347"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 20.0,
+        "fontWeight": 100,
+        "letterSpacing": 1.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

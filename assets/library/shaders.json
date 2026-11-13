@@ -3187,5 +3187,425 @@
       "#6a00ff",
       "#3dff8a"
     ]
+  },
+  {
+    "name": "Neon Harmonic Scope",
+    "expression": "let env = 0.6 + 0.4 * sin(p.x * 1.7 + t * 0.35);\nvar y = 0.0;\nvar tg = vec3<f32>(0.0);\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i) + 1.0;\n    let dir = select(1.0, -1.0, i == 1 || i == 3);\n    let yk = 0.12 / k * env * sin(p.x * k * 9.0 + dir * t * (0.8 + 0.5 * k));\n    y += yk;\n    let dk = abs(p.y - yk);\n    let tint = mix(mix(c2, c1, 0.5), c5, f32(i) * 0.2);\n    tg += tint * (0.0002 / (dk * dk + 0.0002)) * 0.3;\n}\nlet dc = abs(p.y - y);\nlet core = exp(-dc * dc * 250000.0);\nlet halo_w = 0.00025 / (dc * dc + 0.00025);\nlet spark = sin(p.x * 140.0 + t * 17.0) * sin(p.x * 53.0 - t * 11.0);\nlet sparks = spark * spark * halo_w * 1.5 * mix(c1, c3, 0.5);\nlet line = vec3<f32>(1.0, 0.97, 1.0) * core * 1.3 + sparks;\nlet haze = mix(c4 * 0.9, c2 * 0.35, smoothstep(-0.5, 0.5, p.y));\nlet grid = pow(abs(sin(p.x * 45.0) * sin(p.y * 45.0)), 8.0) * 0.25;\nlet scan = 0.9 + 0.1 * sin(p.y * 1200.0);\nlet col = (haze + grid * c2 * 0.5) * scan + line + tg * glow_amount + halo_w * c1 * 0.15;\nlet vignette = clamp(1.2 - 1.1 * dot(p, p), 0.0, 1.0);\nreturn mix(bg, tonemap(col * 1.1) * vignette, strength);",
+    "variables": [
+      {
+        "name": "glow_amount",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff4fd8",
+      "#6fd8ff",
+      "#fff176",
+      "#2a1450",
+      "#9dff7a"
+    ]
+  },
+  {
+    "name": "Harmonic Wave",
+    "expression": "let tt = t * wave_speed;\nlet grid = abs(fract(p * vec2<f32>(10.0, 6.0)) - 0.5);\nlet grid_line = smoothstep(0.46, 0.5, max(grid.x, grid.y));\nlet base = mix(bg, c4, smoothstep(-0.5, 0.5, p.y) * 0.8) + c2 * grid_line * 0.08;\nvar glow_col = vec3<f32>(0.0);\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let f = 1.0 + k * 0.6;\n    let x = p.x * 3.14159 * f + tt * (0.6 + 0.3 * k);\n    let amp = 0.16 - 0.025 * k;\n    let fund = sin(x + k * 1.7);\n    let h2 = sin(2.0 * x - tt * 0.9 + k) * harmonic_mix * 0.45;\n    let h3 = sin(3.0 * x + tt * 0.4) * harmonic_mix * 0.2;\n    let y = (fund + h2 + h3) * amp;\n    let d = abs(p.y - y);\n    let wave_line = 1.0 - smoothstep(0.0015, 0.0045, d);\n    let bloom = exp(-d * 30.0) * 0.5;\n    let tint = mix(mix(c1, c2, smoothstep(0.5, 1.5, k)), mix(c3, c5, smoothstep(2.5, 3.0, k)), smoothstep(1.5, 2.5, k));\n    glow_col += tint * (wave_line + bloom);\n}\nreturn mix(bg, tonemap(base + glow_col * 1.3), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "harmonic_mix",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff4fd8",
+      "#6fd3ff",
+      "#ffe866",
+      "#2a1450",
+      "#9dff7a"
+    ]
+  },
+  {
+    "name": "Harmonic Waveform",
+    "expression": "let haze = cloud(p * 2.0 + vec2<f32>(t * 0.02, 0.0));\nlet hx = p.x * 0.5 + 0.5;\nlet pat = (0.5 + 0.5 * sin(p.x * 120.0) * sin(p.y * 90.0)) * 0.04;\nlet base = bg + mix(c4, c2 * 0.25, haze) * 0.5 * (0.6 + 0.4 * smoothstep(-0.5, 0.5, p.y)) + vec3<f32>(pat * 0.2, 0.0, pat);\nvar ya = 0.0;\nvar yb = 0.0;\nfor (var i = 1; i <= 5; i++) {\n    let k = f32(i);\n    let hw = select(harmonics, 1.0, i == 1);\n    ya += hw * sin(p.x * 5.0 * k + t * wave_speed * (0.6 + 0.2 * k) + k * 1.3) / k;\n    yb += hw * sin(p.x * 3.7 * k - t * wave_speed * (0.5 + 0.15 * k) + k * 2.1) / (k * 1.2);\n}\nlet env = 1.0 - 0.3 * p.x * p.x;\nlet ca = p.y - ya * 0.07 * env;\nlet cb = p.y - (yb * 0.05 + 0.03 * sin(p.x * 2.0 + t * 0.4)) * env;\nlet da = abs(ca);\nlet db = abs(cb);\nlet coreA = 1.0 - smoothstep(0.0, 0.0028, da);\nlet coreB = (1.0 - smoothstep(0.0, 0.002, db)) * 0.7;\nlet glowA = exp(-da * 45.0) * glow_amount;\nlet glowB = exp(-db * 35.0) * glow_amount * 0.6;\nlet lineA = mix(mix(c2, c5, smoothstep(0.0, 0.5, hx)), c1, smoothstep(0.5, 1.0, hx));\nlet lineB = mix(c1, c3, smoothstep(0.0, 1.0, hx));\nlet sc = vec2<f32>(floor(p.x * 70.0), floor(t * 10.0));\nlet spark = step(0.985, hash(sc)) * exp(-da * 70.0);\nlet light = lineA * (coreA * 1.4 + glowA * 0.8) + lineB * (coreB + glowB) + vec3<f32>(1.0) * coreA * 0.6 + c5 * spark * 1.2;\nlet color = base + light;\nreturn mix(bg, tonemap(color), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.5,
+        "value": 1.0
+      },
+      {
+        "name": "glow_amount",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "harmonics",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.6
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff4fa3",
+      "#5ad7ff",
+      "#fff07a",
+      "#2a1450",
+      "#9dffb0"
+    ]
+  },
+  {
+    "name": "Harmonic Lattice",
+    "expression": "var wave = 0.0;\nvar wave2 = 0.0;\nvar slope = 0.0;\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i);\n    let freq = 1.0 + k;\n    let amp = wave_gain * 0.12 / (1.0 + k);\n    let ph = t * wave_speed * (1.0 + 0.35 * k);\n    wave += amp * sin(p.x * freq * 6.0 - ph);\n    slope += amp * freq * 6.0 * cos(p.x * freq * 6.0 - ph);\n    wave2 += amp * 0.6 * sin(p.x * (2.0 + 2.0 * k) * 6.0 + ph * 1.3 + 1.7);\n}\nlet dist = abs(p.y - wave) / sqrt(1.0 + slope * slope);\nlet dist2 = abs(p.y - wave2 - 0.02) / sqrt(1.0 + 4.0 * abs(sin(p.x * 9.0)));\nlet line = 1.0 - smoothstep(0.0015, 0.0042, dist);\nlet line2 = 1.0 - smoothstep(0.0012, 0.0032, dist2);\nlet glow = exp(-dist * 55.0) * 0.8 + exp(-dist * 16.0) * 0.22;\nlet glow2 = exp(-dist2 * 40.0) * 0.45;\nlet sparks = step(0.982, hash(vec2<f32>(floor(p.x * 45.0), floor(t * 7.0)))) * exp(-dist * 110.0);\nlet tint = mix(mix(c1, c2, smoothstep(-0.9, 0.0, p.x)), mix(c3, c5, smoothstep(0.0, 0.9, p.x)), smoothstep(-0.3, 0.6, p.x));\nlet haze = c4 * (0.5 + 0.5 * sin(p.x * 2.0 + p.y * 3.0 + t * 0.1)) * 0.6;\nlet g = abs(fract(p * 12.0) - 0.5);\nlet grid = (1.0 - smoothstep(0.42, 0.5, max(g.x, g.y))) * 0.07;\nlet base = bg + haze * 0.5 + c4 * grid;\nlet charge = tint * (line * 1.4 + glow * 0.9 + sparks * 1.2) + mix(c2, vec3<f32>(1.0), 0.4) * (line2 * 0.9 + glow2 * 0.6);\nlet color = tonemap(base + charge);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.5,
+        "value": 1.3
+      },
+      {
+        "name": "wave_gain",
+        "min": 0.5,
+        "max": 2.0,
+        "value": 1.8
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff4fd8",
+      "#6fe7ff",
+      "#ffe866",
+      "#2a1262",
+      "#9dff7a"
+    ]
+  },
+  {
+    "name": "Silk Waveforms",
+    "expression": "var glow_acc = vec3<f32>(0.0);\nvar ink = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let fk = k / 5.0;\n    let freq = 2.2 + 0.7 * k;\n    let phase = k * 1.3 + t * wave_speed * (0.6 + 0.15 * k);\n    let wy = (fk - 0.5) * 0.8 + wave_height * sin(p.x * freq + phase) * cos(p.x * 0.9 - 0.1 * t * k);\n    let d = abs(p.y - wy);\n    let wcol = mix(mix(c1, c2, fk), c5, fract(k * 0.37));\n    let trace = 1.0 - smoothstep(0.0, 0.0035, d);\n    let g = exp(-d / glow_size);\n    glow_acc += wcol * g * 0.35;\n    ink += wcol * trace;\n}\nlet haze = noise(p * 2.5 + vec2<f32>(t * 0.03, -t * 0.02));\nlet base = bg + c4 * haze * 0.6;\nlet color = base + glow_acc + ink * 1.2;\nreturn mix(bg, tonemap(color), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.1,
+        "max": 1.0,
+        "value": 0.4
+      },
+      {
+        "name": "wave_height",
+        "min": 0.05,
+        "max": 0.35,
+        "value": 0.18
+      },
+      {
+        "name": "glow_size",
+        "min": 0.02,
+        "max": 0.2,
+        "value": 0.08
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff8fa3",
+      "#7fd6e0",
+      "#ffd07a",
+      "#2b1830",
+      "#b9a6ff"
+    ]
+  },
+  {
+    "name": "Oscilloscope Nebula",
+    "expression": "let void_bg = mix(bg, c4, smoothstep(0.25, 0.85, noise(p * 2.5 + vec2<f32>(t * 0.02, 0.0))));\nlet twinkle = stars(p * 22.0, t) * c5 * 0.7;\nvar acc = vec3<f32>(0.0, 0.0, 0.0);\nfor (var i = 0; i < 8; i++) {\n    let fi = f32(i);\n    let alive = step(fi + 0.5, wave_count);\n    let y0 = -0.42 + fi * 0.12;\n    let x = p.x * (2.0 + 0.3 * fi);\n    let swing = sin(x + t * wave_speed * (1.0 + 0.1 * fi) + fi * 0.7) + 0.5 * sin(2.3 * x - t * 0.7 + fi * 1.4);\n    let wy = y0 + 0.06 * swing;\n    let d = abs(p.y - wy);\n    let u = fi / 7.0;\n    let tint = select(mix(c1, c2, u * 2.0), mix(c2, c3, u * 2.0 - 1.0), u > 0.5);\n    let sharp = 1.0 - smoothstep(0.0, 0.004, d);\n    let glow_l = exp(-d * 40.0) * 0.5;\n    acc += tint * (sharp * 1.4 + glow_l) * alive;\n}\nlet color = tonemap(void_bg + twinkle + acc * 0.9);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "wave_count",
+        "min": 3.0,
+        "max": 8.0,
+        "value": 6.0
+      },
+      {
+        "name": "wave_speed",
+        "min": 0.1,
+        "max": 1.5,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#58e1ff",
+      "#c77dff",
+      "#ff6fb1",
+      "#1a1040",
+      "#ffd36b"
+    ]
+  },
+  {
+    "name": "Ember Tide Waves",
+    "expression": "let warp = noise(vec2<f32>(p.x * 2.0 + t * 0.1, p.y * 1.5)) - 0.5;\nvar acc = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let phase = k * 0.9 + warp * 2.0;\n    let freq = 2.0 + 0.4 * k;\n    let base = (k - 2.5) * 0.09;\n    let wave_y = base + wave_amp * sin(p.x * freq + t * (wave_speed + 0.05 * k) + phase) * (1.0 - 0.1 * k);\n    let dist = abs(p.y - wave_y - warp * 0.05);\n    let crisp = 1.0 - smoothstep(0.0, line_width * (1.0 + 0.3 * k), dist);\n    let glow_band = exp(-dist * 28.0) * 0.35;\n    let tint = mix(mix(c3, c2, k / 5.0), c5, step(4.0, k));\n    acc += tint * (crisp + glow_band) * (0.6 + 0.4 * k / 5.0);\n}\nlet wash = mix(c4 * 0.6, c3 * 0.35, smoothstep(-0.5, 0.5, p.y));\nlet color = wash + acc * mix(c1, c2, 0.5);\nreturn mix(bg, tonemap(color * 1.2), strength);",
+    "variables": [
+      {
+        "name": "wave_amp",
+        "min": 0.05,
+        "max": 0.4,
+        "value": 0.2
+      },
+      {
+        "name": "wave_speed",
+        "min": 0.1,
+        "max": 1.5,
+        "value": 0.4
+      },
+      {
+        "name": "line_width",
+        "min": 0.002,
+        "max": 0.02,
+        "value": 0.006
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff7a45",
+      "#ffb347",
+      "#7a2e8e",
+      "#1a0f2e",
+      "#ffe9c7"
+    ]
+  },
+  {
+    "name": "Oscilloscope Fever",
+    "expression": "var glow = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let n = f32(i);\n    let f = 2.0 + n * 0.7;\n    let ph = n * 1.3 + t * wave_speed * (0.6 + 0.15 * n);\n    let env = 0.6 + 0.4 * sin(p.x * 1.7 - t * 0.3 + n);\n    let y = wave_amp * sin(p.x * f * 3.0 + ph) * env + (n - 2.5) * 0.09;\n    let d = abs(p.y - y);\n    let core = 1.0 - smoothstep(0.0, line_width, d);\n    let glowv = halo(d, 0.05) * 0.35;\n    let pick = fract(n * 0.2 + p.y * 0.3);\n    let shade = mix(mix(c1, c2, pick), mix(c3, c5, pick), n / 5.0);\n    glow += shade * (core * 1.2 + glowv);\n}\nlet scan = 0.5 + 0.5 * sin(p.y * 220.0);\nlet base = c4 * (0.7 + 0.3 * scan) * (1.2 - abs(p.x) * 0.4);\nlet total = base + glow;\nreturn mix(bg, tonemap(total * 1.3), strength);",
+    "variables": [
+      {
+        "name": "wave_amp",
+        "min": 0.05,
+        "max": 0.35,
+        "value": 0.18
+      },
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 0.8
+      },
+      {
+        "name": "line_width",
+        "min": 0.002,
+        "max": 0.02,
+        "value": 0.006
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff2e88",
+      "#00e5ff",
+      "#ffe14d",
+      "#1a0630",
+      "#7cff4a"
+    ]
+  },
+  {
+    "name": "Sick Grid",
+    "expression": "let wob = wobble * (0.6 * sin(t * 0.37 + p.x * 2.3) + 0.4 * sin(t * 0.91 - p.x * 5.1));\nlet hz = 0.04 + wob;\nlet floor_mask = 1.0 - step(hz, p.y);\nlet d = max(hz - p.y, 0.015);\nlet depth = 1.0 / d;\nlet gz = depth * 0.35 + t * speed;\nlet gx = p.x * depth * 0.5;\nlet hd = abs(fract(gz + 0.5) - 0.5);\nlet vd = abs(fract(gx + 0.5) - 0.5);\nlet hl = 1.0 - smoothstep(0.0, line_w, hd);\nlet vl = 1.0 - smoothstep(0.0, line_w * 0.8, vd);\nlet row = hash(vec2<f32>(floor(gz), 3.0));\nlet flick = 0.6 + 0.4 * sin(t * 2.0 + row * 6.28);\nlet vis = smoothstep(0.015, 0.4, d);\nlet grid = max(hl, vl * 0.9) * vis * flick;\nlet glow_line = smoothstep(0.5, 0.0, hd) * 0.2 * vis;\nlet floor_col = c2 * (grid * 1.2 + glow_line) + c3 * 0.15 * vis;\nlet horizon = c2 * 0.35 * exp(-abs(p.y - hz) * 18.0);\nlet mist = noise(vec2<f32>(p.x * 3.0 + t * 0.05, p.y * 4.0)) * exp(-abs(p.y - hz) * 6.0);\nlet sky = horizon + c3 * 0.25 * mist;\nlet scene = mix(sky, floor_col, floor_mask);\nreturn mix(bg, tonemap(bg + scene), strength);",
+    "variables": [
+      {
+        "name": "speed",
+        "min": 0.1,
+        "max": 1.0,
+        "value": 0.4
+      },
+      {
+        "name": "wobble",
+        "min": 0.0,
+        "max": 0.12,
+        "value": 0.05
+      },
+      {
+        "name": "line_w",
+        "min": 0.02,
+        "max": 0.2,
+        "value": 0.07
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#c2ff6a",
+      "#ff3fa4",
+      "#5b1f6e",
+      "#ff709c",
+      "#5ef2d0"
+    ]
+  },
+  {
+    "name": "Gilded Searchlight",
+    "expression": "let depth = 0.75 - p.y;\nlet fl = vec2<f32>(p.x / depth, 1.0 / depth) * 0.9 + vec2<f32>(0.0, t * 0.15);\nlet cell = floor(fl);\nlet local = fract(fl) - 0.5;\nlet frame = max(abs(local.x), abs(local.y));\nlet tile_in = 1.0 - smoothstep(0.40, 0.42, frame);\nlet gold_rim = smoothstep(0.38, 0.41, frame) * (1.0 - smoothstep(0.44, 0.47, frame));\nlet beam_x = 0.8 * sin(t * 0.45) + 0.3 * p.y;\nlet dist_b = abs(p.x - beam_x);\nlet beam = exp(-(dist_b * dist_b) / (beam_width * (0.006 + 0.02 * depth)));\nlet hue = hash(cell + vec2<f32>(3.1, 7.7));\nlet tint = hsv(hue, 0.55, 0.95);\nlet flash = clamp(beam * (0.7 + 0.3 * hash(cell)) * 1.5, 0.0, 1.0);\nlet tile = mix(c4 * 1.4, tint, 0.3 + 0.7 * flash) * tile_in;\nlet rim = mix(c1, c5, beam) * gold_rim * (0.5 + 0.8 * beam);\nlet beam_glow = c2 * beam * 0.3;\nlet fade = clamp(1.3 - depth * 0.6, 0.0, 1.0);\nlet color = tonemap((tile + rim + beam_glow) * fade);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "beam_width",
+        "min": 0.5,
+        "max": 2.0,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#d4af37",
+      "#f5ecd7",
+      "#b8860b",
+      "#14110c",
+      "#ffd76a"
+    ]
+  },
+  {
+    "name": "Nebula Tide",
+    "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet X = p.x * depth;\nlet Z = depth;\nlet tw = t * wave_speed;\nlet a1 = X * 1.3 + Z * 0.7 - tw * 1.1;\nlet a2 = X * 2.1 - Z * 1.1 + tw * 1.4;\nlet a3 = X * 0.6 + Z * 2.3 - tw * 0.8;\nlet a4 = X * 3.7 + Z * 3.1 + tw * 2.0;\nlet h = sin(a1) * 0.5 + sin(a2) * 0.3 + sin(a3) * 0.2 + sin(a4) * 0.12;\nlet gx = 0.65 * cos(a1) + 0.63 * cos(a2) + 0.12 * cos(a3) + 0.44 * cos(a4);\nlet gz = 0.35 * cos(a1) - 0.33 * cos(a2) + 0.46 * cos(a3) + 0.37 * cos(a4);\nlet slope = 0.2 * wave_height;\nlet fine = noise(vec2<f32>(X * 4.0 - tw * 0.6, Z * 2.0 + tw * 0.3));\nlet nx = (-gx) * slope + (fine - 0.5) * 0.075;\nlet nz = (-gz) * slope;\nlet n = normalize(vec3<f32>(nx, 1.0, nz));\nlet refl_mix = clamp(0.3 + 4.0 * (1.0 - n.y), 0.0, 1.0);\nlet fog = exp(-below * 2.5);\nlet mirror = vec2<f32>(p.x + nx * 0.6, hz + 0.05 + clamp(below * 0.9, 0.0, 0.5));\nlet neb = fbm(mirror * vec2<f32>(3.0, 4.0) + vec2<f32>(t * 0.02, 0.0));\nlet sky_refl = mix(c1 * 0.5, c5 * 0.6, smoothstep(hz, 0.5, mirror.y)) + mix(c5, c4, neb) * neb * nebula_glow * 0.8 + c3 * stars(mirror * 22.0, t) * 0.5;\nlet neb_d = noise(p * vec2<f32>(3.0, 4.0) + vec2<f32>(t * 0.02, 0.0));\nlet stars_v = stars(p * 22.0, t);\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet sky_d = mix(c5 * 0.4, c1 * 0.3, smoothstep(hz, 0.5, p.y)) + mix(c5, c4, neb_d) * neb_d * nebula_glow * 0.8 + c3 * stars_v * 0.8 + c4 * moon;\nlet deep = mix(c1 * 0.8, c2, clamp(0.5 + h * 0.5, 0.0, 1.0)) * (0.5 + 0.5 * fog);\nlet water_base = mix(deep, sky_refl, refl_mix * 0.7);\nlet crest = smoothstep(0.6, 0.95, h * 0.5 + 0.5);\nlet glint_x = p.x - 0.42 + nx * 0.35;\nlet glint = (1.0 - smoothstep(0.0, 0.1, abs(glint_x))) * (0.4 + 0.6 * fog) * (0.4 + 0.6 * crest);\nlet water = water_base + c3 * crest * 0.35 + c4 * glint * 0.9;\nlet foam = (1.0 - smoothstep(0.0, 0.02, abs(p.y - hz))) * (0.5 + 0.5 * fine) * c3;\nlet scene = mix(water + foam, sky_d, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene * 1.2), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.9
+      },
+      {
+        "name": "wave_height",
+        "min": 0.3,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "nebula_glow",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#14083a",
+      "#0b4f6c",
+      "#7fd8ff",
+      "#ffb3d9",
+      "#6a3fd1"
+    ]
+  },
+  {
+    "name": "Poster Tide",
+    "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nlet w1 = noise(vec2<f32>(px * 0.8 + t * 0.15 * wave_speed, depth * 2.0 - t * 0.5 * wave_speed));\nlet w2 = noise(vec2<f32>(px * 1.7 - t * 0.25 * wave_speed, depth * 4.0 + t * 0.7 * wave_speed));\nlet ripple = w1 * 0.6 + w2 * 0.4;\nlet crest = smoothstep(0.55, 0.8, ripple);\nlet glint_x = p.x - 0.42 + (w2 - 0.5) * 0.12 * (1.0 + depth * 0.2);\nlet glint = smoothstep(0.1, 0.0, abs(glint_x)) * (0.3 + 0.7 * fog) * (0.5 + 0.5 * crest);\nlet base = mix(c1 * 0.7, c2, ripple) * (0.5 + 0.5 * fog);\nvar col = base + c3 * crest * 0.3;\nvar outline = 0.0;\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let z = depth * (1.0 + k * 0.45) + sin(px * (0.9 + k * 0.35) - t * wave_speed * (0.5 + k * 0.2) + k * 2.1) * wave_height * (0.4 + k * 0.1);\n    let band = floor(z * 0.5);\n    let f = fract(z * 0.5);\n    let edge_d = min(f, 1.0 - f);\n    let seam = 1.0 - smoothstep(0.02, 0.06, edge_d);\n    let fill_col = mix(c2, c5, hash(vec2<f32>(band, k)));\n    col = mix(col, fill_col * (0.6 + 0.4 * fog), step(0.5, f) * 0.55);\n    outline = max(outline, seam * (1.0 - 0.2 * k));\n}\nlet water = mix(col, c1 * 0.4, outline * 0.85) + c4 * glint * 0.7;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c5 * 0.45, c1 * 0.3, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = smoothstep(0.02, 0.0, abs(p.y - hz)) * (0.4 + 0.6 * ripple) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.9
+      },
+      {
+        "name": "wave_height",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#0d2b5c",
+      "#12a3a0",
+      "#ffe9c7",
+      "#ff8c3a",
+      "#e64b8c"
+    ]
+  },
+  {
+    "name": "Neon Tidewave",
+    "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nvar swell = 0.0;\nvar ridge = 0.0;\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let drift = noise(vec2<f32>(px * 0.3 + k * 5.0, depth * 0.4 + t * 0.05 * wave_speed));\n    let ph = px * (1.2 + k * 0.7) + drift * 4.0 * wave_height + depth * 0.25 * (1.0 + k * 0.4) - t * wave_speed * (0.9 + k * 0.5);\n    let wv = 0.5 + 0.5 * sin(ph);\n    swell += wv / (1.0 + k);\n    ridge = max(ridge, pow(wv, 6.0 + 4.0 * k));\n}\nlet swell_n = swell / 2.083;\nlet crest = smoothstep(0.3, 1.0, ridge);\nlet glint_x = p.x - 0.42 + (swell_n - 0.5) * 0.15 * (1.0 + depth * 0.2);\nlet glint = (1.0 - smoothstep(0.0, 0.1, abs(glint_x))) * (0.3 + 0.7 * fog) * (0.4 + 0.6 * crest);\nlet spark_cell = floor(vec2<f32>(px * 10.0, depth * 3.0 - t * wave_speed * 0.5));\nlet sparkle = step(0.985, hash(spark_cell)) * crest * fog;\nlet water = mix(c1 * 0.8, c2, swell_n) * (0.5 + 0.5 * fog) + c3 * crest * 0.7 + c4 * glint * 0.9 + c4 * sparkle * 1.2 + c5 * (1.0 - fog) * 0.4;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c3 * 0.3, c5 * 0.6, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = (1.0 - smoothstep(0.0, 0.02, abs(p.y - hz))) * (0.4 + 0.6 * swell_n) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene * 1.1), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.9
+      },
+      {
+        "name": "wave_height",
+        "min": 0.3,
+        "max": 2.0,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#0a1f5c",
+      "#00b8d9",
+      "#ff3e9a",
+      "#ffb13b",
+      "#6a2cff"
+    ]
+  },
+  {
+    "name": "Playful Swell",
+    "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nvar swell = 0.0;\nvar crest_acc = 0.0;\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let spd = wave_speed * (0.4 + 0.2 * k);\n    let n = noise(vec2<f32>(px * (0.5 + 0.4 * k) - t * 0.2 * spd, depth * (1.2 + 0.7 * k) + t * 0.5 * spd));\n    swell += n * (0.5 - 0.08 * k);\n    crest_acc += (1.0 - abs(2.0 * n - 1.0)) * (0.3 + 0.1 * k);\n}\nlet crest = smoothstep(0.75 - 0.1 * wave_height, 0.95, crest_acc / 1.8);\nlet refl_x = p.x - 0.42 + (swell - 0.76) * 0.2 * wave_height;\nlet road = smoothstep(0.12, 0.0, abs(refl_x)) * (0.4 + 0.6 * fog);\nlet stripes = smoothstep(0.35, 0.65, 0.5 + 0.5 * sin(depth * 5.0 - t * 2.0 * wave_speed + swell * 3.0));\nlet glint = road * stripes;\nlet bp = vec2<f32>(px * 2.0, depth * 3.0 - t * 0.8 * wave_speed);\nlet bc = floor(bp);\nlet hb = hash(bc);\nlet bub = stroke(sd_circle(fract(bp) - 0.5, 0.05 + 0.1 * hb), 0.02) * step(0.92, hb);\nlet water = mix(c1 * 0.7, c2, clamp(swell, 0.0, 1.0)) * (0.5 + 0.5 * fog) + c3 * crest * (0.25 + 0.5 * fog) + c4 * glint * 0.8 + c3 * bub * fog * 0.6;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c5 * 0.45, c1 * 0.3, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = smoothstep(0.02, 0.0, abs(p.y - hz)) * (0.4 + 0.6 * crest_acc / 1.8) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+    "variables": [
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.9
+      },
+      {
+        "name": "wave_height",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#0f1f3d",
+      "#1f5a6e",
+      "#9fd0d8",
+      "#e6ba99",
+      "#3c5a8f"
+    ]
+  },
+  {
+    "name": "Koi Moire",
+    "expression": "let w = p + warp * vec2<f32>(sin(p.y * 13.0 + t * 0.6), sin(p.x * 11.0 - t * 0.5));\nlet ca = vec2<f32>(0.12 * sin(t * 0.21), 0.08 * cos(t * 0.17));\nlet cb = -ca;\nlet sa = sin(length(w - ca) * ring_density * 6.2832 - t * 0.8);\nlet sb = sin(length(w - cb) * ring_density * 6.2832 + t * 0.6);\nlet ba = smoothstep(-0.2, 0.2, sa);\nlet bb = smoothstep(-0.2, 0.2, sb);\nlet mono = mix(c1, c2, abs(ba - bb));\nlet accent_ring = stroke(sd_circle(w, accent_radius + 0.015 * sin(t * 0.5)), 0.012);\nlet color = mix(mono, c3, accent_ring);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "ring_density",
+        "min": 6.0,
+        "max": 30.0,
+        "value": 14.0
+      },
+      {
+        "name": "warp",
+        "min": 0.0,
+        "max": 0.08,
+        "value": 0.035
+      },
+      {
+        "name": "accent_radius",
+        "min": 0.1,
+        "max": 0.45,
+        "value": 0.3
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#0a0a0a",
+      "#e9e5de",
+      "#ff6a1a",
+      "#1c1c1c",
+      "#8a8a8a"
+    ]
   }
 ]

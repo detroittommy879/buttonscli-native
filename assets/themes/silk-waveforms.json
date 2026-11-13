@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff8fa3",
+        "#7fd6e0",
+        "#ffd07a",
+        "#2b1830",
+        "#b9a6ff"
+      ],
+      "custom": {
+        "expression": "var glow_acc = vec3<f32>(0.0);\nvar ink = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let fk = k / 5.0;\n    let freq = 2.2 + 0.7 * k;\n    let phase = k * 1.3 + t * wave_speed * (0.6 + 0.15 * k);\n    let wy = (fk - 0.5) * 0.8 + wave_height * sin(p.x * freq + phase) * cos(p.x * 0.9 - 0.1 * t * k);\n    let d = abs(p.y - wy);\n    let wcol = mix(mix(c1, c2, fk), c5, fract(k * 0.37));\n    let trace = 1.0 - smoothstep(0.0, 0.0035, d);\n    let g = exp(-d / glow_size);\n    glow_acc += wcol * g * 0.35;\n    ink += wcol * trace;\n}\nlet haze = noise(p * 2.5 + vec2<f32>(t * 0.03, -t * 0.02));\nlet base = bg + c4 * haze * 0.6;\nlet color = base + glow_acc + ink * 1.2;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Silk Waveforms",
+        "variables": [
+          {
+            "max": 1.5,
+            "min": 0.10000000149011612,
+            "name": "wave_speed",
+            "value": 0.5
+          },
+          {
+            "max": 0.3499999940395355,
+            "min": 0.05000000074505806,
+            "name": "wave_height",
+            "value": 0.18000000715255737
+          },
+          {
+            "max": 0.20000000298023224,
+            "min": 0.019999999552965164,
+            "name": "glow_size",
+            "value": 0.07999999821186066
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Dark warm canvas with soft rose, aqua and amber light lines drifting like silk.",
+    "id": "silk-waveforms",
+    "name": "Silk Waveforms",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:silk-waveforms",
+    "updatedAt": "2026-11-11T22:53:04.072Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb3c1",
+        "background": "#1c160c",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#1c160c"
+      },
+      "shell": {
+        "accent": "#ff8fa3",
+        "accentHover": "#ffb3c1",
+        "background": "#0d0a06",
+        "backgroundSecondary": "#1c160c",
+        "border": "#4a3328",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff8fa3",
+          "thickness": 2.0
+        },
+        "textDim": "#a89a7a",
+        "textMain": "#f5ecd7"
+      },
+      "statusBar": {
+        "background": "#1c160c",
+        "border": "#4a3328",
+        "text": "#a89a7a",
+        "warning": "#ffd07a"
+      },
+      "tabs": {
+        "activeBackground": "#0d0a06",
+        "activeBorder": "#ff8fa3",
+        "background": "#1c160c",
+        "idleBackground": "#1c160c"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#0a0805",
+        "blue": "#7aa8e0",
+        "brightBlack": "#5c4a3a",
+        "brightBlue": "#a8c8ff",
+        "brightCyan": "#b5f0f5",
+        "brightGreen": "#b5ecc0",
+        "brightMagenta": "#e8b8ff",
+        "brightRed": "#ff9aa8",
+        "brightWhite": "#fff8ee",
+        "brightYellow": "#ffe6a8",
+        "cyan": "#7fd6e0",
+        "green": "#8fd694",
+        "magenta": "#d68fe6",
+        "red": "#ff6b7a",
+        "white": "#f5ecd7",
+        "yellow": "#ffd07a"
+      },
+      "background": "#0a0805",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Monoisome Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f5ecd7",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0f14",
+        "#ff8fa3",
+        "#7fd6e0",
+        "#ffd07a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

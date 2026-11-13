@@ -806,5 +806,520 @@
     "layout": "grid",
     "visible_panes": 3,
     "row_banding_brightness": 0
+  },
+  {
+    "name": "5-pane-shader-circus",
+    "theme_id": "hallowmas-copy-copy-v3",
+    "app_theme_id": "hallowmas-copy-copy-v3",
+    "terminal_theme_id": "hallowmas-copy-copy-v3",
+    "gradient_theme_id": "hallowmas-copy-copy-v3",
+    "effects_theme_id": "hallowmas-copy-copy-v3",
+    "panes": [
+      {
+        "theme_id": "filtered-squarewave-v1",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v25",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v9",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "gravity-arcade-v10",
+        "font": null
+      },
+      {
+        "theme_id": "hallowmas-copy-copy-v4",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "5-pane-shader-circus2",
+    "theme_id": "hallowmas-copy-copy-v3",
+    "app_theme_id": "hallowmas-copy-copy-v3",
+    "terminal_theme_id": "hallowmas-copy-copy-v3",
+    "gradient_theme_id": "hallowmas-copy-copy-v3",
+    "effects_theme_id": "hallowmas-copy-copy-v3",
+    "panes": [
+      {
+        "theme_id": "filtered-squarewave-v2",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v25",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v9",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 300,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "gravity-arcade-v11",
+        "font": null
+      },
+      {
+        "theme_id": "hallowmas-copy-copy-v4",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Silk_Audio_Waveforms",
+    "theme_id": "oscilloscope-fever-v1",
+    "app_theme_id": "oscilloscope-fever-v1",
+    "terminal_theme_id": "oscilloscope-fever-v1",
+    "gradient_theme_id": "gilded-searchlight",
+    "effects_theme_id": "oscilloscope-fever-v1",
+    "panes": [
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "silk-waveforms-v1",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 2,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "sky and night wave view",
+    "theme_id": "bubble-parade-v3",
+    "app_theme_id": "bubble-parade-v3",
+    "terminal_theme_id": "bubble-parade-v3",
+    "gradient_theme_id": "bubble-parade",
+    "effects_theme_id": "bubble-parade",
+    "panes": [
+      {
+        "theme_id": "gravity-arcade-v7",
+        "font": null
+      },
+      {
+        "theme_id": "scope-trace-v1",
+        "font": null
+      },
+      {
+        "theme_id": "autumn-gusts-v12",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "bubble-parade-v4",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "4-panes-waveforms-violet-dark",
+    "theme_id": "oscilloscope-fever-v1",
+    "app_theme_id": "oscilloscope-fever-v1",
+    "terminal_theme_id": "oscilloscope-fever-v1",
+    "gradient_theme_id": "gilded-searchlight",
+    "effects_theme_id": "oscilloscope-fever-v1",
+    "panes": [
+      {
+        "theme_id": null,
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 15.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "silk-waveforms-v2",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "harmonic-waveform",
+        "font": null
+      },
+      {
+        "theme_id": "oscilloscope-fever-v4",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Variety42",
+    "theme_id": "pur-v24",
+    "app_theme_id": "pur-v24",
+    "terminal_theme_id": "pur-v24",
+    "gradient_theme_id": "pur-v24",
+    "effects_theme_id": "pur-v24",
+    "panes": [
+      {
+        "theme_id": "evening-thunder-v1",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 15.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "hearthscale-quilt",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "pur-v40",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "ember-accordion",
+        "font": {
+          "zone": {
+            "family": "Fira Code Bundled",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "quiet-winter",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v9",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Variety-33-4panes",
+    "theme_id": "filtered-squarewave-v3",
+    "app_theme_id": "filtered-squarewave-v3",
+    "terminal_theme_id": "filtered-squarewave-v3",
+    "gradient_theme_id": "filtered-squarewave-v3",
+    "effects_theme_id": "filtered-squarewave-v3",
+    "panes": [
+      {
+        "theme_id": "autumn-to-winter-v2",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 15.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "blue-triangle-flow",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "oscilloscope-fever-v4",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "solar-splash-v1",
+        "font": {
+          "zone": {
+            "family": "Fira Code Bundled",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "trapezoid-stampede",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "hyperspace-mandala",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Variety-11-4panes",
+    "theme_id": "autumn-gusts-v6",
+    "app_theme_id": "autumn-gusts-v6",
+    "terminal_theme_id": "autumn-gusts-v6",
+    "gradient_theme_id": "autumn-gusts-v6",
+    "effects_theme_id": "autumn-gusts-v6",
+    "panes": [
+      {
+        "theme_id": "glitch-reef",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 15.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-window",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "gravity-arcade-v4",
+        "font": {
+          "zone": {
+            "family": "JetBrains Mono Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-veil-v10",
+        "font": {
+          "zone": {
+            "family": "Fira Code Bundled",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "autumn-gusts",
+        "font": null
+      },
+      {
+        "theme_id": "row-banding-8",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "BadStormsOnMars1",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v8",
+        "font": null
+      },
+      {
+        "theme_id": "winter-rain-parallax-v7",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst-v3",
+        "font": {
+          "zone": {
+            "family": "Space Mono (System)",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
   }
 ]
