@@ -168,7 +168,20 @@ impl SpacedUi for Ui {
         self.button(spaced_text(self, text))
     }
     fn spaced_small_button(&mut self, text: impl Into<WidgetText>) -> Response {
-        self.small_button(spaced_text(self, text))
+        // egui's small buttons have no vertical padding, so scripts whose
+        // glyphs reach past the line box (Arabic, Devanagari) hang over the
+        // frame. Grow the button by exactly that overhang; Latin is unchanged.
+        let width = self.available_width() - 2.0 * self.spacing().button_padding.x;
+        let galley = spaced_text(self, text).into_galley(self, None, width, egui::TextStyle::Body);
+        let overhang = (galley.rect.top() - galley.mesh_bounds.top())
+            .max(galley.mesh_bounds.bottom() - galley.rect.bottom())
+            .max(0.0);
+        let min_height = galley.size().y + 2.0 * overhang.ceil();
+        self.add(
+            egui::Button::new(WidgetText::Galley(galley))
+                .small()
+                .min_size(egui::vec2(0.0, min_height)),
+        )
     }
     fn spaced_selectable_label(&mut self, selected: bool, text: impl Into<WidgetText>) -> Response {
         self.selectable_label(selected, spaced_text(self, text))
@@ -212,6 +225,44 @@ impl SpacedUi for Ui {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn small_buttons_contain_tall_scripts_and_keep_latin_height() {
+        let ctx = egui::Context::default();
+        crate::fonts::install(&ctx, &crate::fonts::FontCatalog::bundled());
+        let mut sizes = Vec::new();
+        for _ in 0..2 {
+            sizes.clear();
+            let output = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    for text in ["مساعدة الذكاء الاصطناعي", "Settings"] {
+                        sizes.push(ui.spaced_small_button(text).rect);
+                    }
+                    sizes.push(ui.small_button("Settings").rect);
+                });
+            });
+            let arabic = sizes[0];
+            let glyphs = output
+                .shapes
+                .iter()
+                .find_map(|clipped| match &clipped.shape {
+                    egui::Shape::Text(text) if text.galley.text().starts_with("مساعدة") => {
+                        Some(text.galley.mesh_bounds.translate(text.pos.to_vec2()))
+                    }
+                    _ => None,
+                })
+                .expect("Arabic button text is painted");
+            assert!(
+                arabic.expand(0.5).contains_rect(glyphs),
+                "glyphs {glyphs:?} overhang button {arabic:?}"
+            );
+        }
+        assert_eq!(
+            sizes[1].height(),
+            sizes[2].height(),
+            "Latin small buttons keep egui's height"
+        );
+    }
 
     #[test]
     fn tracking_changes_layout_and_hit_bounds_and_inherits_through_children() {

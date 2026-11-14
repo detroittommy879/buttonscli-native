@@ -6,6 +6,8 @@
   theme and shader editor, menus, status bar, tooltips and AI Help now
   translate in all 20 languages (machine translations). Screen readers get
   the translated names.
+- Small buttons (status bar, AI Help) no longer cut through Arabic and
+  other tall scripts.
 - **One-command install**: `curl -fsSL https://buttonscli.com/install.sh | sh`
   (Linux/macOS), `irm https://buttonscli.com/install.ps1 | iex` (PowerShell)
   or `install.cmd` (Command Prompt). Per-user, checksum-verified, adds a
