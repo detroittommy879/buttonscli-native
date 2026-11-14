@@ -17,6 +17,15 @@ rest keep running in the background.
   position has its own color on its tab and border, so you can tell them apart.
 - **Tab groups:** save the set of open terminals under a name and reopen it
   later from the tab menu.
+- **New tab:** **+** after the tabs lists every shell found on your computer
+  (PowerShell, cmd, each WSL distro…) and the simulated terminal.
+- **Which terminal is this?** Hover a pane and its tab name and pane number
+  show in the corner, in that pane's own theme and font. Turn it off or change
+  its opacity under **Settings → Themes** (**Show terminal name on hover**).
+
+![The new-tab menu open under the + button, listing Automatic, Simulated terminal, PowerShell, cmd and several WSL distributions](images/new-tab-menu.png)
+
+![A pane with a wavy shader background and the label P2 · term6 in its top-right corner](images/pane-hover-label.png)
 
 <!-- IMAGE: layouts.png — the same four terminals as COL, ROW and GRID, side by side. | alt: The same four terminals in the COL, ROW and GRID layouts, side by side -->
 ![The same four terminals in the COL, ROW and GRID layouts, side by side](images/layouts.png)
@@ -33,6 +42,13 @@ Enter for you.
 
 The SSH dock works the same way for server connections. Docks can resize,
 collapse and auto-hide.
+
+With **Auto-hide command dock** on (**Settings → Workspace**), the left dock
+folds into a thin strip at the window edge. Move the mouse there and it slides
+out over the terminals; it hides again after the **Auto-hide delay**.
+**Peek area** sets how close to the edge the mouse has to be.
+
+![The left command dock slid out over an htop pane, with its buttons and the Run a command box](images/left-dock-auto-hide.jpg)
 
 <!-- IMAGE: button-editor.png — the preset editor with label, command and Send Enter after typing. | alt: The Add preset window: button label Run tests, command cargo test and Send Enter after typing ticked -->
 ![The Add preset window: button label Run tests, command cargo test and Send Enter after typing ticked](images/button-editor.png)

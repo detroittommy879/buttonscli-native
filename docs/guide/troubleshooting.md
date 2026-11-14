@@ -90,6 +90,11 @@ Messages fade after 5 seconds. Hover **SHELL READY** in the status bar to see
 the last one, or change the time in **Settings → Workspace** (0 keeps them
 until you click ×).
 
+**I picked a language I can't read.**
+Open **◐ Look** in the status bar: the language entry also says *(Language)*
+in English. Or open Settings: the language tab has a small *Language &
+Region* caption above it in English.
+
 ## Logs and crash reports
 
 ButtonsCLI keeps a log of the current and previous launch, and a crash report

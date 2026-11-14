@@ -93,9 +93,17 @@ effects. Each pane can keep a different theme.
     <td width="50%"><img src="docs/images/theme-editor-october-2026.png" alt="Dark theme settings with the personal theme editor and ANSI palette controls" width="100%"></td>
     <td width="50%"><img src="docs/images/font-settings-october-2026.png" alt="Dark font settings with independent family, weight and size controls for the UI, tabs, docks and terminal" width="100%"></td>
   </tr>
+  <tr>
+    <th align="left">Text backing: readable text over any shader</th>
+    <th align="left">Inverted backing for bright shaders</th>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/guide/images/text-backing.jpg" alt="Three panes with busy shaders; htop, a file tree and apt output sit on soft dark panels that follow each line" width="100%"></td>
+    <td width="50%"><img src="docs/guide/images/text-backing-invert.jpg" alt="Claude Code and Codex over a bright bubble shader, their text drawn dark on light panels" width="100%"></td>
+  </tr>
 </table>
 
-<sub>Screenshots captured on Windows in October 2026. They show customized
+<sub>Screenshots captured on Windows in October and November 2026. They show customized
 settings and live shell sessions; visible commands and remote connections are
 examples from that workspace.</sub>
 

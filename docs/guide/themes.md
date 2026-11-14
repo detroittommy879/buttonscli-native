@@ -107,6 +107,27 @@ panes**, makes every pane use the shared theme again.
 the rest of the UI. A pane can also have its own terminal font. Bundled fonts
 work offline; you can import TTF/OTF files too.
 
+## Text backing
+
+Busy shaders can make text hard to read. **Text backing** in the status bar
+puts a soft panel behind the text in every pane, in that pane's own colors,
+while the shader stays visible around it. **Backing options** next to it:
+
+- **Opacity %** and **Feather** (how soft the edges are).
+- **Whole lines** backs each line edge to edge instead of only the words.
+- **Invert text and backing colors** uses the text colors as the panel and
+  draws the text dark, for very bright shaders. Selections and TUI
+  backgrounds keep their own colors.
+
+![Three panes with busy shaders; the text in htop, a file tree and apt output sits on soft dark panels that follow each line](images/text-backing.jpg)
+
+![Claude Code and Codex in two panes over a bright bubble shader, their text drawn dark on light panels with Invert text and backing colors ticked](images/text-backing-invert.jpg)
+
+To check a look, tick **◐ Look → Test text**: it opens a pane with no shell
+that shows the 16 ANSI colors, 256-color and true-color ramps, bold, italic,
+underline, box drawing, wide characters and emoji. Untick it (or close the
+tab) when done.
+
 ## Calm
 
 The **Calm** button next to a theme in the Library applies it without
