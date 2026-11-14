@@ -7,11 +7,40 @@ description: Install ButtonsCLI, open it, and find your way around the window.
 
 ## Install
 
-**Download** (once releases are published): get the file for your system
-from the GitHub Releases page — a `.zip` for Windows, an AppImage for Linux,
-or the macOS build — and run it.
+**One command** (installs the newest release for your user, no admin rights,
+and adds ButtonsCLI to your app launcher or Start Menu):
 
-**Build with Rust** (works today): install current stable Rust and Git, then:
+Linux and macOS:
+
+```sh
+curl -fsSL https://buttonscli.com/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://buttonscli.com/install.ps1 | iex
+```
+
+Windows Command Prompt:
+
+```bat
+curl -fsSL https://buttonscli.com/install.cmd -o install.cmd && install.cmd && del install.cmd
+```
+
+The script checks the download against the release's SHA-256 list. On Linux
+it lists any missing window/graphics libraries and offers to install them;
+add `-s -- --deps` after `sh` to install them without asking, or
+`-s -- --uninstall` to remove ButtonsCLI (your settings stay). Read the script
+first if you like: open the same URL in a browser.
+
+**Download** instead: get the file for your system from the
+[GitHub Releases](https://github.com/detroittommy879/buttonscli-native/releases/latest)
+page — a `.zip` for Windows, a `.tar.gz` or AppImage for Linux, or the macOS
+`.dmg`. These builds aren't code-signed yet, so Windows SmartScreen and macOS
+may warn the first time; the one-command install avoids most of that.
+
+**Build with Rust**: install current stable Rust and Git, then:
 
 ```sh
 cargo install --git https://github.com/detroittommy879/buttonscli-native.git --branch main --locked --bin buttonscli

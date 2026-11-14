@@ -166,10 +166,28 @@ fn literal_catalog() -> &'static LiteralCatalog {
     })
 }
 
+/// `src/i18n/overlay.json`: translations added one locale at a time by
+/// `scripts/i18n-work.py apply` (see docs/dev/TRANSLATIONS.md). Unlike the
+/// two full catalogs, an entry may cover only some locales; it wins over them.
+fn overlay_catalog() -> &'static LiteralCatalog {
+    static OVERLAY: OnceLock<LiteralCatalog> = OnceLock::new();
+    OVERLAY.get_or_init(|| {
+        serde_json::from_str(include_str!("i18n/overlay.json"))
+            .expect("bundled translation overlay is valid JSON")
+    })
+}
+
 pub fn literal(locale: &str, english: &str) -> String {
     let locale = resolve_locale(locale);
     if locale == "en" {
         return english.to_owned();
+    }
+    let overlay = &overlay_catalog().messages;
+    if let Some(translated) = [english, catalog_alias(english)]
+        .into_iter()
+        .find_map(|key| overlay.get(key).and_then(|values| values.get(locale)))
+    {
+        return translated.clone();
     }
     // The imported source catalog leaves this account action untranslated in three locales.
     if english == "Sign out" {
@@ -1521,6 +1539,37 @@ mod tests {
             );
             for locale in SUPPORTED_LOCALES {
                 assert!(translations.contains_key(locale), "{locale}: {english}");
+            }
+        }
+    }
+
+    #[test]
+    fn overlay_translations_are_nonempty_known_locales_with_matching_placeholders() {
+        let placeholders = |text: &str| {
+            let mut names: Vec<String> = text
+                .split('{')
+                .skip(1)
+                .filter_map(|rest| rest.split_once('}').map(|(name, _)| name.to_owned()))
+                .filter(|name| {
+                    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                })
+                .collect();
+            names.sort();
+            names
+        };
+        for (english, translations) in &overlay_catalog().messages {
+            for (locale, value) in translations {
+                assert!(
+                    SUPPORTED_LOCALES.contains(&locale.as_str()) && locale != "en",
+                    "{locale}: {english}"
+                );
+                assert!(!value.trim().is_empty(), "{locale}: {english}");
+                assert_eq!(
+                    placeholders(value),
+                    placeholders(english),
+                    "{locale}: {english}"
+                );
+                assert_eq!(&literal(locale, english), value);
             }
         }
     }

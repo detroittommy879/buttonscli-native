@@ -97,6 +97,9 @@ jobs:
           dir="buttonscli-$version-linux-x86_64"
           mkdir "$dir"
           cp target/release/buttonscli target/release/buttonsclictl README.md LICENSE-MIT LICENSE-APACHE THIRD_PARTY.md "$dir"/
+          # For packaging/install/install.sh (launcher entry and icon).
+          cp packaging/icon-256.png "$dir"/buttonscli.png
+          cp packaging/buttonscli.desktop "$dir"/
           tar czf "$dir.tar.gz" "$dir"
 
           mkdir -p AppDir/usr/bin

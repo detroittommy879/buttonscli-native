@@ -36,10 +36,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn text_backing_defaults_off_and_preserves_disabled_adjustments() {
+    fn text_backing_defaults_on_and_preserves_disabled_adjustments() {
         let mut prefs: Preferences = serde_json::from_str("{}").unwrap();
         assert!(prefs.text_backing.available);
-        assert!(!prefs.text_backing.enabled);
+        assert!(prefs.text_backing.enabled);
         assert!(!prefs.text_backing.invert);
         prefs.text_backing.enabled = true;
         prefs.text_backing.available = false;
