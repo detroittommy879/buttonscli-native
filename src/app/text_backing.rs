@@ -7,20 +7,26 @@ impl ButtonsApp {
             return;
         }
         let mut changed = ui
-            .spaced_checkbox(&mut backing.enabled, "Text backing")
-            .on_hover_text("Soften the background behind terminal text in all panes.")
+            .spaced_checkbox(
+                &mut backing.enabled,
+                crate::i18n::literal(&self.locale, "Text backing"),
+            )
+            .on_hover_text(crate::i18n::literal(
+                &self.locale,
+                "Soften the background behind terminal text in all panes.",
+            ))
             .changed();
-        ui.solo_menu_button("text-backing-options", "Backing options", |ui| {
+        ui.solo_menu_button("text-backing-options", crate::i18n::literal(&self.locale, "Backing options"), |ui| {
             let opacity =
-                ui.add(egui::Slider::new(&mut backing.opacity, 0..=100).text("Opacity %"));
+                ui.add(egui::Slider::new(&mut backing.opacity, 0..=100).text(crate::i18n::literal(&self.locale, "Opacity %")));
             changed |= opacity.drag_stopped() || (opacity.changed() && !opacity.dragged());
-            let feather = ui.add(egui::Slider::new(&mut backing.feather, 0..=20).text("Feather"));
+            let feather = ui.add(egui::Slider::new(&mut backing.feather, 0..=20).text(crate::i18n::literal(&self.locale, "Feather")));
             changed |= feather.drag_stopped() || (feather.changed() && !feather.dragged());
             changed |= ui
-                .spaced_checkbox(&mut backing.whole_line, "Whole lines")
+                .spaced_checkbox(&mut backing.whole_line, crate::i18n::literal(&self.locale, "Whole lines"))
                 .changed();
-            changed |= ui.spaced_checkbox(&mut backing.invert, "Invert text and backing colors")
-                .on_hover_text("Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.").changed();
+            changed |= ui.spaced_checkbox(&mut backing.invert, crate::i18n::literal(&self.locale, "Invert text and backing colors"))
+                .on_hover_text(crate::i18n::literal(&self.locale, "Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.")).changed();
             ui.spaced_label(
                 crate::i18n::literal(&self.locale, "Colors follow each pane. Disable in Settings → Experimental."),
             );

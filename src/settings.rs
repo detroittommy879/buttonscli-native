@@ -567,10 +567,10 @@ impl ShufflePool {
 
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Favorites => "Favorite themes",
-            Self::Mine => "My themes",
-            Self::Shaders => "Themes with a shader",
-            Self::All => "All themes",
+            Self::Favorites => crate::i18n::key("Favorite themes"),
+            Self::Mine => crate::i18n::key("My themes"),
+            Self::Shaders => crate::i18n::key("Themes with a shader"),
+            Self::All => crate::i18n::key("All themes"),
         }
     }
 }

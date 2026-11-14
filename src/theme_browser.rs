@@ -21,10 +21,10 @@ impl ThemeSort {
 
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Name => "Name A–Z",
-            Self::NameDescending => "Name Z–A",
-            Self::FavoritesFirst => "Favorites first",
-            Self::NativeVersion => "Native version (newest first)",
+            Self::Name => crate::i18n::key("Name A–Z"),
+            Self::NameDescending => crate::i18n::key("Name Z–A"),
+            Self::FavoritesFirst => crate::i18n::key("Favorites first"),
+            Self::NativeVersion => crate::i18n::key("Native version (newest first)"),
         }
     }
 }
@@ -42,9 +42,9 @@ impl ThemeCollection {
 
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::All => "All collections",
-            Self::Native => "Native themes",
-            Self::Legacy => "Legacy themes",
+            Self::All => crate::i18n::key("All collections"),
+            Self::Native => crate::i18n::key("Native themes"),
+            Self::Legacy => crate::i18n::key("Legacy themes"),
         }
     }
 }

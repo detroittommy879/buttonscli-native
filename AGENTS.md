@@ -257,6 +257,13 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   (partial locales allowed, wins over the catalogs); never hand-edit the
   full catalogs for that. One agent per locale writing only scratch files;
   you run `apply`.
+  UI audit regression fixtures: `python scripts/test_audit_i18n.py`. The audit
+  follows widget text arguments across lines; mark English variable/table sources
+  with `crate::i18n::key("…")` before translating at the display site. Never mark
+  user names or IDs. `MessageKey` English (`fn english` in `i18n.rs`) also
+  goes through `literal`; the audit collects it. In egui 0.31, use `ComboBox::new("stable English ID",
+  translated_label)` for a translated labeled picker: neither `.id_salt()` nor
+  `.label()` exists on that builder. Collapsing headers use `.id_salt()`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.

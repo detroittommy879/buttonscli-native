@@ -105,14 +105,23 @@ impl ButtonsApp {
                 .halign(Align::Min)
                 .sense(egui::Sense::hover()),
             );
-            response.on_hover_text(format!(
-                "{} · Signed by the ButtonsCLI developer\n{}",
-                message.category.label(),
-                message.title
+            response.on_hover_text(crate::i18n::formatted_literal(
+                &self.locale,
+                "{label} · Signed by the ButtonsCLI developer\n{title}",
+                &[
+                    (
+                        "label",
+                        &crate::i18n::literal(&self.locale, message.category.label()),
+                    ),
+                    ("title", &(message.title).to_string()),
+                ],
             ));
             if ui
                 .small_button("×")
-                .on_hover_text("Dismiss this developer notice")
+                .on_hover_text(crate::i18n::literal(
+                    &self.locale,
+                    "Dismiss this developer notice",
+                ))
                 .clicked()
             {
                 self.dismiss_announcement(&message.id);
@@ -124,7 +133,11 @@ impl ButtonsApp {
                     .unwrap_or_default();
                 if ui
                     .small_button("↗")
-                    .on_hover_text(format!("Open {host} in your browser\n{url}"))
+                    .on_hover_text(crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Open {host} in your browser\n{url}",
+                        &[("host", &(host).to_string()), ("url", &(url).to_string())],
+                    ))
                     .clicked()
                 {
                     ui.ctx().open_url(egui::OpenUrl::new_tab(url));
@@ -144,7 +157,7 @@ impl ButtonsApp {
         let mut close = false;
         let screen = ctx.screen_rect();
         let width = (screen.width() - 48.0).clamp(80.0, 440.0);
-        egui::Window::new("ButtonsCLI notice")
+        egui::Window::new(crate::i18n::literal(&self.locale, "ButtonsCLI notice"))
             .id(egui::Id::new(("signed-developer-notice", &message.id)))
             .open(&mut open)
             .collapsible(false)
@@ -156,7 +169,7 @@ impl ButtonsApp {
             .show(ctx, |ui| {
                 ui.set_max_width(width);
                 ui.label(
-                    RichText::new(message.category.label())
+                    RichText::new(crate::i18n::literal(&self.locale, message.category.label()))
                         .small()
                         .color(self.colors().accent),
                 );
@@ -171,9 +184,12 @@ impl ButtonsApp {
                     });
                 ui.add_space(10.0);
                 ui.label(
-                    RichText::new("Signed by the ButtonsCLI developer")
-                        .small()
-                        .weak(),
+                    RichText::new(crate::i18n::literal(
+                        &self.locale,
+                        "Signed by the ButtonsCLI developer",
+                    ))
+                    .small()
+                    .weak(),
                 );
                 if let Some(url) = &message.url {
                     let host = url::Url::parse(url)
@@ -182,7 +198,11 @@ impl ButtonsApp {
                         .unwrap_or_default();
                     if ui
                         .button(crate::i18n::literal(&self.locale, "Open link ↗"))
-                        .on_hover_text(format!("Open {host} in your browser\n{url}"))
+                        .on_hover_text(crate::i18n::formatted_literal(
+                            &self.locale,
+                            "Open {host} in your browser\n{url}",
+                            &[("host", &(host).to_string()), ("url", &(url).to_string())],
+                        ))
                         .clicked()
                     {
                         ctx.open_url(egui::OpenUrl::new_tab(url));
@@ -199,19 +219,22 @@ impl ButtonsApp {
 
     pub(super) fn announcement_settings(&mut self, ui: &mut egui::Ui) {
         ui.separator();
-        ui.spaced_strong("Developer notices");
-        ui.add(egui::Label::new("Optional signed messages from the ButtonsCLI developer: security notices and product news. Checks buttonscli.com at startup and every six hours while open. The host sees your IP and a generic app user agent; no terminal content or profile identifiers are sent.").wrap());
+        ui.spaced_strong(crate::i18n::literal(&self.locale, "Developer notices"));
+        ui.add(egui::Label::new(crate::i18n::literal(&self.locale, "Optional signed messages from the ButtonsCLI developer: security notices and product news. Checks buttonscli.com at startup and every six hours while open. The host sees your IP and a generic app user agent; no terminal content or profile identifiers are sent.")).wrap());
         let mut changed = ui
             .checkbox(
                 &mut self.preferences.announcements.enabled,
-                "Receive signed developer notices",
+                crate::i18n::literal(&self.locale, "Receive signed developer notices"),
             )
             .changed();
         ui.add_enabled_ui(self.preferences.announcements.enabled, |ui| {
             changed |= ui
                 .checkbox(
                     &mut self.preferences.announcements.promotions,
-                    "Also show promotions and paid feature offers",
+                    crate::i18n::literal(
+                        &self.locale,
+                        "Also show promotions and paid feature offers",
+                    ),
                 )
                 .changed();
         });
@@ -221,7 +244,7 @@ impl ButtonsApp {
             }
             self.persist_native_preferences();
         }
-        ui.small("Every message can be dismissed. Links open only when clicked. BUTTONSCLI_NO_ANNOUNCEMENTS=1 disables this channel.");
+        ui.small(crate::i18n::literal(&self.locale, "Every message can be dismissed. Links open only when clicked. BUTTONSCLI_NO_ANNOUNCEMENTS=1 disables this channel."));
     }
 }
 

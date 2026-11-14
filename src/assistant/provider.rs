@@ -130,11 +130,13 @@ impl AiTask {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Help => "AI Help model",
-            Self::Theme => "Theme generation model",
-            Self::Shader => "Shader generation model",
-            Self::ShaderJudge => "Shader judge model (checks and fixes; pick a different model)",
-            Self::Simulation => "Simulated terminal model",
+            Self::Help => crate::i18n::key("AI Help model"),
+            Self::Theme => crate::i18n::key("Theme generation model"),
+            Self::Shader => crate::i18n::key("Shader generation model"),
+            Self::ShaderJudge => {
+                crate::i18n::key("Shader judge model (checks and fixes; pick a different model)")
+            }
+            Self::Simulation => crate::i18n::key("Simulated terminal model"),
         }
     }
 }

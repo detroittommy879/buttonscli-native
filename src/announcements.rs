@@ -67,9 +67,9 @@ pub enum Category {
 impl Category {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Security => "Security notice",
-            Self::News => "Product news",
-            Self::Promotion => "Promotion",
+            Self::Security => crate::i18n::key("Security notice"),
+            Self::News => crate::i18n::key("Product news"),
+            Self::Promotion => crate::i18n::key("Promotion"),
         }
     }
 }

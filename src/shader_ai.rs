@@ -115,30 +115,54 @@ const MAX_SLIDERS: usize = 4;
 
 /// Creative directions given to parallel lanes, one per lane.
 pub(crate) const DIRECTIONS: [(&str, &str); 12] = [
-    ("Balanced", "A faithful, polished take on the request."),
     (
-        "Subtle",
+        crate::i18n::key("Balanced"),
+        "A faithful, polished take on the request.",
+    ),
+    (
+        crate::i18n::key("Subtle"),
         "A calmer, darker version that keeps text very readable.",
     ),
-    ("Bold", "A vivid, high-energy version with strong color."),
-    ("Playful", "An unexpected, playful interpretation."),
-    ("Geometric", "Lean on crisp shapes, grids or symmetry."),
-    ("Organic", "Lean on flowing noise, clouds and soft motion."),
-    ("Minimal", "As few elements as possible, placed with care."),
     (
-        "Layered",
+        crate::i18n::key("Bold"),
+        "A vivid, high-energy version with strong color.",
+    ),
+    (
+        crate::i18n::key("Playful"),
+        "An unexpected, playful interpretation.",
+    ),
+    (
+        crate::i18n::key("Geometric"),
+        "Lean on crisp shapes, grids or symmetry.",
+    ),
+    (
+        crate::i18n::key("Organic"),
+        "Lean on flowing noise, clouds and soft motion.",
+    ),
+    (
+        crate::i18n::key("Minimal"),
+        "As few elements as possible, placed with care.",
+    ),
+    (
+        crate::i18n::key("Layered"),
         "Two or three layers at different depths and speeds.",
     ),
-    ("Retro", "A retro look: pixels, scanlines, CRT or 80s neon."),
     (
-        "Dreamy",
+        crate::i18n::key("Retro"),
+        "A retro look: pixels, scanlines, CRT or 80s neon.",
+    ),
+    (
+        crate::i18n::key("Dreamy"),
         "Soft focus, gentle glow and slow, floating motion.",
     ),
     (
-        "Cosmic",
+        crate::i18n::key("Cosmic"),
         "Space-like depth: stars, nebulae, orbits or warps.",
     ),
-    ("Graphic", "Flat colors and bold outlines, like a poster."),
+    (
+        crate::i18n::key("Graphic"),
+        "Flat colors and bold outlines, like a poster.",
+    ),
 ];
 
 /// Where a lane is in its pipeline, for the progress flowchart.

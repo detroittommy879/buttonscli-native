@@ -125,29 +125,29 @@ impl ButtonsApp {
             ui.spaced_label(crate::i18n::literal(&self.locale, "Judge model"));
             egui::ComboBox::from_id_salt("shader-lab-judge")
                 .selected_text(match lab.judge {
-                    JudgeMode::Review => "Reviews every result",
-                    JudgeMode::FixOnly => "Only fixes compile errors",
-                    JudgeMode::Off => "Off (writer fixes its own errors)",
+                    JudgeMode::Review => crate::i18n::literal(&self.locale, "Reviews every result"),
+                    JudgeMode::FixOnly => crate::i18n::literal(&self.locale, "Only fixes compile errors"),
+                    JudgeMode::Off => crate::i18n::literal(&self.locale, "Off (writer fixes its own errors)"),
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut lab.judge, JudgeMode::Review, "Reviews every result")
-                        .on_hover_text("One extra request per version. The judge may rewrite code that already works.");
-                    ui.selectable_value(&mut lab.judge, JudgeMode::FixOnly, "Only fixes compile errors")
-                        .on_hover_text("No extra request unless the writer's code fails the checks. Without a Shader judge model in AI models, the Shader model does it.");
-                    ui.selectable_value(&mut lab.judge, JudgeMode::Off, "Off (writer fixes its own errors)")
-                        .on_hover_text("The judge model is never asked.");
+                    ui.selectable_value(&mut lab.judge, JudgeMode::Review, crate::i18n::literal(&self.locale, "Reviews every result"))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "One extra request per version. The judge may rewrite code that already works."));
+                    ui.selectable_value(&mut lab.judge, JudgeMode::FixOnly, crate::i18n::literal(&self.locale, "Only fixes compile errors"))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "No extra request unless the writer's code fails the checks. Without a Shader judge model in AI models, the Shader model does it."));
+                    ui.selectable_value(&mut lab.judge, JudgeMode::Off, crate::i18n::literal(&self.locale, "Off (writer fixes its own errors)"))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "The judge model is never asked."));
                 });
         });
         ui.spaced_checkbox(
             &mut lab.picture_check,
-            "Picture check: draw each result once and send flat, empty, white or still ones back",
+            crate::i18n::literal(&self.locale, "Picture check: draw each result once and send flat, empty, white or still ones back"),
         )
-        .on_hover_text("A fixed pixel test, not a model: it never judges taste. One extra writer request only when the test fails.");
+        .on_hover_text(crate::i18n::literal(&self.locale, "A fixed pixel test, not a model: it never judges taste. One extra writer request only when the test fails."));
         ui.spaced_checkbox(
             &mut lab.loops,
-            "Allow `var`, `if`/`else` and fixed-count `for` loops in shader code",
+            crate::i18n::literal(&self.locale, "Allow `var`, `if`/`else` and fixed-count `for` loops in shader code"),
         )
-        .on_hover_text("Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Switching this off stops every shader that uses them from drawing, including some built-in ones.");
+        .on_hover_text(crate::i18n::literal(&self.locale, "Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Switching this off stops every shader that uses them from drawing, including some built-in ones."));
         ui.horizontal(|ui| {
             ui.spaced_label(crate::i18n::literal(&self.locale, "Work limit per pixel"));
             ui.add(
@@ -155,22 +155,22 @@ impl ButtonsApp {
                     .range(0..=ShaderLab::MAX_COST_LIMIT)
                     .speed(5),
             )
-            .on_hover_text("Helper calls are priced (flow 44, voronoi 28, fbm 20, cloud and ridged 12, noise 4, others 1 to 3) and a shader may spend this much. 240 stays smooth on laptop graphics; 0 is no limit.");
+            .on_hover_text(crate::i18n::literal(&self.locale, "Helper calls are priced (flow 44, voronoi 28, fbm 20, cloud and ridged 12, noise 4, others 1 to 3) and a shader may spend this much. 240 stays smooth on laptop graphics; 0 is no limit."));
             if ui.spaced_button(crate::i18n::literal(&self.locale, "Reset")).clicked() {
                 lab.cost_limit = ShaderLab::DEFAULT_COST_LIMIT;
             }
             ui.spaced_label(if lab.cost_limit == 0 {
-                "no limit".to_owned()
+                crate::i18n::literal(&self.locale, "no limit").to_owned()
             } else {
-                format!("about {} fbm or {} flow calls", lab.cost_limit / 20, lab.cost_limit / 44)
+                crate::i18n::formatted_literal(&self.locale, "about {cost_limit} fbm or {cost_limit2} flow calls", &[("cost_limit", &(lab.cost_limit / 20).to_string()), ("cost_limit2", &(lab.cost_limit / 44).to_string())])
             });
         });
         ui
             .spaced_checkbox(
                 &mut lab.feedback,
-                "Feedback: shader code may call `prev(p)` for the color it drew there last frame",
+                crate::i18n::literal(&self.locale, "Feedback: shader code may call `prev(p)` for the color it drew there last frame"),
             )
-            .on_hover_text("For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off.");
+            .on_hover_text(crate::i18n::literal(&self.locale, "For trails, ripples and things that build up over time, e.g. `return max(new_color, prev(p) * 0.96);`. Create with AI is told about it too. Each pane that uses it keeps two extra frame-sized images on the GPU. A frame is drawn per animation tick (the FPS limit), so trails are shorter at higher FPS; paused motion holds the picture. Shaders that use it stop drawing when this is off."));
         if *lab != before {
             self.apply_shader_lab();
             self.persist_native_preferences();

@@ -48,13 +48,13 @@ impl FeedbackCategory {
 
     pub(crate) const fn label(self) -> &'static str {
         match self {
-            Self::FeatureRequest => "Feature request",
-            Self::BugReport => "Bug report",
-            Self::UiIdea => "UI idea",
-            Self::AiHelp => "AI Help",
-            Self::Performance => "Performance issue",
-            Self::Pricing => "Pricing concern",
-            Self::Other => "Other complaint or idea",
+            Self::FeatureRequest => crate::i18n::key("Feature request"),
+            Self::BugReport => crate::i18n::key("Bug report"),
+            Self::UiIdea => crate::i18n::key("UI idea"),
+            Self::AiHelp => crate::i18n::key("AI Help"),
+            Self::Performance => crate::i18n::key("Performance issue"),
+            Self::Pricing => crate::i18n::key("Pricing concern"),
+            Self::Other => crate::i18n::key("Other complaint or idea"),
         }
     }
 }

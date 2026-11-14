@@ -391,11 +391,11 @@ impl ButtonsApp {
     pub(super) fn shuffle_menu(&mut self, ui: &mut egui::Ui) -> bool {
         let before = self.preferences.shuffle.clone();
         let now = ui.input(|input| input.time);
-        ui.spaced_strong("Shuffle");
+        ui.spaced_strong(crate::i18n::literal(&self.locale, "Shuffle"));
         let mut next = false;
         wrapping_row(ui, |ui| {
-            ui.spaced_checkbox(&mut self.preferences.shuffle.enabled, "Change theme every")
-                .on_hover_text("Moves on to another theme from the list below now and then, fading the colors into it. Never edits or saves a theme.");
+            ui.spaced_checkbox(&mut self.preferences.shuffle.enabled, crate::i18n::literal(&self.locale, "Change theme every"))
+                .on_hover_text(crate::i18n::literal(&self.locale, "Moves on to another theme from the list below now and then, fading the colors into it. Never edits or saves a theme."));
             ui.add(
                 egui::DragValue::new(&mut self.preferences.shuffle.minutes)
                     .range(crate::settings::Shuffle::MINUTES)
@@ -404,8 +404,11 @@ impl ButtonsApp {
                     .suffix(" min"),
             );
             if ui
-                .small_button("Next")
-                .on_hover_text("Change to the next theme now")
+                .small_button(crate::i18n::literal(&self.locale, "Next"))
+                .on_hover_text(crate::i18n::literal(
+                    &self.locale,
+                    "Change to the next theme now",
+                ))
                 .clicked()
             {
                 next = true;
@@ -415,26 +418,36 @@ impl ButtonsApp {
         ui.horizontal(|ui| {
             ui.spaced_label(crate::i18n::literal(&self.locale, "From"));
             egui::ComboBox::from_id_salt("shuffle-pool")
-                .selected_text(shuffle.pool.label())
+                .selected_text(crate::i18n::literal(&self.locale, shuffle.pool.label()))
                 .show_ui(ui, |ui| {
                     for pool in ShufflePool::ALL {
-                        ui.selectable_value(&mut shuffle.pool, pool, pool.label());
+                        ui.selectable_value(
+                            &mut shuffle.pool,
+                            pool,
+                            crate::i18n::literal(&self.locale, pool.label()),
+                        );
                     }
                 });
         });
         ui.add(
             egui::Slider::new(&mut shuffle.fade_seconds, crate::settings::Shuffle::FADE)
-                .text("Fade seconds"),
+                .text(crate::i18n::literal(&self.locale, "Fade seconds")),
         );
-        ui.spaced_checkbox(&mut shuffle.shader_only, "Shaders only")
-            .on_hover_text("Changes only the shared shader and keeps the current colors. Panes with a theme of their own keep their own shader. Pick the pool \"Themes with a shader\" to use only themes that have one.");
+        ui.spaced_checkbox(&mut shuffle.shader_only, crate::i18n::literal(&self.locale, "Shaders only"))
+            .on_hover_text(crate::i18n::literal(&self.locale, "Changes only the shared shader and keeps the current colors. Panes with a theme of their own keep their own shader. Pick the pool \"Themes with a shader\" to use only themes that have one."));
         ui.add_enabled_ui(!shuffle.shader_only, |ui| {
-            ui.spaced_checkbox(&mut shuffle.every_pane, "A different theme in each pane")
+            ui.spaced_checkbox(&mut shuffle.every_pane, crate::i18n::literal(&self.locale, "A different theme in each pane"))
         })
         .inner
-        .on_hover_text("Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders.");
-        ui.spaced_checkbox(&mut shuffle.fonts, "Fonts too")
-            .on_hover_text("Also use each theme's fonts. A font change resizes the terminals.");
+        .on_hover_text(crate::i18n::literal(&self.locale, "Panes keep their last pick when Shuffle stops. To use one theme everywhere again, apply a theme to all panes in Library, or use \"Use on the whole app\" in Settings → Shaders."));
+        ui.spaced_checkbox(
+            &mut shuffle.fonts,
+            crate::i18n::literal(&self.locale, "Fonts too"),
+        )
+        .on_hover_text(crate::i18n::literal(
+            &self.locale,
+            "Also use each theme's fonts. A font change resizes the terminals.",
+        ));
         let count = self.shuffle_pool().len();
         let mut note = format!(
             "{count} theme{} in the list",
