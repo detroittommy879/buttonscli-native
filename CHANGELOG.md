@@ -4,9 +4,8 @@
 
 - **More of the app speaks your language**: Settings tabs and pages, the
   theme and shader editor, menus, status bar, tooltips and AI Help now
-  translate (machine translations; Finnish, Dutch, Norwegian, Russian and
-  Traditional Chinese, and some Hindi and Japanese, still show English for
-  the newest text). Screen readers get the translated names.
+  translate in all 20 languages (machine translations). Screen readers get
+  the translated names.
 - **One-command install**: `curl -fsSL https://buttonscli.com/install.sh | sh`
   (Linux/macOS), `irm https://buttonscli.com/install.ps1 | iex` (PowerShell)
   or `install.cmd` (Command Prompt). Per-user, checksum-verified, adds a

@@ -9,26 +9,26 @@ How to work through it: [TRANSLATIONS.md](TRANSLATIONS.md).
 
 | Locale | Language | App UI done | Left | New in code | Still English | Overlay | Kept English | Guide pages |
 |---|---|---:|---:|---:|---:|---:|---:|---|
-| `fi` | Finnish (Suomi) | 83.2% | 295 | 295 | 0 | 662 | 18 | 0/14 current, 0 stale |
-| `nl` | Dutch (Nederlands) | 83.2% | 295 | 295 | 0 | 655 | 45 | 0/14 current, 0 stale |
-| `no` | Norwegian (Norsk) | 83.2% | 295 | 295 | 0 | 654 | 32 | 0/14 current, 0 stale |
-| `ru` | Russian (Русский) | 83.2% | 295 | 295 | 0 | 661 | 18 | 0/14 current, 0 stale |
-| `zh-TW` | Chinese (Traditional) (繁體中文) | 83.2% | 295 | 295 | 0 | 659 | 14 | 0/14 current, 0 stale |
-| `hi` | Hindi (हिन्दी) | 94.6% | 95 | 95 | 0 | 859 | 17 | 0/14 current, 0 stale |
-| `ja` | Japanese (日本語) | 94.6% | 95 | 95 | 0 | 1194 | 20 | 0/14 current, 1 stale |
 | `ar` | Arabic (العربية) | 100.0% | 0 | 0 | 0 | 948 | 23 | 0/14 current, 0 stale |
 | `da` | Danish (Dansk) | 100.0% | 0 | 0 | 0 | 925 | 68 | 0/14 current, 0 stale |
 | `de` | German (Deutsch) | 100.0% | 0 | 0 | 0 | 927 | 65 | 0/14 current, 1 stale |
 | `es` | Spanish (Español) | 100.0% | 0 | 0 | 0 | 1256 | 53 | 0/14 current, 1 stale |
+| `fi` | Finnish (Suomi) | 100.0% | 0 | 0 | 0 | 926 | 49 | 0/14 current, 0 stale |
 | `fr` | French (Français) | 100.0% | 0 | 0 | 0 | 930 | 60 | 0/14 current, 0 stale |
+| `hi` | Hindi (हिन्दी) | 100.0% | 0 | 0 | 0 | 946 | 25 | 0/14 current, 0 stale |
 | `it` | Italian (Italiano) | 100.0% | 0 | 0 | 0 | 917 | 70 | 0/14 current, 0 stale |
+| `ja` | Japanese (日本語) | 100.0% | 0 | 0 | 0 | 1281 | 28 | 0/14 current, 1 stale |
 | `ko` | Korean (한국어) | 100.0% | 0 | 0 | 0 | 946 | 22 | 0/14 current, 0 stale |
+| `nl` | Dutch (Nederlands) | 100.0% | 0 | 0 | 0 | 924 | 71 | 0/14 current, 0 stale |
+| `no` | Norwegian (Norsk) | 100.0% | 0 | 0 | 0 | 935 | 46 | 0/14 current, 0 stale |
 | `pl` | Polish (Polski) | 100.0% | 0 | 0 | 0 | 933 | 51 | 0/14 current, 0 stale |
 | `pt-BR` | Portuguese (Brazil) (Português (Brasil)) | 100.0% | 0 | 0 | 0 | 1255 | 56 | 0/14 current, 0 stale |
+| `ru` | Russian (Русский) | 100.0% | 0 | 0 | 0 | 934 | 40 | 0/14 current, 0 stale |
 | `sv` | Swedish (Svenska) | 100.0% | 0 | 0 | 0 | 929 | 54 | 0/14 current, 0 stale |
 | `tr` | Turkish (Türkçe) | 100.0% | 0 | 0 | 0 | 939 | 38 | 0/14 current, 0 stale |
 | `uk` | Ukrainian (Українська) | 100.0% | 0 | 0 | 0 | 908 | 22 | 0/14 current, 0 stale |
 | `zh-CN` | Chinese (Simplified) (简体中文) | 100.0% | 0 | 0 | 0 | 944 | 22 | 0/14 current, 0 stale |
+| `zh-TW` | Chinese (Traditional) (繁體中文) | 100.0% | 0 | 0 | 0 | 946 | 22 | 0/14 current, 0 stale |
 
 *Left* = strings that still show English in that language: *new in code* (wrapped
 but missing from every catalog) plus *still English* (catalog value equals the
