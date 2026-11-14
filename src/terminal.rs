@@ -184,6 +184,42 @@ impl TerminalTab {
         }
     }
 
+    /// Look → Test text: a pane with no shell that shows colors, styles and
+    /// glyphs through the normal terminal renderer. Typing does nothing.
+    pub(crate) fn test_text(id: u64, title: String) -> Self {
+        let output = Arc::new(OutputCapture::default());
+        let input: ByteObserver = Arc::new(|_| {});
+        let mut backend = TerminalBackend::new_virtual(id, input);
+        backend.feed_virtual_output(crate::test_text::sample().as_bytes());
+        Self {
+            id,
+            title,
+            custom_title: None,
+            shell_name: "Test text".into(),
+            working_directory: None,
+            reported_title: None,
+            profile_id: crate::test_text::PROFILE_ID.into(),
+            backend,
+            simulated: None,
+            output,
+            effect_textures: Default::default(),
+            exited: false,
+        }
+    }
+
+    pub(crate) fn is_test_text(&self) -> bool {
+        self.profile_id == crate::test_text::PROFILE_ID
+    }
+
+    /// Clears the test pane and prints the sample again (after a resize).
+    pub(crate) fn redraw_test_text(&mut self) {
+        if self.is_test_text() {
+            self.backend.feed_virtual_output(
+                format!("\x1b[3J\x1b[2J\x1b[H{}", crate::test_text::sample()).as_bytes(),
+            );
+        }
+    }
+
     pub fn write(&mut self, text: impl AsRef<[u8]>) {
         self.backend
             .process_command(BackendCommand::Write(text.as_ref().to_vec()));
@@ -210,6 +246,10 @@ impl TerminalTab {
     }
 
     pub fn request_exit(&mut self) {
+        if self.is_test_text() {
+            self.exited = true;
+            return;
+        }
         if let Some(simulated) = &self.simulated {
             simulated.cancel();
             self.exited = true;

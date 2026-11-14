@@ -232,7 +232,11 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `process_terminal_events` (`program_clipboard`); reads stay denied.
 - Python edit scripts: pass `encoding='utf-8'` (the default here is cp1252).
 - Python edit scripts: write them with the Write tool and run the file; Bash
-  heredocs mangle `\n` inside Python strings here.
+  heredocs mangle `\n` inside Python strings here. GNU sed/perl one-liners
+  also turn `\x1b` into a raw ESC byte; check with `grep -c $'\x1b' file`.
+- Look → Test text (`src/test_text.rs`, `src/app/test_text.rs`) is a virtual
+  tab with profile ID `buttonscli-test-text`; `open_tab_in` recreates it, so
+  reopen-closed and tab groups work without a shell.
 - Isolated app runs (USERPROFILE scratch): the first run shows a language/look
   dialog, and its look sets `preferences.pane_looks`, which override
   `theme_id`. Stop only the PID you started; never stop every `buttonscli`.

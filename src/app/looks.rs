@@ -270,10 +270,12 @@ impl ButtonsApp {
                 changed |= self.shuffle_menu(ui);
                 ui.separator();
                 changed |= self.idle_glow_menu(ui);
+                ui.separator();
+                changed |= self.look_display_section(ui, ctx);
             })
             .response
             .on_hover_text(
-                crate::i18n::literal(&self.locale, "Look presets, Calm effects, GPU shaders, motion speed and Shuffle for every pane."),
+                crate::i18n::literal(&self.locale, "Look presets, Calm effects, GPU shaders, motion speed, Shuffle, window opacity, language and test text."),
             );
         }
         if let Some(look) = chosen {

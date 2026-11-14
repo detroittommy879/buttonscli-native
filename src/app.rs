@@ -2860,7 +2860,8 @@ impl ButtonsApp {
         working_directory: Option<std::path::PathBuf>,
     ) {
         let simulated = profile_id == crate::assistant::virtual_terminal::PROFILE_ID;
-        let launch = if simulated {
+        let test_text = profile_id == crate::test_text::PROFILE_ID;
+        let launch = if simulated || test_text {
             None
         } else {
             Some(match self.shell_launch(profile_id) {
@@ -2882,6 +2883,7 @@ impl ButtonsApp {
         let (title, next_title_number) = next_available_title(self.next_title_number, &taken);
         let result = match launch {
             Some(launch) => TerminalTab::spawn(id, title, context, self.events_tx.clone(), launch),
+            None if test_text => Ok(TerminalTab::test_text(id, title)),
             None => Ok(TerminalTab::simulated(
                 id,
                 title,
@@ -6050,11 +6052,25 @@ impl ButtonsApp {
                     crate::i18n::literal(&self.locale, "Tab groups"),
                 );
                 if localization_settings_available() {
-                    ui.spaced_selectable_value(
-                        &mut self.settings_tab,
-                        SettingsTab::Language,
-                        crate::i18n::literal(&self.locale, "Language & Region"),
-                    );
+                    // Outside English, an English caption above the tab helps
+                    // anyone who picked a language by mistake find the way back.
+                    if self.locale == "en" {
+                        ui.spaced_selectable_value(
+                            &mut self.settings_tab,
+                            SettingsTab::Language,
+                            crate::i18n::literal(&self.locale, "Language & Region"),
+                        );
+                    } else {
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 0.0;
+                            ui.weak(egui::RichText::new("Language & Region").small());
+                            ui.spaced_selectable_value(
+                                &mut self.settings_tab,
+                                SettingsTab::Language,
+                                crate::i18n::literal(&self.locale, "Language & Region"),
+                            );
+                        });
+                    }
                 }
                 ui.spaced_selectable_value(
                     &mut self.settings_tab,
@@ -18240,6 +18256,8 @@ mod shuffle;
 mod status_bar_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod tab_groups;
+#[cfg(not(target_arch = "wasm32"))]
+mod test_text;
 #[cfg(not(target_arch = "wasm32"))]
 mod text_backing;
 #[cfg(not(target_arch = "wasm32"))]
