@@ -210,8 +210,8 @@ impl ButtonsApp {
 
     /// Settings → Experimental.
     pub(super) fn experimental_settings(&mut self, ui: &mut egui::Ui) {
-        ui.spaced_heading("Experimental");
-        ui.spaced_label("Features still being tried out. Enable or disable them here; they may change or go away.");
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Experimental"));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Features still being tried out. Enable or disable them here; they may change or go away."));
         ui.add_space(6.0);
         if ui.spaced_checkbox(&mut self.preferences.text_backing.available, "Enable text backing controls")
             .on_hover_text("Allows soft backing behind terminal text. Off removes the backing and hides its status-bar controls; your adjustments are kept.").changed() {

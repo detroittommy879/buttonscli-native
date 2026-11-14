@@ -181,14 +181,16 @@ impl ButtonsApp {
                         .and_then(|url| url.host_str().map(str::to_owned))
                         .unwrap_or_default();
                     if ui
-                        .button("Open link ↗")
+                        .button(crate::i18n::literal(&self.locale, "Open link ↗"))
                         .on_hover_text(format!("Open {host} in your browser\n{url}"))
                         .clicked()
                     {
                         ctx.open_url(egui::OpenUrl::new_tab(url));
                     }
                 }
-                close = ui.button("Close").clicked();
+                close = ui
+                    .button(crate::i18n::literal(&self.locale, "Close"))
+                    .clicked();
             });
         if close || !open {
             self.dismiss_announcement(&message.id);

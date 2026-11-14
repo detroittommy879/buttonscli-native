@@ -123,9 +123,12 @@ impl ChatView {
         queue: &dyn Fn(AiHelpCommand),
     ) {
         wrapping_row(ui, |ui| {
-            ui.spaced_heading("AI Help");
+            ui.spaced_heading(crate::i18n::literal(&self.locale, "AI Help"));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.spaced_small_button("AI providers").clicked() {
+                if ui
+                    .spaced_small_button(crate::i18n::literal(&self.locale, "AI providers"))
+                    .clicked()
+                {
                     queue(AiHelpCommand::OpenSettings);
                 }
             });
@@ -135,7 +138,7 @@ impl ChatView {
         } else {
             ui.spaced_weak("Connect a provider to start chatting.");
             if ui
-                .spaced_button("Sign in with ChatGPT")
+                .spaced_button(crate::i18n::literal(&self.locale, "Sign in with ChatGPT"))
                 .on_hover_text("Opens AI providers. A ChatGPT plan needs no API key.")
                 .clicked()
             {
@@ -218,7 +221,7 @@ impl ChatView {
         if state.busy {
             wrapping_row(ui, |ui| {
                 ui.spinner();
-                ui.spaced_label("Receiving response…");
+                ui.spaced_label(crate::i18n::literal(&self.locale, "Receiving response…"));
                 if ui
                     .spaced_button(text(locale, MessageKey::Cancel, &[]))
                     .clicked()
@@ -288,7 +291,11 @@ impl ChatView {
                             });
                     });
                 }
-                if !state.context_busy && ui.spaced_small_button("Refresh snapshot").clicked() {
+                if !state.context_busy
+                    && ui
+                        .spaced_small_button(crate::i18n::literal(&self.locale, "Refresh snapshot"))
+                        .clicked()
+                {
                     if let Some(command) = state.preview_request() {
                         queue(command);
                     }
@@ -348,7 +355,7 @@ impl ChatView {
             ui.set_width(ui.available_width());
             if state.messages.is_empty() {
                 ui.add_space(25.0);
-                ui.spaced_heading("What are you working on?");
+                ui.spaced_heading(crate::i18n::literal(&self.locale, "What are you working on?"));
                 ui.spaced_weak("Ask about a command, understand an error, or plan your next step.");
                 ui.add_space(8.0);
                 ui.spaced_small("Terminal output is shared only when you include a snapshot. Suggested actions wait for your review.");
@@ -363,7 +370,7 @@ impl ChatView {
                             if let Some((id, title)) = state.message_targets.get(&index) {
                                 ui.spaced_weak(format!("{title} · #{id}"));
                             }
-                            if !message.is_empty() && ui.spaced_small_button("Copy").clicked() {
+                            if !message.is_empty() && ui.spaced_small_button(crate::i18n::literal(&self.locale, "Copy")).clicked() {
                                 ui.ctx().copy_text(message.clone());
                             }
                         });
@@ -371,7 +378,7 @@ impl ChatView {
                         if message.is_empty() && state.busy {
                             ui.spaced_weak("Thinking…");
                         } else if *assistant {
-                            render_message(ui, message);
+                            render_message(ui, &self.locale, message);
                         } else {
                             ui.add(egui::Label::new(message).wrap().selectable(true));
                         }
@@ -392,7 +399,7 @@ impl ChatView {
                             crate::assistant::reply::SuggestedAction::Command { label, description, command, .. } => {
                                 ui.spaced_strong(label);
                                 ui.spaced_label(description);
-                                code_block(ui, command);
+                                code_block_with_locale(ui, &self.locale, command);
                                 wrapping_row(ui, |ui| {
                                     if ui.add_enabled(ready, egui::Button::new("Insert")).clicked() {
                                         queue(AiHelpCommand::Deliver { target_id, action: action.clone(), press_enter: false });
@@ -435,14 +442,22 @@ impl ChatView {
     }
 }
 
+#[cfg(test)]
 fn code_block(ui: &mut egui::Ui, code: &str) {
+    code_block_with_locale(ui, "en", code);
+}
+
+fn code_block_with_locale(ui: &mut egui::Ui, locale: &str, code: &str) {
     egui::Frame::new()
         .fill(ui.visuals().code_bg_color)
         .corner_radius(5)
         .inner_margin(8)
         .show(ui, |ui| {
             ui.set_width((ui.available_width() - 1.0).max(0.0));
-            if ui.spaced_small_button("Copy code").clicked() {
+            if ui
+                .spaced_small_button(crate::i18n::literal(locale, "Copy code"))
+                .clicked()
+            {
                 ui.ctx().copy_text(code.to_owned());
             }
             ui.add(
@@ -566,11 +581,11 @@ fn inline_text(ui: &egui::Ui, source: &str, strong: bool) -> egui::text::LayoutJ
     job
 }
 
-fn render_message(ui: &mut egui::Ui, message: &str) {
+fn render_message(ui: &mut egui::Ui, locale: &str, message: &str) {
     for block in chat_blocks(message) {
         match block {
             ChatBlock::Code(code) => {
-                code_block(ui, code);
+                code_block_with_locale(ui, locale, code);
             }
             ChatBlock::Text(text) => {
                 for line in text.lines() {

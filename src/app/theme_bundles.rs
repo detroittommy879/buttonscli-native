@@ -320,7 +320,7 @@ impl ButtonsApp {
                     save = response.lost_focus()
                         && ui.input(|input| input.key_pressed(egui::Key::Enter));
                     save |= ui
-                        .spaced_button("Save")
+                        .spaced_button(crate::i18n::literal(&self.locale, "Save"))
                         .on_hover_text("Each pane's theme, shader and font, plus the layout. A bundle with the same name is replaced.")
                         .clicked();
                 });
@@ -426,10 +426,16 @@ impl ButtonsApp {
                             bundle.layout.as_str()
                         }
                     ));
-                    if ui.spaced_button("Apply").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Apply"))
+                        .clicked()
+                    {
                         apply = Some(bundle.name.clone());
                     }
-                    if ui.spaced_button("Delete").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Delete"))
+                        .clicked()
+                    {
                         delete = Some(index);
                     }
                 });
@@ -458,7 +464,10 @@ impl ButtonsApp {
                                     RichText::new(format!("◆ {}", bundle.name)).strong(),
                                 )
                                 .on_hover_text("Comes with ButtonsCLI.");
-                                if ui.spaced_button("Apply").clicked() {
+                                if ui
+                                    .spaced_button(crate::i18n::literal(&self.locale, "Apply"))
+                                    .clicked()
+                                {
                                     apply = Some(bundle.name.clone());
                                 }
                             });

@@ -71,7 +71,7 @@ impl ButtonsApp {
                 changed = true;
             }
         });
-        ui.spaced_label("Scales text, buttons and terminals together. Windows display scaling still applies on top.");
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Scales text, buttons and terminals together. Windows display scaling still applies on top."));
         if changed {
             self.persist_native_preferences();
         }

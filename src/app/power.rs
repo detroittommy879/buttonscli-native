@@ -122,7 +122,7 @@ impl ButtonsApp {
         let before = self.preferences.shader_lab.clone();
         let lab = &mut self.preferences.shader_lab;
         ui.horizontal(|ui| {
-            ui.spaced_label("Judge model");
+            ui.spaced_label(crate::i18n::literal(&self.locale, "Judge model"));
             egui::ComboBox::from_id_salt("shader-lab-judge")
                 .selected_text(match lab.judge {
                     JudgeMode::Review => "Reviews every result",
@@ -149,14 +149,14 @@ impl ButtonsApp {
         )
         .on_hover_text("Loops must look like `for (var i = 0; i < 8; i++)`: at most 64 turns, so they always end. `while` and `loop` stay off. Switching this off stops every shader that uses them from drawing, including some built-in ones.");
         ui.horizontal(|ui| {
-            ui.spaced_label("Work limit per pixel");
+            ui.spaced_label(crate::i18n::literal(&self.locale, "Work limit per pixel"));
             ui.add(
                 egui::DragValue::new(&mut lab.cost_limit)
                     .range(0..=ShaderLab::MAX_COST_LIMIT)
                     .speed(5),
             )
             .on_hover_text("Helper calls are priced (flow 44, voronoi 28, fbm 20, cloud and ridged 12, noise 4, others 1 to 3) and a shader may spend this much. 240 stays smooth on laptop graphics; 0 is no limit.");
-            if ui.spaced_button("Reset").clicked() {
+            if ui.spaced_button(crate::i18n::literal(&self.locale, "Reset")).clicked() {
                 lab.cost_limit = ShaderLab::DEFAULT_COST_LIMIT;
             }
             ui.spaced_label(if lab.cost_limit == 0 {

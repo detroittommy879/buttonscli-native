@@ -224,7 +224,10 @@ impl ButtonsApp {
                 let submitted =
                     response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
                 if replacing {
-                    ui.spaced_label("Replaces the saved group with this name.");
+                    ui.spaced_label(crate::i18n::literal(
+                        &self.locale,
+                        "Replaces the saved group with this name.",
+                    ));
                 }
                 if let Some(error) = &self.group_save_error {
                     ui.spaced_colored_label(ui.visuals().error_fg_color, error);
@@ -264,7 +267,7 @@ impl ButtonsApp {
 
     pub(super) fn tab_group_settings(&mut self, ui: &mut egui::Ui) {
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Tab groups"));
-        ui.spaced_label("Save your open terminals (order, names, themes, fonts and layout) and reopen them in one click. Each terminal can run a startup command, such as ssh root@my-server. Running a Left command saves it as that terminal's startup command.");
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Save your open terminals (order, names, themes, fonts and layout) and reopen them in one click. Each terminal can run a startup command, such as ssh root@my-server. Running a Left command saves it as that terminal's startup command."));
         if ui
             .add_enabled(
                 !self.tabs.is_empty(),
@@ -286,7 +289,8 @@ impl ButtonsApp {
             groups.restore_on_launch && !groups.groups.is_empty(),
             |ui| {
                 ui.horizontal(|ui| {
-                    let label = ui.spaced_label("Group to open");
+                    let label =
+                        ui.spaced_label(crate::i18n::literal(&self.locale, "Group to open"));
                     egui::ComboBox::from_id_salt("tab-group-launch")
                         .selected_text(crate::ui_text::spaced_text(
                             ui,
@@ -311,9 +315,10 @@ impl ButtonsApp {
             },
         );
         if groups.groups.is_empty() {
-            ui.spaced_label(
+            ui.spaced_label(crate::i18n::literal(
+                &self.locale,
                 "No saved groups yet. Use File → Save tabs as group… or the button above.",
-            );
+            ));
             return;
         }
         ui.separator();
@@ -326,17 +331,23 @@ impl ButtonsApp {
                 ui.horizontal(|ui| {
                     ui.spaced_label(RichText::new(group.name.as_str()).strong());
                     ui.spaced_label(format!("{} terminals · {}", group.tabs.len(), group.layout));
-                    if ui.spaced_button("Open").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Open"))
+                        .clicked()
+                    {
                         open = Some(group.name.clone());
                     }
                     if ui
-                        .spaced_button("Update")
+                        .spaced_button(crate::i18n::literal(&self.locale, "Update"))
                         .on_hover_text("Replace with the terminals open now")
                         .clicked()
                     {
                         update = Some(group.name.clone());
                     }
-                    if ui.spaced_button("Delete").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Delete"))
+                        .clicked()
+                    {
                         delete = Some(index);
                     }
                 });

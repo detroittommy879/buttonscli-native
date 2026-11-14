@@ -22,7 +22,7 @@ impl ButtonsApp {
             changed |= ui.spaced_checkbox(&mut backing.invert, "Invert text and backing colors")
                 .on_hover_text("Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.").changed();
             ui.spaced_label(
-                "Colors follow each pane. Disable in Settings → Experimental.",
+                crate::i18n::literal(&self.locale, "Colors follow each pane. Disable in Settings → Experimental."),
             );
         });
         if changed {

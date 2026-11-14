@@ -413,7 +413,7 @@ impl ButtonsApp {
         });
         let shuffle = &mut self.preferences.shuffle;
         ui.horizontal(|ui| {
-            ui.spaced_label("From");
+            ui.spaced_label(crate::i18n::literal(&self.locale, "From"));
             egui::ComboBox::from_id_salt("shuffle-pool")
                 .selected_text(shuffle.pool.label())
                 .show_ui(ui, |ui| {
