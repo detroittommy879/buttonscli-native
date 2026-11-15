@@ -271,6 +271,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
+- Agent control walkthrough page: `shader-playground/agents/` (scripted, all
+  fake; `/native/try/agents/` once deployed with the playground). Preview with
+  the `shader-playground` entry in `.claude/launch.json`, then `/agents/`.
 - Standalone HTML/WebGPU playground: `shader-playground/` (independent of paused
   WASM). Refresh its public-only catalog with `python scripts/export-shader-playground.py`;
   serves on localhost/HTTPS. Native `shaderBackground` can be JSON null; exporters

@@ -366,6 +366,7 @@ def sections(v):
         <li>Authenticated, local only: it listens on <code>127.0.0.1</code> with a fresh token every run.</li>
         <li>Tools are labeled read-only or destructive, so MCP clients can ask before acting.</li>
       </ul>
+      <p><a class="btn btn-ghost" href="/native/try/agents/"><span>Watch the animated walkthrough ↗</span></a></p>
       <p class="muted">The agent can send commands to real shells, so connect only clients you trust.</p>
     </div>
     <figure class="term" data-reveal style="--d:.1s;margin:0">

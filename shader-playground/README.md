@@ -76,6 +76,18 @@ The plain iframe supports the same URL parameters, but does not automatically
 pause when scrolled offscreen. Parent CSP must allow `frame-src https://buttonscli.com`
 and, for the helper, `script-src https://buttonscli.com`.
 
+## Agent control walkthrough (`agents/`)
+
+`agents/index.html` is a scripted animation of an AI agent driving ButtonsCLI
+through agent control (served at `/native/try/agents/`, linked from the
+homepage's agent section). Everything in it is fake: the agent, commands and
+output are written in `agents/demo.js`. It reuses `../data/` for five random
+shaders per load and falls back to gradients without WebGPU. The story runs on
+a virtual clock (`sleep`), which is what makes pause, speed and the scene
+buttons work; keep scene timings deterministic (no `Math.random` in delays) or
+the progress chips drift. Dark by default; `?theme=light` or the header button.
+Tool names and CLI examples must match `src/ctl/` and `docs/CONTROL-API.md`.
+
 ## Hosting
 
 Copy this directory's `index.html`, `app.js`, `embed.js`, `style.css`, and `data/` together to
