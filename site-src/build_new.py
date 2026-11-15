@@ -366,7 +366,6 @@ def sections(v):
         <li>Authenticated, local only: it listens on <code>127.0.0.1</code> with a fresh token every run.</li>
         <li>Tools are labeled read-only or destructive, so MCP clients can ask before acting.</li>
       </ul>
-      <p><a class="btn btn-ghost" href="/native/try/agents/"><span>Watch the animated walkthrough ↗</span></a></p>
       <p class="muted">The agent can send commands to real shells, so connect only clients you trust.</p>
     </div>
     <figure class="term" data-reveal style="--d:.1s;margin:0">
@@ -379,6 +378,23 @@ def sections(v):
 <span class="p">$</span> <span class="k">buttonsclictl</span> mcp</code></pre>
       <figcaption class="visually-hidden">Example buttonsclictl commands</figcaption>
     </figure>
+  </div>
+  <div class="wrap" id="agent-demo" style="margin-top:2.5rem">
+    <h3>Watch it work</h3>
+    <p class="muted">An animated walkthrough: an agent opens four tabs, runs a dev server, tests, git and a log tail, reads a failing test and fixes it. Simulated, nothing runs. <a href="/native/try/agents/" target="_blank" rel="noopener">Open it in its own tab ↗</a></p>
+    <iframe id="agent-demo-frame" title="Animated walkthrough of ButtonsCLI agent control" loading="lazy" style="display:block;width:100%;height:900px;border:0;color-scheme:dark"></iframe>
+    <script>
+    (function(){{
+      var f=document.getElementById('agent-demo-frame'),d=document.documentElement;
+      var theme=function(){{return d.getAttribute('data-theme')==='light'?'light':'dark'}};
+      f.src='/native/try/agents/?embed=1&theme='+theme();
+      addEventListener('message',function(e){{
+        if(e.source!==f.contentWindow||!e.data||e.data.type!=='buttonscli-agents-height')return;
+        var h=Number(e.data.height);if(h>300&&h<3000)f.style.height=h+'px';
+      }});
+      new MutationObserver(function(){{if(f.contentWindow)f.contentWindow.postMessage({{type:'buttonscli-agents-theme',theme:theme()}},location.origin)}}).observe(d,{{attributes:true,attributeFilter:['data-theme']}});
+    }})();
+    </script>
   </div>
 </section>
 

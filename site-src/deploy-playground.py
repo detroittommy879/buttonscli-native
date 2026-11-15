@@ -33,6 +33,10 @@ live = html / 'native/try'
 live.rename(backup / 'old-try')
 staged.rename(live)
 shutil.copy2(source / 'site-src/build_new.py', builder)
+sitemap = source / 'site-src/make_sitemap.py'
+if sitemap.is_file():
+    shutil.copy2(root / 'site-src/make_sitemap.py', backup / 'make_sitemap.py')
+    shutil.copy2(sitemap, root / 'site-src/make_sitemap.py')
 # Legacy /native/ visitors must also receive the new preview, not a WASM probe.
 legacy = html / 'native/index.html'
 text = legacy.read_text(encoding='utf-8')

@@ -471,6 +471,14 @@ async function start() {
     try { localStorage.setItem('buttonscli-agents-theme', next); } catch {}
   };
   new IntersectionObserver(entries => { onscreen = entries[0].isIntersecting; }).observe(stage);
+  if (document.documentElement.classList.contains('embedded') && parent !== window) {
+    // The host page fits the iframe to this height and passes its own dark/light choice down.
+    new ResizeObserver(() => parent.postMessage({type: 'buttonscli-agents-height', height: Math.ceil(document.body.scrollHeight)}, '*')).observe(document.body);
+    addEventListener('message', event => {
+      if (event.source !== parent || event.data?.type !== 'buttonscli-agents-theme') return;
+      document.documentElement.dataset.theme = event.data.theme === 'light' ? 'light' : 'dark'; themeLabel();
+    });
+  }
   addEventListener('resize', () => svg.replaceChildren());
   setPlaying(clock.playing);
   stage.classList.remove('booting');

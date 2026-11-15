@@ -4,16 +4,19 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Watch your AI agent work · ButtonsCLI agent control</title>
 <meta name="description" content="An animated walkthrough of ButtonsCLI agent control: Claude Code, Codex, Antigravity or any MCP client runs its commands in terminal panes you can see, scroll and take over.">
+<link rel="canonical" href="https://buttonscli.com/native/try/agents/">
 <meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#040913">
 <script>
 // Dark unless the visitor chose light here before, or the link asks for it.
 (() => {
-  let theme = new URLSearchParams(location.search).get('theme');
-  try { theme = theme || localStorage.getItem('buttonscli-agents-theme'); } catch {}
+  const params = new URLSearchParams(location.search);
+  if (params.has('embed')) document.documentElement.classList.add('embedded'); // player only, for iframes
+  let theme = params.get('theme');
+  try { theme = theme || (params.has('embed') ? null : localStorage.getItem('buttonscli-agents-theme')); } catch {}
   if (theme === 'light') document.documentElement.dataset.theme = 'light';
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=20261115-4">
+<link rel="stylesheet" href="style.css?v=20261115-5">
 </head>
 <body>
 <a class="skip" href="#how">Skip the animation</a>
@@ -148,5 +151,5 @@
 </main>
 
 <footer class="foot"><p>© ButtonsCLI. The agent and commands in the animation are simulated. Claude Code, Codex and Antigravity are named as examples of agents that can connect; they belong to their owners and are not affiliated with ButtonsCLI.</p></footer>
-<script type="module" src="demo.js?v=20261115-4"></script>
+<script type="module" src="demo.js?v=20261115-5"></script>
 </body></html>
