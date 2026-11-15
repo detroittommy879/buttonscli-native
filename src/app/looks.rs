@@ -27,22 +27,22 @@ impl LookPreset {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::Minimal => "Minimal",
-            Self::Moderate => "Moderate",
-            Self::Showoff => "Showoff",
+            Self::Minimal => crate::i18n::key("Minimal"),
+            Self::Moderate => crate::i18n::key("Moderate"),
+            Self::Showoff => crate::i18n::key("Showoff"),
         }
     }
 
     pub(super) fn description(self) -> &'static str {
         match self {
             Self::Minimal => {
-                "Plain black panes, left panel hidden, no shader backgrounds or motion."
+                crate::i18n::key("Plain black panes, left panel hidden, no shader backgrounds or motion.")
             }
             Self::Moderate => {
-                "Mild GPU shader backgrounds and a different color for each pane, moving slowly."
+                crate::i18n::key("Mild GPU shader backgrounds and a different color for each pane, moving slowly.")
             }
             Self::Showoff => {
-                "The summer-storm-winter-autumn bundle: five seasonal panes with GPU shaders at full speed."
+                crate::i18n::key("The summer-storm-winter-autumn bundle: five seasonal panes with GPU shaders at full speed.")
             }
         }
     }
@@ -50,7 +50,7 @@ impl LookPreset {
 
 /// A three-stop slider (Minimal, Moderate, Showoff) with the stop names under it.
 /// Returns true when the choice changed.
-pub(super) fn look_slider(ui: &mut egui::Ui, look: &mut LookPreset) -> bool {
+pub(super) fn look_slider(locale: &str, ui: &mut egui::Ui, look: &mut LookPreset) -> bool {
     let mut index = LookPreset::ALL
         .iter()
         .position(|candidate| candidate == look)
@@ -85,7 +85,7 @@ pub(super) fn look_slider(ui: &mut egui::Ui, look: &mut LookPreset) -> bool {
             let rect = ui.painter().text(
                 egui::pos2(x, row.top()),
                 anchor,
-                preset.label(),
+                crate::i18n::literal(locale, preset.label()),
                 font.clone(),
                 color,
             );
@@ -101,7 +101,7 @@ pub(super) fn look_slider(ui: &mut egui::Ui, look: &mut LookPreset) -> bool {
 
 /// The motion speed as a percentage, dragged like the row-banding control.
 /// Returns true once a change is finished, so callers save it once.
-pub(super) fn motion_speed_drag(ui: &mut egui::Ui, speed: &mut f32) -> bool {
+pub(super) fn motion_speed_drag(locale: &str, ui: &mut egui::Ui, speed: &mut f32) -> bool {
     let mut percent = (*speed * 100.0).round();
     let response = ui
         .add(
@@ -109,13 +109,14 @@ pub(super) fn motion_speed_drag(ui: &mut egui::Ui, speed: &mut f32) -> bool {
                 .range(0.0..=crate::settings::MAX_MOTION_SPEED * 100.0)
                 .speed(1.0)
                 .suffix("%")
-                .prefix("Motion "),
+                .prefix(crate::i18n::literal(locale, "Motion ")),
         )
-        .on_hover_text(
+        .on_hover_text(crate::i18n::literal(
+            locale,
             "Drag to speed up or slow down shader and gradient motion in every pane. \
              0% stops it, 100% is each theme's own speed, 200% is double. \
              Double-click to type a value.",
-        );
+        ));
     *speed = (percent / 100.0).clamp(0.0, crate::settings::MAX_MOTION_SPEED);
     response.drag_stopped() || (response.changed() && !response.dragged())
 }
@@ -175,15 +176,15 @@ impl ButtonsApp {
         let mut changed = false;
         wrapping_row(ui, |ui| {
             changed |= ui
-                .spaced_checkbox(&mut setting.enabled, "Override panes")
-                .on_hover_text("Every pane's shader uses this Strength instead of its own, for bright shaders or a Strength left too high. Themes are not changed: untick it and each pane goes back to its own.")
+                .spaced_checkbox(&mut setting.enabled, crate::i18n::literal(&self.locale, "Override panes"))
+                .on_hover_text(crate::i18n::literal(&self.locale, "Every pane's shader uses this Strength instead of its own, for bright shaders or a Strength left too high. Themes are not changed: untick it and each pane goes back to its own."))
                 .changed();
             let response = ui.add(
                 egui::Slider::new(
                     &mut setting.strength,
                     crate::theme::ShaderBackground::STRENGTH,
                 )
-                .text("Strength"),
+                .text(crate::i18n::literal(&self.locale, "Strength")),
             );
             if response.changed() {
                 setting.enabled = true;
@@ -210,7 +211,7 @@ impl ButtonsApp {
             ui.disable();
         }
         let mut speed = self.preferences.motion_speed;
-        let done = motion_speed_drag(ui, &mut speed);
+        let done = motion_speed_drag(&self.locale, ui, &mut speed);
         if speed != self.preferences.motion_speed {
             self.preferences.motion_speed = speed;
         }
@@ -220,18 +221,18 @@ impl ButtonsApp {
         let calm_label = crate::i18n::text(&self.locale, crate::i18n::MessageKey::CalmMode, &[]);
         // Always "Look": the button used to rename itself to "Calm effects"
         // while Calm was on, which read as a different control.
-        let title = "◐ Look";
+        let title = crate::i18n::literal(&self.locale, "◐ Look");
         let mut chosen = None;
         let mut changed = false;
         {
             ui.solo_menu_button("status-look", title, |ui| {
                 ui.set_min_width(260.0);
-                ui.spaced_strong("Look");
+                ui.spaced_strong(crate::i18n::literal(&self.locale, "Look"));
                 let mut look = self.current_look().unwrap_or_default();
-                if look_slider(ui, &mut look) {
+                if look_slider(&self.locale, ui, &mut look) {
                     chosen = Some(look);
                 }
-                ui.spaced_small(look.description());
+                ui.spaced_small(crate::i18n::literal(&self.locale, look.description()));
                 ui.separator();
                 changed |= ui
                     .spaced_checkbox(&mut self.preferences.calm_mode, calm_label)
@@ -244,21 +245,21 @@ impl ButtonsApp {
                 changed |= ui
                     .spaced_checkbox(
                         &mut self.preferences.shader_backgrounds_enabled,
-                        "GPU shader backgrounds",
+                        crate::i18n::literal(&self.locale, "GPU shader backgrounds"),
                     )
                     .changed();
                 changed |= ui
                     .spaced_checkbox(
                         &mut self.preferences.classic_effects,
-                        "Classic effects (static, scanlines)",
+                        crate::i18n::literal(&self.locale, "Classic effects (static, scanlines)"),
                     )
-                    .on_hover_text("TV static, scanlines and moving gradients from themes. Off: no pane shows them, and applying a theme never turns them back on. Shaders are not affected.")
+                    .on_hover_text(crate::i18n::literal(&self.locale, "TV static, scanlines and moving gradients from themes. Off: no pane shows them, and applying a theme never turns them back on. Shaders are not affected."))
                     .changed();
                 ui.horizontal(|ui| {
-                    if motion_speed_drag(ui, &mut self.preferences.motion_speed) {
+                    if motion_speed_drag(&self.locale, ui, &mut self.preferences.motion_speed) {
                         changed = true;
                     }
-                    if ui.small_button("Reset").clicked() {
+                    if ui.small_button(crate::i18n::literal(&self.locale, "Reset")).clicked() {
                         self.preferences.motion_speed = 1.0;
                         changed = true;
                     }
@@ -269,10 +270,12 @@ impl ButtonsApp {
                 changed |= self.shuffle_menu(ui);
                 ui.separator();
                 changed |= self.idle_glow_menu(ui);
+                ui.separator();
+                changed |= self.look_display_section(ui, ctx);
             })
             .response
             .on_hover_text(
-                "Look presets, Calm effects, GPU shaders, motion speed and Shuffle for every pane.",
+                crate::i18n::literal(&self.locale, "Look presets, Calm effects, GPU shaders, motion speed, Shuffle, window opacity, language and test text."),
             );
         }
         if let Some(look) = chosen {

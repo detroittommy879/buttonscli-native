@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **◐ Look menu** now also has window opacity, text backing opacity, the
+  display language and **Test text**: a pane with no shell that shows ANSI
+  colors, styles, box drawing, wide characters and emoji, to check a look.
+- Outside English, the language entries (Look menu and the Settings tab)
+  also say "Language" in English, so a wrong pick is easy to undo.
+- Guide: text backing, the pane hover label, the new-tab menu and the
+  auto-hiding left dock, with new screenshots (also in the README).
+
+- **More of the app speaks your language**: Settings tabs and pages, the
+  theme and shader editor, menus, status bar, tooltips and AI Help now
+  translate in all 20 languages (machine translations). Screen readers get
+  the translated names.
+- Small buttons (status bar, AI Help) no longer cut through Arabic and
+  other tall scripts.
 - **One-command install**: `curl -fsSL https://buttonscli.com/install.sh | sh`
   (Linux/macOS), `irm https://buttonscli.com/install.ps1 | iex` (PowerShell)
   or `install.cmd` (Command Prompt). Per-user, checksum-verified, adds a

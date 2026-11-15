@@ -134,22 +134,28 @@ impl ButtonsApp {
     /// between. True when a setting changed and should be saved.
     pub(super) fn idle_glow_menu(&mut self, ui: &mut egui::Ui) -> bool {
         let before = self.preferences.idle_glow.clone();
-        ui.spaced_strong("Idle glow");
+        ui.spaced_strong(crate::i18n::literal(&self.locale, "Idle glow"));
         ui.spaced_small(
-            "Turn it on here for every pane, or for one pane from its menu. Its shader ramps from Low to High after the terminal has been quiet.",
+            crate::i18n::literal(&self.locale, "Turn it on here for every pane, or for one pane from its menu. Its shader ramps from Low to High after the terminal has been quiet."),
         );
         let mut all = self.preferences.idle_glow.all_panes;
         if ui
-            .spaced_checkbox(&mut all, "All panes")
-            .on_hover_text("Every pane glows when quiet, new tabs too. A pane's menu can still turn it off for that pane.")
+            .spaced_checkbox(&mut all, crate::i18n::literal(&self.locale, "All panes"))
+            .on_hover_text(crate::i18n::literal(&self.locale, "Every pane glows when quiet, new tabs too. A pane's menu can still turn it off for that pane."))
             .changed()
         {
             self.set_idle_glow_all(all);
         }
         let glow = &mut self.preferences.idle_glow;
         let strength = crate::theme::ShaderBackground::STRENGTH;
-        ui.add(egui::Slider::new(&mut glow.low, strength.clone()).text("Low"));
-        ui.add(egui::Slider::new(&mut glow.high, strength).text("High"));
+        ui.add(
+            egui::Slider::new(&mut glow.low, strength.clone())
+                .text(crate::i18n::literal(&self.locale, "Low")),
+        );
+        ui.add(
+            egui::Slider::new(&mut glow.high, strength)
+                .text(crate::i18n::literal(&self.locale, "High")),
+        );
         // Logarithmic with 0.1 s steps, so 1.4 s is as easy to pick as 5 min.
         // The number can also be clicked and typed.
         ui.add(
@@ -159,7 +165,7 @@ impl ButtonsApp {
                 .step_by(0.1)
                 .max_decimals(1)
                 .suffix(" s")
-                .text("Quiet before it starts"),
+                .text(crate::i18n::literal(&self.locale, "Quiet before it starts")),
         );
         ui.add(
             egui::Slider::new(&mut glow.ramp_seconds, IdleGlow::RAMP)
@@ -168,17 +174,20 @@ impl ButtonsApp {
                 .step_by(0.1)
                 .max_decimals(1)
                 .suffix(" s")
-                .text("Time to reach High"),
+                .text(crate::i18n::literal(&self.locale, "Time to reach High")),
         );
         wrapping_row(ui, |ui| {
-            ui.small("Quick:");
+            ui.small(crate::i18n::literal(&self.locale, "Quick:"));
             for (label, delay, ramp) in [
-                ("Snappy", 1.4, 1.0),
-                ("5 s", 5.0, 3.0),
-                ("30 s", 30.0, 20.0),
-                ("2 min", 120.0, 30.0),
+                (crate::i18n::key("Snappy"), 1.4, 1.0),
+                (crate::i18n::key("5 s"), 5.0, 3.0),
+                (crate::i18n::key("30 s"), 30.0, 20.0),
+                (crate::i18n::key("2 min"), 120.0, 30.0),
             ] {
-                if ui.small_button(label).clicked() {
+                if ui
+                    .small_button(crate::i18n::literal(&self.locale, label))
+                    .clicked()
+                {
                     glow.delay_seconds = delay;
                     glow.ramp_seconds = ramp;
                 }

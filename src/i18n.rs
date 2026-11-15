@@ -177,6 +177,12 @@ fn overlay_catalog() -> &'static LiteralCatalog {
     })
 }
 
+/// Marks an English UI string that is translated later through `literal(locale, var)`.
+/// Identity at runtime; `scripts/audit-i18n.py` collects these as translation keys.
+pub const fn key(english: &'static str) -> &'static str {
+    english
+}
+
 pub fn literal(locale: &str, english: &str) -> String {
     let locale = resolve_locale(locale);
     if locale == "en" {
@@ -1509,7 +1515,7 @@ mod tests {
         assert_eq!(text("fr", MessageKey::AiHelp, &[]), "Aide IA");
         assert_eq!(
             text("fr", MessageKey::ImportConfirm, &[("profile", "Work")]),
-            "Import into Work"
+            "Importer dans Work"
         );
         assert_eq!(text("xx", MessageKey::Cancel, &[]), "Cancel");
         assert_eq!(literal("es", "Cancel"), "Cancelar");

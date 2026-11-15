@@ -154,5 +154,6 @@ and gradient motion at once: drag it left or right, or double-click to type.
 0% holds the current frame and stops redrawing, 100% is each theme's own
 speed, and 200% is double. **◐ Look** next to it has Minimal, Moderate and
 Showoff presets, Calm effects, the GPU shader switch, **Override panes** (one
-Strength for every pane) and [Shuffle](themes.md#shuffle), which changes the
-theme every few minutes.
+Strength for every pane), [Shuffle](themes.md#shuffle), which changes the
+theme every few minutes, window opacity, the display language and
+[Test text](themes.md#text-backing).

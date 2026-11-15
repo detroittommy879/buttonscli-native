@@ -5,10 +5,10 @@ use crate::settings::{SavedTab, TabGroup};
 
 pub(super) fn layout_name(layout: PaneLayout) -> &'static str {
     match layout {
-        PaneLayout::Single => "single",
-        PaneLayout::Columns => "columns",
-        PaneLayout::Rows => "rows",
-        PaneLayout::Grid => "grid",
+        PaneLayout::Single => crate::i18n::key("single"),
+        PaneLayout::Columns => crate::i18n::key("columns"),
+        PaneLayout::Rows => crate::i18n::key("rows"),
+        PaneLayout::Grid => crate::i18n::key("grid"),
     }
 }
 
@@ -157,7 +157,10 @@ impl ButtonsApp {
                     crate::i18n::literal(&self.locale, "Save tabs as group…"),
                 ),
             )
-            .on_hover_text("Save these terminals, their order, themes and layout under a name")
+            .on_hover_text(crate::i18n::literal(
+                &self.locale,
+                "Save these terminals, their order, themes and layout under a name",
+            ))
             .clicked()
         {
             self.open_group_save();
@@ -202,6 +205,7 @@ impl ButtonsApp {
             .iter()
             .any(|group| group.name == self.group_name_draft.trim());
         egui::Window::new(crate::i18n::literal(&self.locale, "Save tab group"))
+            .id(egui::Id::new("Save tab group"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -212,10 +216,14 @@ impl ButtonsApp {
                     &self.font_catalog,
                     &self.preferences.typography.settings,
                 );
-                ui.spaced_label(format!("Group name ({} terminals)", self.tabs.len()));
+                ui.spaced_label(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Group name ({tabs} terminals)",
+                    &[("tabs", &(self.tabs.len()).to_string())],
+                ));
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut self.group_name_draft)
-                        .hint_text("e.g. VPS servers")
+                        .hint_text(crate::i18n::literal(&self.locale, "e.g. VPS servers"))
                         .desired_width(f32::INFINITY),
                 );
                 if !response.has_focus() && self.group_name_draft.is_empty() {
@@ -224,7 +232,10 @@ impl ButtonsApp {
                 let submitted =
                     response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
                 if replacing {
-                    ui.spaced_label("Replaces the saved group with this name.");
+                    ui.spaced_label(crate::i18n::literal(
+                        &self.locale,
+                        "Replaces the saved group with this name.",
+                    ));
                 }
                 if let Some(error) = &self.group_save_error {
                     ui.spaced_colored_label(ui.visuals().error_fg_color, error);
@@ -264,11 +275,14 @@ impl ButtonsApp {
 
     pub(super) fn tab_group_settings(&mut self, ui: &mut egui::Ui) {
         ui.spaced_heading(crate::i18n::literal(&self.locale, "Tab groups"));
-        ui.spaced_label("Save your open terminals (order, names, themes, fonts and layout) and reopen them in one click. Each terminal can run a startup command, such as ssh root@my-server. Running a Left command saves it as that terminal's startup command.");
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Save your open terminals (order, names, themes, fonts and layout) and reopen them in one click. Each terminal can run a startup command, such as ssh root@my-server. Running a Left command saves it as that terminal's startup command."));
         if ui
             .add_enabled(
                 !self.tabs.is_empty(),
-                crate::ui_text::button(ui, "Save current tabs as group…"),
+                crate::ui_text::button(
+                    ui,
+                    crate::i18n::literal(&self.locale, "Save current tabs as group…"),
+                ),
             )
             .clicked()
         {
@@ -279,19 +293,23 @@ impl ButtonsApp {
         let groups = &mut self.preferences.tab_groups;
         ui.spaced_checkbox(
             &mut groups.restore_on_launch,
-            "Open a tab group when ButtonsCLI starts",
+            crate::i18n::literal(&self.locale, "Open a tab group when ButtonsCLI starts"),
         )
-        .on_hover_text("Command-line options such as --tabs still win.");
+        .on_hover_text(crate::i18n::literal(
+            &self.locale,
+            "Command-line options such as --tabs still win.",
+        ));
         ui.add_enabled_ui(
             groups.restore_on_launch && !groups.groups.is_empty(),
             |ui| {
                 ui.horizontal(|ui| {
-                    let label = ui.spaced_label("Group to open");
+                    let label =
+                        ui.spaced_label(crate::i18n::literal(&self.locale, "Group to open"));
                     egui::ComboBox::from_id_salt("tab-group-launch")
                         .selected_text(crate::ui_text::spaced_text(
                             ui,
                             if groups.launch_group.is_empty() {
-                                "Choose a group".to_owned()
+                                crate::i18n::literal(&self.locale, "Choose a group").to_owned()
                             } else {
                                 groups.launch_group.clone()
                             },
@@ -311,9 +329,10 @@ impl ButtonsApp {
             },
         );
         if groups.groups.is_empty() {
-            ui.spaced_label(
+            ui.spaced_label(crate::i18n::literal(
+                &self.locale,
                 "No saved groups yet. Use File → Save tabs as group… or the button above.",
-            );
+            ));
             return;
         }
         ui.separator();
@@ -325,56 +344,89 @@ impl ButtonsApp {
             ui.push_id(("tab-group", index), |ui| {
                 ui.horizontal(|ui| {
                     ui.spaced_label(RichText::new(group.name.as_str()).strong());
-                    ui.spaced_label(format!("{} terminals · {}", group.tabs.len(), group.layout));
-                    if ui.spaced_button("Open").clicked() {
+                    ui.spaced_label(crate::i18n::formatted_literal(
+                        &self.locale,
+                        "{tabs} terminals · {layout}",
+                        &[
+                            ("tabs", &(group.tabs.len()).to_string()),
+                            ("layout", &(group.layout).to_string()),
+                        ],
+                    ));
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Open"))
+                        .clicked()
+                    {
                         open = Some(group.name.clone());
                     }
                     if ui
-                        .spaced_button("Update")
-                        .on_hover_text("Replace with the terminals open now")
+                        .spaced_button(crate::i18n::literal(&self.locale, "Update"))
+                        .on_hover_text(crate::i18n::literal(
+                            &self.locale,
+                            "Replace with the terminals open now",
+                        ))
                         .clicked()
                     {
                         update = Some(group.name.clone());
                     }
-                    if ui.spaced_button("Delete").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Delete"))
+                        .clicked()
+                    {
                         delete = Some(index);
                     }
                 });
-                egui::CollapsingHeader::new("Terminals and startup commands")
-                    .id_salt("tabs")
-                    .show(ui, |ui| {
-                        egui::Grid::new("saved-tabs")
-                            .num_columns(3)
-                            .spacing([8.0, 4.0])
-                            .show(ui, |ui| {
-                                ui.spaced_label(RichText::new("Name").strong());
-                                ui.spaced_label(RichText::new("Folder").strong());
-                                ui.spaced_label(RichText::new("Startup command").strong());
-                                ui.end_row();
-                                for tab in &mut group.tabs {
-                                    if ui
-                                        .add(
-                                            egui::TextEdit::singleline(&mut tab.title)
-                                                .desired_width(120.0),
-                                        )
-                                        .changed()
-                                    {
-                                        tab.custom_title = true;
-                                    }
-                                    ui.add(
-                                        egui::TextEdit::singleline(&mut tab.working_directory)
-                                            .hint_text("default")
-                                            .desired_width(180.0),
-                                    );
-                                    ui.add(
-                                        egui::TextEdit::singleline(&mut tab.startup_command)
-                                            .hint_text("e.g. ssh root@my-server")
-                                            .desired_width(220.0),
-                                    );
-                                    ui.end_row();
+                egui::CollapsingHeader::new(crate::i18n::literal(
+                    &self.locale,
+                    "Terminals and startup commands",
+                ))
+                .id_salt("tabs")
+                .show(ui, |ui| {
+                    egui::Grid::new("saved-tabs")
+                        .num_columns(3)
+                        .spacing([8.0, 4.0])
+                        .show(ui, |ui| {
+                            ui.spaced_label(
+                                RichText::new(crate::i18n::literal(&self.locale, "Name")).strong(),
+                            );
+                            ui.spaced_label(
+                                RichText::new(crate::i18n::literal(&self.locale, "Folder"))
+                                    .strong(),
+                            );
+                            ui.spaced_label(
+                                RichText::new(crate::i18n::literal(
+                                    &self.locale,
+                                    "Startup command",
+                                ))
+                                .strong(),
+                            );
+                            ui.end_row();
+                            for tab in &mut group.tabs {
+                                if ui
+                                    .add(
+                                        egui::TextEdit::singleline(&mut tab.title)
+                                            .desired_width(120.0),
+                                    )
+                                    .changed()
+                                {
+                                    tab.custom_title = true;
                                 }
-                            });
-                    });
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut tab.working_directory)
+                                        .hint_text(crate::i18n::literal(&self.locale, "default"))
+                                        .desired_width(180.0),
+                                );
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut tab.startup_command)
+                                        .hint_text(crate::i18n::literal(
+                                            &self.locale,
+                                            "e.g. ssh root@my-server",
+                                        ))
+                                        .desired_width(220.0),
+                                );
+                                ui.end_row();
+                            }
+                        });
+                });
             });
             ui.add_space(4.0);
         }

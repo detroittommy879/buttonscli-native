@@ -310,18 +310,21 @@ impl ButtonsApp {
         let contents = |ui: &mut egui::Ui| {
             if top_level {
                 // Save what is on screen without opening Settings.
-                ui.spaced_strong("Save current looks as a bundle");
+                ui.spaced_strong(crate::i18n::literal(
+                    &self.locale,
+                    "Save current looks as a bundle",
+                ));
                 ui.horizontal(|ui| {
                     let response = ui.add(
                         egui::TextEdit::singleline(draft)
-                            .hint_text("Name (optional)")
+                            .hint_text(crate::i18n::literal(&self.locale, "Name (optional)"))
                             .desired_width(200.0),
                     );
                     save = response.lost_focus()
                         && ui.input(|input| input.key_pressed(egui::Key::Enter));
                     save |= ui
-                        .spaced_button("Save")
-                        .on_hover_text("Each pane's theme, shader and font, plus the layout. A bundle with the same name is replaced.")
+                        .spaced_button(crate::i18n::literal(&self.locale, "Save"))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Each pane's theme, shader and font, plus the layout. A bundle with the same name is replaced."))
                         .clicked();
                 });
                 if save {
@@ -342,7 +345,7 @@ impl ButtonsApp {
             ui.spaced_menu_button(text, contents)
         };
         menu.response
-            .on_hover_text("Apply a saved (★) or built-in (◆) theme bundle to the open terminals, or save the current looks as one.");
+            .on_hover_text(crate::i18n::literal(&self.locale, "Apply a saved (★) or built-in (◆) theme bundle to the open terminals, or save the current looks as one."));
         if save {
             let name = self.bundle_name_draft.trim().to_owned();
             self.notice = Some(match self.save_theme_bundle(&name) {
@@ -363,15 +366,18 @@ impl ButtonsApp {
     /// Theme Library section: save the current looks, apply or delete bundles.
     pub(super) fn theme_bundle_settings(&mut self, ui: &mut egui::Ui) {
         ui.separator();
-        ui.spaced_label(RichText::new("Theme bundles").strong());
-        ui.spaced_label(format!(
-            "Save the shared theme, each pane's theme and font (up to {MAX_PANE_LOOKS} panes) and the layout. Applying a bundle styles the terminals already open: P1 gets pane 1's look, and so on. It never opens or closes terminals."
-        ));
+        ui.spaced_label(
+            RichText::new(crate::i18n::literal(&self.locale, "Theme bundles")).strong(),
+        );
+        ui.spaced_label(crate::i18n::formatted_literal(&self.locale, "Save the shared theme, each pane's theme and font (up to {MAX_PANE_LOOKS} panes) and the layout. Applying a bundle styles the terminals already open: P1 gets pane 1's look, and so on. It never opens or closes terminals.", &[("MAX_PANE_LOOKS", &(MAX_PANE_LOOKS).to_string())]));
         let mut save = false;
         ui.horizontal(|ui| {
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.bundle_name_draft)
-                    .hint_text("Bundle name, or empty for Bundle 1, 2, …")
+                    .hint_text(crate::i18n::literal(
+                        &self.locale,
+                        "Bundle name, or empty for Bundle 1, 2, …",
+                    ))
                     .desired_width(220.0),
             );
             save = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
@@ -384,15 +390,24 @@ impl ButtonsApp {
                 .add(crate::ui_text::button(
                     ui,
                     if replacing {
-                        "Replace bundle"
+                        crate::i18n::literal(&self.locale, "Replace bundle")
                     } else {
-                        "Save current looks"
+                        crate::i18n::literal(&self.locale, "Save current looks")
                     },
                 ))
-                .on_hover_text(format!(
-                    "{} panes · {}",
-                    self.tabs.len().min(MAX_PANE_LOOKS),
-                    layout_name(self.pane_layout)
+                .on_hover_text(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "{MAX_PANE_LOOKS} panes · {pane_layout}",
+                    &[
+                        (
+                            "MAX_PANE_LOOKS",
+                            &(self.tabs.len().min(MAX_PANE_LOOKS)).to_string(),
+                        ),
+                        (
+                            "pane_layout",
+                            &crate::i18n::literal(&self.locale, layout_name(self.pane_layout)),
+                        ),
+                    ],
                 ))
                 .clicked();
         });
@@ -417,19 +432,30 @@ impl ButtonsApp {
                         .iter()
                         .filter(|look| **look != PaneLook::default())
                         .count();
-                    ui.spaced_label(format!(
-                        "{styled} styled pane{} · {}",
-                        if styled == 1 { "" } else { "s" },
-                        if bundle.layout.is_empty() {
-                            "any layout"
+                    let layout = if bundle.layout.is_empty() {
+                        crate::i18n::literal(&self.locale, "any layout")
+                    } else {
+                        crate::i18n::literal(&self.locale, &bundle.layout)
+                    };
+                    ui.spaced_label(crate::i18n::formatted_literal(
+                        &self.locale,
+                        if styled == 1 {
+                            "{styled} styled pane · {layout}"
                         } else {
-                            bundle.layout.as_str()
-                        }
+                            "{styled} styled panes · {layout}"
+                        },
+                        &[("styled", &styled.to_string()), ("layout", &layout)],
                     ));
-                    if ui.spaced_button("Apply").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Apply"))
+                        .clicked()
+                    {
                         apply = Some(bundle.name.clone());
                     }
-                    if ui.spaced_button("Delete").clicked() {
+                    if ui
+                        .spaced_button(crate::i18n::literal(&self.locale, "Delete"))
+                        .clicked()
+                    {
                         delete = Some(index);
                     }
                 });
@@ -448,23 +474,31 @@ impl ButtonsApp {
             })
             .collect();
         if !built_in.is_empty() {
-            egui::CollapsingHeader::new(format!("◆ Built-in bundles ({})", built_in.len()))
-                .id_salt("built-in-bundles")
-                .show(ui, |ui| {
-                    for bundle in built_in {
-                        ui.push_id(("built-in-bundle", bundle.name.as_str()), |ui| {
-                            ui.horizontal(|ui| {
-                                ui.spaced_label(
-                                    RichText::new(format!("◆ {}", bundle.name)).strong(),
-                                )
-                                .on_hover_text("Comes with ButtonsCLI.");
-                                if ui.spaced_button("Apply").clicked() {
-                                    apply = Some(bundle.name.clone());
-                                }
-                            });
+            egui::CollapsingHeader::new(crate::i18n::formatted_literal(
+                &self.locale,
+                "◆ Built-in bundles ({built_in})",
+                &[("built_in", &(built_in.len()).to_string())],
+            ))
+            .id_salt("built-in-bundles")
+            .show(ui, |ui| {
+                for bundle in built_in {
+                    ui.push_id(("built-in-bundle", bundle.name.as_str()), |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spaced_label(RichText::new(format!("◆ {}", bundle.name)).strong())
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Comes with ButtonsCLI.",
+                                ));
+                            if ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "Apply"))
+                                .clicked()
+                            {
+                                apply = Some(bundle.name.clone());
+                            }
                         });
-                    }
-                });
+                    });
+                }
+            });
         }
         if let Some(index) = delete {
             let removed = self.preferences.theme_bundles.remove(index);

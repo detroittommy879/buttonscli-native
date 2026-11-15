@@ -118,17 +118,26 @@ pub(crate) struct InstallerPlan {
 }
 
 pub(crate) const PROVIDER_LINKS: [(&str, &str); 5] = [
-    ("Free/low-cost AI: OpenRouter", "https://openrouter.ai"),
     (
-        "Free/low-cost AI: OpenAI data sharing",
+        crate::i18n::key("Free/low-cost AI: OpenRouter"),
+        "https://openrouter.ai",
+    ),
+    (
+        crate::i18n::key("Free/low-cost AI: OpenAI data sharing"),
         "https://platform.openai.com/settings/organization/data-controls/sharing",
     ),
     (
-        "Free/low-cost AI: NVIDIA Build",
+        crate::i18n::key("Free/low-cost AI: NVIDIA Build"),
         "https://build.nvidia.com/",
     ),
-    ("Free/low-cost AI: Groq", "https://groq.com"),
-    ("Free/low-cost AI: Mistral", "https://mistral.ai"),
+    (
+        crate::i18n::key("Free/low-cost AI: Groq"),
+        "https://groq.com",
+    ),
+    (
+        crate::i18n::key("Free/low-cost AI: Mistral"),
+        "https://mistral.ai",
+    ),
 ];
 
 pub(crate) fn build_plan(

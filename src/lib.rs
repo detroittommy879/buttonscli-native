@@ -75,6 +75,8 @@ mod window_opacity;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod terminal;
+#[cfg(not(target_arch = "wasm32"))]
+mod test_text;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod diagnostics;

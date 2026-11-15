@@ -27,17 +27,17 @@ impl ButtonsApp {
         let Some(update) = &self.update_available else {
             return;
         };
-        let label = RichText::new(format!("⬆ v{} available", update.version))
-            .small()
-            .strong()
-            .color(Color32::WHITE);
+        let label = RichText::new(crate::i18n::formatted_literal(
+            &self.locale,
+            "⬆ v{version} available",
+            &[("version", &(update.version).to_string())],
+        ))
+        .small()
+        .strong()
+        .color(Color32::WHITE);
         let response = ui
             .add(egui::Button::new(label).fill(UPDATE_GREEN))
-            .on_hover_text(format!(
-                "ButtonsCLI {} is out (this is {}). Opens the release page on GitHub; nothing is downloaded or installed here.",
-                update.version,
-                crate::BUILD_VERSION
-            ));
+            .on_hover_text(crate::i18n::formatted_literal(&self.locale, "ButtonsCLI {version} is out (this is {BUILD_VERSION}). Opens the release page on GitHub; nothing is downloaded or installed here.", &[("version", &(update.version).to_string()), ("BUILD_VERSION", crate::BUILD_VERSION)]));
         if response.clicked() {
             ui.ctx()
                 .open_url(egui::OpenUrl::new_tab(update.url.clone()));

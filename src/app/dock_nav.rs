@@ -154,16 +154,34 @@ impl ButtonsApp {
         if options.buttons {
             wrapping_row(ui, |ui| {
                 for (label, command, hint) in [
-                    ("↑ Up", "cd ..", "cd ..  (the parent folder)"),
                     (
-                        "← Back",
-                        "cd -",
-                        "cd -  (the folder you were in before; bash, zsh and PowerShell 7)",
+                        crate::i18n::key("↑ Up"),
+                        "cd ..",
+                        crate::i18n::key("cd ..  (the parent folder)"),
                     ),
-                    ("~ Home", "cd ~", "cd ~  (your home folder)"),
-                    ("ls", "ls", "ls  (list this folder)"),
+                    (
+                        crate::i18n::key("← Back"),
+                        "cd -",
+                        crate::i18n::key(
+                            "cd -  (the folder you were in before; bash, zsh and PowerShell 7)",
+                        ),
+                    ),
+                    (
+                        crate::i18n::key("~ Home"),
+                        "cd ~",
+                        crate::i18n::key("cd ~  (your home folder)"),
+                    ),
+                    ("ls", "ls", crate::i18n::key("ls  (list this folder)")),
                 ] {
-                    if ui.spaced_button(label).on_hover_text(hint).clicked() {
+                    if ui
+                        .spaced_button(if label == "ls" {
+                            label.to_owned()
+                        } else {
+                            crate::i18n::literal(&self.locale, label)
+                        })
+                        .on_hover_text(crate::i18n::literal(&self.locale, hint))
+                        .clicked()
+                    {
                         run = Some(command.to_owned());
                     }
                 }
@@ -183,9 +201,12 @@ impl ButtonsApp {
                 .unwrap_or_default();
             if folders.is_empty() {
                 ui.spaced_label(
-                    RichText::new("Run ls or dir to get folder buttons")
-                        .small()
-                        .color(self.colors().muted),
+                    RichText::new(crate::i18n::literal(
+                        &self.locale,
+                        "Run ls or dir to get folder buttons",
+                    ))
+                    .small()
+                    .color(self.colors().muted),
                 );
             } else {
                 wrapping_row(ui, |ui| {
@@ -210,30 +231,42 @@ impl ButtonsApp {
 
     /// Settings → Experimental.
     pub(super) fn experimental_settings(&mut self, ui: &mut egui::Ui) {
-        ui.spaced_heading("Experimental");
-        ui.spaced_label("Features still being tried out. Enable or disable them here; they may change or go away.");
+        ui.spaced_heading(crate::i18n::literal(&self.locale, "Experimental"));
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Features still being tried out. Enable or disable them here; they may change or go away."));
         ui.add_space(6.0);
-        if ui.spaced_checkbox(&mut self.preferences.text_backing.available, "Enable text backing controls")
-            .on_hover_text("Allows soft backing behind terminal text. Off removes the backing and hides its status-bar controls; your adjustments are kept.").changed() {
+        if ui.spaced_checkbox(&mut self.preferences.text_backing.available, crate::i18n::literal(&self.locale, "Enable text backing controls"))
+            .on_hover_text(crate::i18n::literal(&self.locale, "Allows soft backing behind terminal text. Off removes the backing and hides its status-bar controls; your adjustments are kept.")).changed() {
             self.persist_native_preferences();
         }
         self.text_backing_controls(ui);
         ui.separator();
-        ui.spaced_label(RichText::new("Folder navigation in the left panel").strong());
+        ui.spaced_label(
+            RichText::new(crate::i18n::literal(
+                &self.locale,
+                "Folder navigation in the left panel",
+            ))
+            .strong(),
+        );
         let navigation = &mut self.preferences.dock_navigation;
         let mut changed = ui
-            .spaced_checkbox(&mut navigation.buttons, "Up, Back, Home and ls buttons")
-            .on_hover_text("They type cd .., cd -, cd ~ and ls into the focused terminal.")
+            .spaced_checkbox(
+                &mut navigation.buttons,
+                crate::i18n::literal(&self.locale, "Up, Back, Home and ls buttons"),
+            )
+            .on_hover_text(crate::i18n::literal(
+                &self.locale,
+                "They type cd .., cd -, cd ~ and ls into the focused terminal.",
+            ))
             .changed();
         changed |= ui
             .spaced_checkbox(
                 &mut navigation.folders,
-                "A button for each folder after ls or dir",
+                crate::i18n::literal(&self.locale, "A button for each folder after ls or dir"),
             )
-            .on_hover_text("Reads the folders from the listing on screen (colored names, a trailing slash, or the d / <DIR> column), so it also works over SSH. Clicking one types cd \"name\". The buttons go away after the next cd.")
+            .on_hover_text(crate::i18n::literal(&self.locale, "Reads the folders from the listing on screen (colored names, a trailing slash, or the d / <DIR> column), so it also works over SSH. Clicking one types cd \"name\". The buttons go away after the next cd."))
             .changed();
         ui.spaced_label(
-            RichText::new("Folder buttons depend on how your shell prints listings. A plain ls with colors off and no -F shows no folders.")
+            RichText::new(crate::i18n::literal(&self.locale, "Folder buttons depend on how your shell prints listings. A plain ls with colors off and no -F shows no folders."))
                 .small()
                 .color(self.colors().muted),
         );

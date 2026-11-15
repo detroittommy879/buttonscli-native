@@ -54,7 +54,7 @@ impl ButtonsApp {
                 )
                 .step_by(5.0)
                 .suffix("%")
-                .text("UI size"),
+                .text(crate::i18n::literal(&self.locale, "UI size")),
             );
             // Apply on release: resizing everything mid-drag moves the slider.
             if response.drag_stopped() || (response.changed() && !response.dragged()) {
@@ -63,15 +63,15 @@ impl ButtonsApp {
             }
             let mut auto_box = auto;
             if ui
-                .spaced_checkbox(&mut auto_box, "Auto")
-                .on_hover_text("Pick a size from this monitor: 100% on large workspaces, down to 80% on 1080p at 100% scaling.")
+                .spaced_checkbox(&mut auto_box, crate::i18n::literal(&self.locale, "Auto"))
+                .on_hover_text(crate::i18n::literal(&self.locale, "Pick a size from this monitor: 100% on large workspaces, down to 80% on 1080p at 100% scaling."))
                 .changed()
             {
                 self.preferences.ui_scale = if auto_box { 0.0 } else { current };
                 changed = true;
             }
         });
-        ui.spaced_label("Scales text, buttons and terminals together. Windows display scaling still applies on top.");
+        ui.spaced_label(crate::i18n::literal(&self.locale, "Scales text, buttons and terminals together. Windows display scaling still applies on top."));
         if changed {
             self.persist_native_preferences();
         }

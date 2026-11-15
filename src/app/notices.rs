@@ -71,7 +71,7 @@ impl ButtonsApp {
                         ui.horizontal(|ui| {
                             dismiss = ui
                                 .small_button("×")
-                                .on_hover_text("Dismiss. The last message stays on the status bar's SHELL READY hover.")
+                                .on_hover_text(crate::i18n::literal(&self.locale, "Dismiss. The last message stays on the status bar's SHELL READY hover."))
                                 .clicked();
                             ui.add(
                                 egui::Label::new(RichText::new(&notice).color(colors.warning))
