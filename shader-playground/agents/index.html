@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Watch your AI agent work · ButtonsCLI agent control</title>
 <meta name="description" content="An animated walkthrough of ButtonsCLI agent control: Claude Code, Codex, Antigravity or any MCP client runs its commands in terminal panes you can see, scroll and take over.">
-<meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#0b0912">
+<meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#040913">
 <script>
 // Dark unless the visitor chose light here before, or the link asks for it.
 (() => {
@@ -13,7 +13,7 @@
   if (theme === 'light') document.documentElement.dataset.theme = 'light';
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=20261115-2">
+<link rel="stylesheet" href="style.css?v=20261115-4">
 </head>
 <body>
 <a class="skip" href="#how">Skip the animation</a>
@@ -30,7 +30,7 @@
 <main>
 <section class="hero">
   <p class="eyebrow">Agent control <span class="tag">Preview</span></p>
-  <h1>See what your agent is doing <span class="grad">in every terminal</span>.</h1>
+  <h1>See what your agent is doing <span class="grad">in every terminal</span> <span class="ether" role="text" aria-label="… in style."><span aria-hidden="true" style="display:contents"><span style="--i:0">…</span><span style="--i:1"> </span><span style="--i:2">i</span><span style="--i:3">n</span><span style="--i:4"> </span><span style="--i:5">s</span><span style="--i:6">t</span><span style="--i:7">y</span><span style="--i:8">l</span><span style="--i:9">e</span><span style="--i:10">.</span></span></span></h1>
   <p class="lede">Coding agents usually run commands where you can't see them. Connect one to ButtonsCLI and it works in real terminal tabs instead: you watch each command arrive, scroll the output, and take over a pane whenever you want.</p>
 </section>
 
@@ -65,6 +65,7 @@
     <label class="speed">Speed <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
     <button type="button" id="shuffle">⚄ New shaders</button>
   </div>
+  <p class="realnote">The real app looks much better than this simulation.</p>
   <p class="fineprint" id="gpu-note">A simulation: nothing here runs a command. The pane backgrounds are the app's real shaders, picked at random on each load.</p>
 </section>
 
@@ -147,5 +148,5 @@
 </main>
 
 <footer class="foot"><p>© ButtonsCLI. The agent and commands in the animation are simulated. Claude Code, Codex and Antigravity are named as examples of agents that can connect; they belong to their owners and are not affiliated with ButtonsCLI.</p></footer>
-<script type="module" src="demo.js?v=20261115-2"></script>
+<script type="module" src="demo.js?v=20261115-4"></script>
 </body></html>

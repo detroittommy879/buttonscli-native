@@ -119,14 +119,12 @@ function arrowPoints(from, to) {
   const rel = r => ({l: r.left - s.left, t: r.top - s.top, r: r.right - s.left, b: r.bottom - s.top, cx: (r.left + r.right) / 2 - s.left, cy: (r.top + r.bottom) / 2 - s.top, w: r.width});
   const A = rel(from.getBoundingClientRect()), B = rel(to.getBoundingClientRect()), V = rel(view);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  if (A.r <= B.l + 4) { // side by side
-    const p0 = [A.r - 2, clamp(A.cy, V.t + 30, V.b - 30)], p1 = [B.l + Math.min(34, B.w * 0.25), B.cy];
-    const d = Math.max(50, (p1[0] - p0[0]) * 0.55);
-    return [p0, [p0[0] + d, p0[1]], [p1[0] - d, p1[1]], p1];
-  }
-  const p0 = [clamp(B.cx, A.l + 24, A.r - 24), Math.min(A.b, V.b) - 2], p1 = [B.cx, B.t + 16]; // stacked
-  const d = Math.max(34, (p1[1] - p0[1]) * 0.5);
-  return [p0, [p0[0], p0[1] + d], [p1[0], p1[1] - d], p1];
+  const side = A.cx < B.l; // side by side, else stacked
+  const p0 = side ? [A.r - 2, clamp(A.cy, V.t + 30, V.b - 30)] : [clamp(B.cx, A.l + 24, A.r - 24), Math.min(A.b, V.b) - 2];
+  const p1 = side ? [B.l + Math.min(40, B.w * 0.25), B.cy] : [B.cx, B.t + 18];
+  // Bow the path to one side so it reads as an arc, never a straight line.
+  const dx = p1[0] - p0[0], dy = p1[1] - p0[1], k = -0.26, nx = -dy * k, ny = dx * k;
+  return [p0, [p0[0] + dx * 0.25 + nx, p0[1] + dy * 0.25 + ny], [p0[0] + dx * 0.75 + nx, p0[1] + dy * 0.75 + ny], p1];
 }
 async function arrow(from, to, {kind = 'send', label = '', reverse = false, hold = 1500} = {}) {
   if (clock.skipping) return sleep(650);
