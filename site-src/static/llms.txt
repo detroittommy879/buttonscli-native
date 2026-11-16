@@ -1,0 +1,24 @@
+# ButtonsCLI
+
+> ButtonsCLI Native is a free, MIT-licensed terminal app written in Rust for Windows, macOS and Linux. It is built for people who would rather click: command buttons, tiled panes, per-pane themes and fonts, AI-generated GPU shader backgrounds, and AI agent control over MCP or a CLI.
+
+## Main pages
+
+- [Homepage](https://buttonscli.com/): what ButtonsCLI Native is, screenshots, and downloads
+- [Docs](https://buttonscli.com/native/docs/): user guide for ButtonsCLI Native
+- [Full docs as text](https://buttonscli.com/native/docs/llms-full.txt): the whole guide in one file
+- [Short docs as text](https://buttonscli.com/native/docs/llms-small.txt)
+- [Source and releases](https://github.com/detroittommy879/buttonscli-native): code and the latest release downloads
+
+## Key docs
+
+- [Getting started](https://buttonscli.com/native/docs/getting-started/)
+- [Workspace and buttons](https://buttonscli.com/native/docs/workspace/)
+- [Themes](https://buttonscli.com/native/docs/themes/) and [theme gallery](https://buttonscli.com/native/docs/theme-gallery/)
+- [Shader backgrounds](https://buttonscli.com/native/docs/shaders/) and [AI shaders](https://buttonscli.com/native/docs/ai-shaders/)
+- [Set up AI](https://buttonscli.com/native/docs/ai-setup/)
+- [Troubleshooting](https://buttonscli.com/native/docs/troubleshooting/)
+
+## Older app
+
+- [ButtonsCLI Classic](https://buttonscli.com/classic/): the earlier Tauri-based app. Its docs are at https://buttonscli.com/docs/.

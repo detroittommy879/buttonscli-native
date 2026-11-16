@@ -74,6 +74,12 @@ function urlSegments(localeDir, slug) {
 	return [localeDir, slug === 'index' ? '' : slug].filter(Boolean);
 }
 
+// Site base path ("/native/docs"), set from Astro's config. Images and llms.txt
+// use base-absolute URLs: Starlight serves untranslated pages under /<lang>/
+// too, where a relative "../_guide/" points one folder too shallow.
+let BASE = process.env.DOCS_BASE ?? '/buttonscli-native';
+const fromBase = (rest) => `${BASE.replace(/\/$/, '')}/${rest}`;
+
 function relativeUrl(from, to, hash = '') {
 	const up = '../'.repeat(from.length);
 	const down = to.length ? to.join('/') + '/' : '';
@@ -164,7 +170,7 @@ function convertPage({ text, englishFile, slug, language, outFile, shots, images
 				if (!found || !isInside(DOCS, found.src)) return all;
 				const rel = posix(path.relative(DOCS, found.src));
 				images.set(path.join(OUT_PUBLIC, rel), found.src);
-				return `${pre}${relativeUrl(here, ['_guide'])}${rel}${post}`;
+				return `${pre}${fromBase('_guide/')}${rel}${post}`;
 			});
 			return line.replace(/(!?)\[([^\]]*)\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (all, bang, label, target, title) => {
 				if (/^([a-z]+:|#|\/)/i.test(target)) return all;
@@ -182,7 +188,7 @@ function convertPage({ text, englishFile, slug, language, outFile, shots, images
 					}
 				}
 				if (abs === path.join(GUIDE, 'llms.txt')) {
-					return `[${label}](${relativeUrl(here, [])}llms.txt${title})`;
+					return `[${label}](${fromBase('llms.txt')}${title})`;
 				}
 				if (isInside(REPO, abs)) {
 					const kind = fs.existsSync(abs) && fs.statSync(abs).isDirectory() ? 'tree' : 'blob';
@@ -367,7 +373,12 @@ export default function syncDocsIntegration() {
 	return {
 		name: 'buttonscli-sync-docs',
 		hooks: {
-			'astro:config:setup': ({ logger }) => {
+			'astro:config:setup': ({ config, command, injectRoute, logger }) => {
+				BASE = config.base || BASE;
+				// The screenshot checklist is a local tool: never built, deployed or in the sitemap.
+				if (command === 'dev') {
+					injectRoute({ pattern: '/screenshots', entrypoint: new URL('../src/dev/screenshots.astro', import.meta.url) });
+				}
 				syncDocs({ log: (m) => logger.info(m) });
 			},
 			'astro:server:setup': ({ logger }) => {

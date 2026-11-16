@@ -15,3 +15,14 @@ and `site-src/build_new.py` in that folder. Run as ubuntu on amp. It checks the
 expected homepage-generator SHA256, backs up all changed live files, installs the
 static playground, updates the old native landing page's embed, regenerates the
 homepage variants and activates b. Never upload credentials or native profiles.
+
+`static/robots.txt` and `static/llms.txt` are the source of the live files;
+`activate.sh` installs them. Edit them here, never on amp. The Apache
+vhosts (http→https, www→apex SEO rules) are not in this public repo: they
+name private services. A local copy is in `.private/server-config/`.
+
+Variant `d` (Hairline) keeps its stylesheet here in `assets/d.css`; a file in
+`site-src/assets/` wins over `html/assets/site/`. Local preview: mirror amp's
+`html/assets/{site,native,fonts}` into `.private/site-preview/html/assets/`, run
+`BUTTONSCLI_HTML_ROOT=.private/site-preview/html python site-src/build_new.py`,
+then the `homepage-preview` launch entry (`/new_abcd00/d/`).

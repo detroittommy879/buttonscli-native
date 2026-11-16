@@ -27,7 +27,7 @@ Node is only needed for the site; the app itself stays Node-free.
   [`docs/guide/IMAGES.md`](../docs/guide/IMAGES.md));
 - adds the hero to the home page and an **Edit page** link to the source file;
 - lists every screenshot spot in `src/generated/shots.json` for
-  `/screenshots/` (not in the sidebar).
+  `/screenshots/` (not in the sidebar; `npm run dev` only, never built).
 
 A new `docs/guide/*.md` page appears under **More** in the sidebar; give it a
 group in `GROUPS` in [`guide.config.mjs`](guide.config.mjs).

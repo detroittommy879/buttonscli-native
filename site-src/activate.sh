@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Make a staged design the live buttonscli.com homepage.
-#   ./activate.sh a|b|c
+#   ./activate.sh a|b|c|d
 # - backs up index.html, classic/index.html and sitemap.xml to ~/backups/
 # - copies new_abcd00/<variant>/index.html to index.html (staging noindex -> canonical)
 # - points /classic/ canonical at itself so it can be indexed
+# - installs static/robots.txt and static/llms.txt
 # - regenerates sitemap.xml
 # Undo with: ./rollback.sh <backup dir printed below>
 set -euo pipefail
 
 V="${1:-}"
-case "$V" in a|b|c) ;; *) echo "usage: $0 a|b|c" >&2; exit 1 ;; esac
+case "$V" in a|b|c|d) ;; *) echo "usage: $0 a|b|c|d" >&2; exit 1 ;; esac
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../html" && pwd)"
@@ -33,6 +34,12 @@ mv "$ROOT/index.html.new" "$ROOT/index.html"
 
 sed -i 's#<link rel="canonical" href="https://buttonscli.com/" />#<link rel="canonical" href="https://buttonscli.com/classic/" />#' "$ROOT/classic/index.html"
 touch "$ROOT/classic/index.html"
+
+# robots.txt and llms.txt live in site-src/static/ (source of truth).
+for f in robots.txt llms.txt; do
+  [ -f "$ROOT/$f" ] && cp -p "$ROOT/$f" "$BK/$f"
+  cp "$HERE/static/$f" "$ROOT/$f"
+done
 
 python3 "$HERE/make_sitemap.py"
 echo "live: variant $V is now https://buttonscli.com/ (Classic at /classic/)"

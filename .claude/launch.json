@@ -29,6 +29,20 @@
         "shader-playground"
       ],
       "port": 8765
+    },
+    {
+      "name": "homepage-preview",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        ".private/site-preview/html"
+      ],
+      "port": 8766
     }
   ]
 }
