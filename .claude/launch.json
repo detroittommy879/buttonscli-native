@@ -4,9 +4,31 @@
     {
       "name": "docs-site",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "site", "run", "dev", "--", "--port", "4321"],
+      "runtimeArgs": [
+        "--prefix",
+        "site",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "4321"
+      ],
       "port": 4321,
       "url": "http://localhost:4321"
+    },
+    {
+      "name": "shader-playground",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "shader-playground"
+      ],
+      "port": 8765
     }
   ]
 }

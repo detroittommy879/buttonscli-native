@@ -271,6 +271,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 - **WASM build is paused**: the CI `web` job has `if: ${{ false }}` and
   `web/web-config.json` has `"enabled": false`. Flip both to resume.
 - Browser showcase: `src/web_showcase.rs`, `web/web-config.json`, `web/README.md`.
+- Agent control walkthrough page: `shader-playground/agents/` (scripted, all
+  fake; `/native/try/agents/` once deployed with the playground). Preview with
+  the `shader-playground` entry in `.claude/launch.json`, then `/agents/`.
 - Standalone HTML/WebGPU playground: `shader-playground/` (independent of paused
   WASM). Refresh its public-only catalog with `python scripts/export-shader-playground.py`;
   serves on localhost/HTTPS. Native `shaderBackground` can be JSON null; exporters
@@ -302,6 +305,11 @@ cargo build --locked --release --bin buttonscli
 ```
 
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
+- Performance: `show_viewport_immediate` couples parent/child redraws in egui 0.31.
+  Offscreen shader previews need `ui.is_rect_visible(rect)` before callback creation
+  and animation scheduling: paint clipping does not skip wgpu callback preparation.
+  Research/next steps: `.private/dev-notes/codex-optimize-ideas.md` (2026-11-16;
+  source audit, not measured performance). Keep worker polling outside culling guards.
 - Use `wrapping_row` for button rows: egui's centered `horizontal_wrapped` can make
   successive controls descend with larger fonts. Rows mixing labels, small and full
   buttons (status bar) use `centered_wrapping_row` (fixed line height, centered). Favorites allocate the name/star

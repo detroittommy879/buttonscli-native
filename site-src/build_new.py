@@ -379,6 +379,23 @@ def sections(v):
       <figcaption class="visually-hidden">Example buttonsclictl commands</figcaption>
     </figure>
   </div>
+  <div class="wrap" id="agent-demo" style="margin-top:2.5rem">
+    <h3>Watch it work</h3>
+    <p class="muted">An animated walkthrough: an agent opens four tabs, runs a dev server, tests, git and a log tail, reads a failing test and fixes it. Simulated, nothing runs. <a href="/native/try/agents/" target="_blank" rel="noopener">Open it in its own tab ↗</a></p>
+    <iframe id="agent-demo-frame" title="Animated walkthrough of ButtonsCLI agent control" loading="lazy" style="display:block;width:100%;height:900px;border:0;color-scheme:dark"></iframe>
+    <script>
+    (function(){{
+      var f=document.getElementById('agent-demo-frame'),d=document.documentElement;
+      var theme=function(){{return d.getAttribute('data-theme')==='light'?'light':'dark'}};
+      f.src='/native/try/agents/?embed=1&theme='+theme();
+      addEventListener('message',function(e){{
+        if(e.source!==f.contentWindow||!e.data||e.data.type!=='buttonscli-agents-height')return;
+        var h=Number(e.data.height);if(h>300&&h<3000)f.style.height=h+'px';
+      }});
+      new MutationObserver(function(){{if(f.contentWindow)f.contentWindow.postMessage({{type:'buttonscli-agents-theme',theme:theme()}},location.origin)}}).observe(d,{{attributes:true,attributeFilter:['data-theme']}});
+    }})();
+    </script>
+  </div>
 </section>
 
 <section aria-labelledby="ai-title">

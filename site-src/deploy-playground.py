@@ -15,7 +15,8 @@ html = root / 'html'
 builder = root / 'site-src/build_new.py'
 assert hashlib.sha256(builder.read_bytes()).hexdigest() == args.expected_builder_sha, 'Server source changed; inspect before deploying'
 source = args.source.resolve()
-for name in ['index.html', 'app.js', 'style.css', 'embed.js', 'text-backing.js', 'data/library.json']:
+for name in ['index.html', 'app.js', 'style.css', 'embed.js', 'text-backing.js', 'data/library.json',
+             'agents/index.html', 'agents/demo.js', 'agents/style.css']:
     assert (source / 'shader-playground' / name).is_file(), f'Missing {name}'
 assert (source / 'site-src/build_new.py').is_file()
 stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
@@ -32,6 +33,10 @@ live = html / 'native/try'
 live.rename(backup / 'old-try')
 staged.rename(live)
 shutil.copy2(source / 'site-src/build_new.py', builder)
+sitemap = source / 'site-src/make_sitemap.py'
+if sitemap.is_file():
+    shutil.copy2(root / 'site-src/make_sitemap.py', backup / 'make_sitemap.py')
+    shutil.copy2(sitemap, root / 'site-src/make_sitemap.py')
 # Legacy /native/ visitors must also receive the new preview, not a WASM probe.
 legacy = html / 'native/index.html'
 text = legacy.read_text(encoding='utf-8')

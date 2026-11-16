@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-type="software">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watch your AI agent work · ButtonsCLI agent control</title>
+<meta name="description" content="An animated walkthrough of ButtonsCLI agent control: Claude Code, Codex, Antigravity or any MCP client runs its commands in terminal panes you can see, scroll and take over.">
+<link rel="canonical" href="https://buttonscli.com/native/try/agents/">
+<meta name="page-type" content="software"><meta name="site-kind" content="software"><meta name="theme-color" content="#040913">
+<script>
+// Dark unless the visitor chose light here before, or the link asks for it.
+(() => {
+  const params = new URLSearchParams(location.search);
+  if (params.has('embed')) document.documentElement.classList.add('embedded'); // player only, for iframes
+  let theme = params.get('theme');
+  try { theme = theme || (params.has('embed') ? null : localStorage.getItem('buttonscli-agents-theme')); } catch {}
+  if (theme === 'light') document.documentElement.dataset.theme = 'light';
+})();
+</script>
+<link rel="stylesheet" href="style.css?v=20261115-5">
+</head>
+<body>
+<a class="skip" href="#how">Skip the animation</a>
+<header class="top">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">B</span>ButtonsCLI</a>
+  <nav aria-label="Main">
+    <a href="/native/try/">Shader playground</a>
+    <a href="/native/docs/">Docs</a>
+    <a href="https://github.com/detroittommy879/buttonscli-native/releases/latest" rel="noopener">Download</a>
+  </nav>
+  <button id="theme" class="ghost" aria-label="Switch between dark and light">☀ Light</button>
+</header>
+
+<main>
+<section class="hero">
+  <p class="eyebrow">Agent control <span class="tag">Preview</span></p>
+  <h1>See what your agent is doing <span class="grad">in every terminal</span> <span class="ether" role="text" aria-label="… in style."><span aria-hidden="true" style="display:contents"><span style="--i:0">…</span><span style="--i:1"> </span><span style="--i:2">i</span><span style="--i:3">n</span><span style="--i:4"> </span><span style="--i:5">s</span><span style="--i:6">t</span><span style="--i:7">y</span><span style="--i:8">l</span><span style="--i:9">e</span><span style="--i:10">.</span></span></span></h1>
+  <p class="lede">Coding agents usually run commands where you can't see them. Connect one to ButtonsCLI and it works in real terminal tabs instead: you watch each command arrive, scroll the output, and take over a pane whenever you want.</p>
+</section>
+
+<section class="player" aria-label="Animated walkthrough">
+  <div class="stage booting" id="stage" role="img" aria-label="Animation: an AI coding agent connects to ButtonsCLI, opens four terminal tabs, runs a dev server, tests, git and a log tail in them, reads the failing test, fixes it and reruns, while every pane stays visible.">
+    <div class="win agent" id="agent">
+      <div class="win-bar"><i></i><i></i><i></i><span class="win-title">AI coding agent</span><span class="agent-name" id="agent-name">Claude Code</span></div>
+      <div class="agent-log" id="agent-log"></div>
+      <div class="agent-foot"><span class="dot" id="agent-dot"></span><span id="agent-status">No terminal tools connected</span></div>
+    </div>
+    <div class="win app" id="app">
+      <div class="app-title"><span>▦ ButtonsCLI</span><span class="app-sub">Native</span></div>
+      <div class="app-tabs" id="tabs"></div>
+      <div class="app-dock"><span>Clear</span><span>Git Status</span><span>Git Log</span><span>npm test</span><span>docker ps</span></div>
+      <div class="workspace backing-on" id="workspace"></div>
+      <div class="app-status"><span class="ready" id="app-ready">READY</span><button type="button" id="agent-inst" tabindex="-1">Agent Inst.</button><span class="control" id="control-state">control: 127.0.0.1 · waiting</span><span class="grow"></span><span>Text backing ✓</span></div>
+    </div>
+    <svg id="arrows" aria-hidden="true"></svg>
+    <div class="toast" id="toast" hidden></div>
+    <div class="chapter" id="chapter" hidden></div>
+    <div class="endcard" id="endcard" hidden>
+      <h2>Every command ran where you could see it.</h2>
+      <p>Same agent, same work. Now the terminals are yours to watch.</p>
+      <div class="end-actions"><button type="button" id="again">↻ Play again</button><a class="btn" href="https://github.com/detroittommy879/buttonscli-native/releases/latest" rel="noopener">Download ButtonsCLI</a></div>
+    </div>
+  </div>
+  <div class="caption" aria-live="polite"><span class="scene-no" id="scene-no"></span><strong id="scene-title"></strong><span id="scene-text"></span></div>
+  <div class="controls">
+    <button type="button" id="play" class="primary" aria-label="Pause">❚❚ Pause</button>
+    <button type="button" id="restart" aria-label="Restart from the beginning">↺ Restart</button>
+    <ol class="chips" id="chips" aria-label="Scenes"></ol>
+    <label class="speed">Speed <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+    <button type="button" id="shuffle">⚄ New shaders</button>
+  </div>
+  <p class="realnote">The real app looks much better than this simulation.</p>
+  <p class="fineprint" id="gpu-note">A simulation: nothing here runs a command. The pane backgrounds are the app's real shaders, picked at random on each load.</p>
+</section>
+
+<section id="how" class="band">
+  <h2>How it works</h2>
+  <ol class="steps">
+    <li><span class="n">1</span><h3>Click <em>Agent Inst.</em></h3><p>The status bar button copies instructions for this running app: where its connection file is and which helper to call. The token stays in the file, not in what you paste.</p></li>
+    <li><span class="n">2</span><h3>Paste into your agent</h3><p>Claude Code, Codex, Antigravity, or anything else that can run a command line tool or use an MCP server. No Node, Python or other runtime is needed.</p></li>
+    <li><span class="n">3</span><h3>Watch the panes</h3><p>The agent opens tabs, arranges them, types commands and reads the output back. Each pane is a normal terminal: click it and type, or press Ctrl+C yourself.</p></li>
+  </ol>
+</section>
+
+<section class="band two">
+  <div>
+    <h2>From a shell</h2>
+    <p><code>buttonsclictl</code> ships next to the app. An agent that can run commands can use it directly.</p>
+<pre><code><span class="c"># lay out four named tabs in a grid</span>
+<span class="p">$</span> <span class="k">buttonsclictl</span> open-layout --layout grid \
+    --name server --name tests --name git --name logs
+<span class="c"># run a command and wait for its output to settle</span>
+<span class="p">$</span> <span class="k">buttonsclictl</span> run --tab tests <span class="s">"npm test"</span>
+<span class="c"># read back what the pane shows</span>
+<span class="p">$</span> <span class="k">buttonsclictl</span> read --tab tests --lines 40
+<span class="c"># stop the dev server</span>
+<span class="p">$</span> <span class="k">buttonsclictl</span> key ctrl+c --tab server</code></pre>
+  </div>
+  <div>
+    <h2>Or over MCP</h2>
+    <p>The same helper is a stdio MCP server. <em>Agent Inst.</em> copies an entry like this with your real paths.</p>
+<pre><code>{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"buttonscli-native"</span>: {
+      <span class="s">"command"</span>: <span class="s">"C:/Program Files/ButtonsCLI/buttonsclictl.exe"</span>,
+      <span class="s">"args"</span>: [<span class="s">"mcp"</span>],
+      <span class="s">"env"</span>: { <span class="s">"BUTTONSCLI_CONTROL_INFO_PATH"</span>:
+               <span class="s">"C:/Users/you/.buttonscli-native/control"</span> }
+    }
+  }
+}</code></pre>
+  </div>
+</section>
+
+<section class="band">
+  <h2>The 14 tools</h2>
+  <div class="tools">
+    <div><h3><span class="pill read">read-only</span> Look</h3><ul>
+      <li><code>status</code> is the app running and reachable</li>
+      <li><code>tabs</code> list tabs, shown and hidden</li>
+      <li><code>read</code> recent output from a tab</li>
+      <li><code>wait_for_text</code> until a marker appears</li>
+      <li><code>wait_for_quiet</code> until output stops changing</li>
+      <li><code>presets</code> your saved command buttons</li>
+      <li><code>help</code> tool list and tab selector rules</li>
+    </ul></div>
+    <div><h3><span class="pill layout">layout</span> Arrange</h3><ul>
+      <li><code>create_tab</code> a new named terminal</li>
+      <li><code>rename_tab</code> so tabs say what they are for</li>
+      <li><code>open_layout</code> named tabs side by side, stacked or in a grid</li>
+    </ul></div>
+    <div><h3><span class="pill act">sends input</span> Act</h3><ul>
+      <li><code>run</code> type a command, then wait for text or quiet</li>
+      <li><code>send</code> text or a long paste, with or without Enter</li>
+      <li><code>key</code> Ctrl+C, Ctrl+D, Ctrl+Z, Enter, Tab, Escape</li>
+      <li><code>preset_run</code> press one of your command buttons</li>
+    </ul></div>
+  </div>
+  <p class="muted">Tools carry read-only and destructive labels, so an MCP client can ask you before the ones that send input.</p>
+</section>
+
+<section class="band">
+  <h2>Good to know</h2>
+  <ul class="checks">
+    <li><strong>Local only.</strong> The control service listens on <code>127.0.0.1</code> with a random port and a new token each time the app starts. It refuses requests that come from a web page.</li>
+    <li><strong>Real shells.</strong> What the agent sends is typed into a real terminal. Connect only clients you trust.</li>
+    <li><strong>Long jobs keep running.</strong> A dev server or log tail lives in its tab, not inside one agent tool call.</li>
+    <li><strong>No exit codes.</strong> <code>run</code> reports when output went quiet or matched your text. It does not say whether the command succeeded; the agent reads the output for that.</li>
+  </ul>
+  <p class="cta"><a class="btn" href="https://github.com/detroittommy879/buttonscli-native/releases/latest" rel="noopener">Download ButtonsCLI</a><a class="btn ghost" href="https://github.com/detroittommy879/buttonscli-native/blob/main/docs/CONTROL-API.md" rel="noopener">Control API reference</a><a class="btn ghost" href="/native/try/">Try the shaders</a></p>
+</section>
+</main>
+
+<footer class="foot"><p>© ButtonsCLI. The agent and commands in the animation are simulated. Claude Code, Codex and Antigravity are named as examples of agents that can connect; they belong to their owners and are not affiliated with ButtonsCLI.</p></footer>
+<script type="module" src="demo.js?v=20261115-5"></script>
+</body></html>

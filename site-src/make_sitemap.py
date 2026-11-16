@@ -17,6 +17,7 @@ SITE = "https://buttonscli.com"
 PAGES = [
     ("/", "index.html"),
     ("/classic/", "classic/index.html"),
+    ("/native/try/agents/", "native/try/agents/index.html"),
     ("/3/", "3/index.html"),
     ("/daily-joke-lab/index.html", "daily-joke-lab/index.html"),
 ]
