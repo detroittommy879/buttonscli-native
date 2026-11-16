@@ -32,7 +32,7 @@ impl AutoTile {
     /// Preserve pane positions, keep focus when shrinking, then fill in tab order.
     /// Membership uses IDs so reordering or removing tabs cannot transfer it.
     pub(crate) fn select(&self, ids: &[u64], focused: usize, previous: &[usize]) -> Vec<usize> {
-        let count = self.requested_count.clamp(1, 10);
+        let count = self.requested_count.clamp(1, crate::settings::MAX_PANES);
         let mut selected = Vec::with_capacity(count);
         for index in previous.iter().copied() {
             if ids.get(index).is_some_and(|id| self.includes(*id)) && !selected.contains(&index) {
@@ -116,7 +116,7 @@ mod tests {
         tiles.set_included(2, false);
         assert_eq!(tiles.eligible_count(&ids), 63);
         let selected = tiles.select(&ids, 0, &[]);
-        assert_eq!(selected.len(), 10);
+        assert_eq!(selected.len(), 63.min(crate::settings::MAX_PANES));
         assert!(!selected.contains(&1));
     }
 

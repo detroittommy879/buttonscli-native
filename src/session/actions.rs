@@ -141,10 +141,12 @@ impl Action {
             }
             Self::GridColumns {
                 columns: Some(columns),
-            } if !(1..=10).contains(columns) => Err(ActionError::InvalidInput),
+            } if !(1..=crate::settings::MAX_PANES).contains(columns) => {
+                Err(ActionError::InvalidInput)
+            }
             Self::ShowTabs { ids }
                 if ids.is_empty()
-                    || ids.len() > 10
+                    || ids.len() > crate::settings::MAX_PANES
                     || ids
                         .iter()
                         .copied()

@@ -379,7 +379,7 @@ mod setup {
                 .feed_virtual_output(format!("\x1b[2J\x1b[H{text}").as_bytes());
         }
         app.visible_panes = (0..count).collect();
-        app.auto_tile.requested_count = count.clamp(1, 10);
+        app.auto_tile.requested_count = count.clamp(1, crate::settings::MAX_PANES);
         app.focused = 0;
     }
 

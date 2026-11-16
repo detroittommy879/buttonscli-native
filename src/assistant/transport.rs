@@ -104,6 +104,29 @@ fn bearer_header(key: &str) -> Result<reqwest::header::HeaderValue, TransportErr
     Ok(value)
 }
 
+const APP_TITLE: &str = "ButtonsCLI Native";
+const APP_URL: &str = "https://buttonscli.com/native/";
+
+/// OpenRouter app attribution (openrouter.ai/docs/app-attribution): the app
+/// URL, name and category, so usage shows on ButtonsCLI's OpenRouter app page.
+/// Sent only to openrouter.ai; other providers just get `X-Title`.
+fn attribution_headers(url: &url::Url) -> reqwest::header::HeaderMap {
+    use reqwest::header::{HeaderMap, HeaderValue};
+    let mut headers = HeaderMap::new();
+    let openrouter = url
+        .host_str()
+        .is_some_and(|host| host == "openrouter.ai" || host.ends_with(".openrouter.ai"));
+    if openrouter {
+        headers.insert("HTTP-Referer", HeaderValue::from_static(APP_URL));
+        headers.insert("X-OpenRouter-Title", HeaderValue::from_static(APP_TITLE));
+        headers.insert(
+            "X-OpenRouter-Categories",
+            HeaderValue::from_static("cli-agent"),
+        );
+    }
+    headers
+}
+
 fn auth_headers(request: &Request) -> Result<reqwest::header::HeaderMap, TransportError> {
     let mut headers = reqwest::header::HeaderMap::new();
     if request.anthropic {
@@ -156,12 +179,14 @@ impl HttpTransport for ReqwestTransport {
             .connect_timeout(Duration::from_secs(5))
             .build()
             .map_err(|_| TransportError::Network)?;
+        let attribution = attribution_headers(&parsed);
         let mut builder = match request.method {
             Method::Get => client.get(parsed),
             Method::Post => client.post(parsed),
         }
         .header("Accept", "application/json")
-        .header("X-Title", "ButtonsCLI Native");
+        .header("X-Title", APP_TITLE)
+        .headers(attribution);
         builder = builder.headers(auth_headers(&request)?);
         if let Some(body) = request.body {
             builder = builder.json(&body);
@@ -222,12 +247,14 @@ impl HttpTransport for ReqwestTransport {
             .connect_timeout(Duration::from_secs(5))
             .build()
             .map_err(|_| TransportError::Network)?;
+        let attribution = attribution_headers(&parsed);
         let mut builder = match request.method {
             Method::Get => client.get(parsed),
             Method::Post => client.post(parsed),
         }
         .header("Accept", "application/json, text/event-stream")
-        .header("X-Title", "ButtonsCLI Native");
+        .header("X-Title", APP_TITLE)
+        .headers(attribution);
         builder = builder.headers(auth_headers(&request)?);
         if let Some(body) = request.body {
             builder = builder.json(&body);
@@ -311,6 +338,18 @@ fn retry_after(value: &str) -> Option<Duration> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn openrouter_gets_app_attribution_and_others_do_not() {
+        let openrouter = url::Url::parse("https://openrouter.ai/api/v1/chat/completions").unwrap();
+        let headers = super::attribution_headers(&openrouter);
+        assert_eq!(headers["HTTP-Referer"], "https://buttonscli.com/native/");
+        assert_eq!(headers["X-OpenRouter-Title"], "ButtonsCLI Native");
+        let other = url::Url::parse("https://api.example.com/v1").unwrap();
+        assert!(super::attribution_headers(&other).is_empty());
+        let lookalike = url::Url::parse("https://notopenrouter.ai/v1").unwrap();
+        assert!(super::attribution_headers(&lookalike).is_empty());
+    }
+
     use super::*;
 
     #[test]

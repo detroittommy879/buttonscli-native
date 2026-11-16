@@ -133,7 +133,8 @@ impl ButtonsApp {
             PaneLayout::Single => self.set_pane_layout(PaneLayout::Single, ctx),
             layout => {
                 self.pane_layout = layout;
-                self.auto_tile.requested_count = group.visible_panes.clamp(2, 10);
+                self.auto_tile.requested_count =
+                    group.visible_panes.clamp(2, crate::settings::MAX_PANES);
                 self.refresh_auto_tiles();
             }
         }

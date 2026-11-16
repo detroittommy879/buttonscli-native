@@ -491,6 +491,7 @@ impl<'a> TerminalView<'a> {
                 let selected = self.backend.selectable_content();
                 if !selected.is_empty() {
                     layout.ctx.copy_text(selected);
+                    crate::text_backing::note_copied(&layout.ctx, None);
                 }
             }
         }

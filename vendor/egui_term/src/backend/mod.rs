@@ -1596,6 +1596,29 @@ mod scrollback_tests {
     }
 
     #[test]
+    fn padded_full_width_rows_copy_as_separate_lines() {
+        // A TUI paints each row to the last column; the row wraps on a blank.
+        let size = TermSize::new(8, 3);
+        let mut terminal =
+            Term::new(term::Config::default(), &size, VoidListener);
+        for (line, word) in ["ab", "cd", "ef"].iter().enumerate() {
+            let row = &mut terminal.grid_mut()[Line(line as i32)];
+            for (column, character) in word.chars().enumerate() {
+                row[Column(column)].c = character;
+            }
+            for column in word.len()..8 {
+                row[Column(column)].c = ' ';
+                row[Column(column)].bg = Color::Indexed(4);
+            }
+            if line < 2 {
+                row[Column(7)].flags.insert(term::cell::Flags::WRAPLINE);
+            }
+        }
+        select_all_in_term(&mut terminal);
+        assert_eq!(terminal.selection_to_string().unwrap(), "ab\ncd\nef\n");
+    }
+
+    #[test]
     fn select_all_covers_retained_buffer_and_clear_keeps_terminal_state() {
         let size = TermSize::new(8, 2);
         let mut terminal = Term::new(

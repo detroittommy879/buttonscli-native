@@ -474,6 +474,11 @@ pub(crate) struct ThemeBundle {
     pub(crate) row_banding_brightness: Option<u8>,
 }
 
+/// A sanity guard on panes shown at once (not a design limit): how many
+/// actually render depends on window and font size.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub(crate) const MAX_PANES: usize = 64;
+
 /// Named sets of open terminals that can be reopened later.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
