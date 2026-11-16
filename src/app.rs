@@ -1265,6 +1265,8 @@ enum PaneAction {
     ShaderSettings,
     /// Give this pane its own text backing colors (theme editor, pane mode).
     TextBackingColors,
+    /// Type a tmux command into this pane.
+    Tmux(tmux::TmuxAction),
     ResetSimulation,
     UndoSimulation,
     CancelSimulation,
@@ -2446,6 +2448,7 @@ impl ButtonsApp {
                 let text = self.tabs[index].backend.selectable_content();
                 if !text.is_empty() {
                     ctx.copy_text(text);
+                    egui_term::note_copied(ctx, None);
                 }
             }
             PaneAction::Paste => {
@@ -2456,6 +2459,10 @@ impl ButtonsApp {
                 ctx.request_repaint();
             }
             PaneAction::ResetMouseMode => self.tabs[index].backend.reset_mouse_modes(),
+            PaneAction::Tmux(tmux_action) => {
+                let line = tmux::command(tmux_action, &self.tabs[index].title);
+                self.tabs[index].write(line);
+            }
             PaneAction::ToggleIdleGlow => self.toggle_idle_glow(id),
             PaneAction::SelectAll => self.tabs[index].backend.select_all(),
             PaneAction::Clear => self.tabs[index].backend.clear_screen(),
@@ -17306,6 +17313,7 @@ fn pane_action_menu(
         *action = Some(PaneAction::ResetMouseMode);
         ui.close_menu();
     }
+    tmux::tmux_menu(ui, locale, action);
     let mut glow = glow_on;
     if ui
         .spaced_checkbox(&mut glow, crate::i18n::literal(locale, "Idle glow"))
@@ -18368,6 +18376,8 @@ mod test_text;
 mod text_backing;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
+#[cfg(not(target_arch = "wasm32"))]
+mod tmux;
 #[cfg(not(target_arch = "wasm32"))]
 mod ui_scale;
 #[cfg(not(target_arch = "wasm32"))]
