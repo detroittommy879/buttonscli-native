@@ -15,3 +15,8 @@ and `site-src/build_new.py` in that folder. Run as ubuntu on amp. It checks the
 expected homepage-generator SHA256, backs up all changed live files, installs the
 static playground, updates the old native landing page's embed, regenerates the
 homepage variants and activates b. Never upload credentials or native profiles.
+
+`static/robots.txt` and `static/llms.txt` are the source of the live files;
+`activate.sh` installs them. Edit them here, never on amp. The Apache
+vhosts (http→https, www→apex SEO rules) are not in this public repo: they
+name private services. A local copy is in `.private/server-config/`.
