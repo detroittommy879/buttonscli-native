@@ -670,10 +670,10 @@ async fn open_layout(
     Json(request): Json<OpenLayoutRequest>,
 ) -> Result<Json<LayoutResponse>, (StatusCode, Json<serde_json::Value>)> {
     authorize(&headers, &state)?;
-    if !(2..=32).contains(&request.names.len()) {
+    if !(2..=crate::settings::MAX_PANES).contains(&request.names.len()) {
         return Err(api_error(
             StatusCode::BAD_REQUEST,
-            "open-layout requires between 2 and 32 tab names",
+            "open-layout requires between 2 and 64 tab names",
         ));
     }
     let mode = match request.layout.as_str() {
@@ -689,11 +689,11 @@ async fn open_layout(
     };
     if request
         .columns
-        .is_some_and(|columns| !(1..=10).contains(&columns))
+        .is_some_and(|columns| !(1..=crate::settings::MAX_PANES).contains(&columns))
     {
         return Err(api_error(
             StatusCode::BAD_REQUEST,
-            "columns must be between 1 and 10",
+            "columns must be between 1 and 64",
         ));
     }
     if request.columns.is_some() && request.layout != "grid" {
@@ -761,7 +761,11 @@ async fn open_layout(
         &snapshot,
         None,
         Action::ShowTabs {
-            ids: created_ids.iter().take(10).copied().collect(),
+            ids: created_ids
+                .iter()
+                .take(crate::settings::MAX_PANES)
+                .copied()
+                .collect(),
         },
     )
     .await

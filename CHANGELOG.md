@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Copying from full-screen programs** (Claude Code, Codex, htop…) keeps
+  the line breaks: rows they pad to the window edge no longer paste as one
+  long line full of spaces, and trailing blanks are trimmed.
+- A **Copied to clipboard** label appears briefly next to the pointer after
+  copy-on-select, right-click copy or the Copy shortcut, on a feathered
+  backing so it stays readable over any shader.
+- **UI size**: Auto keeps Retina/HiDPI screens (MacBooks, 150%+ scaling) at
+  100% instead of shrinking them, and the slider waits until you let go
+  before resizing.
+- **No more 10-pane cap**: show as many panes as fit the window and font
+  (a sanity guard of 64 remains); the control API accepts up to 64.
+- OpenRouter requests carry app attribution (ButtonsCLI's URL, name and
+  category); other providers are unchanged.
+
 - **◐ Look menu** now also has window opacity, text backing opacity, the
   display language and **Test text**: a pane with no shell that shows ANSI
   colors, styles, box drawing, wide characters and emoji, to check a look.

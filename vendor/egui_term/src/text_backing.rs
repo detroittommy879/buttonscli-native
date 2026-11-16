@@ -90,6 +90,46 @@ pub(crate) fn shapes(
     }
 }
 
+/// One feathered backing behind `rect` (a label outside the terminal grid),
+/// drawn the same way as terminal text backing.
+pub fn backing_shapes(
+    rect: Rect,
+    color: Color32,
+    opacity: f32,
+    feather: f32,
+) -> Vec<Shape> {
+    let options = TextBacking {
+        opacity,
+        feather,
+        whole_line: false,
+        invert: false,
+    };
+    shapes(
+        std::iter::once((rect, color)),
+        rect.expand(feather.max(0.0) + 1.0),
+        rect.width().max(1.0),
+        options,
+    )
+}
+
+/// Records a copy to the clipboard at `pos`, for the app's "Copied" toast.
+pub fn note_copied(ctx: &egui::Context, pos: Option<egui::Pos2>) {
+    let at = ctx.input(|input| input.time);
+    let pos = pos.or_else(|| ctx.pointer_latest_pos());
+    ctx.data_mut(|data| {
+        data.insert_temp(copied_id(), (at, pos));
+    });
+}
+
+/// The time and place of the latest copy recorded by `note_copied`.
+pub fn last_copied(ctx: &egui::Context) -> Option<(f64, Option<egui::Pos2>)> {
+    ctx.data(|data| data.get_temp(copied_id()))
+}
+
+fn copied_id() -> egui::Id {
+    egui::Id::new("egui_term-copied-to-clipboard")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

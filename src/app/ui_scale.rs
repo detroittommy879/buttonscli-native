@@ -8,8 +8,20 @@ use super::*;
 const REFERENCE_HEIGHT: f32 = 1728.0;
 const AUTO_MIN: f32 = 0.8;
 
-/// The automatic size for a monitor of `height` points at zoom 1.
-pub(crate) fn auto_scale(height: Option<f32>) -> f32 {
+/// HiDPI screens (Retina laptops, 150%+ Windows scaling) already size the UI
+/// for their viewing distance: Auto keeps them at 100%.
+const HIDPI_PIXELS_PER_POINT: f32 = 1.5;
+
+/// How long the UI size slider waits after the last change, with the
+/// pointer released, before resizing everything.
+const SLIDER_SETTLE_SECONDS: f64 = 0.4;
+
+/// The automatic size for a monitor of `height` points at zoom 1, shown with
+/// `native_ppp` physical pixels per point.
+pub(crate) fn auto_scale(height: Option<f32>, native_ppp: Option<f32>) -> f32 {
+    if native_ppp.is_some_and(|ppp| ppp >= HIDPI_PIXELS_PER_POINT) {
+        return 1.0;
+    }
     match height {
         Some(height) if height.is_finite() && height > 0.0 => {
             // Steps of 5% keep it stable while windows move between monitors.
@@ -27,8 +39,14 @@ impl ButtonsApp {
         }
         // egui reports the monitor in zoomed points; undo the current zoom.
         let zoom = ctx.zoom_factor();
-        let height = ctx.input(|input| input.viewport().monitor_size.map(|size| size.y * zoom));
-        auto_scale(height)
+        let (height, native_ppp) = ctx.input(|input| {
+            let viewport = input.viewport();
+            (
+                viewport.monitor_size.map(|size| size.y * zoom),
+                viewport.native_pixels_per_point,
+            )
+        });
+        auto_scale(height, native_ppp)
     }
 
     pub(super) fn apply_ui_scale(&self, ctx: &egui::Context) {
@@ -43,7 +61,11 @@ impl ButtonsApp {
     pub(super) fn ui_scale_settings(&mut self, ui: &mut egui::Ui) {
         let auto = self.preferences.ui_scale <= 0.0;
         let current = self.effective_ui_scale(ui.ctx());
-        let mut percent = (current * 100.0).round();
+        // A pending slider value: (percent, time of last change). Resizing
+        // everything while the pointer is down moves the slider under it.
+        let pending_id = egui::Id::new("ui-scale-pending");
+        let pending: Option<(f32, f64)> = ui.ctx().data(|data| data.get_temp(pending_id));
+        let mut percent = pending.map_or((current * 100.0).round(), |(value, _)| value);
         let mut changed = false;
         wrapping_row(ui, |ui| {
             let response = ui.add_enabled(
@@ -56,10 +78,20 @@ impl ButtonsApp {
                 .suffix("%")
                 .text(crate::i18n::literal(&self.locale, "UI size")),
             );
-            // Apply on release: resizing everything mid-drag moves the slider.
-            if response.drag_stopped() || (response.changed() && !response.dragged()) {
-                self.preferences.ui_scale = percent / 100.0;
-                changed = true;
+            let ctx = ui.ctx().clone();
+            let now = ctx.input(|input| input.time);
+            if response.changed() {
+                ctx.data_mut(|data| data.insert_temp(pending_id, (percent, now)));
+            }
+            if let Some((_, since)) = ctx.data(|data| data.get_temp::<(f32, f64)>(pending_id)) {
+                let held = ctx.input(|input| input.pointer.any_down());
+                if !held && now - since >= SLIDER_SETTLE_SECONDS {
+                    ctx.data_mut(|data| data.remove::<(f32, f64)>(pending_id));
+                    self.preferences.ui_scale = percent / 100.0;
+                    changed = true;
+                } else {
+                    ctx.request_repaint_after(std::time::Duration::from_millis(100));
+                }
             }
             let mut auto_box = auto;
             if ui
@@ -84,13 +116,19 @@ mod tests {
 
     #[test]
     fn auto_scale_shrinks_small_workspaces_in_five_percent_steps() {
-        assert_eq!(auto_scale(None), 1.0);
-        assert_eq!(auto_scale(Some(f32::NAN)), 1.0);
-        assert_eq!(auto_scale(Some(1728.0)), 1.0); // 4K at 125%
-        assert_eq!(auto_scale(Some(2160.0)), 1.0); // 4K at 100%
-        assert_eq!(auto_scale(Some(1440.0)), 0.85); // 1440p at 100%
-        assert_eq!(auto_scale(Some(1080.0)), 0.8); // 1080p at 100%
-        assert_eq!(auto_scale(Some(864.0)), 0.8); // 1080p at 125%
+        assert_eq!(auto_scale(None, None), 1.0);
+        assert_eq!(auto_scale(Some(f32::NAN), None), 1.0);
+        assert_eq!(auto_scale(Some(1728.0), Some(1.25)), 1.0); // 4K at 125%
+        assert_eq!(auto_scale(Some(2160.0), Some(1.0)), 1.0); // 4K at 100%
+        assert_eq!(auto_scale(Some(1440.0), Some(1.0)), 0.85); // 1440p at 100%
+        assert_eq!(auto_scale(Some(1080.0), Some(1.0)), 0.8); // 1080p at 100%
+        assert_eq!(auto_scale(Some(864.0), Some(1.25)), 0.8); // 1080p at 125%
+    }
+
+    #[test]
+    fn auto_scale_keeps_hidpi_laptops_at_full_size() {
+        assert_eq!(auto_scale(Some(982.0), Some(2.0)), 1.0); // M1 MacBook Retina
+        assert_eq!(auto_scale(Some(960.0), Some(1.5)), 1.0); // 1440p at 150%
     }
 
     #[test]

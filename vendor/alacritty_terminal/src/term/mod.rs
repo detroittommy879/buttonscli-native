@@ -654,12 +654,21 @@ impl<T> Term<T> {
             }
         }
 
+        // ButtonsCLI: full-screen programs paint every row to the last column
+        // with spaces, which sets WRAPLINE. Copying those rows produced one
+        // huge line with long blank runs. A wrapped row that ends in two or
+        // more spaces is padding, not a soft wrap: copy it as its own line.
+        let padded_wrap = text.ends_with("  ");
         if cols.end >= self.columns() - 1
             && (line_length.0 == 0
+                || padded_wrap
                 || !self.grid[line][line_length - 1]
                     .flags
                     .contains(Flags::WRAPLINE))
         {
+            // Trailing blanks (often painted background) are never wanted.
+            let trimmed = text.trim_end_matches(' ').len();
+            text.truncate(trimmed);
             text.push('\n');
         }
 

@@ -2906,7 +2906,10 @@ impl ButtonsApp {
                 );
                 self.focused = index;
                 if self.pane_layout != PaneLayout::Single {
-                    self.auto_tile.requested_count = self.visible_panes.len().clamp(1, 10);
+                    self.auto_tile.requested_count = self
+                        .visible_panes
+                        .len()
+                        .clamp(1, crate::settings::MAX_PANES);
                     self.refresh_auto_tiles();
                 }
                 self.notice = None;
@@ -2965,7 +2968,10 @@ impl ButtonsApp {
             pane_state_after_new_tab(&self.visible_panes, self.focused, index, self.pane_layout);
         self.focused = index;
         if self.pane_layout != PaneLayout::Single {
-            self.auto_tile.requested_count = self.visible_panes.len().clamp(1, 10);
+            self.auto_tile.requested_count = self
+                .visible_panes
+                .len()
+                .clamp(1, crate::settings::MAX_PANES);
             self.refresh_auto_tiles();
         }
         self.notice = None;
@@ -3430,7 +3436,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn set_visible_pane_count(&mut self, count: usize, context: &egui::Context) {
-        let count = count.clamp(1, 10);
+        let count = count.clamp(1, crate::settings::MAX_PANES);
         if count == 1 {
             self.set_pane_layout(PaneLayout::Single, context);
             return;
@@ -3496,7 +3502,7 @@ impl ButtonsApp {
         if count == 0 {
             return;
         }
-        self.auto_tile.requested_count = count.min(10);
+        self.auto_tile.requested_count = count.min(crate::settings::MAX_PANES);
         if self.pane_layout == PaneLayout::Single {
             self.pane_layout = PaneLayout::Grid;
         }
@@ -5626,7 +5632,7 @@ impl ButtonsApp {
                                 .color(colors.status_text),
                         ).on_hover_text(crate::i18n::literal(&self.locale, "Visible / requested panes. Use the tab strip to reach panes hidden by window size."));
                         if ui
-                            .add_enabled(pane_count < 10, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+")))
+                            .add_enabled(pane_count < crate::settings::MAX_PANES, crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "+")))
                             .on_hover_text(crate::i18n::literal(&self.locale, "Show one more terminal"))
                             .clicked()
                         {
@@ -5636,7 +5642,7 @@ impl ButtonsApp {
                     #[cfg(not(target_arch = "wasm32"))]
                     if ui.add_enabled(self.auto_tile.eligible_count(&self.tab_ids()) > 0,
                         crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "All")))
-                        .on_hover_text(crate::i18n::literal(&self.locale, "Auto-tile all included terminals (up to 10). No new terminals are opened."))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Auto-tile all included terminals. No new terminals are opened."))
                         .clicked() {
                         self.show_all_auto_tiles();
                     }
@@ -15363,6 +15369,7 @@ impl ButtonsApp {
                     let selected = tab.backend.selectable_content();
                     if !selected.is_empty() {
                         ctx.copy_text(selected);
+                        egui_term::note_copied(ctx, None);
                     }
                 }
             }
@@ -16595,6 +16602,7 @@ fn render_pane_tree(
                     && tab.backend.last_content().selectable_range.is_some();
                 if copy_directly && response.secondary_clicked() {
                     ui.ctx().copy_text(tab.backend.selectable_content());
+                    egui_term::note_copied(ui.ctx(), None);
                 }
                 if !copy_directly {
                     response.context_menu(|ui| {
@@ -18234,6 +18242,8 @@ mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
 #[cfg(not(target_arch = "wasm32"))]
+mod copied_toast;
+#[cfg(not(target_arch = "wasm32"))]
 mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
@@ -18426,6 +18436,8 @@ impl eframe::App for ButtonsApp {
         if let Some(area) = notice_area {
             self.notice_overlay(ctx, area);
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.copied_toast(ctx);
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]

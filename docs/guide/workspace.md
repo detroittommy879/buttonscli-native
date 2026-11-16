@@ -7,8 +7,8 @@ description: Tabs, panes, layouts, command buttons and right-click menus.
 
 ## Tabs and panes
 
-Every tab is a running terminal. Up to ten are shown at once as **panes**; the
-rest keep running in the background.
+Every tab is a running terminal. As many as fit the window are shown at once
+as **panes**; the rest keep running in the background.
 
 - **Click a tab that is on screen** to type in it.
 - **Click a tab that is off screen** to swap it into the pane you are using.
@@ -72,6 +72,14 @@ keyboard focus.
   scroll or select locally anyway, as in Alacritty.
 - Full-screen programs that don't use the mouse (`less`, `man`) get arrow
   keys from the wheel, so they scroll too.
+- Copy and paste without the keyboard: drag over text and it is copied
+  as soon as you let go (a short **Copied to clipboard** label confirms
+  it). Right-click a pane with nothing selected and choose **Paste**.
+  Right-clicking while text is selected copies it instead. Turn either
+  off in Settings → Keyboard & clipboard.
+- Text copied from full-screen programs (Claude Code, Codex, htop) keeps
+  its line breaks; blanks those programs paint up to the window edge are
+  trimmed.
 - Pasted text has control characters removed, so a paste can't run hidden
   commands. Line breaks and tabs are kept.
 

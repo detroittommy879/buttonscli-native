@@ -127,7 +127,8 @@ for normal desktop use.
 
 Selectors can be `active`, a numeric session ID, `tab-<id>`, or an exact
 case-insensitive title. Duplicate titles return an ambiguity error. Layouts can
-open up to 32 tabs; at most ten panes are visible at once. Grid column requests
+open up to 64 tabs and show up to 64 panes at once (a sanity guard, not a
+design limit); how many fit depends on window and font size. Grid column requests
 are honored within the window's minimum pane sizes and may be reduced when the
 window is narrow.
 
