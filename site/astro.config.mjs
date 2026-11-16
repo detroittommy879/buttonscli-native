@@ -47,6 +47,13 @@ export default defineConfig({
 				'A fast native terminal with command buttons, per-pane themes, GPU shader backgrounds and AI-made looks.',
 			logo: { src: './src/assets/logo.png' },
 			favicon: '/favicon.png',
+			// Link previews (social media, chat apps) use the native app picture.
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://buttonscli.com/assets/native/og-buttonscli-native.jpg' } },
+				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://buttonscli.com/assets/native/og-buttonscli-native.jpg' } },
+			],
 			social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
 			defaultLocale: 'root',
 			locales: {
