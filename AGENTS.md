@@ -305,6 +305,11 @@ cargo build --locked --release --bin buttonscli
 ```
 
 - Use pinned egui/eframe 0.31 APIs; current upstream docs may describe incompatible APIs.
+- Performance: `show_viewport_immediate` couples parent/child redraws in egui 0.31.
+  Offscreen shader previews need `ui.is_rect_visible(rect)` before callback creation
+  and animation scheduling: paint clipping does not skip wgpu callback preparation.
+  Research/next steps: `.private/dev-notes/codex-optimize-ideas.md` (2026-11-16;
+  source audit, not measured performance). Keep worker polling outside culling guards.
 - Use `wrapping_row` for button rows: egui's centered `horizontal_wrapped` can make
   successive controls descend with larger fonts. Rows mixing labels, small and full
   buttons (status bar) use `centered_wrapping_row` (fixed line height, centered). Favorites allocate the name/star
