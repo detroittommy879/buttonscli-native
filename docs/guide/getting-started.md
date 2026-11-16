@@ -87,6 +87,7 @@ Primary is Ctrl on Windows/Linux and Command on macOS.
 | New / close / reopen tab | `Primary+Shift+T` / `Primary+Shift+W` / `Primary+Shift+U` |
 | Copy / paste | `Primary+Shift+C` / `Primary+Shift+V` |
 | Settings | `Primary+Shift+,` |
+| Command history | `Primary+Shift+H` |
 | Move focus from the terminal to the app controls | `F6` |
 | Quit | `Primary+Shift+Q` |
 

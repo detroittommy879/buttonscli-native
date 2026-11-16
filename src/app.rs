@@ -755,6 +755,8 @@ pub struct ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     pane_rects: std::collections::BTreeMap<u64, egui::Rect>,
     #[cfg(not(target_arch = "wasm32"))]
+    history_popup: Option<command_history::HistoryPopup>,
+    #[cfg(not(target_arch = "wasm32"))]
     hovered_tab: Option<u64>,
     #[cfg(not(target_arch = "wasm32"))]
     layout_window_start: usize,
@@ -1267,6 +1269,8 @@ enum PaneAction {
     TextBackingColors,
     /// Type a tmux command into this pane.
     Tmux(tmux::TmuxAction),
+    /// Pick a command from shell history for this pane.
+    CommandHistory,
     ResetSimulation,
     UndoSimulation,
     CancelSimulation,
@@ -1873,6 +1877,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             pane_rects: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            history_popup: None,
+            #[cfg(not(target_arch = "wasm32"))]
             hovered_tab: None,
             #[cfg(not(target_arch = "wasm32"))]
             layout_window_start: 0,
@@ -2459,6 +2465,7 @@ impl ButtonsApp {
                 ctx.request_repaint();
             }
             PaneAction::ResetMouseMode => self.tabs[index].backend.reset_mouse_modes(),
+            PaneAction::CommandHistory => self.open_command_history(index),
             PaneAction::Tmux(tmux_action) => {
                 let line = tmux::command(tmux_action, &self.tabs[index].title);
                 self.tabs[index].write(line);
@@ -13744,6 +13751,11 @@ impl ButtonsApp {
             crate::i18n::literal(&self.locale, "Copy automatically when mouse selection ends"),
         );
         ui.spaced_checkbox(
+            &mut self.preferences.keyboard.history_popup,
+            crate::i18n::literal(&self.locale, "Command history popup (Primary+Shift+H or a pane's right-click menu)"),
+        )
+        .on_hover_text(crate::i18n::literal(&self.locale, "Lists commands from this computer's bash, zsh, fish and PowerShell history files. Commands typed over SSH stay on the remote machine."));
+        ui.spaced_checkbox(
             &mut self.preferences.keyboard.programs_copy,
             crate::i18n::literal(&self.locale, "Let terminal programs copy to the clipboard"),
         )
@@ -15417,6 +15429,7 @@ impl ButtonsApp {
                 });
             }
             ShortcutAction::Paste => ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste),
+            ShortcutAction::CommandHistory => self.open_command_history(self.focused),
             ShortcutAction::OpenSettings | ShortcutAction::Quit => {}
         }
         #[cfg(target_arch = "wasm32")]
@@ -17292,6 +17305,10 @@ fn pane_action_menu(
         (crate::i18n::key("Use global theme"), PaneAction::UseGlobal),
         (crate::i18n::key("Copy selection"), PaneAction::Copy),
         (crate::i18n::key("Paste"), PaneAction::Paste),
+        (
+            crate::i18n::key("Command history…"),
+            PaneAction::CommandHistory,
+        ),
         (crate::i18n::key("Select all"), PaneAction::SelectAll),
         (crate::i18n::key("Clear screen"), PaneAction::Clear),
         (crate::i18n::key("Rename"), PaneAction::Rename),
@@ -18346,6 +18363,8 @@ mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
 #[cfg(not(target_arch = "wasm32"))]
+mod command_history;
+#[cfg(not(target_arch = "wasm32"))]
 mod copied_toast;
 #[cfg(not(target_arch = "wasm32"))]
 mod dock_nav;
@@ -18544,6 +18563,8 @@ impl eframe::App for ButtonsApp {
         }
         #[cfg(not(target_arch = "wasm32"))]
         self.copied_toast(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.command_history_popup(ctx);
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]

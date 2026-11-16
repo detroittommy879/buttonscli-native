@@ -914,6 +914,7 @@ pub enum MessageKey {
     ShortcutPaste,
     ShortcutOpenSettings,
     ShortcutQuit,
+    ShortcutCommandHistory,
     TerminalFind,
     TerminalSearchHint,
     TerminalSearchNext,
@@ -947,7 +948,7 @@ pub enum MessageKey {
 }
 
 impl MessageKey {
-    pub const ALL: [Self; 143] = [
+    pub const ALL: [Self; 144] = [
         Self::ImportFromOriginal,
         Self::ImportPreview,
         Self::ImportConfirm,
@@ -1061,6 +1062,7 @@ impl MessageKey {
         Self::ShortcutPaste,
         Self::ShortcutOpenSettings,
         Self::ShortcutQuit,
+        Self::ShortcutCommandHistory,
         Self::TerminalFind,
         Self::TerminalSearchHint,
         Self::TerminalSearchNext,
@@ -1258,6 +1260,7 @@ fn english(key: MessageKey) -> &'static str {
         MessageKey::ShortcutPaste => "Paste",
         MessageKey::ShortcutOpenSettings => "Open Settings",
         MessageKey::ShortcutQuit => "Quit",
+        MessageKey::ShortcutCommandHistory => "Command history…",
         MessageKey::TerminalFind => "Find in terminal…",
         MessageKey::TerminalSearchHint => "Search text or regex",
         MessageKey::TerminalSearchNext => "Next",

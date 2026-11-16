@@ -846,6 +846,8 @@ pub(crate) struct KeyboardPreferences {
     pub(crate) programs_copy: bool,
     pub(crate) bracketed_paste: bool,
     pub(crate) option_as_meta: bool,
+    /// Primary+Shift+H / pane menu: pick a command from shell history.
+    pub(crate) history_popup: bool,
 }
 
 impl Default for KeyboardPreferences {
@@ -856,6 +858,7 @@ impl Default for KeyboardPreferences {
             programs_copy: true,
             bracketed_paste: true,
             option_as_meta: false,
+            history_popup: true,
         }
     }
 }

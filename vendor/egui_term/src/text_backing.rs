@@ -20,7 +20,8 @@ pub enum BackingStyle {
     Horizontal,
     /// Each text row takes the next color, cycling.
     Lines,
-    /// Outline rings around the text, first color innermost.
+    /// Outline rings around the text (first color innermost) on the usual
+    /// backing color.
     Rings,
 }
 
@@ -184,15 +185,22 @@ pub(crate) fn shapes(
         Some(palette) if palette.style == BackingStyle::Rings => {
             // Outermost ring first for every run, then the next one in, so
             // inner colors always cover the outer rings of neighboring rows.
+            // The text itself sits on the usual backing color, so it stays
+            // readable whatever the ring colors are.
             let colors = palette.colors();
             for ring in (0..colors.len()).rev() {
                 let color = with_alpha(colors[ring], opacity);
                 let outermost = ring + 1 == colors.len();
                 let edge = if outermost { feather.max(0.75) } else { 0.75 };
                 for (rect, _) in &runs {
-                    let grown = rect.expand(palette.ring_width * ring as f32);
+                    let grown =
+                        rect.expand(palette.ring_width * (ring + 1) as f32);
                     feathered_rect(&mut mesh, grown, edge, |_| color);
                 }
+            }
+            for (rect, color) in &runs {
+                let color = with_alpha(*color, opacity);
+                feathered_rect(&mut mesh, *rect, 0.75, |_| color);
             }
         },
         Some(palette) => {
@@ -376,11 +384,14 @@ mod tests {
         let Shape::Mesh(mesh) = &result[0] else {
             panic!("expected a mesh");
         };
-        // One feathered quad (16 vertices) per ring; outer ring drawn first.
-        assert_eq!(mesh.vertices.len(), 32);
+        // One feathered quad (16 vertices) per ring, outer ring first, then
+        // the text core in its usual backing color.
+        assert_eq!(mesh.vertices.len(), 48);
         assert_eq!(mesh.vertices[5].color, blue);
         assert_eq!(mesh.vertices[16 + 5].color, red);
-        // The outer ring reaches ring_width beyond the text.
-        assert_eq!(mesh.vertices[5].pos, egui::pos2(-3.0, -3.0));
+        assert_eq!(mesh.vertices[32 + 5].color, Color32::BLACK);
+        // Ring k reaches (k + 1) * ring_width beyond the text.
+        assert_eq!(mesh.vertices[5].pos, egui::pos2(-6.0, -6.0));
+        assert_eq!(mesh.vertices[16 + 5].pos, egui::pos2(-3.0, -3.0));
     }
 }
