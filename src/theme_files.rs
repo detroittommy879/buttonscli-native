@@ -194,7 +194,7 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
         .map(|colors| colors.map(to_hex).to_vec())
         .unwrap_or_default();
     let typography = theme.typography.clone().unwrap_or_default();
-    json!({
+    let mut document = json!({
         "version": 1,
         "metadata": {
             "nativeThemeVersion": theme.native_version.unwrap_or(1),
@@ -312,7 +312,11 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
             "simpleNoiseIdleDelaySeconds": theme.effects.simple_noise_idle_delay_seconds,
             "simpleNoiseIdleRampSeconds": theme.effects.simple_noise_idle_ramp_seconds,
         },
-    })
+    });
+    if let Some(backing) = &theme.text_backing {
+        document["theme"]["terminal"]["textBacking"] = backing.to_value();
+    }
+    document
 }
 
 fn font_zone(zone: &FontZone) -> Value {

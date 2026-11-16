@@ -1263,6 +1263,8 @@ enum PaneAction {
     PaneBackground(String),
     UseShader(Box<crate::theme::SavedShader>),
     ShaderSettings,
+    /// Give this pane its own text backing colors (theme editor, pane mode).
+    TextBackingColors,
     ResetSimulation,
     UndoSimulation,
     CancelSimulation,
@@ -2510,6 +2512,29 @@ impl ButtonsApp {
                 self.theme_settings_tab = ThemeSettingsTab::Shaders;
                 self.show_settings = true;
             }
+            PaneAction::TextBackingColors => {
+                // Start from the colors this pane shows now, so nothing jumps.
+                let id = self.tabs[index].id;
+                let current = self.terminal_presentation_for(id);
+                let start = current
+                    .text_backing
+                    .clone()
+                    .or_else(|| self.preferences.text_backing.custom_colors())
+                    .unwrap_or_else(|| {
+                        text_backing::starter_backing_colors(
+                            crate::theme::parse_color(&current.terminal_colors.background)
+                                .unwrap_or(Color32::BLACK),
+                        )
+                    });
+                self.edit_pane_look(index, |document| {
+                    if document["theme"]["terminal"]["textBacking"].is_null() {
+                        document["theme"]["terminal"]["textBacking"] = start.to_value();
+                    }
+                });
+                self.settings_tab = SettingsTab::Themes;
+                self.theme_settings_tab = ThemeSettingsTab::Edit;
+                self.show_settings = true;
+            }
             PaneAction::ResetSimulation => {
                 let tab = &mut self.tabs[index];
                 if let Some(simulated) = &mut tab.simulated {
@@ -3709,7 +3734,7 @@ impl ButtonsApp {
             keyboard: &self.preferences.keyboard,
             scroll_lines: self.preferences.terminal_scroll_lines,
             row_brightness: self.preferences.row_banding_brightness,
-            text_backing: self.preferences.text_backing,
+            text_backing: self.preferences.text_backing.clone(),
             animation_fps,
             animation_delay,
             motion: (self.motion_time, self.preferences.motion_speed),
@@ -11321,6 +11346,7 @@ impl ButtonsApp {
                         );
                     }
                 }
+                theme_text_backing_section(ui, &locale, &mut document);
             }
             ui.spaced_label(
                 RichText::new(crate::i18n::literal(
@@ -16112,6 +16138,12 @@ fn terminal_surface(
                     feather: interaction.text_backing.feather.min(20) as f32,
                     whole_line: interaction.text_backing.whole_line,
                     invert: interaction.text_backing.invert,
+                    // A pane's theme colors win over the colors set for all panes.
+                    palette: theme
+                        .text_backing
+                        .clone()
+                        .or_else(|| interaction.text_backing.custom_colors())
+                        .and_then(|colors| backing_palette(&colors)),
                 })
             } else {
                 None
@@ -16342,6 +16374,18 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+fn backing_palette(colors: &crate::theme::TextBackingColors) -> Option<egui_term::BackingPalette> {
+    use crate::theme::TextBackingStyle;
+    let style = match colors.style {
+        TextBackingStyle::Vertical => egui_term::BackingStyle::Vertical,
+        TextBackingStyle::Horizontal => egui_term::BackingStyle::Horizontal,
+        TextBackingStyle::Lines => egui_term::BackingStyle::Lines,
+        TextBackingStyle::Rings => egui_term::BackingStyle::Rings,
+    };
+    egui_term::BackingPalette::new(&colors.colors, style, colors.ring_width)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn pane_effects_for_focus(
     effects: &TerminalEffects,
     focused: bool,
@@ -16544,7 +16588,7 @@ fn render_pane_tree(
                     keyboard: state.keyboard.clone(),
                     scroll_lines: state.scroll_lines,
                     row_brightness: state.row_brightness,
-                    text_backing: state.text_backing,
+                    text_backing: state.text_backing.clone(),
                     animation_fps: state.animation_fps,
                     animation_delay: state.animation_delay,
                     motion: state.motion,
@@ -17204,6 +17248,14 @@ fn pane_shader_menu(
         .clicked()
     {
         *action = Some(PaneAction::ShaderSettings);
+        ui.close_menu();
+    }
+    if ui
+        .spaced_button(crate::i18n::literal(locale, "Text backing colors…"))
+        .on_hover_text(crate::i18n::literal(locale, "Give this pane its own backing colors, gradient or outline rings. Other panes keep the colors set for all panes."))
+        .clicked()
+    {
+        *action = Some(PaneAction::TextBackingColors);
         ui.close_menu();
     }
 }
@@ -18053,6 +18105,50 @@ const APP_THEME_COLOR_GROUPS: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
 ];
+
+/// Theme editor: optional text backing colors saved with the theme
+/// (`theme.terminal.textBacking`). Off means the global Text backing colors.
+#[cfg(not(target_arch = "wasm32"))]
+fn theme_text_backing_section(ui: &mut egui::Ui, locale: &str, document: &mut Value) {
+    let mut colors =
+        crate::theme::TextBackingColors::from_value(&document["theme"]["terminal"]["textBacking"]);
+    let mut own = colors.is_some();
+    let toggled = ui
+        .spaced_checkbox(&mut own, crate::i18n::literal(locale, "Own text backing colors"))
+        .on_hover_text(crate::i18n::literal(locale, "Saved with this theme (and bundles that use it). Applies while Text backing is on; off uses the colors set for all panes."))
+        .changed();
+    if toggled {
+        colors = own.then(|| {
+            let background = document
+                .pointer("/theme/terminal/background")
+                .and_then(Value::as_str)
+                .and_then(crate::theme::parse_color)
+                .unwrap_or(Color32::BLACK);
+            text_backing::starter_backing_colors(background)
+        });
+    }
+    let mut changed = toggled;
+    if let Some(colors) = colors.as_mut() {
+        let ansi: Vec<Color32> = ["red", "yellow", "green", "cyan", "blue", "magenta"]
+            .into_iter()
+            .filter_map(|name| document["theme"]["terminal"]["ansiColors"][name].as_str())
+            .filter_map(crate::theme::parse_color)
+            .collect();
+        changed |=
+            text_backing::backing_colors_editor(ui, locale, "theme-text-backing", colors, &ansi);
+    }
+    if changed {
+        match (colors, document["theme"]["terminal"].as_object_mut()) {
+            (Some(colors), Some(terminal)) => {
+                terminal.insert("textBacking".into(), colors.to_value());
+            }
+            (None, Some(terminal)) => {
+                terminal.remove("textBacking");
+            }
+            _ => {}
+        }
+    }
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 fn theme_color_setting(

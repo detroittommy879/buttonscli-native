@@ -1,7 +1,131 @@
 use super::*;
+use crate::theme::{TextBackingColors, TextBackingStyle};
+
+/// Ready-made color lists for the backing editor.
+const PRESETS: [(&str, &[&str]); 4] = [
+    (
+        "Rainbow",
+        &[
+            "#ff3b3b", "#ff9f1c", "#ffe14d", "#3ddc6a", "#3aa0ff", "#a35cff",
+        ],
+    ),
+    ("Sunset", &["#ffd23f", "#ff7a45", "#ff5fb0", "#6b2fa0"]),
+    ("Ocean", &["#9be7ff", "#2b8cbe", "#08306b"]),
+    ("Fade to black", &["#3a3f4b", "#000000"]),
+];
+
+/// Default colors when someone first turns custom colors on.
+pub(super) fn starter_backing_colors(base: Color32) -> TextBackingColors {
+    TextBackingColors {
+        colors: vec![base, Color32::BLACK],
+        style: TextBackingStyle::Vertical,
+        ring_width: 3.0,
+    }
+}
+
+/// Color list (add, remove, reorder by removing), layout and ring width.
+/// `theme_colors` feeds the "Theme colors" preset. Returns true on change.
+pub(super) fn backing_colors_editor(
+    ui: &mut egui::Ui,
+    locale: &str,
+    id: &str,
+    backing: &mut TextBackingColors,
+    theme_colors: &[Color32],
+) -> bool {
+    let mut changed = false;
+    let mut remove = None;
+    ui.push_id(id, |ui| {
+        wrapping_row(ui, |ui| {
+            for (index, color) in backing.colors.iter_mut().enumerate() {
+                ui.push_id(index, |ui| {
+                    changed |= ui.color_edit_button_srgba(color).changed();
+                    if ui
+                        .small_button("×")
+                        .on_hover_text(crate::i18n::literal(locale, "Remove this color"))
+                        .clicked()
+                    {
+                        remove = Some(index);
+                    }
+                });
+            }
+            if backing.colors.len() < TextBackingColors::MAX_COLORS
+                && ui
+                    .small_button("+")
+                    .on_hover_text(crate::i18n::literal(locale, "Add a color"))
+                    .clicked()
+            {
+                let last = backing.colors.last().copied().unwrap_or(Color32::BLACK);
+                backing.colors.push(last);
+                changed = true;
+            }
+        });
+        if let Some(index) = remove {
+            if backing.colors.len() > 1 {
+                backing.colors.remove(index);
+                changed = true;
+            }
+        }
+        wrapping_row(ui, |ui| {
+            ui.spaced_label(crate::i18n::literal(locale, "Presets:"));
+            for (name, colors) in PRESETS {
+                if ui
+                    .small_button(crate::i18n::literal(locale, name))
+                    .clicked()
+                {
+                    backing.colors = colors
+                        .iter()
+                        .filter_map(|c| crate::theme::parse_color(c))
+                        .collect();
+                    changed = true;
+                }
+            }
+            if !theme_colors.is_empty()
+                && ui
+                    .small_button(crate::i18n::literal(locale, "Theme colors"))
+                    .on_hover_text(crate::i18n::literal(locale, "The pane theme's ANSI colors"))
+                    .clicked()
+            {
+                backing.colors = theme_colors
+                    .iter()
+                    .copied()
+                    .take(TextBackingColors::MAX_COLORS)
+                    .collect();
+                changed = true;
+            }
+        });
+        egui::ComboBox::new("text-backing-style", crate::i18n::literal(locale, "Layout"))
+            .selected_text(crate::i18n::literal(locale, backing.style.label()))
+            .show_ui(ui, |ui| {
+                for style in TextBackingStyle::ALL {
+                    changed |= ui
+                        .selectable_value(
+                            &mut backing.style,
+                            style,
+                            crate::i18n::literal(locale, style.label()),
+                        )
+                        .changed();
+                }
+            });
+        if backing.style == TextBackingStyle::Rings {
+            changed |= ui
+                .add(
+                    egui::Slider::new(&mut backing.ring_width, 1.0..=12.0)
+                        .step_by(1.0)
+                        .text(crate::i18n::literal(locale, "Ring width")),
+                )
+                .changed();
+        }
+    });
+    changed
+}
 
 impl ButtonsApp {
     pub(super) fn text_backing_controls(&mut self, ui: &mut egui::Ui) {
+        let terminal =
+            self.terminal_presentation_for(self.tabs.get(self.focused).map_or(0, |tab| tab.id));
+        let global_backing_base = crate::theme::parse_color(&terminal.terminal_colors.background)
+            .unwrap_or(Color32::BLACK);
+        let global_theme_colors = ansi_colors(&terminal.terminal_colors);
         let backing = &mut self.preferences.text_backing;
         if !backing.available {
             return;
@@ -27,14 +151,67 @@ impl ButtonsApp {
                 .changed();
             changed |= ui.spaced_checkbox(&mut backing.invert, crate::i18n::literal(&self.locale, "Invert text and backing colors"))
                 .on_hover_text(crate::i18n::literal(&self.locale, "Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.")).changed();
+            ui.separator();
+            let mut custom = backing.custom_colors();
+            let mut use_custom = custom.is_some();
+            if ui
+                .spaced_checkbox(&mut use_custom, crate::i18n::literal(&self.locale, "Custom colors for all panes"))
+                .on_hover_text(crate::i18n::literal(&self.locale, "Pick colors, a gradient or outline rings instead of the pane background. A pane whose theme has its own backing colors keeps them (right-click a pane → Text backing colors…)."))
+                .changed()
+            {
+                custom = use_custom.then(|| starter_backing_colors(global_backing_base));
+                changed = true;
+            }
+            if let Some(colors) = custom.as_mut() {
+                changed |= backing_colors_editor(ui, &self.locale, "global-text-backing", colors, &global_theme_colors);
+            }
+            if changed {
+                store_global_backing(backing, custom.as_ref());
+            }
             ui.spaced_label(
-                crate::i18n::literal(&self.locale, "Colors follow each pane. Disable in Settings → Experimental."),
+                crate::i18n::literal(&self.locale, "Without custom colors, the backing follows each pane. Disable in Settings → Experimental."),
             );
         });
         if changed {
             self.persist_native_preferences();
         }
     }
+}
+
+/// Saves the custom colors (or clears them) into the global preference.
+fn store_global_backing(
+    backing: &mut crate::settings::TextBacking,
+    colors: Option<&TextBackingColors>,
+) {
+    match colors {
+        Some(colors) => {
+            backing.colors = colors
+                .colors
+                .iter()
+                .map(|color| crate::theme::to_hex(*color))
+                .collect();
+            backing.style = colors.style.as_str().into();
+            backing.ring_width = colors.ring_width.round().clamp(1.0, 24.0) as u8;
+        }
+        None => backing.colors.clear(),
+    }
+}
+
+/// The six chromatic ANSI colors, then bright ones, for the "Theme colors" preset.
+pub(super) fn ansi_colors(terminal: &crate::theme::TerminalColors) -> Vec<Color32> {
+    [
+        &terminal.red,
+        &terminal.yellow,
+        &terminal.green,
+        &terminal.cyan,
+        &terminal.blue,
+        &terminal.magenta,
+        &terminal.bright_red,
+        &terminal.bright_blue,
+    ]
+    .into_iter()
+    .filter_map(|color| crate::theme::parse_color(color))
+    .collect()
 }
 
 #[cfg(test)]
@@ -59,5 +236,23 @@ mod tests {
         assert!(!NATIVE_APPEARANCE_FIELDS
             .iter()
             .any(|(name, _)| *name == "text_backing"));
+    }
+
+    #[test]
+    fn global_custom_backing_colors_round_trip_and_clear() {
+        let mut backing = crate::settings::TextBacking::default();
+        assert!(backing.custom_colors().is_none());
+        let colors = TextBackingColors {
+            colors: vec![Color32::RED, Color32::BLUE],
+            style: TextBackingStyle::Lines,
+            ring_width: 5.0,
+        };
+        store_global_backing(&mut backing, Some(&colors));
+        assert_eq!(backing.custom_colors(), Some(colors));
+        let saved: crate::settings::TextBacking =
+            serde_json::from_str(&serde_json::to_string(&backing).unwrap()).unwrap();
+        assert_eq!(saved, backing);
+        store_global_backing(&mut backing, None);
+        assert!(backing.custom_colors().is_none());
     }
 }
