@@ -111,6 +111,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   renderer `vendor/egui_term/src/text_backing.rs`. Paint once after background
   callbacks, before all cell backgrounds/glyphs (per-cell feathering covers neighbors).
   Keep it out of theme import scopes. Experimental `available` is the kill switch.
+  Custom colors: `TextBacking::colors/style/ring_width` (all panes) and a theme's
+  `theme.terminal.textBacking` (`TextBackingColors`, wins per pane); rendered by
+  `egui_term::BackingPalette` (Rings: outer ring first for all runs, then the core).
   Inversion backs runs with their foreground (whole rows use default foreground),
   uses background for ink, and preserves explicit TUI/selection/search colors.
   Web backing lives in `shader-playground/text-backing.js`; layout switches must
@@ -404,6 +407,8 @@ cargo build --locked --release --bin buttonscli
   fall back to the focused tab for queued requests, previews or delivery. Preview workers
   must match `context_generation` before publishing. Keep keys in OS credentials.
   See `docs/dev/LOCAL-FEATURE-FLAGS.md` for gated-feature testing.
+- `vendor/alacritty_terminal` tests cannot run here (not a workspace member, dev-deps):
+  put tests for fork changes in `egui_term` (it calls `selection_to_string` etc.).
 - Cargo Git installation can retain local vendor patches; crates.io publication cannot
   use path-only dependencies. See `docs/dev/CARGO-INSTALL.md`. Do not replace forks with upstream
   releases merely to make packaging pass.
