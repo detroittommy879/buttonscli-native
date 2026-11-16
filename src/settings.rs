@@ -771,8 +771,10 @@ pub(crate) const DEFAULT_UI_SCROLL_SPEED: f32 = 2.5;
 pub(crate) const MAX_UI_SCROLL_SPEED: f32 = 8.0;
 pub(crate) const MAX_TERMINAL_SCROLL_LINES: u8 = 20;
 
-/// Global readability controls; never imported from themes.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+/// Global readability controls; never imported from themes. A theme can
+/// still bring its own backing colors (`terminal.textBacking`), which win
+/// over `colors` here for panes using that theme.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub(crate) struct TextBacking {
     pub(crate) available: bool,
@@ -781,6 +783,32 @@ pub(crate) struct TextBacking {
     pub(crate) feather: u8,
     pub(crate) whole_line: bool,
     pub(crate) invert: bool,
+    /// Custom colors ("#rrggbb") for all panes; empty = pane background
+    /// (or text color when inverted), the default.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) colors: Vec<String>,
+    /// `TextBackingStyle` name: vertical, horizontal, lines or rings.
+    pub(crate) style: String,
+    /// Ring width in points for the rings style.
+    pub(crate) ring_width: u8,
+}
+
+impl TextBacking {
+    /// The custom colors for all panes, if any are set.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn custom_colors(&self) -> Option<crate::theme::TextBackingColors> {
+        let colors: Vec<_> = self
+            .colors
+            .iter()
+            .filter_map(|color| crate::theme::parse_color(color))
+            .take(crate::theme::TextBackingColors::MAX_COLORS)
+            .collect();
+        (!colors.is_empty()).then(|| crate::theme::TextBackingColors {
+            colors,
+            style: crate::theme::TextBackingStyle::parse(&self.style),
+            ring_width: f32::from(self.ring_width.clamp(1, 24)),
+        })
+    }
 }
 
 impl Default for TextBacking {
@@ -792,6 +820,9 @@ impl Default for TextBacking {
             feather: 6,
             whole_line: false,
             invert: false,
+            colors: Vec::new(),
+            style: "vertical".into(),
+            ring_width: 3,
         }
     }
 }
@@ -815,6 +846,8 @@ pub(crate) struct KeyboardPreferences {
     pub(crate) programs_copy: bool,
     pub(crate) bracketed_paste: bool,
     pub(crate) option_as_meta: bool,
+    /// Primary+Shift+H / pane menu: pick a command from shell history.
+    pub(crate) history_popup: bool,
 }
 
 impl Default for KeyboardPreferences {
@@ -825,6 +858,7 @@ impl Default for KeyboardPreferences {
             programs_copy: true,
             bracketed_paste: true,
             option_as_meta: false,
+            history_popup: true,
         }
     }
 }

@@ -118,6 +118,21 @@ while the shader stays visible around it. **Backing options** next to it:
 - **Invert text and backing colors** uses the text colors as the panel and
   draws the text dark, for very bright shaders. Selections and TUI
   backgrounds keep their own colors.
+- **Custom colors for all panes** swaps the pane colors for your own: up to
+  eight colors (**+** adds one, **×** removes one), or a preset (Rainbow,
+  Sunset, Ocean, Fade to black, the theme's colors). **Layout** picks how they
+  are used:
+  - **Gradient top to bottom** or **left to right** across the pane.
+  - **One color per line**, cycling.
+  - **Outline rings**: the text keeps its usual panel and each color is a ring
+    around it, the first one innermost. **Ring width** sets how thick.
+
+To give one pane its own colors, right-click it and choose **Text backing
+colors…**. That opens the theme editor for that pane with **Own text backing
+colors** ticked; the colors are saved with that pane's theme (and with bundles
+that use it). Other panes keep the colors for all panes. Unticking **Own text
+backing colors** goes back to them. AI theme generation can also suggest
+backing colors when you ask for them.
 
 ![Three panes with busy shaders; the text in htop, a file tree and apt output sits on soft dark panels that follow each line](images/text-backing.jpg)
 

@@ -24,6 +24,98 @@ pub struct ThemeDefinition {
     pub legacy_shader_requested: bool,
     pub effects: TerminalEffects,
     pub typography: Option<Typography>,
+    /// Custom text backing colors (`terminal.textBacking`); `None` follows
+    /// the global Text backing settings.
+    pub text_backing: Option<TextBackingColors>,
+}
+
+/// How custom text backing colors are laid out (see egui_term's renderer).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextBackingStyle {
+    #[default]
+    Vertical,
+    Horizontal,
+    Lines,
+    Rings,
+}
+
+impl TextBackingStyle {
+    pub const ALL: [Self; 4] = [Self::Vertical, Self::Horizontal, Self::Lines, Self::Rings];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Vertical => "vertical",
+            Self::Horizontal => "horizontal",
+            Self::Lines => "lines",
+            Self::Rings => "rings",
+        }
+    }
+
+    pub fn parse(text: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|style| style.as_str().eq_ignore_ascii_case(text.trim()))
+            .unwrap_or_default()
+    }
+
+    /// English UI label (translated at the display site).
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Vertical => "Gradient top to bottom",
+            Self::Horizontal => "Gradient left to right",
+            Self::Lines => "One color per line",
+            Self::Rings => "Outline rings",
+        }
+    }
+}
+
+/// Up to eight custom backing colors with a layout. Stored in theme JSON as
+/// `terminal.textBacking: { colors: ["#rrggbb", …], style, ringWidth }` and
+/// in `Preferences::text_backing` for all panes.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextBackingColors {
+    pub colors: Vec<Color32>,
+    pub style: TextBackingStyle,
+    pub ring_width: f32,
+}
+
+impl TextBackingColors {
+    pub const MAX_COLORS: usize = 8;
+
+    pub fn from_value(value: &Value) -> Option<Self> {
+        let colors: Vec<Color32> = value
+            .get("colors")?
+            .as_array()?
+            .iter()
+            .filter_map(Value::as_str)
+            .filter_map(parse_color)
+            .take(Self::MAX_COLORS)
+            .collect();
+        if colors.is_empty() {
+            return None;
+        }
+        Some(Self {
+            colors,
+            style: value
+                .get("style")
+                .and_then(Value::as_str)
+                .map(TextBackingStyle::parse)
+                .unwrap_or_default(),
+            ring_width: value
+                .get("ringWidth")
+                .and_then(Value::as_f64)
+                .filter(|width| width.is_finite())
+                .map_or(3.0, |width| width.clamp(1.0, 24.0) as f32),
+        })
+    }
+
+    pub fn to_value(&self) -> Value {
+        serde_json::json!({
+            "colors": self.colors.iter().map(|color| to_hex(*color)).collect::<Vec<_>>(),
+            "style": self.style.as_str(),
+            "ringWidth": self.ring_width,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -710,6 +802,7 @@ fn native_themes() -> Vec<ThemeDefinition> {
                 thickness: 2.0,
             },
             typography: None,
+            text_backing: None,
         }
     })
     .collect()
@@ -866,6 +959,7 @@ fn parse_legacy_value(
             .unwrap_or(false),
         effects: parse_effects(terminal, effects_value),
         typography: parse_typography(&theme["typography"], terminal),
+        text_backing: TextBackingColors::from_value(&terminal["textBacking"]),
     })
 }
 

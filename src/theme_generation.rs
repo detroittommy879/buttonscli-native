@@ -205,6 +205,7 @@ pub(crate) fn schema_text(seed: &Value) -> String {
          \"brightCyan\":\"#RRGGBB\",\"brightWhite\":\"#RRGGBB\"}},\
          \"gradient\":[\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\",\"#RRGGBB\"]}}}}\n\
          gradient is four colors for the terminal background gradient and shader colors: first a deep tone close to terminalBackground, then three accent colors that define the theme's character.\n\
+         Optional inside palette: \"textBacking\":{{\"colors\":[\"#RRGGBB\",...],\"style\":\"vertical|horizontal|lines|rings\",\"ringWidth\":3}}: 1 to 8 colors drawn as a soft backing behind terminal text (a gradient, one color per line, or outline rings with the first color innermost). Include it only when the brief asks for it or it clearly suits the theme; terminal text must stay readable on every color.\n\
          App text needs at least 4.5:1 contrast against appCanvas, and terminal text at least 4.5:1 against terminalBackground.\n\
          When fontCatalog is provided, include a top-level typography object with all seven zones: shell, tabs, presetDock, settings, assistant, statusBar, terminal. Each zone has fontFamily (exact catalog name), fontWeight (one of that family's real weights), fontSize (8 to 32), and letterSpacing (-1 to 4; terminal must be 0). Terminal requires terminal:true in the catalog. Use deliberate family and size contrasts appropriate to the brief; avoid defaulting every zone to the same font. Installed/custom fonts may only be used if listed. No invented fonts.\n\
          Example zone: \"tabs\":{{\"fontFamily\":\"Roboto Bundled\",\"fontWeight\":500,\"fontSize\":18,\"letterSpacing\":0.5}}.\n\
@@ -414,6 +415,13 @@ pub(crate) fn candidate_from_response(
                 .map(|color| json!(color.as_str().unwrap_or_default().to_ascii_lowercase()))
                 .collect(),
         );
+    }
+    // Optional custom text backing colors; invalid ones are dropped, not fatal.
+    if let Some(backing) = palette
+        .get("textBacking")
+        .and_then(crate::theme::TextBackingColors::from_value)
+    {
+        result["theme"]["terminal"]["textBacking"] = backing.to_value();
     }
     crate::theme::validate_personal_document(&result)?;
     Ok(ThemeCandidate {
@@ -989,5 +997,33 @@ pub(crate) mod tests {
                 result.map(|c| c.document["metadata"]["name"].clone())
             );
         }
+    }
+
+    #[test]
+    fn ai_theme_can_bring_text_backing_colors() {
+        let mut patch = valid_patch();
+        patch["palette"]["textBacking"] =
+            json!({"colors": ["#FF0000", "#0000ff", "nope"], "style": "rings", "ringWidth": 4});
+        let candidate = candidate_from_response(&response(patch), &base_document()).unwrap();
+        let backing = &candidate.document["theme"]["terminal"]["textBacking"];
+        assert_eq!(backing["colors"], json!(["#ff0000", "#0000ff"]));
+        assert_eq!(backing["style"], "rings");
+        let theme = crate::theme::ThemeDefinition::editor_document(&candidate.document).unwrap();
+        let colors = theme.text_backing.unwrap();
+        assert_eq!(colors.style, crate::theme::TextBackingStyle::Rings);
+        assert_eq!(colors.ring_width, 4.0);
+        // Saving keeps it; a theme without it saves no textBacking key.
+        let saved = crate::theme_files::document_from_theme(
+            &crate::theme::ThemeDefinition::editor_document(&candidate.document).unwrap(),
+            "Saved",
+        );
+        assert_eq!(saved["theme"]["terminal"]["textBacking"]["style"], "rings");
+        let plain = candidate_from_response(&response(valid_patch()), &base_document()).unwrap();
+        let plain = crate::theme::ThemeDefinition::editor_document(&plain.document).unwrap();
+        assert!(
+            crate::theme_files::document_from_theme(&plain, "Plain")["theme"]["terminal"]
+                .get("textBacking")
+                .is_none()
+        );
     }
 }

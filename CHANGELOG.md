@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Text backing colors**: pick up to eight colors for the backing behind
+  terminal text, as a gradient, one color per line, or outline rings around
+  the text. Set them for all panes in Backing options, or for one pane with
+  right-click → Text backing colors… (saved with that pane's theme and its
+  bundles). AI theme generation can suggest them.
+- **Command history** (Primary+Shift+H or the pane menu): filter earlier
+  commands from bash, zsh, fish and PowerShell history; Enter types one,
+  Shift+Enter runs it.
+- **tmux** in the pane menu: attach or start a session named after the tab,
+  list sessions, or detach, so work keeps running when SSH drops.
+
 - **Copying from full-screen programs** (Claude Code, Codex, htop…) keeps
   the line breaks: rows they pad to the window edge no longer paste as one
   long line full of spaces, and trailing blanks are trimmed.

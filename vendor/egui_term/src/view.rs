@@ -2179,6 +2179,7 @@ mod render_parity_tests {
                 feather: 4.0,
                 whole_line: false,
                 invert: false,
+                palette: None,
             }),
         );
         assert_eq!(texts(&plain), texts(&backed));
@@ -2213,6 +2214,7 @@ mod render_parity_tests {
                 feather: 0.0,
                 whole_line: false,
                 invert: true,
+                palette: None,
             }),
         );
         let original = texts(&plain);
@@ -2242,6 +2244,7 @@ mod render_parity_tests {
                 feather: 0.0,
                 whole_line: false,
                 invert: true,
+                palette: None,
             }),
         );
         assert_eq!(texts(&zero), original);

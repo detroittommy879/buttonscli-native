@@ -57,12 +57,46 @@ out over the terminals; it hides again after the **Auto-hide delay**.
 
 | On… | You get |
 | --- | --- |
-| A pane | Favorite themes, Random theme, Use global theme, copy, **Paste**, select all, clear screen, rename, **Reset mouse mode** (only while a program uses the mouse), auto-tile, close, and a **Shader** section (Strength, background color, use a shader) |
+| A pane | Favorite themes, Random theme, Use global theme, copy, **Paste**, **Command history…**, select all, clear screen, rename, **Reset mouse mode** (only while a program uses the mouse), **tmux**, auto-tile, close, a **Shader** section (Strength, background color, use a shader) and **Text backing colors…** |
 | A tab | Rename, move left/right, auto-tile, close |
 | A button | Run, edit, delete |
 
 Pane actions apply to the pane you right-clicked, even if another one has
 keyboard focus.
+
+## Command history
+
+Can't remember a command you typed last week? Press **Primary+Shift+H** (or
+right-click a pane → **Command history…**). A list of earlier commands opens
+over the pane, newest first, read from this computer's bash, zsh, fish and
+PowerShell history files. Type to filter (every word must match), pick one
+with **↑/↓** or the mouse, then:
+
+- **Enter** types it at the prompt so you can edit it first.
+- **Shift+Enter** or a double-click runs it.
+- **Esc** closes the list.
+
+Commands typed inside SSH sessions are kept on the remote machine, so they
+are not listed. Turn the popup off in Settings → Keyboard & clipboard.
+
+## Keep sessions running with tmux
+
+tmux runs your shells inside a session that stays alive on that machine when
+the connection drops or you close ButtonsCLI; reconnecting picks up exactly
+where you left off, with programs still running. It matters most over SSH:
+a long build or an AI agent on a server keeps going while your laptop
+sleeps. Right-click a pane → **tmux**:
+
+- **Attach or start session** types `tmux new-session -A -s <tab name>`,
+  which starts a session named after the tab or reattaches to it.
+- **List sessions** types `tmux ls`.
+- **Detach (keep running)** types `tmux detach-client`; Attach brings the
+  session back later, even from a new window or another computer.
+
+tmux has to be installed on the machine the pane is connected to (for
+example `sudo apt install tmux`). It is not available in Windows shells, but
+works in WSL and SSH panes. Inside tmux, tmux handles the mouse: hold
+**Shift** to select text for copying.
 
 ## Mouse and scrolling
 

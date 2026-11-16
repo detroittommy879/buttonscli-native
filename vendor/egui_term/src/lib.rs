@@ -5,7 +5,10 @@ mod text_backing;
 mod theme;
 mod types;
 mod view;
-pub use text_backing::{backing_shapes, last_copied, note_copied, TextBacking};
+pub use text_backing::{
+    backing_shapes, last_copied, note_copied, BackingPalette, BackingStyle,
+    TextBacking,
+};
 
 pub use alacritty_terminal::event_loop::SensitiveInput;
 pub use alacritty_terminal::term::ClipboardType;

@@ -17,10 +17,11 @@ pub(crate) enum ShortcutAction {
     Paste,
     OpenSettings,
     Quit,
+    CommandHistory,
 }
 
 impl ShortcutAction {
-    pub(crate) const ALL: [Self; 8] = [
+    pub(crate) const ALL: [Self; 9] = [
         Self::NewTab,
         Self::CloseTab,
         Self::ReopenTab,
@@ -29,6 +30,7 @@ impl ShortcutAction {
         Self::Paste,
         Self::OpenSettings,
         Self::Quit,
+        Self::CommandHistory,
     ];
 
     pub(crate) fn message_key(self) -> MessageKey {
@@ -41,6 +43,7 @@ impl ShortcutAction {
             Self::Paste => MessageKey::ShortcutPaste,
             Self::OpenSettings => MessageKey::ShortcutOpenSettings,
             Self::Quit => MessageKey::ShortcutQuit,
+            Self::CommandHistory => MessageKey::ShortcutCommandHistory,
         }
     }
 
@@ -54,6 +57,7 @@ impl ShortcutAction {
             Self::Paste => "paste",
             Self::OpenSettings => "open-settings",
             Self::Quit => "quit",
+            Self::CommandHistory => "command-history",
         }
     }
 
@@ -164,6 +168,7 @@ impl Default for ShortcutSettings {
             (ShortcutAction::Paste, "V"),
             (ShortcutAction::OpenSettings, "Comma"),
             (ShortcutAction::Quit, "Q"),
+            (ShortcutAction::CommandHistory, "H"),
         ];
         Self {
             bindings: defaults
