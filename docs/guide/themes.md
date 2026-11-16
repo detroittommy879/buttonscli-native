@@ -118,7 +118,8 @@ while the shader stays visible around it. **Backing options** next to it:
 - **Invert text and backing colors** uses the text colors as the panel and
   draws the text dark, for very bright shaders. Selections and TUI
   backgrounds keep their own colors.
-- **Custom colors for all panes** swaps the pane colors for your own: up to
+- **Backing colors…** opens a small window. Tick **Custom colors for all
+  panes** to swap the pane colors for your own: up to
   eight colors (**+** adds one, **×** removes one), or a preset (Rainbow,
   Sunset, Ocean, Fade to black, the theme's colors). **Layout** picks how they
   are used:

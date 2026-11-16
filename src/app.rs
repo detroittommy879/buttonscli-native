@@ -18565,6 +18565,8 @@ impl eframe::App for ButtonsApp {
         self.copied_toast(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.command_history_popup(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.text_backing_colors_window(ctx);
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
