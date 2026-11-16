@@ -20,3 +20,9 @@ homepage variants and activates b. Never upload credentials or native profiles.
 `activate.sh` installs them. Edit them here, never on amp. The Apache
 vhosts (http→https, www→apex SEO rules) are not in this public repo: they
 name private services. A local copy is in `.private/server-config/`.
+
+Variant `d` (Hairline) keeps its stylesheet here in `assets/d.css`; a file in
+`site-src/assets/` wins over `html/assets/site/`. Local preview: mirror amp's
+`html/assets/{site,native,fonts}` into `.private/site-preview/html/assets/`, run
+`BUTTONSCLI_HTML_ROOT=.private/site-preview/html python site-src/build_new.py`,
+then the `homepage-preview` launch entry (`/new_abcd00/d/`).
