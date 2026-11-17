@@ -1,13 +1,14 @@
 mod backend;
 mod bindings;
 mod font;
+mod letter_rings;
 mod text_backing;
 mod theme;
 mod types;
 mod view;
 pub use text_backing::{
     backing_shapes, last_copied, note_copied, BackingPalette, BackingStyle,
-    TextBacking,
+    RingStyle, TextBacking,
 };
 
 pub use alacritty_terminal::event_loop::SensitiveInput;

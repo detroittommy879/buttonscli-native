@@ -16163,7 +16163,16 @@ fn terminal_surface(
                         .text_backing
                         .clone()
                         .or_else(|| interaction.text_backing.custom_colors())
-                        .and_then(|colors| backing_palette(&colors)),
+                        .and_then(|colors| {
+                            // Moving rings: repaint on the animation tick.
+                            if moving
+                                && colors.rings.flow != 0
+                                && colors.style == crate::theme::TextBackingStyle::Rings
+                            {
+                                ui.ctx().request_repaint_after(interaction.animation_delay);
+                            }
+                            backing_palette(&colors, time)
+                        }),
                 })
             } else {
                 None
@@ -16394,7 +16403,10 @@ fn mix_effect_color(a: Color32, b: Color32, amount: f32) -> Color32 {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn backing_palette(colors: &crate::theme::TextBackingColors) -> Option<egui_term::BackingPalette> {
+fn backing_palette(
+    colors: &crate::theme::TextBackingColors,
+    time: f32,
+) -> Option<egui_term::BackingPalette> {
     use crate::theme::TextBackingStyle;
     let style = match colors.style {
         TextBackingStyle::Vertical => egui_term::BackingStyle::Vertical,
@@ -16402,7 +16414,19 @@ fn backing_palette(colors: &crate::theme::TextBackingColors) -> Option<egui_term
         TextBackingStyle::Lines => egui_term::BackingStyle::Lines,
         TextBackingStyle::Rings => egui_term::BackingStyle::Rings,
     };
-    egui_term::BackingPalette::new(&colors.colors, style, colors.ring_width)
+    let rings = colors.rings.normalized();
+    let palette = egui_term::BackingPalette::new(&colors.colors, style, colors.ring_width)?;
+    Some(palette.with_rings(egui_term::RingStyle {
+        blend: f32::from(rings.blend) / 100.0,
+        repeat: rings.repeat,
+        taper: f32::from(rings.taper) / 100.0,
+        gap: f32::from(rings.gap),
+        round: rings.round,
+        reverse: rings.reverse,
+        phase: time * f32::from(rings.flow) / 10.0,
+        fade: f32::from(rings.fade),
+        letters: rings.letters,
+    }))
 }
 
 #[cfg(not(target_arch = "wasm32"))]

@@ -125,8 +125,25 @@ while the shader stays visible around it. **Backing options** next to it:
   are used:
   - **Gradient top to bottom** or **left to right** across the pane.
   - **One color per line**, cycling.
-  - **Outline rings**: the text keeps its usual panel and each color is a ring
-    around it, the first one innermost. **Ring width** sets how thick.
+  - **Outline rings**: each color is a ring around the text, the first one
+    innermost. With **Follow letter shapes** ticked the rings trace the
+    letters themselves, like an outline drawn by hand; unticked, they go
+    around a box behind each run of text (lighter work for very large or
+    fast-scrolling panes). **Ring width** sets how thick.
+    **Blend %** fades each ring into the next: 100 makes one smooth gradient
+    around the text (red then yellow passes through orange), 0 gives hard
+    bands. **Fade from text** lets the text's own panel color run into the
+    rings and fade out, so there is no hard box around the text (0 brings
+    the box back). **Repeat colors** runs through the list up to four times,
+    **Taper %** narrows the outer rings, **Gap around text** leaves plain
+    backing before the first ring, **Round corners** and **Reverse order** do
+    what they say, and **Flow** moves the colors outward or inward (it follows
+    Motion). Rings follow Opacity and Feather like the other layouts; below
+    full opacity, box rings of neighboring lines show through each other
+    where they overlap.
+    For text that stays easy to read, make the first color one that
+    contrasts with the text (black around light text), or keep some
+    **Fade from text**.
 
 To give one pane its own colors, right-click it and choose **Text backing
 colors…**. That opens the theme editor for that pane with **Own text backing
