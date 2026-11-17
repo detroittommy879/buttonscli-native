@@ -4,8 +4,8 @@
 
 - **Text backing colors**: pick up to eight colors for the backing behind
   terminal text, as a gradient, one color per line, or outline rings around
-  the text. Set them for all panes in Backing options, or for one pane with
-  right-click → Text backing colors… (saved with that pane's theme and its
+  the text. Set them for all panes in Backing options → Backing colors…,
+  or for one pane with right-click → Text backing colors… (saved with that pane's theme and its
   bundles). AI theme generation can suggest them.
 - **Command history** (Primary+Shift+H or the pane menu): filter earlier
   commands from bash, zsh, fish and PowerShell history; Enter types one,
