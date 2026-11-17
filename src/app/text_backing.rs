@@ -1,5 +1,5 @@
 use super::*;
-use crate::theme::{TextBackingColors, TextBackingStyle};
+use crate::theme::{RingOptions, TextBackingColors, TextBackingStyle};
 
 /// Ready-made color lists for the backing editor.
 const PRESETS: [(&str, &[&str]); 4] = [
@@ -20,6 +20,7 @@ pub(super) fn starter_backing_colors(base: Color32) -> TextBackingColors {
         colors: vec![base, Color32::BLACK],
         style: TextBackingStyle::Vertical,
         ring_width: 3.0,
+        rings: RingOptions::default(),
     }
 }
 
@@ -109,11 +110,61 @@ pub(super) fn backing_colors_editor(
         if backing.style == TextBackingStyle::Rings {
             changed |= ui
                 .add(
-                    egui::Slider::new(&mut backing.ring_width, 1.0..=12.0)
+                    egui::Slider::new(&mut backing.ring_width, 1.0..=24.0)
                         .step_by(1.0)
                         .text(crate::i18n::literal(locale, "Ring width")),
                 )
                 .changed();
+            changed |= ring_options_editor(ui, locale, &mut backing.rings);
+        }
+    });
+    changed
+}
+
+/// Blend, repeats, taper, gap, movement and corner options for outline rings.
+fn ring_options_editor(ui: &mut egui::Ui, locale: &str, rings: &mut RingOptions) -> bool {
+    let text = |english: &'static str| crate::i18n::literal(locale, english);
+    let mut changed = ui
+        .add(egui::Slider::new(&mut rings.blend, 0..=100).text(text("Blend %")))
+        .on_hover_text(text(
+            "How far each ring fades into the next: 0 is hard bands, 100 one smooth gradient around the text.",
+        ))
+        .changed();
+    changed |= ui
+        .add(egui::Slider::new(&mut rings.repeat, 1..=4).text(text("Repeat colors")))
+        .on_hover_text(text("Run through the color list this many times."))
+        .changed();
+    changed |= ui
+        .add(egui::Slider::new(&mut rings.taper, 0..=90).text(text("Taper %")))
+        .on_hover_text(text("Make the outer rings narrower than the inner ones."))
+        .changed();
+    changed |= ui
+        .add(egui::Slider::new(&mut rings.gap, 0..=12).text(text("Gap around text")))
+        .on_hover_text(text("Plain backing between the text and the first ring."))
+        .changed();
+    changed |= ui
+        .add(
+            egui::Slider::new(
+                &mut rings.flow,
+                -RingOptions::MAX_FLOW..=RingOptions::MAX_FLOW,
+            )
+            .text(text("Flow")),
+        )
+        .on_hover_text(text(
+            "Move the colors outward (or inward, below 0). Follows Motion; 0 keeps them still.",
+        ))
+        .changed();
+    wrapping_row(ui, |ui| {
+        changed |= ui
+            .spaced_checkbox(&mut rings.round, text("Round corners"))
+            .changed();
+        changed |= ui
+            .spaced_checkbox(&mut rings.reverse, text("Reverse order"))
+            .on_hover_text(text("Put the last color next to the text."))
+            .changed();
+        if *rings != RingOptions::default() && ui.small_button(text("Reset rings")).clicked() {
+            *rings = RingOptions::default();
+            changed = true;
         }
     });
     changed
@@ -186,6 +237,9 @@ impl ButtonsApp {
         let base = crate::theme::parse_color(&terminal.terminal_colors.background)
             .unwrap_or(Color32::BLACK);
         let theme_colors = ansi_colors(&terminal.terminal_colors);
+        // A pane whose theme has its own colors ignores the ones set here.
+        let pane_has_own = terminal.text_backing.is_some();
+        let mut drop_own = false;
         let locale = self.locale.clone();
         let backing = &mut self.preferences.text_backing;
         let mut changed = false;
@@ -215,7 +269,22 @@ impl ButtonsApp {
                 if !backing.enabled {
                     ui.spaced_label(crate::i18n::literal(&locale, "Text backing is off: tick Text backing in the status bar to see these colors."));
                 }
+                if pane_has_own {
+                    ui.separator();
+                    ui.spaced_label(crate::i18n::literal(&locale, "The active pane's theme has its own backing colors, so the colors here do not change that pane."));
+                    drop_own = ui
+                        .spaced_button(crate::i18n::literal(&locale, "Use these colors in the active pane"))
+                        .on_hover_text(crate::i18n::literal(&locale, "Removes the own backing colors from that pane's theme (as an edit you can keep or undo in the theme editor)."))
+                        .clicked();
+                }
             });
+        if drop_own {
+            self.edit_pane_look(self.focused, |document| {
+                if let Some(terminal) = document["theme"]["terminal"].as_object_mut() {
+                    terminal.remove("textBacking");
+                }
+            });
+        }
         ctx.data_mut(|data| data.insert_temp(id, open));
         // Picker drags change colors every frame: show them live, save once
         // the mouse is released.
@@ -247,6 +316,7 @@ fn store_global_backing(
                 .collect();
             backing.style = colors.style.as_str().into();
             backing.ring_width = colors.ring_width.round().clamp(1.0, 24.0) as u8;
+            backing.rings = colors.rings.normalized();
         }
         None => backing.colors.clear(),
     }
@@ -301,6 +371,13 @@ mod tests {
             colors: vec![Color32::RED, Color32::BLUE],
             style: TextBackingStyle::Lines,
             ring_width: 5.0,
+            rings: RingOptions {
+                blend: 40,
+                repeat: 2,
+                round: true,
+                flow: -5,
+                ..RingOptions::default()
+            },
         };
         store_global_backing(&mut backing, Some(&colors));
         assert_eq!(backing.custom_colors(), Some(colors));

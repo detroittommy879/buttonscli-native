@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Outline rings blend**: text backing rings now fade into each other, so
+  the rings themselves form a gradient around the text (**Blend %**; 0 keeps
+  hard bands). New ring options: Repeat colors, Taper, Gap around text, Round
+  corners, Reverse order and Flow (moving colors). Ring width goes up to 24.
 - **Text backing colors**: pick up to eight colors for the backing behind
   terminal text, as a gradient, one color per line, or outline rings around
   the text. Set them for all panes in Backing options → Backing colors…,

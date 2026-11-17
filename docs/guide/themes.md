@@ -127,6 +127,13 @@ while the shader stays visible around it. **Backing options** next to it:
   - **One color per line**, cycling.
   - **Outline rings**: the text keeps its usual panel and each color is a ring
     around it, the first one innermost. **Ring width** sets how thick.
+    **Blend %** fades each ring into the next: 100 makes one smooth gradient
+    around the text (red then yellow passes through orange), 0 gives hard
+    bands. **Repeat colors** runs through the list up to four times,
+    **Taper %** narrows the outer rings, **Gap around text** leaves plain
+    backing before the first ring, **Round corners** and **Reverse order** do
+    what they say, and **Flow** moves the colors outward or inward (it follows
+    Motion). Rings are always solid: Opacity does not apply to them.
 
 To give one pane its own colors, right-click it and choose **Text backing
 colors…**. That opens the theme editor for that pane with **Own text backing

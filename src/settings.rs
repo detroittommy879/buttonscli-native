@@ -791,6 +791,8 @@ pub(crate) struct TextBacking {
     pub(crate) style: String,
     /// Ring width in points for the rings style.
     pub(crate) ring_width: u8,
+    /// Blend, repeats, taper and the other rings options.
+    pub(crate) rings: crate::theme::RingOptions,
 }
 
 impl TextBacking {
@@ -807,6 +809,7 @@ impl TextBacking {
             colors,
             style: crate::theme::TextBackingStyle::parse(&self.style),
             ring_width: f32::from(self.ring_width.clamp(1, 24)),
+            rings: self.rings.normalized(),
         })
     }
 }
@@ -823,6 +826,7 @@ impl Default for TextBacking {
             colors: Vec::new(),
             style: "vertical".into(),
             ring_width: 3,
+            rings: crate::theme::RingOptions::default(),
         }
     }
 }

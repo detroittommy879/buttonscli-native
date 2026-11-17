@@ -69,14 +69,63 @@ impl TextBackingStyle {
     }
 }
 
+/// How outline rings are drawn. Stored as `rings` next to the colors, in
+/// theme JSON and in `Preferences::text_backing`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct RingOptions {
+    /// 0 = hard bands, 100 = each ring fades into the next.
+    pub blend: u8,
+    /// Times the color list repeats outward (1–4).
+    pub repeat: u8,
+    /// Percent the outermost ring is narrower than the first (0–90).
+    pub taper: u8,
+    /// Points of plain backing between the text and the first ring (0–12).
+    pub gap: u8,
+    pub round: bool,
+    /// Last color innermost.
+    pub reverse: bool,
+    /// Tenths of a ring per second the colors move outward (negative:
+    /// inward), scaled by Motion; 0 = still.
+    pub flow: i8,
+}
+
+impl Default for RingOptions {
+    fn default() -> Self {
+        Self {
+            blend: 100,
+            repeat: 1,
+            taper: 0,
+            gap: 0,
+            round: false,
+            reverse: false,
+            flow: 0,
+        }
+    }
+}
+
+impl RingOptions {
+    pub const MAX_FLOW: i8 = 30;
+
+    pub fn normalized(mut self) -> Self {
+        self.blend = self.blend.min(100);
+        self.repeat = self.repeat.clamp(1, 4);
+        self.taper = self.taper.min(90);
+        self.gap = self.gap.min(12);
+        self.flow = self.flow.clamp(-Self::MAX_FLOW, Self::MAX_FLOW);
+        self
+    }
+}
+
 /// Up to eight custom backing colors with a layout. Stored in theme JSON as
-/// `terminal.textBacking: { colors: ["#rrggbb", …], style, ringWidth }` and
-/// in `Preferences::text_backing` for all panes.
+/// `terminal.textBacking: { colors: ["#rrggbb", …], style, ringWidth, rings }`
+/// and in `Preferences::text_backing` for all panes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextBackingColors {
     pub colors: Vec<Color32>,
     pub style: TextBackingStyle,
     pub ring_width: f32,
+    pub rings: RingOptions,
 }
 
 impl TextBackingColors {
@@ -106,15 +155,25 @@ impl TextBackingColors {
                 .and_then(Value::as_f64)
                 .filter(|width| width.is_finite())
                 .map_or(3.0, |width| width.clamp(1.0, 24.0) as f32),
+            // A bad value in one option only resets the ring options.
+            rings: value
+                .get("rings")
+                .and_then(|rings| serde_json::from_value::<RingOptions>(rings.clone()).ok())
+                .unwrap_or_default()
+                .normalized(),
         })
     }
 
     pub fn to_value(&self) -> Value {
-        serde_json::json!({
+        let mut value = serde_json::json!({
             "colors": self.colors.iter().map(|color| to_hex(*color)).collect::<Vec<_>>(),
             "style": self.style.as_str(),
             "ringWidth": self.ring_width,
-        })
+        });
+        if self.rings != RingOptions::default() {
+            value["rings"] = serde_json::json!(self.rings);
+        }
+        value
     }
 }
 

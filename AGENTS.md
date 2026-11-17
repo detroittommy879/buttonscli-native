@@ -114,6 +114,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   Custom colors: `TextBacking::colors/style/ring_width` (all panes) and a theme's
   `theme.terminal.textBacking` (`TextBackingColors`, wins per pane); rendered by
   `egui_term::BackingPalette` (Rings: outer ring first for all runs, then the core).
+  Rings are hollow bands between `ring_stops` (distance, color), always opaque
+  (see-through bands would show every overlap between rows); options live in
+  `theme::RingOptions` (`rings` in theme JSON and settings) → `egui_term::RingStyle`.
+  Flow needs the repaint request beside `backing_palette`.
   Inversion backs runs with their foreground (whole rows use default foreground),
   uses background for ink, and preserves explicit TUI/selection/search colors.
   Web backing lives in `shader-playground/text-backing.js`; layout switches must
