@@ -25,4 +25,6 @@ Variant `d` (Hairline) keeps its stylesheet here in `assets/d.css`; a file in
 `site-src/assets/` wins over `html/assets/site/`. Local preview: mirror amp's
 `html/assets/{site,native,fonts}` into `.private/site-preview/html/assets/`, run
 `BUTTONSCLI_HTML_ROOT=.private/site-preview/html python site-src/build_new.py`,
-then the `homepage-preview` launch entry (`/new_abcd00/d/`).
+then the `homepage-preview` launch entry (`/new_abcd00/d/`). The agent
+walkthrough section embeds `/native/try/agents/`: copy `shader-playground/` to
+`.private/site-preview/html/native/try/` too, or it shows a 404 error locally.
