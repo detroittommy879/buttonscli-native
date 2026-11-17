@@ -331,11 +331,13 @@ pub(crate) fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32, f32)> {
 }
 
 /// Outline rings around every run: one gradient that follows the text.
-/// Opaque: see-through rings would show every overlap between rows.
+/// Below full opacity the bands of neighboring rows show through each other
+/// where they overlap; that layered look is wanted, so it is not hidden.
 fn ring_mesh(
     mesh: &mut Mesh,
     runs: &[(Rect, Color32)],
     palette: &BackingPalette,
+    opacity: f32,
     feather: f32,
 ) {
     let round = palette.rings.round;
@@ -351,6 +353,12 @@ fn ring_mesh(
                 lerp(*color, *backing, *share)
             } else {
                 *color
+            };
+            // The last stop is the transparent outer edge.
+            let color = if color.a() == 0 {
+                color
+            } else {
+                with_alpha(color, opacity)
             };
             ring.clear();
             outline(*rect, *distance, round, &mut ring);
@@ -378,7 +386,7 @@ fn ring_mesh(
     // whatever the ring colors are.
     let (gap, ..) = stops[0];
     for (rect, color) in runs {
-        let color = with_alpha(*color, 1.0);
+        let color = with_alpha(*color, opacity);
         let base = mesh.vertices.len() as u32;
         mesh.colored_vertex(rect.center(), color);
         for (distance, color) in
@@ -455,7 +463,7 @@ pub(crate) fn shapes(
             }
         },
         Some(palette) if palette.style == BackingStyle::Rings => {
-            ring_mesh(&mut mesh, &runs, &palette, feather);
+            ring_mesh(&mut mesh, &runs, &palette, opacity, feather);
         },
         Some(palette) => {
             let height = bounds.height().max(1.0);

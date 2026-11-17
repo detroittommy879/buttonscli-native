@@ -138,7 +138,9 @@ while the shader stays visible around it. **Backing options** next to it:
     **Taper %** narrows the outer rings, **Gap around text** leaves plain
     backing before the first ring, **Round corners** and **Reverse order** do
     what they say, and **Flow** moves the colors outward or inward (it follows
-    Motion). Box rings are always solid; letter outlines follow Opacity.
+    Motion). Rings follow Opacity and Feather like the other layouts; below
+    full opacity, box rings of neighboring lines show through each other
+    where they overlap.
     For text that stays easy to read, make the first color one that
     contrasts with the text (black around light text), or keep some
     **Fade from text**.
