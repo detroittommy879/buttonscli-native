@@ -452,11 +452,30 @@ cargo build --locked --release --bin buttonscli
   windows, 1px transitions and fonts; `native_status_bar_resize_probe` captures QA.
 - Website (amp, `ssh 193.122.157.24` from PowerShell; Git Bash has no key):
   web root `/var/www/buttonscli.com/html`. `/docs/` is the Classic (Tauri)
-  docs: never overwrite it. The native guide is `site/` built with
-  `DOCS_SITE=https://buttonscli.com DOCS_BASE=/native/docs` and copied to
-  `html/native/docs/` (build in PowerShell: Git Bash rewrites `/native/docs`
-  into a Windows path). Homepage variants come from
-  `/var/www/buttonscli.com/site-src/build_new.py` (staged under
-  `/new_abcd00/`); `activate.sh b` makes one live, `rollback.sh` undoes it.
-  Site icon source: `.private/icons/codex-output/tom1.png` (black tile);
-  the app icon uses `tom1-transp.png`.
+  docs: never overwrite it. Live homepage = variant **d** (Hairline); Classic
+  homepage at `/classic/`. Never hand-edit generated files on amp: change the
+  repo, merge, then deploy from `main`. Site icon source:
+  `.private/icons/codex-output/tom1.png` (black tile); the app icon uses
+  `tom1-transp.png`. Sync both after doc/homepage changes merge:
+  - **Docs** (`/native/docs/`, from `docs/guide/`). In PowerShell (Git Bash
+    rewrites `/native/docs` into a Windows path), in `site/`:
+    `$env:DOCS_SITE='https://buttonscli.com'; $env:DOCS_BASE='/native/docs';
+    $env:DOCS_HIDE_PLACEHOLDERS='1'; npm run build`. Check `dist/index.html`
+    links start `/native/docs/`. Then `tar -czf $env:TEMP\native-docs.tgz -C
+    dist .`, scp it to `/tmp/`, and on amp extract into `html/native/docs-next`,
+    `mv html/native/docs ~/backups/native-docs-<UTC stamp>`, rename
+    `docs-next` to `docs`. Verify with curl (200s, new text, a
+    `/de/theme-gallery/` image). Rollback: move the backup back.
+  - **Homepage** (`site-src/`, generator copy lives in amp
+    `/var/www/buttonscli.com/site-src/`). Back up that folder to
+    `~/backups/site-src-<stamp>`, upload the changed `site-src` files from
+    `main` (`build_new.py`, `activate.sh`, `make_sitemap.py`, `assets/`,
+    `static/`; pipe `git show origin/main:<path>` over ssh and compare
+    sha256), run `python3 build_new.py`, look at
+    `https://buttonscli.com/new_abcd00/d/`, then `./activate.sh d` (backs up
+    and prints the `rollback.sh <dir>` argument). It also installs
+    `static/robots.txt`/`llms.txt` and rewrites the sitemap.
+  - **Playground** (`/native/try/`, incl. `agents/`): `site-src/deploy-playground.py`
+    (see `site-src/README.md`); it re-activates `--variant`, default `d`.
+  - Local preview first: `site-src/README.md` (mirror assets and
+    `shader-playground/` into `.private/site-preview/html/`).

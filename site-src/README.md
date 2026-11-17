@@ -2,8 +2,8 @@
 
 Imported from the current amp source on 2026-11-13 so homepage edits survive a
 rebuild. `build_new.py` uses the sibling `html/assets/site/` CSS/JS, screenshot and
-font assets on amp. Its output is `html/new_abcd00/`; `activate.sh b` activates
-variant b and backs up the old homepage. Do not overwrite Classic `/docs/`.
+font assets on amp. Its output is `html/new_abcd00/`; `activate.sh d` makes
+variant d (Hairline, live since 2026-11-17) the homepage and backs up the old one. Do not overwrite Classic `/docs/`.
 
 The playground embed is authored in `build_new.py`, not patched into generated
 homepage HTML. Public playground files come from `../shader-playground/` and are
@@ -14,7 +14,8 @@ under `/home/ubuntu/backups/`. WASM CI remains disabled.
 and `site-src/build_new.py` in that folder. Run as ubuntu on amp. It checks the
 expected homepage-generator SHA256, backs up all changed live files, installs the
 static playground, updates the old native landing page's embed, regenerates the
-homepage variants and activates b. Never upload credentials or native profiles.
+homepage variants and re-activates `--variant` (default `d`, the live Hairline
+design since 2026-11-17). Never upload credentials or native profiles.
 
 `static/robots.txt` and `static/llms.txt` are the source of the live files;
 `activate.sh` installs them. Edit them here, never on amp. The Apache

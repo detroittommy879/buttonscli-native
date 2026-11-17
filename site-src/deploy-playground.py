@@ -9,6 +9,8 @@ from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('--source', type=Path, required=True)
 parser.add_argument('--expected-builder-sha', required=True)
+# The live homepage design; activate.sh re-publishes it after the rebuild.
+parser.add_argument('--variant', default='d', choices=['a', 'b', 'c', 'd'])
 args = parser.parse_args()
 root = Path('/var/www/buttonscli.com')
 html = root / 'html'
@@ -47,7 +49,7 @@ text = text.replace("frame.allow = 'clipboard-write';", "frame.allow = 'fullscre
 legacy.write_text(text, encoding='utf-8')
 try:
     subprocess.run(['python3', str(builder)], check=True)
-    subprocess.run(['bash', str(root / 'site-src/activate.sh'), 'b'], check=True)
+    subprocess.run(['bash', str(root / 'site-src/activate.sh'), args.variant], check=True)
 except Exception:
     # Keep the failed new version for diagnosis; restore the previous live state.
     live.rename(backup / 'failed-try')
