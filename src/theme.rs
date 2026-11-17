@@ -88,6 +88,9 @@ pub struct RingOptions {
     /// Tenths of a ring per second the colors move outward (negative:
     /// inward), scaled by Motion; 0 = still.
     pub flow: i8,
+    /// Points over which the text's own backing color fades into the
+    /// rings (0–24); 0 = a hard edge around the text panel.
+    pub fade: u8,
 }
 
 impl Default for RingOptions {
@@ -100,6 +103,7 @@ impl Default for RingOptions {
             round: false,
             reverse: false,
             flow: 0,
+            fade: 6,
         }
     }
 }
@@ -112,6 +116,7 @@ impl RingOptions {
         self.repeat = self.repeat.clamp(1, 4);
         self.taper = self.taper.min(90);
         self.gap = self.gap.min(12);
+        self.fade = self.fade.min(24);
         self.flow = self.flow.clamp(-Self::MAX_FLOW, Self::MAX_FLOW);
         self
     }

@@ -129,7 +129,9 @@ while the shader stays visible around it. **Backing options** next to it:
     around it, the first one innermost. **Ring width** sets how thick.
     **Blend %** fades each ring into the next: 100 makes one smooth gradient
     around the text (red then yellow passes through orange), 0 gives hard
-    bands. **Repeat colors** runs through the list up to four times,
+    bands. **Fade from text** lets the text's own panel color run into the
+    rings and fade out, so there is no hard box around the text (0 brings
+    the box back). **Repeat colors** runs through the list up to four times,
     **Taper %** narrows the outer rings, **Gap around text** leaves plain
     backing before the first ring, **Round corners** and **Reverse order** do
     what they say, and **Flow** moves the colors outward or inward (it follows

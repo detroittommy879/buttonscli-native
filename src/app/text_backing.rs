@@ -131,6 +131,12 @@ fn ring_options_editor(ui: &mut egui::Ui, locale: &str, rings: &mut RingOptions)
         ))
         .changed();
     changed |= ui
+        .add(egui::Slider::new(&mut rings.fade, 0..=24).text(text("Fade from text")))
+        .on_hover_text(text(
+            "How far the text's own backing color reaches into the rings before it has faded out. 0 draws a hard edge around the text.",
+        ))
+        .changed();
+    changed |= ui
         .add(egui::Slider::new(&mut rings.repeat, 1..=4).text(text("Repeat colors")))
         .on_hover_text(text("Run through the color list this many times."))
         .changed();

@@ -55,6 +55,9 @@ pub struct RingStyle {
     pub reverse: bool,
     /// Rings the colors have moved outward (animation); 0 = still.
     pub phase: f32,
+    /// Points over which the text's own backing color fades into the
+    /// rings; 0 = a hard edge around the text panel.
+    pub fade: f32,
 }
 
 impl Default for RingStyle {
@@ -67,6 +70,7 @@ impl Default for RingStyle {
             round: false,
             reverse: false,
             phase: 0.0,
+            fade: 0.0,
         }
     }
 }
@@ -204,9 +208,10 @@ fn outline(rect: Rect, distance: f32, round: bool, out: &mut Vec<egui::Pos2>) {
     }
 }
 
-/// Distance from the text and color of each place the ring colors change,
+/// Distance from the text, color, and share of the text's own backing
+/// color (1 = all backing, 0 = all ring) at each place the rings change,
 /// innermost first. Colors between two stops are a straight blend.
-fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32)> {
+fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32, f32)> {
     let style = palette.rings;
     let mut colors = palette.colors().to_vec();
     if style.reverse {
@@ -271,8 +276,26 @@ fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32)> {
         let ring = (at.floor() as usize).min(rings - 1);
         edges[ring] + (at - ring as f32) * (edges[ring + 1] - edges[ring])
     };
-    // Ring positions where either the width or the color blend changes.
+    // The text's backing color fades out over the first `fade` points.
+    let fade = finite(style.fade, 0.0, 48.0).min(edges[rings] - edges[0]);
+    let backing = |at: f32| {
+        if fade > 0.0 {
+            (1.0 - (distance(at) - edges[0]) / fade).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    };
+    // Ring positions where the width, the color blend or the fade changes.
     let mut places: Vec<f32> = (0..=rings).map(|ring| ring as f32).collect();
+    if let Some(ring) =
+        (0..rings).find(|ring| edges[ring + 1] >= edges[0] + fade)
+    {
+        places.push(
+            ring as f32
+                + (edges[0] + fade - edges[ring])
+                    / (edges[ring + 1] - edges[ring]),
+        );
+    }
     for boundary in -1..=rings as i64 + count {
         for side in [-half, half] {
             let at = boundary as f32 + phase + side;
@@ -286,17 +309,19 @@ fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32)> {
     // Where two runs overlap, the later one wins inside a step, so blends
     // are cut into steps too thin to show a seam.
     let step = (edges[rings] / 24.0).max(2.0);
-    let mut stops = vec![(distance(places[0]), color(places[0]))];
+    let stop = |at: f32| (distance(at), color(at), backing(at));
+    let mut stops = vec![stop(places[0])];
     for pair in places.windows(2) {
         let (from, to) = (pair[0], pair[1]);
-        let parts = if color(from) == color(to) {
+        let parts = if color(from) == color(to) && backing(from) == backing(to)
+        {
             1
         } else {
             ((distance(to) - distance(from)) / step).ceil().max(1.0) as usize
         };
         for part in 1..=parts {
             let at = from + (to - from) * part as f32 / parts as f32;
-            stops.push((distance(at), color(at)));
+            stops.push(stop(at));
         }
     }
     stops
@@ -312,17 +337,22 @@ fn ring_mesh(
 ) {
     let round = palette.rings.round;
     let mut stops = ring_stops(palette);
-    let (reach, _) = stops[stops.len() - 1];
-    stops.push((reach + feather.max(0.75), Color32::TRANSPARENT));
+    let (reach, ..) = stops[stops.len() - 1];
+    stops.push((reach + feather.max(0.75), Color32::TRANSPARENT, 0.0));
     let points = if round { 4 * CORNER_POINTS } else { 4 };
     let mut ring = Vec::with_capacity(points);
     let first = mesh.vertices.len() as u32;
-    for (rect, _) in runs {
-        for (distance, color) in &stops {
+    for (rect, backing) in runs {
+        for (distance, color, share) in &stops {
+            let color = if *share > 0.0 {
+                lerp(*color, *backing, *share)
+            } else {
+                *color
+            };
             ring.clear();
             outline(*rect, *distance, round, &mut ring);
             for pos in &ring {
-                mesh.colored_vertex(*pos, *color);
+                mesh.colored_vertex(*pos, color);
             }
         }
     }
@@ -343,7 +373,7 @@ fn ring_mesh(
     }
     // The text sits on its usual backing color, so it stays readable
     // whatever the ring colors are.
-    let (gap, _) = stops[0];
+    let (gap, ..) = stops[0];
     for (rect, color) in runs {
         let color = with_alpha(*color, 1.0);
         let base = mesh.vertices.len() as u32;
@@ -663,6 +693,17 @@ mod tests {
             .iter()
             .all(|i| (*i as usize) < round.vertices.len()));
 
+        // Fade: the text's own color (black here) at the text, mostly
+        // red 2.5 points out, all ring color from 4 points on.
+        let faded = draw(RingStyle {
+            fade: 4.0,
+            blend: 0.0,
+            ..RingStyle::default()
+        });
+        assert_eq!(color_at(&faded, 0.0), Some(Color32::BLACK));
+        assert_eq!(color_at(&faded, -2.5), Some(Color32::from_rgb(159, 0, 0)));
+        assert_eq!(color_at(&faded, -4.0), Some(blue));
+
         // Moving colors wrap around: half a ring out, the boundary shade
         // sits on the text edge.
         let moved = draw(RingStyle {
@@ -673,6 +714,7 @@ mod tests {
         assert_eq!(color_at(&moved, -1.5), Some(blue));
         for bad in [f32::NAN, f32::INFINITY] {
             draw(RingStyle {
+                fade: bad,
                 blend: bad,
                 taper: bad,
                 gap: bad,
