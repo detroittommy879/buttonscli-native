@@ -125,6 +125,12 @@ pub(super) fn backing_colors_editor(
 fn ring_options_editor(ui: &mut egui::Ui, locale: &str, rings: &mut RingOptions) -> bool {
     let text = |english: &'static str| crate::i18n::literal(locale, english);
     let mut changed = ui
+        .spaced_checkbox(&mut rings.letters, text("Follow letter shapes"))
+        .on_hover_text(text(
+            "Draw the rings around the letters themselves, like a hand-drawn outline. Off draws them around a box behind each run of text, which is lighter work for large or fast-scrolling panes.",
+        ))
+        .changed();
+    changed |= ui
         .add(egui::Slider::new(&mut rings.blend, 0..=100).text(text("Blend %")))
         .on_hover_text(text(
             "How far each ring fades into the next: 0 is hard bands, 100 one smooth gradient around the text.",
@@ -162,7 +168,13 @@ fn ring_options_editor(ui: &mut egui::Ui, locale: &str, rings: &mut RingOptions)
         .changed();
     wrapping_row(ui, |ui| {
         changed |= ui
-            .spaced_checkbox(&mut rings.round, text("Round corners"))
+            .add_enabled(
+                !rings.letters,
+                egui::Checkbox::new(&mut rings.round, text("Round corners")),
+            )
+            .on_disabled_hover_text(text(
+                "Only for box rings: letter outlines are always round.",
+            ))
             .changed();
         changed |= ui
             .spaced_checkbox(&mut rings.reverse, text("Reverse order"))

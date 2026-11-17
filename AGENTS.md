@@ -118,6 +118,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   (see-through bands would show every overlap between rows); options live in
   `theme::RingOptions` (`rings` in theme JSON and settings) → `egui_term::RingStyle`.
   Flow needs the repaint request beside `backing_palette`.
+  `RingOptions::letters` uses `egui_term/src/letter_rings.rs` instead: glyphs
+  stamped from egui's font atlas into a mask, a chamfer distance map (capped
+  at 0.9 MP, rebuilt only when the text on screen changes), colored through
+  `ring_stops` and drawn as one texture. It honors Opacity; box rings do not.
   Inversion backs runs with their foreground (whole rows use default foreground),
   uses background for ink, and preserves explicit TUI/selection/search colors.
   Web backing lives in `shader-playground/text-backing.js`; layout switches must

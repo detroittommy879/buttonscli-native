@@ -1,6 +1,7 @@
 mod backend;
 mod bindings;
 mod font;
+mod letter_rings;
 mod text_backing;
 mod theme;
 mod types;

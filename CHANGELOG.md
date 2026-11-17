@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Letter outlines**: text backing rings can trace the letters themselves
+  instead of a box around them (**Follow letter shapes**, on by default).
 - **Outline rings blend**: text backing rings now fade into each other, so
   the rings themselves form a gradient around the text (**Blend %**; 0 keeps
   hard bands), and the text's own panel color fades into the first ring

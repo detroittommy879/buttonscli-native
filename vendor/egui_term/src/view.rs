@@ -655,14 +655,52 @@ impl<'a> TerminalView<'a> {
                     } else {
                         global_bg
                     };
-                    (rect, color)
+                    (rect, color, c)
                 });
-            shapes.extend(crate::text_backing::shapes(
-                cells,
-                layout.rect,
-                cell_width,
-                backing,
-            ));
+            let letters = backing.palette.filter(|palette| {
+                palette.style == crate::BackingStyle::Rings
+                    && palette.rings.letters
+            });
+            if let Some(palette) = letters {
+                let fonts = painter.fonts(|fonts| fonts.clone());
+                let mut stamps = Vec::new();
+                for (rect, color, c) in cells {
+                    let mut text = String::from(c.c);
+                    text.extend(c.zerowidth().into_iter().flatten());
+                    let bold = c
+                        .flags
+                        .intersects(cell::Flags::BOLD | cell::Flags::DIM_BOLD);
+                    crate::letter_rings::stamps_for(
+                        &fonts,
+                        rect.center_top(),
+                        text,
+                        if bold {
+                            self.font.bold_font_type()
+                        } else {
+                            self.font.font_type()
+                        },
+                        color,
+                        &mut stamps,
+                    );
+                }
+                shapes.extend(crate::letter_rings::shapes(
+                    painter.ctx(),
+                    layout.id,
+                    &fonts,
+                    &stamps,
+                    layout.rect,
+                    &palette,
+                    backing.opacity,
+                    backing.feather,
+                ));
+            } else {
+                shapes.extend(crate::text_backing::shapes(
+                    cells.map(|(rect, color, _)| (rect, color)),
+                    layout.rect,
+                    cell_width,
+                    backing,
+                ));
+            }
         }
 
         // TUIs hide the cursor (DECTCEM) while they draw their own.

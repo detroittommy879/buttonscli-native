@@ -58,6 +58,8 @@ pub struct RingStyle {
     /// Points over which the text's own backing color fades into the
     /// rings; 0 = a hard edge around the text panel.
     pub fade: f32,
+    /// Follow the shapes of the letters instead of a box around them.
+    pub letters: bool,
 }
 
 impl Default for RingStyle {
@@ -71,6 +73,7 @@ impl Default for RingStyle {
             reverse: false,
             phase: 0.0,
             fade: 0.0,
+            letters: false,
         }
     }
 }
@@ -124,7 +127,7 @@ impl BackingPalette {
     }
 }
 
-fn lerp(a: Color32, b: Color32, t: f32) -> Color32 {
+pub(crate) fn lerp(a: Color32, b: Color32, t: f32) -> Color32 {
     let mix =
         |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     Color32::from_rgb(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()))
@@ -211,7 +214,7 @@ fn outline(rect: Rect, distance: f32, round: bool, out: &mut Vec<egui::Pos2>) {
 /// Distance from the text, color, and share of the text's own backing
 /// color (1 = all backing, 0 = all ring) at each place the rings change,
 /// innermost first. Colors between two stops are a straight blend.
-fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32, f32)> {
+pub(crate) fn ring_stops(palette: &BackingPalette) -> Vec<(f32, Color32, f32)> {
     let style = palette.rings;
     let mut colors = palette.colors().to_vec();
     if style.reverse {

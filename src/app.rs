@@ -16425,6 +16425,7 @@ fn backing_palette(
         reverse: rings.reverse,
         phase: time * f32::from(rings.flow) / 10.0,
         fade: f32::from(rings.fade),
+        letters: rings.letters,
     }))
 }
 

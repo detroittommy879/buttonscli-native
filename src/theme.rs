@@ -91,6 +91,8 @@ pub struct RingOptions {
     /// Points over which the text's own backing color fades into the
     /// rings (0–24); 0 = a hard edge around the text panel.
     pub fade: u8,
+    /// Follow the shapes of the letters instead of a box around them.
+    pub letters: bool,
 }
 
 impl Default for RingOptions {
@@ -104,6 +106,7 @@ impl Default for RingOptions {
             reverse: false,
             flow: 0,
             fade: 6,
+            letters: true,
         }
     }
 }
