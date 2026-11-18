@@ -8,7 +8,7 @@ export const GROUPS = [
 	{ key: 'start', section: 'start', pages: ['index', 'getting-started', 'workspace', 'easier-than-a-terminal'] },
 	{ key: 'looks', section: 'themes', pages: ['themes', 'theme-bundles', 'theme-gallery'] },
 	{ key: 'shaders', section: 'shaders', pages: ['shaders', 'shader-code'] },
-	{ key: 'ai', section: 'ai', pages: ['ai-setup', 'ai-shaders', 'ai-themes'] },
+	{ key: 'ai', section: 'ai', pages: ['ai-setup', 'ai-shaders', 'ai-themes', 'agents'] },
 	{ key: 'reference', section: 'reference', pages: ['sharing', 'troubleshooting'] },
 ];
 
