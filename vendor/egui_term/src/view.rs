@@ -2337,6 +2337,60 @@ mod render_parity_tests {
         assert_eq!(texts(&zero), original);
     }
 
+    #[test]
+    fn text_color_and_contrast_floor_reach_the_glyphs() {
+        // A: default color, B: red, C: on an explicit blue background.
+        let input = b"\x1b[?25lA\x1b[31mB\x1b[0;44mC";
+        let (plain, _) = render(input, true);
+        let original = texts(&plain);
+        let backing = crate::TextBacking {
+            opacity: 1.0,
+            palette: crate::BackingPalette::new(
+                &[Color32::BLACK],
+                crate::BackingStyle::Vertical,
+                3.0,
+            ),
+            text_color: Some(Color32::WHITE),
+            ..Default::default()
+        };
+        let (backed, _) = render_backing(input, true, Some(backing));
+        let colored = texts(&backed);
+        assert_eq!(colored[0].2, Color32::WHITE, "default text is recolored");
+        assert_eq!(colored[1].2, original[1].2, "ANSI red keeps its color");
+        assert_eq!(
+            colored[2].2, original[2].2,
+            "TUI backgrounds are untouched"
+        );
+        let (all, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                recolor_all: true,
+                ..backing
+            }),
+        );
+        assert_eq!(texts(&all)[1].2, Color32::WHITE);
+
+        // Dark grey text on a black backing is lifted to 7:1; so is text
+        // on an explicit background, measured against that background.
+        let dim = b"\x1b[?25l\x1b[38;2;40;40;40mD\x1b[48;2;0;0;200mE";
+        let (lifted, _) = render_backing(
+            dim,
+            true,
+            Some(crate::TextBacking {
+                text_color: None,
+                min_contrast: 7.0,
+                ..backing
+            }),
+        );
+        let lifted = texts(&lifted);
+        assert!(crate::contrast_ratio(lifted[0].2, Color32::BLACK) >= 7.0);
+        assert!(
+            crate::contrast_ratio(lifted[1].2, Color32::from_rgb(0, 0, 200))
+                >= 7.0
+        );
+    }
+
     fn texts(shapes: &[Shape]) -> Vec<(String, Pos2, Color32)> {
         shapes
             .iter()

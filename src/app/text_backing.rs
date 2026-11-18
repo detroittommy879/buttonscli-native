@@ -411,9 +411,9 @@ impl ButtonsApp {
             .unwrap_or(Color32::BLACK);
         let theme_colors = ansi_colors(&terminal.terminal_colors);
         // A pane whose theme has its own colors ignores the ones set here.
-        let pane_has_own = terminal.text_backing.is_some()
-            && !(self.preferences.text_backing.override_theme_colors
-                && !self.preferences.text_backing.colors.is_empty());
+        let global_wins = self.preferences.text_backing.override_theme_colors
+            && !self.preferences.text_backing.colors.is_empty();
+        let pane_has_own = terminal.text_backing.is_some() && !global_wins;
         let mut drop_own = false;
         let locale = self.locale.clone();
         let backing = &mut self.preferences.text_backing;
