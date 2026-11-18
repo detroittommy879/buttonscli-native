@@ -229,3 +229,10 @@ figure {
 .site-nav a {
   font-family: var(--font-body);
 }
+
+/* A fifth card fills the rest of its row in the 3- and 2-column grids. */
+@media (min-width: 700px) {
+  .cards > .card-wide:last-child {
+    grid-column: span 2;
+  }
+}
