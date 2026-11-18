@@ -13,6 +13,9 @@
   only the text that falls short toward white or black.
 - Text backing defaults to 100% opacity and feather 20; feather goes up
   to 30. Settings → Experimental now shows the backing options inline.
+- **Row banding** (status bar ±) now applies to every pane, including
+  unfocused panes and themes with effects off. While it is on, panes show
+  plain bands instead of their shaders; 0 brings the shaders back.
 
 - **Letter outlines**: text backing rings can trace the letters themselves
   instead of a box around them (**Follow letter shapes**, on by default).

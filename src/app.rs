@@ -5612,7 +5612,7 @@ impl ButtonsApp {
                         ui.separator();
                         self.text_backing_controls(ui);
                         ui.spaced_label(crate::i18n::literal(&self.locale, "Row banding"));
-                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text(crate::i18n::literal(&self.locale, "For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls."));
+                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text(crate::i18n::literal(&self.locale, "For readability: alternate row brightness above and below the theme background in every pane, replacing shaders while it is on. 0 turns it off and brings the shaders back."));
                         // Save when a drag ends or a typed value lands, like Motion.
                         if banding.drag_stopped() || (banding.changed() && !banding.dragged()) {
                             self.persist_native_preferences();
@@ -16105,8 +16105,11 @@ fn terminal_surface(
         ui.available_rect_before_wrap().min,
         egui::vec2((available.x - scrollbar_width).max(1.0), available.y),
     );
+    // Row banding is a readability override: while it is on, every pane
+    // shows plain bands instead of its shader (which comes back at 0).
     let shader = theme.effects.shader_background.as_ref().filter(|shader| {
-        interaction.shader_backgrounds_enabled
+        interaction.row_brightness == 0
+            && interaction.shader_backgrounds_enabled
             && local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds)
             && shader.strength > 0.0
     });
@@ -16141,11 +16144,9 @@ fn terminal_surface(
             interaction.keyboard.bracketed_paste,
             interaction.keyboard.option_as_meta,
         )
-        .set_row_brightness(if theme.effects.master_disabled {
-            0
-        } else {
-            interaction.row_brightness
-        })
+        // Applies to every pane, even where effects are off or limited
+        // to the focused pane.
+        .set_row_brightness(interaction.row_brightness)
         .set_row_banding(if effects_master_switch_available() {
             crate::plugins::effects::row_banding::overlay_color(&theme.effects)
         } else {
