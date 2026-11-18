@@ -29,3 +29,9 @@ Variant `d` (Hairline) keeps its stylesheet here in `assets/d.css`; a file in
 then the `homepage-preview` launch entry (`/new_abcd00/d/`). The agent
 walkthrough section embeds `/native/try/agents/`: copy `shader-playground/` to
 `.private/site-preview/html/native/try/` too, or it shows a 404 error locally.
+
+Fonts are self-hosted: `fetch_fonts.py <google-css>` writes `fonts/<family>.css`
+and downloads the woff2 files into `../html/assets/fonts/`. Variant d uses
+Recursive Sans Casual (`family=Recursive:wght,CASL,MONO@300..900,1,0`); upload
+`recursive-latin-4f28f889.woff2` and `recursive-latin-ext-697f85cd.woff2` to
+amp `html/assets/fonts/` (or run `fetch_fonts.py` there) before rebuilding.

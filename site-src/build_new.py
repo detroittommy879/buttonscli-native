@@ -113,8 +113,8 @@ VARIANTS = {
     "d": {
         "name": "Hairline",
         "blurb": "Near-black, square corners, 1px hairlines, one green accent and monospace headings.",
-        "fonts": ["inter", "jetbrains-mono"],
-        "preload": ["jetbrains-mono-latin-0a7197f9.woff2", "inter-latin-6ab57b19.woff2"],
+        "fonts": ["recursive", "jetbrains-mono"],
+        "preload": ["recursive-latin-4f28f889.woff2", "jetbrains-mono-latin-0a7197f9.woff2"],
         "css": "d.css",
         "alt_class": "band",
     },
