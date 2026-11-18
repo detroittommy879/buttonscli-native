@@ -6368,8 +6368,7 @@ impl ButtonsApp {
                 {
                     *close_action = Some(SettingsCloseAction::Keep);
                 }
-                if ui
-                    .spaced_button(crate::i18n::text(
+                if crate::ui_text::safe_button(ui, crate::i18n::text(
                         &self.locale,
                         crate::i18n::MessageKey::SettingsRevertClose,
                         &[],
@@ -10260,7 +10259,7 @@ impl ButtonsApp {
                         });
                         if self.shader_ai.undo.is_some()
                             && !self.shader_ai.busy
-                            && ui.spaced_button(crate::i18n::literal(&self.locale, "Undo AI change")).clicked()
+                            && crate::ui_text::safe_button(ui, crate::i18n::literal(&self.locale, "Undo AI change")).clicked()
                         {
                             custom.expression = self.shader_ai.undo.take().unwrap_or_default();
                             self.shader_ai.message = None;
@@ -10489,9 +10488,11 @@ impl ButtonsApp {
                     {
                         self.save_personal_theme_draft();
                     }
-                    if ui
-                        .spaced_button(crate::i18n::literal(&self.locale, "Discard changes"))
-                        .clicked()
+                    if crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&self.locale, "Discard changes"),
+                    )
+                    .clicked()
                     {
                         self.cancel_personal_theme_draft();
                     }
@@ -10758,9 +10759,11 @@ impl ButtonsApp {
                     )
                 });
                 ui.ctx().request_repaint_after(Duration::from_millis(250));
-                cancel = ui
-                    .spaced_button(crate::i18n::literal(&locale, "Cancel generation"))
-                    .clicked();
+                cancel = crate::ui_text::safe_button(
+                    ui,
+                    crate::i18n::literal(&locale, "Cancel generation"),
+                )
+                .clicked();
             } else {
                 generate = ui
                     .add_enabled(
@@ -10825,15 +10828,22 @@ impl ButtonsApp {
                     )
                 });
                 wrapping_row(ui, |ui| {
-                    save = ui
-                        .spaced_button(crate::i18n::literal(&self.locale, "Save as theme"))
-                        .clicked();
-                    edit = ui
-                        .spaced_button(crate::i18n::literal(&locale, "Edit in theme library"))
-                        .clicked();
-                    discard = ui
-                        .spaced_button(crate::i18n::literal(&locale, "Discard candidate"))
-                        .clicked();
+                    // Theme-proof: the candidate being previewed may be unreadable.
+                    save = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&self.locale, "Save as theme"),
+                    )
+                    .clicked();
+                    edit = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&locale, "Edit in theme library"),
+                    )
+                    .clicked();
+                    discard = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&locale, "Discard candidate"),
+                    )
+                    .clicked();
                 });
             });
             if save {
@@ -10984,6 +10994,7 @@ impl ButtonsApp {
         let resolved_document = ThemeDefinition::editor_document(&document)
             .map(|theme| crate::theme_files::document_from_theme(&theme, &theme.name))
             .unwrap_or(Value::Null);
+        color_adjust::quick_adjust_section(ui, &locale, &mut document, &resolved_document);
         for (section, fields) in APP_THEME_COLOR_GROUPS {
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -11468,10 +11479,7 @@ impl ButtonsApp {
             {
                 self.save_personal_theme_draft();
             }
-            if ui
-                .spaced_button(crate::i18n::literal(&locale, "Cancel"))
-                .clicked()
-            {
+            if crate::ui_text::safe_button(ui, crate::i18n::literal(&locale, "Cancel")).clicked() {
                 self.cancel_personal_theme_draft();
             }
             if self.theme_editor_file_exists {
@@ -18473,6 +18481,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
+#[cfg(not(target_arch = "wasm32"))]
+mod color_adjust;
 #[cfg(not(target_arch = "wasm32"))]
 mod command_history;
 #[cfg(not(target_arch = "wasm32"))]

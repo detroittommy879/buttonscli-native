@@ -16,6 +16,15 @@
 - **Row banding** (status bar ±) now applies to every pane, including
   unfocused panes and themes with effects off. While it is on, panes show
   plain bands instead of their shaders; 0 brings the shaders back.
+- **Theme editor → Quick adjust**: Hue, Saturation, Brightness and Contrast
+  sliders move all terminal colors (or all interface colors) at once, with
+  Reset. Results are a normal draft you can keep as a new variant.
+- Cancel, Discard, Undo and Revert buttons in theme generation, the theme
+  editor and Settings now ignore the theme (white on black), so they stay
+  readable even when a generated theme is not.
+- **Profiles**: the Profile menu can create a new blank profile and rename
+  profiles that are not active.
+- File → Apply theme bundle scrolls when the list is taller than the window.
 
 - **Letter outlines**: text backing rings can trace the letters themselves
   instead of a box around them (**Follow letter shapes**, on by default).
