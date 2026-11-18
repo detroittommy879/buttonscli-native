@@ -41,7 +41,7 @@ the tool refuses to overwrite them. Use a fresh filename/directory each time.
    keep its ID when preserving a user's dismissal. Use `null` to empty a slot.
 4. `./target/debug/announcement-tool.exe sign "$env:USERPROFILE/.buttonscli-signing/announcements-2026-11-11/primary-2026.key" primary-2026 ./notice-payload.json ./notice-signed.json.txt`
 5. `./target/debug/announcement-tool.exe verify ./notice-signed.json.txt`
-6. `scp ./notice-signed.json.txt 193.122.157.24:/var/www/buttonscli.com/html/app-notices/messages.json.txt`
+6. `scp ./notice-signed.json.txt <AMP_HOST>:/var/www/buttonscli.com/html/app-notices/messages.json.txt`
 
 Keep drafts outside Git (or under `.private/`). The two relative filenames above
 are examples for a single publishing session; remove/move those public drafts
@@ -53,7 +53,7 @@ days. Generate a fresh draft before publishing if it has expired.
 
 Activate only after checking the staged content/signature:
 
-`ssh 193.122.157.24 'mv -f /var/www/buttonscli.com/html/app-notices/messages.json.txt /var/www/buttonscli.com/html/app-notices/messages.json'`
+`ssh <AMP_HOST> 'mv -f /var/www/buttonscli.com/html/app-notices/messages.json.txt /var/www/buttonscli.com/html/app-notices/messages.json'`
 
 This is one rename on the same filesystem; readers see the old or new signed
 envelope, never mismatched payload/signature files. Verify the public download with
