@@ -8,6 +8,133 @@ pub struct TextBacking {
     pub invert: bool,
     /// Custom colors instead of the pane background (or text, inverted).
     pub palette: Option<BackingPalette>,
+    /// Draw text on the default background in this color instead of the
+    /// theme's (ignored while inverted).
+    pub text_color: Option<Color32>,
+    /// Also recolor text that has its own (ANSI) color.
+    pub recolor_all: bool,
+    /// WCAG contrast ratio every glyph must reach against what is drawn
+    /// behind it (1 = off). Text below it is moved toward white or black.
+    pub min_contrast: f32,
+}
+
+impl Default for TextBacking {
+    fn default() -> Self {
+        Self {
+            opacity: 0.0,
+            feather: 0.0,
+            whole_line: false,
+            invert: false,
+            palette: None,
+            text_color: None,
+            recolor_all: false,
+            min_contrast: 1.0,
+        }
+    }
+}
+
+/// Largest feather in points.
+pub const MAX_FEATHER: f32 = 30.0;
+
+/// sRGB channel to linear light, as WCAG 2 defines relative luminance.
+fn linear_channel(value: u8) -> f32 {
+    static TABLE: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = [0.0; 256];
+        for (index, slot) in table.iter_mut().enumerate() {
+            let c = index as f32 / 255.0;
+            *slot = if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            };
+        }
+        table
+    })[value as usize]
+}
+
+/// WCAG 2 relative luminance (0 black .. 1 white).
+pub fn relative_luminance(color: Color32) -> f32 {
+    0.2126 * linear_channel(color.r())
+        + 0.7152 * linear_channel(color.g())
+        + 0.0722 * linear_channel(color.b())
+}
+
+/// WCAG 2 contrast ratio, 1 (same) .. 21 (black on white).
+pub fn contrast_ratio(a: Color32, b: Color32) -> f32 {
+    let (la, lb) = (relative_luminance(a), relative_luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+/// `fg` moved toward white or black just far enough to reach `target`
+/// against `bg` (like xterm.js `minimumContrastRatio`). Keeps the hue as
+/// long as possible; returns the better extreme when the target cannot be
+/// reached at all.
+pub fn ensure_contrast(fg: Color32, bg: Color32, target: f32) -> Color32 {
+    let fg = Color32::from_rgb(fg.r(), fg.g(), fg.b());
+    if !(target > 1.0) || contrast_ratio(fg, bg) >= target {
+        return fg;
+    }
+    let lighter = relative_luminance(fg) >= relative_luminance(bg);
+    let (first, second) = if lighter {
+        (Color32::WHITE, Color32::BLACK)
+    } else {
+        (Color32::BLACK, Color32::WHITE)
+    };
+    for toward in [first, second] {
+        if contrast_ratio(toward, bg) < target {
+            continue;
+        }
+        let (mut low, mut high) = (0.0f32, 1.0f32);
+        for _ in 0..10 {
+            let mid = (low + high) * 0.5;
+            if contrast_ratio(lerp(fg, toward, mid), bg) >= target {
+                high = mid;
+            } else {
+                low = mid;
+            }
+        }
+        return lerp(fg, toward, high);
+    }
+    if contrast_ratio(Color32::WHITE, bg) >= contrast_ratio(Color32::BLACK, bg)
+    {
+        Color32::WHITE
+    } else {
+        Color32::BLACK
+    }
+}
+
+/// The color a glyph at `pos` sits on: the backing (`run` color or the
+/// palette color there) blended at `opacity` over `base`. Rings keep the
+/// run color under the text itself.
+pub(crate) fn backdrop_at(
+    options: &TextBacking,
+    run: Color32,
+    base: Color32,
+    pos: egui::Pos2,
+    row: usize,
+    bounds: Rect,
+) -> Color32 {
+    let opacity = options.opacity.clamp(0.0, 1.0);
+    if opacity <= 0.0 {
+        return base;
+    }
+    let backing =
+        match options.palette {
+            Some(palette) => match palette.style {
+                BackingStyle::Rings => run,
+                BackingStyle::Lines => {
+                    let colors = palette.colors();
+                    colors[row % colors.len()]
+                },
+                BackingStyle::Horizontal => palette
+                    .at((pos.x - bounds.left()) / bounds.width().max(1.0)),
+                BackingStyle::Vertical => palette
+                    .at((pos.y - bounds.top()) / bounds.height().max(1.0)),
+            },
+            None => run,
+        };
+    lerp(base, backing, opacity)
 }
 
 /// How custom backing colors are laid out.
@@ -448,7 +575,7 @@ pub(crate) fn shapes(
         return Vec::new();
     }
     let feather = if options.feather.is_finite() {
-        options.feather.clamp(0.0, 20.0)
+        options.feather.clamp(0.0, MAX_FEATHER)
     } else {
         0.0
     };
@@ -518,9 +645,7 @@ pub fn backing_shapes(
     let options = TextBacking {
         opacity,
         feather,
-        whole_line: false,
-        invert: false,
-        palette: None,
+        ..TextBacking::default()
     };
     shapes(
         std::iter::once((rect, color)),
@@ -583,6 +708,37 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].0.width(), 200.0);
     }
+
+    #[test]
+    fn contrast_matches_wcag_and_ensure_contrast_reaches_the_target() {
+        assert!(
+            (contrast_ratio(Color32::BLACK, Color32::WHITE) - 21.0).abs()
+                < 0.01
+        );
+        assert!(
+            (contrast_ratio(Color32::RED, Color32::RED) - 1.0).abs() < 0.001
+        );
+        // #767676 on white is the classic 4.54:1 AA boundary.
+        let grey = Color32::from_rgb(0x76, 0x76, 0x76);
+        assert!((contrast_ratio(grey, Color32::WHITE) - 4.54).abs() < 0.02);
+        let bg = Color32::from_rgb(40, 40, 60);
+        for fg in [
+            Color32::from_rgb(60, 60, 90),
+            Color32::from_rgb(200, 30, 30),
+            Color32::from_rgb(20, 20, 20),
+        ] {
+            let fixed = ensure_contrast(fg, bg, 4.5);
+            assert!(contrast_ratio(fixed, bg) >= 4.5, "{fg:?} -> {fixed:?}");
+        }
+        // Already readable text is left alone; ratio 1 turns it off.
+        assert_eq!(ensure_contrast(Color32::WHITE, bg, 4.5), Color32::WHITE);
+        let dim = Color32::from_rgb(50, 50, 70);
+        assert_eq!(ensure_contrast(dim, bg, 1.0), dim);
+        // A mid grey cannot reach 21: it gets the better extreme.
+        let mid = Color32::from_rgb(128, 128, 128);
+        assert_eq!(ensure_contrast(mid, mid, 21.0), Color32::BLACK);
+    }
+
     #[test]
     fn text_backing_feathers_to_transparent_and_zero_opacity_skips_work() {
         let bounds = rect(0.0, 0.0).expand(30.0);
@@ -592,6 +748,7 @@ mod tests {
             whole_line: false,
             invert: false,
             palette: None,
+            ..Default::default()
         };
         let result = shapes(
             [(rect(0.0, 0.0), Color32::BLACK)].into_iter(),
@@ -637,6 +794,7 @@ mod tests {
                 whole_line: false,
                 invert: false,
                 palette: Some(palette),
+                ..Default::default()
             };
             let mut result = shapes(
                 [(rect(0.0, 0.0), Color32::BLACK)].into_iter(),

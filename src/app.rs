@@ -16155,14 +16155,16 @@ fn terminal_surface(
             if interaction.text_backing.available && interaction.text_backing.enabled {
                 Some(egui_term::TextBacking {
                     opacity: interaction.text_backing.opacity.min(100) as f32 / 100.0,
-                    feather: interaction.text_backing.feather.min(20) as f32,
+                    feather: (interaction.text_backing.feather as f32).min(egui_term::MAX_FEATHER),
                     whole_line: interaction.text_backing.whole_line,
                     invert: interaction.text_backing.invert,
+                    text_color: interaction.text_backing.text_color(),
+                    recolor_all: interaction.text_backing.recolor_all,
+                    min_contrast: interaction.text_backing.contrast_target(),
                     // A pane's theme colors win over the colors set for all panes.
-                    palette: theme
+                    palette: interaction
                         .text_backing
-                        .clone()
-                        .or_else(|| interaction.text_backing.custom_colors())
+                        .colors_for(theme.text_backing.clone())
                         .and_then(|colors| {
                             // Moving rings: repaint on the animation tick.
                             if moving
@@ -16173,6 +16175,12 @@ fn terminal_surface(
                             }
                             backing_palette(&colors, time)
                         }),
+                })
+            } else if interaction.text_backing.available && interaction.text_backing.auto_contrast {
+                // Auto contrast works without backing too (against the pane background).
+                Some(egui_term::TextBacking {
+                    min_contrast: interaction.text_backing.contrast_target(),
+                    ..egui_term::TextBacking::default()
                 })
             } else {
                 None

@@ -14,6 +14,9 @@ const PRESETS: [(&str, &[&str]); 4] = [
     ("Fade to black", &["#3a3f4b", "#000000"]),
 ];
 
+/// Solid single-color presets.
+const SOLID_PRESETS: [(&str, &str); 2] = [("Black", "#000000"), ("White", "#ffffff")];
+
 /// Default colors when someone first turns custom colors on.
 pub(super) fn starter_backing_colors(base: Color32) -> TextBackingColors {
     TextBackingColors {
@@ -77,6 +80,16 @@ pub(super) fn backing_colors_editor(
                         .iter()
                         .filter_map(|c| crate::theme::parse_color(c))
                         .collect();
+                    changed = true;
+                }
+            }
+            for (name, color) in SOLID_PRESETS {
+                if ui
+                    .small_button(crate::i18n::literal(locale, name))
+                    .clicked()
+                {
+                    backing.colors = crate::theme::parse_color(color).into_iter().collect();
+                    backing.style = TextBackingStyle::Vertical;
                     changed = true;
                 }
             }
@@ -188,6 +201,129 @@ fn ring_options_editor(ui: &mut egui::Ui, locale: &str, rings: &mut RingOptions)
     changed
 }
 
+/// One-click looks: solid backing in `backing`, text in `text`, fully
+/// opaque with a soft edge. Wins over pane themes' own backing colors.
+fn apply_readable_preset(
+    backing: &mut crate::settings::TextBacking,
+    backing_color: &str,
+    text: &str,
+) {
+    backing.enabled = true;
+    backing.opacity = 100;
+    backing.feather = 20;
+    backing.invert = false;
+    backing.colors = vec![backing_color.into()];
+    backing.style = TextBackingStyle::Vertical.as_str().into();
+    backing.text_color = text.into();
+    backing.override_theme_colors = true;
+}
+
+/// Back to the theme's own colors (backing follows each pane).
+fn clear_readable_preset(backing: &mut crate::settings::TextBacking) {
+    backing.colors.clear();
+    backing.text_color.clear();
+    backing.override_theme_colors = false;
+}
+
+/// True once a slider is released (or changed by keyboard/click), so
+/// drags show live but save once.
+fn settled(response: &egui::Response) -> bool {
+    response.drag_stopped() || (response.changed() && !response.dragged())
+}
+
+/// Presets, sliders and switches shared by the status-bar menu and
+/// Settings → Experimental. Returns (changed, open the colors window).
+fn backing_options_body(
+    ui: &mut egui::Ui,
+    locale: &str,
+    backing: &mut crate::settings::TextBacking,
+) -> (bool, bool) {
+    let text = |english: &'static str| crate::i18n::literal(locale, english);
+    let mut changed = false;
+    wrapping_row(ui, |ui| {
+        ui.spaced_label(text("Readable:"));
+        if ui
+            .small_button(text("White on black"))
+            .on_hover_text(text(
+                "Black backing and white text in every pane: readable over any shader.",
+            ))
+            .clicked()
+        {
+            apply_readable_preset(backing, "#000000", "#ffffff");
+            changed = true;
+        }
+        if ui
+            .small_button(text("Black on white"))
+            .on_hover_text(text("White backing and black text in every pane."))
+            .clicked()
+        {
+            apply_readable_preset(backing, "#ffffff", "#000000");
+            changed = true;
+        }
+        if (!backing.colors.is_empty() || !backing.text_color.is_empty())
+            && ui
+                .small_button(text("Theme colors"))
+                .on_hover_text(text("Backing and text follow each pane's theme again."))
+                .clicked()
+        {
+            clear_readable_preset(backing);
+            changed = true;
+        }
+    });
+    changed |=
+        settled(&ui.add(egui::Slider::new(&mut backing.opacity, 0..=100).text(text("Opacity %"))));
+    let max_feather = egui_term::MAX_FEATHER as u8;
+    changed |= settled(
+        &ui.add(egui::Slider::new(&mut backing.feather, 0..=max_feather).text(text("Feather"))),
+    );
+    changed |= ui
+        .spaced_checkbox(&mut backing.whole_line, text("Whole lines"))
+        .changed();
+    changed |= ui
+        .spaced_checkbox(&mut backing.invert, text("Invert text and backing colors"))
+        .on_hover_text(text("Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged."))
+        .changed();
+    ui.separator();
+    changed |= ui
+        .spaced_checkbox(&mut backing.auto_contrast, text("Auto contrast"))
+        .on_hover_text(text("Brighten or darken any text that is too close to what is behind it, so it always reaches the contrast below. Works with backing off too."))
+        .changed();
+    if backing.auto_contrast {
+        let mut ratio = f32::from(backing.min_contrast) / 10.0;
+        let range = crate::settings::TextBacking::MIN_CONTRAST_RANGE;
+        let response = ui
+            .add(
+                egui::Slider::new(
+                    &mut ratio,
+                    f32::from(*range.start()) / 10.0..=f32::from(*range.end()) / 10.0,
+                )
+                .step_by(0.1)
+                .suffix(":1")
+                .text(text("Minimum contrast")),
+            )
+            .on_hover_text(text("WCAG contrast ratio: 4.5 is the AA level for normal text, 7 the AAA level, 3 the minimum for large text. 21 is black on white."));
+        backing.min_contrast = (ratio * 10.0).round() as u8;
+        changed |= settled(&response);
+        wrapping_row(ui, |ui| {
+            for (label, value) in [("AA 4.5", 45u8), ("AAA 7", 70)] {
+                if ui.small_button(label).clicked() {
+                    backing.min_contrast = value;
+                    changed = true;
+                }
+            }
+        });
+    }
+    ui.separator();
+    let open = ui
+        .spaced_button(text("Backing and text colors…"))
+        .on_hover_text(text("Pick the text color, or colors, a gradient or outline rings for the backing in all panes."))
+        .clicked();
+    ui.spaced_label(text(
+        "Without custom colors, the backing follows each pane.",
+    ));
+    (changed, open)
+}
+
 impl ButtonsApp {
     pub(super) fn text_backing_controls(&mut self, ui: &mut egui::Ui) {
         let backing = &mut self.preferences.text_backing;
@@ -204,33 +340,52 @@ impl ButtonsApp {
                 "Soften the background behind terminal text in all panes.",
             ))
             .changed();
-        ui.solo_menu_button("text-backing-options", crate::i18n::literal(&self.locale, "Backing options"), |ui| {
-            let opacity =
-                ui.add(egui::Slider::new(&mut backing.opacity, 0..=100).text(crate::i18n::literal(&self.locale, "Opacity %")));
-            changed |= opacity.drag_stopped() || (opacity.changed() && !opacity.dragged());
-            let feather = ui.add(egui::Slider::new(&mut backing.feather, 0..=20).text(crate::i18n::literal(&self.locale, "Feather")));
-            changed |= feather.drag_stopped() || (feather.changed() && !feather.dragged());
-            changed |= ui
-                .spaced_checkbox(&mut backing.whole_line, crate::i18n::literal(&self.locale, "Whole lines"))
-                .changed();
-            changed |= ui.spaced_checkbox(&mut backing.invert, crate::i18n::literal(&self.locale, "Invert text and backing colors"))
-                .on_hover_text(crate::i18n::literal(&self.locale, "Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged.")).changed();
-            ui.separator();
-            // Color pickers and the layout list are popups of their own: inside
-            // this menu, clicking them counted as clicking outside and closed
-            // everything. The colors are edited in a small window instead.
-            if ui
-                .spaced_button(crate::i18n::literal(&self.locale, "Backing colors…"))
-                .on_hover_text(crate::i18n::literal(&self.locale, "Pick colors, a gradient or outline rings for all panes instead of the pane background."))
-                .clicked()
-            {
-                ui.ctx().data_mut(|data| data.insert_temp(colors_window_id(), true));
-                ui.close_menu();
-            }
-            ui.spaced_label(
-                crate::i18n::literal(&self.locale, "Without custom colors, the backing follows each pane. Disable in Settings → Experimental."),
-            );
-        });
+        let locale = self.locale.clone();
+        ui.solo_menu_button(
+            "text-backing-options",
+            crate::i18n::literal(&self.locale, "Backing options"),
+            |ui| {
+                let (body_changed, open) = backing_options_body(ui, &locale, backing);
+                changed |= body_changed;
+                // Color pickers and the layout list are popups of their own: inside
+                // this menu, clicking them counted as clicking outside and closed
+                // everything. The colors are edited in a small window instead.
+                if open {
+                    ui.ctx()
+                        .data_mut(|data| data.insert_temp(colors_window_id(), true));
+                    ui.close_menu();
+                }
+                ui.spaced_label(crate::i18n::literal(
+                    &locale,
+                    "Disable in Settings → Experimental.",
+                ));
+            },
+        );
+        if changed {
+            self.persist_native_preferences();
+        }
+    }
+
+    /// Settings → Experimental: the same options laid out inline (a menu
+    /// inside the Settings page closed itself and hid its colors window).
+    pub(super) fn text_backing_settings(&mut self, ui: &mut egui::Ui) {
+        let locale = self.locale.clone();
+        let backing = &mut self.preferences.text_backing;
+        if !backing.available {
+            return;
+        }
+        let mut changed = ui
+            .spaced_checkbox(
+                &mut backing.enabled,
+                crate::i18n::literal(&locale, "Text backing"),
+            )
+            .changed();
+        let (body_changed, open) = backing_options_body(ui, &locale, backing);
+        if open {
+            ui.ctx()
+                .data_mut(|data| data.insert_temp(colors_window_id(), true));
+        }
+        changed |= body_changed;
         if changed {
             self.persist_native_preferences();
         }
@@ -256,7 +411,9 @@ impl ButtonsApp {
             .unwrap_or(Color32::BLACK);
         let theme_colors = ansi_colors(&terminal.terminal_colors);
         // A pane whose theme has its own colors ignores the ones set here.
-        let pane_has_own = terminal.text_backing.is_some();
+        let pane_has_own = terminal.text_backing.is_some()
+            && !(self.preferences.text_backing.override_theme_colors
+                && !self.preferences.text_backing.colors.is_empty());
         let mut drop_own = false;
         let locale = self.locale.clone();
         let backing = &mut self.preferences.text_backing;
@@ -268,6 +425,30 @@ impl ButtonsApp {
             .resizable(false)
             .default_width(360.0)
             .show(ctx, |ui| {
+                ui.spaced_label(RichText::new(crate::i18n::literal(&locale, "Text")).strong());
+                let mut own_text = !backing.text_color.is_empty();
+                wrapping_row(ui, |ui| {
+                    if ui
+                        .spaced_checkbox(&mut own_text, crate::i18n::literal(&locale, "Own text color"))
+                        .on_hover_text(crate::i18n::literal(&locale, "Draw text on the default background in this color instead of the theme's. Off follows each pane's theme."))
+                        .changed()
+                    {
+                        backing.text_color = if own_text { "#ffffff".into() } else { String::new() };
+                        changed = true;
+                    }
+                    if let Some(mut color) = backing.text_color() {
+                        if ui.color_edit_button_srgba(&mut color).changed() {
+                            backing.text_color = crate::theme::to_hex(color);
+                            changed = true;
+                        }
+                        changed |= ui
+                            .spaced_checkbox(&mut backing.recolor_all, crate::i18n::literal(&locale, "Colored text too"))
+                            .on_hover_text(crate::i18n::literal(&locale, "Also replace colored (ANSI) text. Off keeps colors such as errors and file types."))
+                            .changed();
+                    }
+                });
+                ui.separator();
+                ui.spaced_label(RichText::new(crate::i18n::literal(&locale, "Backing")).strong());
                 let mut custom = backing.custom_colors();
                 let mut use_custom = custom.is_some();
                 if ui
@@ -280,6 +461,10 @@ impl ButtonsApp {
                 }
                 if let Some(colors) = custom.as_mut() {
                     changed |= backing_colors_editor(ui, &locale, "global-text-backing", colors, &theme_colors);
+                    changed |= ui
+                        .spaced_checkbox(&mut backing.override_theme_colors, crate::i18n::literal(&locale, "Also in panes whose theme has its own"))
+                        .on_hover_text(crate::i18n::literal(&locale, "Use these colors everywhere, even where a theme brings its own backing colors."))
+                        .changed();
                 }
                 if changed {
                     store_global_backing(backing, custom.as_ref());

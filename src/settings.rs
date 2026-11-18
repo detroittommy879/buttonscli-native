@@ -793,6 +793,19 @@ pub(crate) struct TextBacking {
     pub(crate) ring_width: u8,
     /// Blend, repeats, taper and the other rings options.
     pub(crate) rings: crate::theme::RingOptions,
+    /// "#rrggbb" for text on the default background while backing is on;
+    /// empty = the theme's colors.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub(crate) text_color: String,
+    /// The text color also replaces colored (ANSI) text.
+    pub(crate) recolor_all: bool,
+    /// `colors` win over a pane theme's own backing colors (set by the
+    /// readable presets).
+    pub(crate) override_theme_colors: bool,
+    /// Keep every glyph at `min_contrast` against what is behind it.
+    pub(crate) auto_contrast: bool,
+    /// WCAG contrast ratio in tenths (45 = 4.5:1, the AA level for text).
+    pub(crate) min_contrast: u8,
 }
 
 impl TextBacking {
@@ -812,6 +825,42 @@ impl TextBacking {
             rings: self.rings.normalized(),
         })
     }
+
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) const MIN_CONTRAST_RANGE: std::ops::RangeInclusive<u8> = 10..=150;
+    pub(crate) const DEFAULT_MIN_CONTRAST: u8 = 45;
+
+    /// Backing colors for a pane whose theme brings `theme_colors`.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn colors_for(
+        &self,
+        theme_colors: Option<crate::theme::TextBackingColors>,
+    ) -> Option<crate::theme::TextBackingColors> {
+        if self.override_theme_colors {
+            self.custom_colors().or(theme_colors)
+        } else {
+            theme_colors.or_else(|| self.custom_colors())
+        }
+    }
+
+    /// The text color override, if one is set.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn text_color(&self) -> Option<egui::Color32> {
+        crate::theme::parse_color(&self.text_color)
+    }
+
+    /// The contrast ratio to enforce, or 1 when auto contrast is off.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn contrast_target(&self) -> f32 {
+        if self.auto_contrast {
+            f32::from(self.min_contrast.clamp(
+                *Self::MIN_CONTRAST_RANGE.start(),
+                *Self::MIN_CONTRAST_RANGE.end(),
+            )) / 10.0
+        } else {
+            1.0
+        }
+    }
 }
 
 impl Default for TextBacking {
@@ -819,14 +868,19 @@ impl Default for TextBacking {
         Self {
             available: true,
             enabled: true,
-            opacity: 75,
-            feather: 6,
+            opacity: 100,
+            feather: 20,
             whole_line: false,
             invert: false,
             colors: Vec::new(),
             style: "vertical".into(),
             ring_width: 3,
             rings: crate::theme::RingOptions::default(),
+            text_color: String::new(),
+            recolor_all: false,
+            override_theme_colors: false,
+            auto_contrast: false,
+            min_contrast: Self::DEFAULT_MIN_CONTRAST,
         }
     }
 }

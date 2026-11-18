@@ -238,7 +238,7 @@ impl ButtonsApp {
             .on_hover_text(crate::i18n::literal(&self.locale, "Allows soft backing behind terminal text. Off removes the backing and hides its status-bar controls; your adjustments are kept.")).changed() {
             self.persist_native_preferences();
         }
-        self.text_backing_controls(ui);
+        self.text_backing_settings(ui);
         ui.separator();
         ui.spaced_label(
             RichText::new(crate::i18n::literal(

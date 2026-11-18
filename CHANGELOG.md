@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Readable text presets**: Backing options → **White on black** / **Black
+  on white** put a solid backing and a fixed text color in every pane, over
+  any shader. **Theme colors** goes back. Backing colors also have **Black**
+  and **White** presets, and a pane's own theme colors can be overridden.
+- **Text color**: Backing and text colors… → **Own text color** draws text
+  in one color (optionally colored ANSI text too).
+- **Auto contrast**: keeps every glyph at a minimum WCAG contrast ratio
+  against what is drawn behind it (default 4.5:1, the AA level), moving
+  only the text that falls short toward white or black.
+- Text backing defaults to 100% opacity and feather 20; feather goes up
+  to 30. Settings → Experimental now shows the backing options inline.
+
 - **Letter outlines**: text backing rings can trace the letters themselves
   instead of a box around them (**Follow letter shapes**, on by default).
 - **Outline rings blend**: text backing rings now fade into each other, so

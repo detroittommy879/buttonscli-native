@@ -791,16 +791,62 @@ impl<'a> TerminalView<'a> {
             }
 
             // Inversion is presentation-only and never changes TUI/selection backgrounds.
-            if self
-                .text_backing
-                .is_some_and(|b| b.invert && b.opacity > 0.0)
-                && matches!(indexed.bg, Color::Named(NamedColor::Background))
-                && !is_inverse
-                && !is_selected
-                && !is_search_match
-                && !is_current_search_match
-            {
-                fg = global_bg;
+            let plain =
+                matches!(indexed.bg, Color::Named(NamedColor::Background))
+                    && !is_inverse
+                    && !is_selected
+                    && !is_search_match
+                    && !is_current_search_match;
+            if let Some(backing) = self.text_backing {
+                let inverted = backing.invert && backing.opacity > 0.0;
+                // What the backing behind this glyph was drawn with.
+                let run = if !inverted {
+                    global_bg
+                } else if backing.whole_line {
+                    self.theme.get_color(Color::Named(NamedColor::Foreground))
+                } else {
+                    fg
+                };
+                if plain && inverted {
+                    fg = global_bg;
+                } else if plain {
+                    if let Some(color) = backing.text_color.filter(|_| {
+                        backing.recolor_all
+                            || matches!(
+                                indexed.fg,
+                                Color::Named(NamedColor::Foreground)
+                                    | Color::Named(
+                                        NamedColor::BrightForeground
+                                    )
+                                    | Color::Named(NamedColor::DimForeground)
+                            )
+                    }) {
+                        fg = color;
+                    }
+                }
+                if backing.min_contrast > 1.0 {
+                    let under = if plain {
+                        let row = ((y - layout.rect.top()) / cell_height)
+                            .round()
+                            .max(0.0)
+                            as usize;
+                        crate::text_backing::backdrop_at(
+                            &backing,
+                            run,
+                            global_bg,
+                            Pos2::new(x, y + cell_height * 0.5),
+                            row,
+                            layout.rect,
+                        )
+                    } else {
+                        bg
+                    };
+                    fg = crate::text_backing::ensure_contrast(
+                        fg,
+                        under,
+                        backing.min_contrast,
+                    );
+                }
             }
 
             // Handle hovered hyperlink underline
@@ -2218,6 +2264,7 @@ mod render_parity_tests {
                 whole_line: false,
                 invert: false,
                 palette: None,
+                ..Default::default()
             }),
         );
         assert_eq!(texts(&plain), texts(&backed));
@@ -2253,6 +2300,7 @@ mod render_parity_tests {
                 whole_line: false,
                 invert: true,
                 palette: None,
+                ..Default::default()
             }),
         );
         let original = texts(&plain);
@@ -2283,6 +2331,7 @@ mod render_parity_tests {
                 whole_line: false,
                 invert: true,
                 palette: None,
+                ..Default::default()
             }),
         );
         assert_eq!(texts(&zero), original);
