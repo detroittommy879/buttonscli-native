@@ -450,7 +450,7 @@ cargo build --locked --release --bin buttonscli
   40% of the window with vertical scroll, ignores unusable minimize/restore sizes
   and repaints when its height changes (egui panels reuse last frame's height). `status_bar_tests.rs` covers cached heights, narrow
   windows, 1px transitions and fonts; `native_status_bar_resize_probe` captures QA.
-- Website (amp, `ssh 193.122.157.24` from PowerShell; Git Bash has no key):
+- Website (amp, `ssh <AMP_HOST>` from PowerShell; Git Bash has no key; the repo is public, so keep the real host IP out of tracked files and set it locally):
   web root `/var/www/buttonscli.com/html`. `/docs/` is the Classic (Tauri)
   docs: never overwrite it. Live homepage = variant **d** (Hairline); Classic
   homepage at `/classic/`. Never hand-edit generated files on amp: change the
