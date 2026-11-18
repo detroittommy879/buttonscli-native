@@ -333,12 +333,22 @@ impl ButtonsApp {
                 }
                 ui.separator();
             }
-            for (name, mark) in names {
-                if ui.spaced_button(format!("{mark} {name}")).clicked() {
-                    apply = Some(name);
-                    ui.close_menu();
-                }
-            }
+            // Long lists ran past the bottom of the window: scroll instead.
+            // Only the visible rows are painted, so this costs no more than
+            // the plain list did.
+            let max_height =
+                (ui.ctx().screen_rect().bottom() - ui.cursor().top() - 16.0).max(120.0);
+            egui::ScrollArea::vertical()
+                .id_salt("bundle-menu-list")
+                .max_height(max_height)
+                .show(ui, |ui| {
+                    for (name, mark) in names {
+                        if ui.spaced_button(format!("{mark} {name}")).clicked() {
+                            apply = Some(name);
+                            ui.close_menu();
+                        }
+                    }
+                });
         };
         let menu = if top_level {
             ui.solo_menu_button("status-bundles", text, contents)
