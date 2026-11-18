@@ -25,6 +25,14 @@
 - **Profiles**: the Profile menu can create a new blank profile and rename
   profiles that are not active.
 - File → Apply theme bundle scrolls when the list is taller than the window.
+- **Feature flags tab** (local `admin` flag): Settings → Feature flags turns
+  the local flags in `feature-flags.json` on and off, applied at once.
+- **Shader window** (local `shader_window` flag, off by default): File → New
+  shader window opens a window with only a shader in it.
+- **AI chat** (local `rich_chat` flag, off by default): View → AI chat, a
+  chat window without a terminal where the model can style words with
+  sizes, fonts, colors, gradients and gentle motion through a small,
+  whitelisted markup; every glyph keeps a 4.5:1 contrast.
 
 - **Letter outlines**: text backing rings can trace the letters themselves
   instead of a box around them (**Follow letter shapes**, on by default).

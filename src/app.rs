@@ -816,6 +816,9 @@ enum SettingsTab {
     /// Debug tools: shaders four at a time with picks for a showcase.
     #[cfg(not(target_arch = "wasm32"))]
     Gallery,
+    /// Local feature flags (`admin` flag).
+    #[cfg(not(target_arch = "wasm32"))]
+    FeatureFlags,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -4504,6 +4507,16 @@ impl ButtonsApp {
                     ui.separator();
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "File"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
+                        if shader_window::available()
+                            && ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "New shader window"))
+                                .on_hover_text(crate::i18n::literal(&self.locale, "A window with only a shader in it. Hover it for the picker; double-click for full screen."))
+                                .clicked()
+                        {
+                            shader_window::open(ctx);
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .spaced_button(crate::i18n::literal(
                                 &self.locale,
@@ -4579,6 +4592,16 @@ impl ButtonsApp {
                         }
                     });
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if rich_chat::available()
+                            && ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "AI chat"))
+                                .on_hover_text(crate::i18n::literal(&self.locale, "Chat with your AI provider in its own window, with styled text and no terminal."))
+                                .clicked()
+                        {
+                            rich_chat::open(ctx);
+                            ui.close_menu();
+                        }
                         ui.spaced_checkbox(
                             &mut self.preferences.show_sidebar,
                             crate::i18n::literal(&self.locale, "Left commands"),
@@ -6263,6 +6286,14 @@ impl ButtonsApp {
                         "Gallery",
                     );
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                if feature_flags::available() {
+                    ui.spaced_selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::FeatureFlags,
+                        crate::i18n::literal(&self.locale, "Feature flags"),
+                    );
+                }
             });
         });
         ui.separator();
@@ -6342,6 +6373,8 @@ impl ButtonsApp {
                 SettingsTab::Debug => self.debug_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Gallery => self.gallery_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::FeatureFlags => self.feature_flag_settings(ui),
             });
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_editor_preview(ctx);
@@ -18491,6 +18524,8 @@ mod copied_toast;
 mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
+mod feature_flags;
+#[cfg(not(target_arch = "wasm32"))]
 mod gallery;
 #[cfg(not(target_arch = "wasm32"))]
 mod idle_glow;
@@ -18504,6 +18539,10 @@ mod notices;
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(not(target_arch = "wasm32"))]
+mod rich_chat;
+#[cfg(not(target_arch = "wasm32"))]
+mod shader_window;
 #[cfg(not(target_arch = "wasm32"))]
 mod shuffle;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -18688,6 +18727,10 @@ impl eframe::App for ButtonsApp {
         self.command_history_popup(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.text_backing_colors_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.shader_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.rich_chat_window(ctx);
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
