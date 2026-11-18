@@ -2324,6 +2324,9 @@ impl ButtonsApp {
         };
         let mut chosen = None;
         let mut open_import = false;
+        let mut create: Option<String> = None;
+        let mut rename: Option<(String, String)> = None;
+        let mut cancel_rename = false;
         let label = format!(
             "{} {}",
             crate::i18n::literal(&self.locale, "Profile:"),
@@ -2341,18 +2344,71 @@ impl ButtonsApp {
                 .small(),
             );
             ui.separator();
+            let rename_id = egui::Id::new("profile-rename");
+            let mut renaming: Option<(String, String)> = ui.ctx().data(|data| data.get_temp(rename_id));
             for profile in profiles.iter() {
+                if let Some((from, draft)) = renaming.as_mut().filter(|(from, _)| *from == profile.name) {
+                    ui.horizontal(|ui| {
+                        let response = ui.add(egui::TextEdit::singleline(draft).desired_width(160.0));
+                        let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                        if enter || ui.small_button(crate::i18n::literal(&self.locale, "Rename")).clicked() {
+                            rename = Some((from.clone(), draft.trim().to_owned()));
+                        }
+                        if ui.small_button("×").on_hover_text(crate::i18n::literal(&self.locale, "Cancel")).clicked() {
+                            cancel_rename = true;
+                        }
+                    });
+                    continue;
+                }
                 let text = format!(
                     "{}{}  ·  {} themes",
                     if profile.active { "✓ " } else { "" },
                     profile.name,
                     profile.themes
                 );
-                if ui.spaced_selectable_label(profile.active, text).clicked() && !profile.active {
-                    chosen = Some(profile.name.clone());
+                ui.horizontal(|ui| {
+                    if ui.spaced_selectable_label(profile.active, text).clicked() && !profile.active {
+                        chosen = Some(profile.name.clone());
+                        ui.close_menu();
+                    }
+                    let rename_button = ui.add_enabled(!profile.active, egui::Button::new("✎").small())
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Rename this profile"))
+                        .on_disabled_hover_text(crate::i18n::literal(&self.locale, "Switch to another profile to rename this one."));
+                    if rename_button.clicked() {
+                        renaming = Some((profile.name.clone(), profile.name.clone()));
+                    }
+                });
+            }
+            if cancel_rename || rename.is_some() {
+                renaming = None;
+            }
+            ui.ctx().data_mut(|data| match &renaming {
+                Some(value) => data.insert_temp(rename_id, value.clone()),
+                None => data.remove::<(String, String)>(rename_id),
+            });
+            ui.separator();
+            let draft_id = egui::Id::new("profile-new-name");
+            let mut draft: String = ui.ctx().data(|data| data.get_temp(draft_id)).unwrap_or_default();
+            ui.horizontal(|ui| {
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut draft)
+                        .hint_text(crate::i18n::literal(&self.locale, "New profile name"))
+                        .desired_width(160.0),
+                );
+                let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                if (enter
+                    || ui
+                        .add_enabled(!draft.trim().is_empty(), egui::Button::new(crate::i18n::literal(&self.locale, "New profile")))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "A blank profile with default settings and no saved themes, then switch to it. Letters, digits, - and _ only."))
+                        .clicked())
+                    && !draft.trim().is_empty()
+                {
+                    create = Some(draft.trim().to_owned());
+                    draft.clear();
                     ui.close_menu();
                 }
-            }
+            });
+            ui.ctx().data_mut(|data| data.insert_temp(draft_id, draft));
             ui.separator();
             if ui
                 .spaced_button(crate::i18n::literal(&self.locale, "Import from original…"))
@@ -2365,6 +2421,28 @@ impl ButtonsApp {
         if response.response.clicked() {
             // Re-read on every open so new or imported profiles show up.
             self.native_profiles = None;
+        }
+        if let Some(name) = create {
+            match store.create_profile(&name) {
+                Ok(name) => {
+                    self.native_profiles = None;
+                    self.switch_native_profile(&name, ctx);
+                }
+                Err(error) => {
+                    self.notice = Some(format!("Could not create profile {name}: {error}"))
+                }
+            }
+        }
+        if let Some((from, to)) = rename.filter(|(from, to)| from != to && !to.is_empty()) {
+            match store.rename_profile(&from, &to) {
+                Ok(to) => {
+                    self.native_profiles = None;
+                    self.notice = Some(format!("Renamed profile {from} to {to}."));
+                }
+                Err(error) => {
+                    self.notice = Some(format!("Could not rename profile {from}: {error}"))
+                }
+            }
         }
         if let Some(name) = chosen {
             self.switch_native_profile(&name, ctx);
