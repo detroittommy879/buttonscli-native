@@ -5461,8 +5461,35 @@ impl ButtonsApp {
                 {
                     self.preferences.show_sidebar = false;
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let arranging = dock_arrange::arranging(ui.ctx());
+                    if self.preferences.ssh_presets.len() > 1
+                        && ui
+                            .add(
+                                egui::Button::new(crate::i18n::literal(&self.locale, "✎"))
+                                    .small()
+                                    .selected(arranging),
+                            )
+                            .on_hover_text(crate::i18n::literal(
+                                &self.locale,
+                                "Arrange: drag buttons into a new order",
+                            ))
+                            .clicked()
+                    {
+                        dock_arrange::set_arranging(ui.ctx(), !arranging);
+                    }
+                }
             });
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        if dock_arrange::arranging(ui.ctx()) {
+            ui.add_space(6.0);
+            if self.dock_arrange_list(ui) {
+                self.persist_native_preferences();
+            }
+            return;
+        }
         if controls_available {
             wrapping_row(ui, |ui| {
                 ui.spaced_checkbox(
@@ -18520,6 +18547,8 @@ mod color_adjust;
 mod command_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod copied_toast;
+#[cfg(not(target_arch = "wasm32"))]
+mod dock_arrange;
 #[cfg(not(target_arch = "wasm32"))]
 mod dock_nav;
 mod docs_capture;

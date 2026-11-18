@@ -25,6 +25,8 @@
 - **Profiles**: the Profile menu can create a new blank profile and rename
   profiles that are not active.
 - File → Apply theme bundle scrolls when the list is taller than the window.
+- **Arrange left commands**: the ✎ button in the left panel's header turns
+  its buttons into drag handles; drop one above or below another to move it.
 - **Feature flags tab** (local `admin` flag): Settings → Feature flags turns
   the local flags in `feature-flags.json` on and off, applied at once.
 - **Shader window** (local `shader_window` flag, off by default): File → New
