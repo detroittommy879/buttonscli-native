@@ -21,6 +21,7 @@ Usage:
   buttonsclictl wait-for-quiet [--tab <selector>] [--chars <n>] [--quiet-ms <n>] [--timeout-ms <n>] [--interval-ms <n>] [--json]
   buttonsclictl send [--tab <selector>] [--delivery <raw|bracketed|slow-typed>] [--delay-ms <n>] [--enter] [--json] (--text <text> | --base64 <payload> | --file <path> | --stdin | <text...>)
   buttonsclictl run [--tab <selector>] [--delivery <raw|bracketed|slow-typed>] [--delay-ms <n>] [--chars <n>] [--quiet-ms <n>] [--timeout-ms <n>] [--interval-ms <n>] [--wait-for-text <text>] [--ignore-case] [--no-enter] [--json] (--text <text> | --base64 <payload> | --file <path> | --stdin | <text...>)
+  buttonsclictl commands [--tab <selector>] [--chars <n>] [--json]   (shell integration: exit codes)
   buttonsclictl key <key> [--tab <selector>] [--json]
   buttonsclictl presets [--json]
   buttonsclictl preset-run --label <label> [--tab <selector>] [--json]
@@ -64,6 +65,10 @@ pub(crate) enum Command {
     Status,
     Tabs,
     Presets,
+    Commands {
+        tab: String,
+        chars: Option<f64>,
+    },
     CreateTab {
         name: String,
         shell: Option<String>,
@@ -363,6 +368,12 @@ pub(crate) fn parse(args: &[String]) -> Result<(Command, bool), String> {
                 ignore_case,
                 enter,
             }
+        }
+        "commands" => {
+            let tab = t.tab()?;
+            let chars = t.number("--chars")?;
+            t.done()?;
+            Command::Commands { tab, chars }
         }
         "key" => {
             let tab = t.tab()?;
@@ -666,6 +677,15 @@ fn render_run(out: &mut dyn Write, payload: &Value) -> std::io::Result<()> {
             "Matched '{matched}' on {} after {elapsed}ms.",
             tab_title(payload)
         )?;
+    } else if reason == Some("command-finished") {
+        let code = payload["exitCode"]
+            .as_i64()
+            .map_or_else(|| "unknown".to_owned(), |code| code.to_string());
+        writeln!(
+            out,
+            "{} finished with exit code {code} after {elapsed}ms.",
+            tab_title(payload)
+        )?;
     } else {
         writeln!(
             out,
@@ -674,7 +694,41 @@ fn render_run(out: &mut dyn Write, payload: &Value) -> std::io::Result<()> {
         )?;
     }
     render_delivery(out, payload)?;
+    if let Some(output) = payload["commandOutput"].as_str() {
+        return write_snapshot(out, output);
+    }
     write_snapshot(out, payload["text"].as_str().unwrap_or_default())
+}
+
+fn render_commands(out: &mut dyn Write, payload: &Value) -> std::io::Result<()> {
+    if payload["tab"]["shellIntegration"] != true {
+        return writeln!(
+            out,
+            "{} has no shell integration marks yet (see docs/CONTROL-API.md).",
+            tab_title(payload)
+        );
+    }
+    for command in payload["commands"].as_array().into_iter().flatten() {
+        let code = match (
+            command["finishedAtMs"].is_null(),
+            command["exitCode"].as_i64(),
+        ) {
+            (true, _) => "running".to_owned(),
+            (false, Some(code)) => format!("exit {code}"),
+            (false, None) => "done".to_owned(),
+        };
+        let duration = command["durationMs"]
+            .as_u64()
+            .map(|ms| format!(" {ms}ms"))
+            .unwrap_or_default();
+        let line = command["command"].as_str().unwrap_or("");
+        writeln!(out, "#{} {code}{duration} {line}", command["id"])?;
+    }
+    if let Some(output) = payload["lastOutput"].as_str() {
+        writeln!(out, "--- last command output ---")?;
+        write_snapshot(out, output)?;
+    }
+    Ok(())
 }
 
 /// Runs a parsed command against `connection`, writing the result to `out`.
@@ -693,6 +747,13 @@ pub(crate) fn execute(
         Command::Status => connection.call("GET", "/v1/status", None)?,
         Command::Tabs => connection.call("GET", "/v1/tabs", None)?,
         Command::Presets => connection.call("GET", "/v1/presets", None)?,
+        Command::Commands { tab, chars } => {
+            let mut path = format!("/v1/tabs/{}/commands", encode_component(tab));
+            if let Some(chars) = chars {
+                path.push_str(&format!("?chars={}", chars.max(0.0) as u64));
+            }
+            connection.call("GET", &path, None)?
+        }
         Command::CreateTab { name, shell, cwd } => connection.call(
             "POST",
             "/v1/tabs",
@@ -835,6 +896,7 @@ pub(crate) fn execute(
         ),
         Command::Tabs => render_tabs(out, &payload["tabs"]),
         Command::Presets => render_presets(out, &payload["presets"]),
+        Command::Commands { .. } => render_commands(out, &payload),
         Command::CreateTab { .. } | Command::RenameTab { .. } => render_action(out, &payload),
         Command::OpenLayout { .. } => {
             writeln!(out, "{}", payload["detail"].as_str().unwrap_or_default())

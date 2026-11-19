@@ -388,8 +388,57 @@ async function callTool(name, args) {
           intervalMs: asOptionalNumber(args?.intervalMs),
           waitForText: asOptionalString(args?.waitForText),
           ignoreCase: asOptionalBoolean(args?.ignoreCase) ?? false,
+          waitFor: asOptionalString(args?.waitFor),
         }),
       );
+    }
+    case "commands": {
+      const tab = asOptionalString(args?.tab) || "active";
+      const chars = asOptionalNumber(args?.chars);
+      const query = chars === undefined ? "" : `?chars=${Math.max(0, Math.floor(chars))}`;
+      return makeJsonResult(
+        await apiRequest("GET", `/v1/tabs/${encodeURIComponent(tab)}/commands${query}`),
+      );
+    }
+    case "batch": {
+      const steps = Array.isArray(args?.steps) ? args.steps : [];
+      if (steps.length === 0) {
+        throw new Error("batch requires a non-empty steps array.");
+      }
+      if (steps.length > MAX_BATCH_STEPS) {
+        throw new Error(`batch runs at most ${MAX_BATCH_STEPS} steps.`);
+      }
+      const stopOnError = asOptionalBoolean(args?.stopOnError) ?? true;
+      const results = [];
+      let ok = true;
+      for (const [index, step] of steps.entries()) {
+        const tool = typeof step?.tool === "string" ? step.tool : "";
+        let entry;
+        try {
+          if (tool === "batch") {
+            throw new Error("batch steps cannot be batch.");
+          }
+          if (!TOOL_DEFINITIONS.some((definition) => definition.name === tool)) {
+            throw new Error(`Unknown tool: ${tool}`);
+          }
+          const result = await callTool(tool, step?.arguments ?? {});
+          const value = result.structuredContent;
+          const failed =
+            result.isError === true ||
+            (typeof value?.exitCode === "number" && value.exitCode !== 0);
+          entry = { step: index + 1, tool, ok: !failed, result: value };
+        } catch (error) {
+          entry = { step: index + 1, tool, ok: false, error: String(error?.message ?? error) };
+        }
+        results.push(entry);
+        if (!entry.ok) {
+          ok = false;
+          if (stopOnError) {
+            break;
+          }
+        }
+      }
+      return makeJsonResult({ ok, completed: results.length, total: steps.length, steps: results });
     }
     case "key": {
       const tab = asOptionalString(args?.tab) || "active";
@@ -567,7 +616,7 @@ const TOOL_DEFINITIONS = [
     name: "run",
     title: "Run Command",
     description:
-      "Send command text, optionally press Enter, and wait for quiet output or matching text. Prefer payloadBase64 for multiline or quote-heavy content.",
+      "Send command text, optionally press Enter, and wait until it finishes. With shell integration the result has exitCode and commandOutput; otherwise it waits for quiet output or matching text. Prefer payloadBase64 for multiline or quote-heavy content.",
     inputSchema: {
       type: "object",
       properties: {
@@ -577,6 +626,7 @@ const TOOL_DEFINITIONS = [
         delivery: { enum: ["raw", "bracketed", "slow-typed"] },
         delayMs: { type: "number" },
         enter: { type: "boolean" },
+        waitFor: { enum: ["auto", "quiet"] },
         chars: { type: "number" },
         quietMs: { type: "number" },
         maxWaitMs: { type: "number" },
@@ -585,6 +635,20 @@ const TOOL_DEFINITIONS = [
         ignoreCase: { type: "boolean" },
       },
       oneOf: [{ required: ["text"] }, { required: ["payloadBase64"] }],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "commands",
+    title: "Recent Commands",
+    description:
+      "List a tab's recent commands with exit codes and durations (needs shell integration), and the last command's output.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tab: { type: "string" },
+        chars: { type: "number" },
+      },
       additionalProperties: false,
     },
   },
@@ -626,7 +690,37 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "batch",
+    title: "Batch",
+    description:
+      "Run up to 20 tool calls in order in one call (for example create_tab, run, run, read). Stops at the first error unless stopOnError is false.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        steps: {
+          type: "array",
+          minItems: 1,
+          maxItems: 20,
+          items: {
+            type: "object",
+            properties: {
+              tool: { type: "string" },
+              arguments: { type: "object" },
+            },
+            required: ["tool"],
+            additionalProperties: false,
+          },
+        },
+        stopOnError: { type: "boolean" },
+      },
+      required: ["steps"],
+      additionalProperties: false,
+    },
+  },
 ];
+
+const MAX_BATCH_STEPS = 20;
 
 function writeMessage(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);

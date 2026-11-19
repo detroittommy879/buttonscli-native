@@ -47,7 +47,9 @@ instructions never contain the token.
 | `status`, `tabs` | See the app and every tab |
 | `create_tab`, `rename_tab`, `open_layout` | Open tabs and arrange them side by side or in a grid |
 | `send`, `key` | Type text, press Enter or keys like Ctrl+C |
-| `run` | Type a command, press Enter and wait until the output settles or matches a pattern |
+| `run` | Type a command, press Enter and wait until it finishes; with shell integration it returns the exit code and the command's own output |
+| `commands` | Recent commands in a tab with exit codes and how long they took |
+| `batch` | Run up to 20 of these tools in order in one call, stopping at the first failure |
 | `read` | Read recent output from a tab |
 | `wait_for_text`, `wait_for_quiet` | Wait until text appears, or until output stops changing |
 | `presets`, `preset_run` | Use your command buttons |
@@ -68,7 +70,20 @@ test it from a second tab:
 
 Each tool call is one step: there is no transaction that undoes earlier steps
 when a later one fails. Agents check each result (the output, or a wait that
-timed out) before the next step, the same way you would.
+timed out) before the next step, the same way you would. `batch` saves round
+trips for steps that don't need a look in between: it stops at the first
+error or failed command.
+
+## Exit codes and "command finished"
+
+PowerShell, bash, zsh and fish tabs that ButtonsCLI starts mark where each
+command starts and ends (shell integration, OSC 133). Agents then know when
+a command really finished and whether it worked, even when it prints nothing
+for a while. You see it too: a command that finishes in a tab you are not
+looking at puts ✓ or ✗ and its exit code on the tab, and a long one shows a
+message and flashes the taskbar. Change this in Settings → Workspace →
+Shell integration. Over SSH, add the script from `assets/shell-integration/`
+to the remote shell's startup file.
 
 ## Tips
 

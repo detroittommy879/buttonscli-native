@@ -287,6 +287,9 @@ pub(crate) struct Preferences {
     pub(crate) strength_override: StrengthOverride,
     /// Status bar → Look → Idle glow: the ramp used by panes that turn it on.
     pub(crate) idle_glow: IdleGlow,
+    /// Settings → Workspace → Shell integration: OSC 133 marks and the
+    /// "command finished" alerts they allow.
+    pub(crate) shell_integration: ShellIntegration,
     pub(crate) right_click_copies_selection: bool,
     pub(crate) scrollback_lines: usize,
     pub(crate) terminal_history: TerminalHistoryPreferences,
@@ -378,6 +381,7 @@ impl Default for Preferences {
             shuffle: Shuffle::default(),
             strength_override: StrengthOverride::default(),
             idle_glow: IdleGlow::default(),
+            shell_integration: ShellIntegration::default(),
             right_click_copies_selection: true,
             scrollback_lines: 10_000,
             terminal_history: TerminalHistoryPreferences::default(),
@@ -615,6 +619,37 @@ impl StrengthOverride {
             Self::default().strength
         };
     }
+}
+
+/// Shell integration (OSC 133 marks): new shells get a small script, and a
+/// command that finishes while its pane is out of view can say so.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub(crate) struct ShellIntegration {
+    /// New PowerShell, bash, zsh and fish tabs load the integration script.
+    pub(crate) enabled: bool,
+    /// Tabs show ✓ or ✗ <code> when a command finished out of view.
+    pub(crate) badges: bool,
+    /// Commands at least this long (seconds) that finish out of view show a
+    /// message; 0 turns the message off.
+    pub(crate) notify_seconds: u32,
+    /// Also flash the taskbar button while the window is in the background.
+    pub(crate) flash_window: bool,
+}
+
+impl Default for ShellIntegration {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            badges: true,
+            notify_seconds: 10,
+            flash_window: true,
+        }
+    }
+}
+
+impl ShellIntegration {
+    pub(crate) const MAX_NOTIFY_SECONDS: u32 = 3600;
 }
 
 /// Status bar → Look → Idle glow. A pane whose terminal has been quiet for a
@@ -896,6 +931,8 @@ pub(crate) struct DockNavigation {
     pub(crate) buttons: bool,
     /// A button for each folder in the focused terminal's last listing.
     pub(crate) folders: bool,
+    /// Folder names in a listing are drawn as buttons inside the terminal.
+    pub(crate) in_terminal: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1018,6 +1055,10 @@ impl Preferences {
         self.shuffle.normalize();
         self.strength_override.normalize();
         self.idle_glow.normalize();
+        self.shell_integration.notify_seconds = self
+            .shell_integration
+            .notify_seconds
+            .min(ShellIntegration::MAX_NOTIFY_SECONDS);
         self.motion_speed = if self.motion_speed.is_finite() {
             self.motion_speed.clamp(0.0, MAX_MOTION_SPEED)
         } else {

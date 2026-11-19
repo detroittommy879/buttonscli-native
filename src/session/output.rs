@@ -4,6 +4,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::marks::{CommandLog, CommandRecord, MarkScanner};
+
 pub(crate) const MAX_OUTPUT_CHARS: usize = 200_000;
 const MAX_LAST_INPUT_CHARS: usize = 200_000;
 
@@ -29,6 +31,10 @@ struct State {
     last_updated_at_ms: u64,
     output_sequence: u64,
     input_sequence: u64,
+    /// Every output character ever recorded (the tail holds the last ones).
+    total_chars: u64,
+    marks: MarkScanner,
+    commands: CommandLog,
 }
 
 impl Default for State {
@@ -43,6 +49,9 @@ impl Default for State {
             last_updated_at_ms: now_ms(),
             output_sequence: 0,
             input_sequence: 0,
+            total_chars: 0,
+            marks: MarkScanner::default(),
+            commands: CommandLog::default(),
         }
     }
 }
@@ -89,6 +98,20 @@ impl OutputCapture {
             return;
         };
         let added_chars = text.chars().count();
+        let now = now_ms();
+        let found = state.marks.scan(bytes);
+        if !found.is_empty() {
+            let base = state.total_chars;
+            let (mut counted_to, mut counted) = (0, 0u64);
+            for mark in found {
+                counted += String::from_utf8_lossy(&bytes[counted_to..mark.end])
+                    .chars()
+                    .count() as u64;
+                counted_to = mark.end;
+                state.commands.apply(mark.mark, base + counted, now);
+            }
+        }
+        state.total_chars = state.total_chars.saturating_add(added_chars as u64);
         state.tail.push_str(&text);
         state.tail_chars = state.tail_chars.saturating_add(added_chars);
         if state.tail_chars > MAX_OUTPUT_CHARS {
@@ -102,11 +125,50 @@ impl OutputCapture {
             state.tail_chars = MAX_OUTPUT_CHARS;
             state.output_truncated = true;
         }
-        let now = now_ms();
         state.last_output_at_ms = Some(now);
         state.last_updated_at_ms = now;
         self.activity_at_ms.store(now, Ordering::Relaxed);
         state.output_sequence = state.output_sequence.saturating_add(1);
+    }
+
+    /// Shell integration marks seen so far (see `session::marks`).
+    pub(crate) fn commands(&self) -> CommandLog {
+        self.state
+            .lock()
+            .map(|state| state.commands.clone())
+            .unwrap_or_default()
+    }
+
+    /// Counts output chunks; changes whenever new output arrives.
+    pub(crate) fn output_sequence(&self) -> u64 {
+        self.state
+            .lock()
+            .map(|state| state.output_sequence)
+            .unwrap_or_default()
+    }
+
+    /// How many commands have finished; cheap to poll.
+    pub(crate) fn finished_commands(&self) -> u64 {
+        self.state
+            .lock()
+            .map(|state| state.commands.finished)
+            .unwrap_or_default()
+    }
+
+    /// The raw output of `record` (up to `limit` trailing characters), while
+    /// it is still in the tail. None once it scrolled out of the capture.
+    pub(crate) fn command_output(&self, record: &CommandRecord, limit: usize) -> Option<String> {
+        let state = self.state.lock().ok()?;
+        let tail_start = state.total_chars - state.tail_chars as u64;
+        let end = record.output_end.unwrap_or(state.total_chars);
+        if record.output_start < tail_start || end < record.output_start {
+            return None;
+        }
+        let skip = (record.output_start - tail_start) as usize;
+        let take = (end - record.output_start) as usize;
+        let text: Vec<char> = state.tail.chars().skip(skip).take(take).collect();
+        let start = text.len().saturating_sub(limit);
+        Some(text[start..].iter().collect())
     }
 
     /// Called when the app sends bytes through the terminal's normal input path.
@@ -298,6 +360,26 @@ mod tests {
         assert!(capture.snapshot().output_truncated);
         assert_eq!(capture.read_chars(2, false), "🧪🧪");
         assert_eq!(capture.read_chars(2, true), "🧪🧪");
+    }
+
+    #[test]
+    fn shell_marks_record_exit_codes_and_command_output() {
+        let capture = OutputCapture::default();
+        capture.record_output_bytes(b"\x1b]133;A\x07$ \x1b]133;B\x07");
+        assert!(capture.commands().active);
+        capture.record_output_bytes(b"ls\r\n\x1b]133;C\x07a.txt\r\n");
+        capture.record_output_bytes(b"b.txt\r\n\x1b]133;D;2\x07\x1b]133;A\x07$ ");
+        let log = capture.commands();
+        let done = log.last_finished().unwrap();
+        assert_eq!(done.exit_code, Some(2));
+        assert_eq!(capture.finished_commands(), 1);
+        let output = capture.command_output(done, 1_000).unwrap();
+        assert!(
+            output.starts_with("a.txt") && output.contains("b.txt"),
+            "{output:?}"
+        );
+        assert!(!output.contains("$ "), "prompt is not output: {output:?}");
+        assert_eq!(capture.command_output(done, 6).unwrap().chars().count(), 6);
     }
 
     #[test]

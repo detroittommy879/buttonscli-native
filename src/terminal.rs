@@ -99,10 +99,14 @@ impl TerminalTab {
     ) -> anyhow::Result<Self> {
         let shell_name = shell_title(&launch.command);
         let working_directory = launch.working_directory.clone();
+        let mut args = launch.args;
+        let mut env = std::collections::HashMap::new();
+        crate::shell_integration::prepare(&launch.command, &mut args, &mut env);
         let settings = BackendSettings {
             shell: launch.command,
-            args: launch.args,
+            args,
             working_directory: launch.working_directory,
+            env,
         };
         let output = Arc::new(OutputCapture::default());
         let input_capture = Arc::clone(&output);
@@ -885,6 +889,83 @@ Start-Sleep -Seconds 30
         assert_eq!(
             profiles[0].id,
             detected_shell_id("wsl.exe", &["--distribution".into(), "Ubuntu Work".into()])
+        );
+    }
+
+    /// Real PowerShell through ConPTY with the integration script: marks
+    /// must survive ConPTY and carry native and cmdlet exit codes.
+    /// Writes the user's ~/.buttonscli-native/shell-integration only for
+    /// unix shells; PowerShell's script is inline.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "starts a real PowerShell; run with --test-threads=1"]
+    fn powershell_integration_reports_exit_codes() {
+        use std::time::{Duration, Instant};
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let shell = if super::executable_on_path("pwsh.exe") {
+            "pwsh.exe"
+        } else {
+            "powershell.exe"
+        };
+        let launch = super::ShellLaunch::for_executable_with_args(
+            "integration-probe",
+            shell,
+            vec!["-NoLogo".into(), "-NoProfile".into()],
+            None,
+        );
+        let mut tab =
+            super::TerminalTab::spawn(991, "probe".into(), egui::Context::default(), tx, launch)
+                .unwrap();
+        let wait = |tab: &mut super::TerminalTab,
+                    what: &str,
+                    done: &dyn Fn(&super::TerminalTab) -> bool| {
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while !done(tab) {
+                tab.backend.sync();
+                assert!(
+                    Instant::now() < deadline,
+                    "{what}: {:?}\n{}",
+                    tab.output.commands(),
+                    tab.output.read_chars(2_000, false)
+                );
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        };
+        wait(&mut tab, "first prompt", &|tab| {
+            tab.output.commands().at_prompt
+        });
+        tab.write("cmd /c exit 3\r");
+        wait(&mut tab, "native exit", &|tab| {
+            tab.output.finished_commands() >= 1
+        });
+        let log = tab.output.commands();
+        let first = log.last_finished().unwrap();
+        assert_eq!(first.exit_code, Some(3));
+        assert_eq!(first.command.as_deref(), Some("cmd /c exit 3"));
+        tab.write("Write-Output probe-ok\r");
+        wait(&mut tab, "success", &|tab| {
+            tab.output.finished_commands() >= 2
+        });
+        let log = tab.output.commands();
+        let second = log.last_finished().unwrap();
+        assert_eq!(second.exit_code, Some(0));
+        let output = tab.output.command_output(second, 1_000).unwrap();
+        assert!(output.contains("probe-ok"), "{output:?}");
+        tab.write("Get-Item C:\\does-not-exist-bcli\r");
+        wait(&mut tab, "cmdlet error", &|tab| {
+            tab.output.finished_commands() >= 3
+        });
+        assert_eq!(
+            tab.output.commands().last_finished().unwrap().exit_code,
+            Some(1)
+        );
+        tab.write("\r");
+        std::thread::sleep(Duration::from_millis(800));
+        tab.backend.sync();
+        assert_eq!(
+            tab.output.finished_commands(),
+            3,
+            "an empty Enter is no command"
         );
     }
 }

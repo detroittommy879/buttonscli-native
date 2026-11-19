@@ -103,8 +103,8 @@ try {
   const listed = await client.listTools();
   const names = listed.tools.map((tool) => tool.name).sort();
   assert.deepEqual(names, [
-    "create_tab", "help", "key", "open_layout", "preset_run", "presets",
-    "read", "rename_tab", "run", "send", "status", "tabs",
+    "batch", "commands", "create_tab", "help", "key", "open_layout", "preset_run",
+    "presets", "read", "rename_tab", "run", "send", "status", "tabs",
     "wait_for_quiet", "wait_for_text",
   ].sort());
 

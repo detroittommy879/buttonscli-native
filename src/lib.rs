@@ -55,6 +55,8 @@ mod session;
 mod settings;
 #[cfg(not(target_arch = "wasm32"))]
 mod shader_ai;
+#[cfg(not(target_arch = "wasm32"))]
+mod shell_integration;
 mod shortcuts;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod startup;

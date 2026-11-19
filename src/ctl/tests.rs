@@ -71,7 +71,12 @@ fn fake_api() -> (u16, Arc<Mutex<Vec<Seen>>>) {
                     "/v1/presets" => json!({"presets": []}),
                     r if r.ends_with("/read") => json!({"tab": tab, "text": "hello ready\n"}),
                     r if r.ends_with("/run") => {
-                        json!({"tab": tab, "text": "out", "elapsedMs": 5, "completionReason": "quiet"})
+                        // `false` fails like a shell with integration reports it.
+                        let failing = serde_json::from_slice::<Value>(&body)
+                            .is_ok_and(|request| request["text"] == "false");
+                        json!({"tab": tab, "text": "out", "elapsedMs": 5,
+                            "completionReason": "command-finished",
+                            "exitCode": if failing { 1 } else { 0 }})
                     }
                     _ => json!({"ok": true, "detail": "Done.", "tab": tab}),
                 };
@@ -240,5 +245,60 @@ fn cli_and_mcp_send_authenticated_requests_with_node_compatible_bodies() {
     assert_eq!(
         post("/v1/tabs/2/run"),
         json!({"text": "ls", "enter": true, "maxWaitMs": 2000, "ignoreCase": false})
+    );
+}
+
+#[test]
+fn mcp_batch_runs_steps_in_order_and_stops_at_a_failed_command() {
+    let (port, seen) = fake_api();
+    let connector: super::mcp::Connector = Arc::new(move || Ok(connection(port)));
+    let call = |id: i64, arguments: Value| {
+        json!({"jsonrpc": "2.0", "id": id, "method": "tools/call",
+            "params": {"name": "batch", "arguments": arguments}})
+        .to_string()
+    };
+    let steps = json!({"steps": [
+        {"tool": "run", "arguments": {"tab": "b", "text": "true"}},
+        {"tool": "commands", "arguments": {"tab": "b", "chars": 100}},
+        {"tool": "run", "arguments": {"tab": "b", "text": "false"}},
+        {"tool": "run", "arguments": {"tab": "b", "text": "never"}},
+    ]});
+    let mut keep_going = steps.clone();
+    keep_going["stopOnError"] = json!(false);
+    let input = [
+        call(1, steps),
+        call(2, keep_going),
+        call(3, json!({"steps": [{"tool": "batch"}]})),
+        call(4, json!({"steps": []})),
+    ]
+    .join("\n")
+        + "\n";
+    let sink = Sink::default();
+    super::mcp::serve(input.as_bytes(), Box::new(sink.clone()), connector);
+    let output = String::from_utf8(sink.0.lock().unwrap().clone()).unwrap();
+    let replies: Vec<Value> = output
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let reply = |id: i64| replies.iter().find(|r| r["id"] == id).unwrap()["result"].clone();
+
+    let first = reply(1)["structuredContent"].clone();
+    assert_eq!(first["ok"], false);
+    assert_eq!(first["completed"], 3, "stops after the failed command");
+    assert_eq!(first["steps"][2]["result"]["exitCode"], 1);
+    assert_eq!(first["steps"][1]["ok"], true);
+    assert_eq!(reply(2)["structuredContent"]["completed"], 4);
+    assert_eq!(reply(3)["structuredContent"]["steps"][0]["ok"], false);
+    assert_eq!(reply(4)["isError"], true, "an empty batch is an error");
+    let seen = seen.lock().unwrap().clone();
+    assert!(
+        seen.iter()
+            .any(|r| r.path == "/v1/tabs/b/commands?chars=100"),
+        "{seen:?}"
+    );
+    assert_eq!(
+        seen.iter().filter(|r| r.body["text"] == "never").count(),
+        1,
+        "only the batch with stopOnError false sends the last step"
     );
 }

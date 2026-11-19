@@ -1,0 +1,40 @@
+# ButtonsCLI shell integration for zsh: OSC 133 marks (A prompt start,
+# C command start, D;<exit code> finished). ButtonsCLI sets ZDOTDIR to a
+# folder whose startup files load yours first; this file then adds the
+# hooks and points ZDOTDIR back at your folder.
+# To use it over SSH or in a shell ButtonsCLI did not start, source it from
+# ~/.zshrc (the guard keeps it from loading twice).
+if [[ -n "$BUTTONSCLI_SHELL_INTEGRATION" ]]; then
+    # Started by ButtonsCLI: load your .zshrc from your own folder first.
+    unset BUTTONSCLI_SHELL_INTEGRATION
+    __bcli_home="${BUTTONSCLI_USER_ZDOTDIR:-$HOME}"
+    unset BUTTONSCLI_USER_ZDOTDIR
+    ZDOTDIR="$__bcli_home"
+    [[ -r "$__bcli_home/.zshrc" ]] && . "$__bcli_home/.zshrc"
+    # Later startup files (.zlogin) and child shells use your own folder.
+    if [[ "$__bcli_home" == "$HOME" ]]; then
+        unset ZDOTDIR
+    else
+        ZDOTDIR="$__bcli_home"
+    fi
+    unset __bcli_home
+fi
+if [[ -z "$__bcli_loaded" && -o interactive ]]; then
+    __bcli_loaded=1
+    __bcli_ran=
+    __bcli_precmd() {
+        local code=$?
+        if [[ -n "$__bcli_ran" ]]; then
+            printf '\033]133;D;%s\007' "$code"
+        fi
+        __bcli_ran=
+        printf '\033]133;A\007'
+        return $code
+    }
+    __bcli_preexec() {
+        __bcli_ran=1
+        printf '\033]133;C\007'
+    }
+    precmd_functions=(__bcli_precmd $precmd_functions)
+    preexec_functions+=(__bcli_preexec)
+fi

@@ -1,5 +1,5 @@
 //! `buttonsclictl mcp`: a stdio MCP server (newline-delimited JSON-RPC 2.0)
-//! with the same 14 tools as `scripts/buttonscli-mcp.mjs`, plus tool
+//! with the same 16 tools as `scripts/buttonscli-mcp.mjs`, plus tool
 //! annotations so clients can tell reads from terminal input.
 
 use std::io::{BufRead, Read, Write};
@@ -28,9 +28,21 @@ Available tools:
 - wait_for_quiet
 - send
 - run
+- commands
 - key
 - presets
 - preset_run
+- batch
+
+Shell integration: when the shell sends OSC 133 marks (on by default for
+PowerShell, bash, zsh and fish tabs ButtonsCLI starts), run waits for the
+command to finish and returns its exitCode and commandOutput; tabs show
+shellIntegration, commandRunning and lastCommand. commands lists recent
+commands with exit codes and durations.
+
+batch runs up to 20 tool calls in order in one call:
+{\"steps\": [{\"tool\": \"run\", \"arguments\": {\"text\": \"cargo build\"}}, ...]}
+It stops at the first error unless stopOnError is false.
 
 Selectors:
 - active: currently focused tab
@@ -38,6 +50,9 @@ Selectors:
 - <tabId>: internal tab id
 - <title>: exact tab title, case-insensitive
 ";
+
+/// Most steps one `batch` call may run.
+const MAX_BATCH_STEPS: usize = 20;
 
 /// Opens a connection for each tool call (the app may have restarted).
 pub type Connector = Arc<dyn Fn() -> Result<Connection, String> + Send + Sync>;
@@ -207,9 +222,10 @@ pub fn tools() -> Vec<Value> {
         tool(
             "run",
             "Run Command",
-            "Send command text, optionally press Enter, and wait for quiet output or matching text. Prefer payloadBase64 for multiline or quote-heavy content.",
+            "Send command text, optionally press Enter, and wait until it finishes. With shell integration the result has exitCode and commandOutput; otherwise it waits for quiet output or matching text. Prefer payloadBase64 for multiline or quote-heavy content.",
             Kind::Input,
             payload_schema(json!({
+                "waitFor": { "enum": ["auto", "quiet"] },
                 "chars": { "type": "number" },
                 "quietMs": { "type": "number" },
                 "maxWaitMs": { "type": "number" },
@@ -217,6 +233,17 @@ pub fn tools() -> Vec<Value> {
                 "waitForText": { "type": "string" },
                 "ignoreCase": { "type": "boolean" },
             })),
+        ),
+        tool(
+            "commands",
+            "Recent Commands",
+            "List a tab's recent commands with exit codes and durations (needs shell integration), and the last command's output.",
+            Kind::Read,
+            json!({
+                "type": "object",
+                "properties": { "tab": { "type": "string" }, "chars": { "type": "number" } },
+                "additionalProperties": false,
+            }),
         ),
         tool(
             "key",
@@ -243,7 +270,88 @@ pub fn tools() -> Vec<Value> {
                 "additionalProperties": false,
             }),
         ),
+        tool(
+            "batch",
+            "Batch",
+            "Run up to 20 tool calls in order in one call (for example create_tab, run, run, read). Stops at the first error unless stopOnError is false.",
+            Kind::Input,
+            json!({
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": MAX_BATCH_STEPS,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "tool": { "type": "string" },
+                                "arguments": { "type": "object" },
+                            },
+                            "required": ["tool"],
+                            "additionalProperties": false,
+                        },
+                    },
+                    "stopOnError": { "type": "boolean" },
+                },
+                "required": ["steps"],
+                "additionalProperties": false,
+            }),
+        ),
     ]
+}
+
+/// `batch`: runs each step through `run_tool` on one connection.
+fn run_batch(args: &Args, c: &Connection) -> Result<Value, String> {
+    let steps = args
+        .0
+        .get("steps")
+        .and_then(Value::as_array)
+        .filter(|steps| !steps.is_empty())
+        .ok_or("batch requires a non-empty steps array.")?;
+    if steps.len() > MAX_BATCH_STEPS {
+        return Err(format!("batch runs at most {MAX_BATCH_STEPS} steps."));
+    }
+    let stop_on_error = args.boolean("stopOnError").unwrap_or(true);
+    let mut results = Vec::new();
+    let mut ok = true;
+    for (index, step) in steps.iter().enumerate() {
+        let name = step.get("tool").and_then(Value::as_str).unwrap_or_default();
+        let empty = json!({});
+        let arguments = step.get("arguments").unwrap_or(&empty);
+        let outcome = if name == "batch" {
+            Err("batch steps cannot be batch.".to_owned())
+        } else if name == "help" {
+            Ok(json!({ "help": HELP_TEXT }))
+        } else if !is_tool(name) {
+            Err(format!("Unknown tool: {name}"))
+        } else {
+            run_tool(name, &Args(arguments), c)
+        };
+        let failed = outcome.is_err()
+            || outcome.as_ref().is_ok_and(|value| {
+                value
+                    .get("exitCode")
+                    .and_then(Value::as_i64)
+                    .is_some_and(|code| code != 0)
+            });
+        results.push(match outcome {
+            Ok(value) => json!({ "step": index + 1, "tool": name, "ok": !failed, "result": value }),
+            Err(error) => json!({ "step": index + 1, "tool": name, "ok": false, "error": error }),
+        });
+        if failed {
+            ok = false;
+            if stop_on_error {
+                break;
+            }
+        }
+    }
+    Ok(json!({
+        "ok": ok,
+        "completed": results.len(),
+        "total": steps.len(),
+        "steps": results,
+    }))
 }
 
 fn text_result(text: String, structured: Value, is_error: bool) -> Value {
@@ -427,6 +535,7 @@ fn run_tool(name: &str, args: &Args, c: &Connection) -> Result<Value, String> {
                     ("maxWaitMs", args.number_value("maxWaitMs")),
                     ("intervalMs", args.number_value("intervalMs")),
                     ("waitForText", args.string("waitForText").map(Value::from)),
+                    ("waitFor", args.string("waitFor").map(Value::from)),
                     (
                         "ignoreCase",
                         Some(Value::from(args.boolean("ignoreCase").unwrap_or(false))),
@@ -434,6 +543,14 @@ fn run_tool(name: &str, args: &Args, c: &Connection) -> Result<Value, String> {
                 ])),
             )
         }
+        "commands" => {
+            let mut path = tab_path("commands");
+            if let Some(chars) = args.number("chars") {
+                path.push_str(&format!("?chars={}", chars.max(0.0) as u64));
+            }
+            c.call("GET", &path, None)
+        }
+        "batch" => run_batch(args, c),
         "key" => {
             let key = args.string("key").ok_or("key requires a key value.")?;
             c.call("POST", &tab_path("key"), Some(&json!({ "key": key })))
@@ -654,13 +771,15 @@ mod tests {
             crate::BUILD_VERSION
         );
         let tools = by_id(2)["result"]["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 14);
+        assert_eq!(tools.len(), 16);
         let annotation = |name: &str, key: &str| {
             tools.iter().find(|t| t["name"] == name).unwrap()["annotations"][key].clone()
         };
         assert_eq!(annotation("read", "readOnlyHint"), true);
         assert_eq!(annotation("run", "destructiveHint"), true);
         assert_eq!(annotation("create_tab", "destructiveHint"), false);
+        assert_eq!(annotation("commands", "readOnlyHint"), true);
+        assert_eq!(annotation("batch", "destructiveHint"), true);
         let status = &by_id(3)["result"];
         assert_eq!(status["isError"], true);
         assert_eq!(status["structuredContent"]["error"], "no app in this test");
