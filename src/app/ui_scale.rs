@@ -16,6 +16,15 @@ const HIDPI_PIXELS_PER_POINT: f32 = 1.5;
 /// pointer released, before resizing everything.
 const SLIDER_SETTLE_SECONDS: f64 = 0.4;
 
+/// Temp-data key: the zoom egui used when it measured `monitor_size`.
+const GATHER_ZOOM_ID: &str = "ui-scale-gather-zoom";
+
+/// Monitor height in points at zoom 1, from egui's report in points at the
+/// zoom it was measured with.
+pub(crate) fn monitor_height_at_zoom_one(reported: f32, gather_zoom: f32) -> f32 {
+    reported * gather_zoom
+}
+
 /// The automatic size for a monitor of `height` points at zoom 1, shown with
 /// `native_ppp` physical pixels per point.
 pub(crate) fn auto_scale(height: Option<f32>, native_ppp: Option<f32>) -> f32 {
@@ -37,12 +46,18 @@ impl ButtonsApp {
         if self.preferences.ui_scale > 0.0 {
             return self.preferences.ui_scale;
         }
-        // egui reports the monitor in zoomed points; undo the current zoom.
-        let zoom = ctx.zoom_factor();
+        // egui reports the monitor in zoomed points, measured with the zoom of
+        // the previous frame (a new zoom is applied after input is gathered).
+        // Undoing it with the current zoom made 1440p bounce between sizes.
+        let gather_zoom = ctx
+            .data(|data| data.get_temp::<f32>(egui::Id::new(GATHER_ZOOM_ID)))
+            .unwrap_or_else(|| ctx.zoom_factor());
         let (height, native_ppp) = ctx.input(|input| {
             let viewport = input.viewport();
             (
-                viewport.monitor_size.map(|size| size.y * zoom),
+                viewport
+                    .monitor_size
+                    .map(|size| monitor_height_at_zoom_one(size.y, gather_zoom)),
                 viewport.native_pixels_per_point,
             )
         });
@@ -53,7 +68,11 @@ impl ButtonsApp {
         // The preference owns the zoom; egui's Ctrl +/- would be undone next frame.
         ctx.options_mut(|options| options.zoom_with_keyboard = false);
         let scale = self.effective_ui_scale(ctx);
-        if (ctx.zoom_factor() - scale).abs() > 0.001 {
+        // The zoom in effect now is the one egui uses to measure the monitor
+        // for the next frame, even if it changes below.
+        let zoom_now = ctx.zoom_factor();
+        ctx.data_mut(|data| data.insert_temp(egui::Id::new(GATHER_ZOOM_ID), zoom_now));
+        if (zoom_now - scale).abs() > 0.001 {
             ctx.set_zoom_factor(scale);
         }
     }
@@ -123,6 +142,58 @@ mod tests {
         assert_eq!(auto_scale(Some(1440.0), Some(1.0)), 0.85); // 1440p at 100%
         assert_eq!(auto_scale(Some(1080.0), Some(1.0)), 0.8); // 1080p at 100%
         assert_eq!(auto_scale(Some(864.0), Some(1.25)), 0.8); // 1080p at 125%
+    }
+
+    /// Mimics egui 0.31: the monitor is measured with the zoom of the previous
+    /// frame, then a pending `set_zoom_factor` is applied. Auto must settle on
+    /// one size and stay there (it used to flip between 80/85/90% on 1440p).
+    fn simulate(physical_height: f32, native_ppp: f32, measure_with_gather_zoom: bool) -> Vec<f32> {
+        let mut zoom = 1.0_f32;
+        let mut pending: Option<f32> = None;
+        let mut zooms = Vec::new();
+        for _ in 0..12 {
+            let reported = physical_height / (native_ppp * zoom); // gathered
+            let gather_zoom = zoom;
+            if let Some(next) = pending.take() {
+                zoom = next; // begin_pass
+            }
+            let undo = if measure_with_gather_zoom {
+                gather_zoom
+            } else {
+                zoom
+            };
+            let scale = auto_scale(
+                Some(super::monitor_height_at_zoom_one(reported, undo)),
+                Some(native_ppp),
+            );
+            if (zoom - scale).abs() > 0.001 {
+                pending = Some(scale);
+            }
+            zooms.push(zoom);
+        }
+        zooms
+    }
+
+    #[test]
+    fn auto_scale_settles_instead_of_flickering() {
+        for (height, ppp, expected) in [
+            (1440.0, 1.0, 0.85),
+            (2160.0, 1.0, 1.0),
+            (1080.0, 1.0, 0.8),
+            (2160.0, 1.25, 1.0),
+        ] {
+            let zooms = simulate(height, ppp, true);
+            assert!(
+                zooms[4..].iter().all(|zoom| *zoom == expected),
+                "{height}@{ppp}: {zooms:?}"
+            );
+        }
+        // The old measurement (undo with the new zoom) never settles on 1440p.
+        let old = simulate(1440.0, 1.0, false);
+        assert!(
+            old[4..].windows(2).any(|pair| pair[0] != pair[1]),
+            "{old:?}"
+        );
     }
 
     #[test]
