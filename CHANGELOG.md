@@ -24,7 +24,21 @@
   readable even when a generated theme is not.
 - **Profiles**: the Profile menu can create a new blank profile and rename
   profiles that are not active.
-- File → Apply theme bundle scrolls when the list is taller than the window.
+- File → Apply theme bundle and the status-bar Bundles menu scroll when the
+  list is taller than the window, with a visible scroll bar; the status-bar
+  list was opening only a few rows tall.
+- Fixed: with Auto UI size on a 2560x1440 monitor at 100% scaling, the window
+  kept switching between two sizes many times a second.
+- Fixed: saving more than 64 theme bundles or saved shaders silently lost the
+  extra ones. Up to 512 of each are kept now, and saving past that says so.
+- **Theme editor → Shader background** switch: turn a theme's shader off to
+  see its gradient or plain background (turning it on restores the same
+  shader). "Use gradient" notes when the shader hides the gradient.
+- Theme editor (Edit tab) says when edits don't reach a pane, for example
+  after a bundle gives every pane its own theme, with **Use on the whole
+  app**. Quick adjust's interface sliders are off while editing one pane
+  (app colors are shared), and the sliders are more robust to theme files
+  that list ANSI colors or leave some out.
 - **Arrange left commands**: the ✎ button in the left panel's header turns
   its buttons into drag handles; drop one above or below another to move it.
 - **Feature flags tab** (local `admin` flag): Settings → Feature flags turns

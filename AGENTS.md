@@ -82,6 +82,26 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   four at a time; picks go to `<profile>/gallery-picks.json` (`pick_entry`:
   WGSL, program, knobs, c1–c5, background) for a future web showcase.
 
+## State rules (most recurring bugs are copies drifting apart)
+
+- One owner per fact; derive the rest. A cache stores the key it was built
+  from and checks it on use. Audit and refactor order:
+  `.private/dev-notes/STATE-AUDIT-2026-11-18.md`.
+- One function per transition: the editor target changes only via
+  `retarget_theme_editor`, drafts end via `settle_pane_draft` /
+  `discard_theme_editor_session`. Don't set those fields elsewhere.
+- egui temp data is for widget drafts. If it snapshots app data (Quick
+  adjust's `GroupState`), store what it belongs to and re-check each frame.
+- `normalize` must never drop user data (bundles/shaders were truncated at
+  64): refuse when saving instead.
+- State-bug tests drive the real UI across frames and transitions (switch
+  pane, apply bundle, switch back): `color_adjust::tests::Frames` clicks
+  widgets by rects recorded in test builds (`color_adjust::probe`).
+- egui gathers `monitor_size` with the previous frame's zoom and applies a
+  new zoom after: use the gather zoom (`ui_scale.rs`), or Auto UI size loops.
+- Panes draw the shader instead of the gradient; the theme editor's
+  "Shader background" switch stashes it in `effects.shaderBackgroundOff`.
+
 ## Pane and input rules
 
 - Tab indices change on move/close; PTY IDs are stable. Key fonts, themes and membership
