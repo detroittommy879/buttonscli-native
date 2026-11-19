@@ -1,0 +1,267 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#2f6d78",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 3.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ffffff",
+        "#9a9a9a",
+        "#5a5a5a",
+        "#0a0a0a",
+        "#f2f2f2"
+      ],
+      "custom": {
+        "expression": "let cell = floor((p + vec2<f32>(0.5, 0.5)) * (120.0 / grain_size));\nlet frame = floor(t * 24.0);\nlet r = hash(cell + vec2<f32>(frame * 13.7, frame * 7.3));\nlet r2 = hash(cell * 1.37 + vec2<f32>(frame * 3.1, 11.0));\nlet grain = mix(r, r2, 0.25);\nlet contrast = smoothstep(0.1, 0.9, grain);\nlet band_y = fract(p.y + 0.5 - t * 0.09);\nlet band = smoothstep(0.0, 0.06, band_y) * (1.0 - smoothstep(0.06, 0.22, band_y));\nlet lift = band * roll * 0.35;\nlet scan = 0.92 + 0.08 * sin((p.y + 0.5) * (120.0 / grain_size) * 3.14159);\nlet base = mix(c4, c2, contrast);\nlet peak = mix(base, c5, smoothstep(0.75, 1.0, contrast) * 0.8);\nlet color = (peak + lift * c2) * scan;\nreturn mix(bg, color, strength);",
+        "name": "Channel 3 Static",
+        "variables": [
+          {
+            "max": 6.0,
+            "min": 1.0,
+            "name": "grain_size",
+            "value": 2.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "roll",
+            "value": 0.5
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "curtains",
+      "scale": 1.0,
+      "speed": 3.799999952316284,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 33.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 74.0,
+    "staticAmplitude": 12.0,
+    "staticBrightness": 32.0,
+    "staticDensity": 0.119999997317791,
+    "staticEnabled": false,
+    "staticIntensity": 9.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-19T02:12:13.287Z",
+    "description": "Pitch black void cut by brutal, chaotic sweeping conic rainbows recreating dynamic mainstage lighting.",
+    "id": "prismatic-magenta-v11",
+    "name": "Prismatic Magenta v11",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:prismatic-magenta-v11",
+    "updatedAt": "2026-11-19T04:11:55.706Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "assistant": null,
+      "controls": null,
+      "layout": null,
+      "presetDock": {
+        "accent": "#ff2ec2",
+        "activeBackground": null,
+        "activeForeground": null,
+        "background": "#00081a",
+        "border": null,
+        "buttonBackground": "#001a50",
+        "buttonHover": "#00236b",
+        "buttonText": "#ffffff",
+        "foreground": null,
+        "headerBackground": null,
+        "itemGap": null,
+        "padding": null,
+        "text": null,
+        "widthAccent": null
+      },
+      "settings": {
+        "background": "#050505"
+      },
+      "shell": {
+        "accent": "#0055ff",
+        "accentHover": "#2e73ff",
+        "background": "#000000",
+        "backgroundSecondary": "#000b1f",
+        "border": "#222222",
+        "borderColor": null,
+        "buttonBackground": "#000614",
+        "foreground": null,
+        "paneDivider": {
+          "color": "#00ff00",
+          "thickness": 2.0
+        },
+        "shadow": null,
+        "shadowColor": null,
+        "textDim": "#a8a8a8",
+        "textMain": "#ffffff"
+      },
+      "statusBar": {
+        "accent": null,
+        "background": "#021b33",
+        "border": "#0045cf",
+        "borderColor": null,
+        "error": null,
+        "foreground": null,
+        "height": null,
+        "success": null,
+        "text": "#ffffff",
+        "warning": "#a83273"
+      },
+      "tabs": {
+        "0": null,
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": null,
+        "active": null,
+        "activeBackground": "#111111",
+        "activeBorder": "#0055ff",
+        "activeBorderColor": null,
+        "activeForeground": null,
+        "activeTabBackground": null,
+        "activeTabForeground": null,
+        "background": "#000000",
+        "border": null,
+        "foreground": null,
+        "gap": null,
+        "height": null,
+        "hoverBackground": null,
+        "idleBackground": "#000614",
+        "inactiveBackground": null,
+        "inactiveForeground": null,
+        "inactiveTabForeground": null,
+        "paddingX": null,
+        "radius": null,
+        "separator": null,
+        "textActive": null,
+        "textIdle": null
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#222222",
+        "blue": "#ffff55",
+        "brightBlack": "#555555",
+        "brightBlue": "#ffff88",
+        "brightCyan": "#ff8888",
+        "brightGreen": "#ff88ff",
+        "brightMagenta": "#88ff88",
+        "brightRed": "#88ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#8888ff",
+        "cyan": "#ff3333",
+        "green": "#ff33ff",
+        "magenta": "#33ff33",
+        "red": "#33ffff",
+        "white": "#eeeeee",
+        "yellow": "#3333ff"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Symbols Nerd Font Mono Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#ffffff",
+      "gradientAngle": 90.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0000",
+        "#1a1a00",
+        "#001a00",
+        "#001a1a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Symbols Nerd Font Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

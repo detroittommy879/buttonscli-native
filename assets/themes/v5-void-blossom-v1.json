@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0a1f5c",
+        "#00b8d9",
+        "#ff3e9a",
+        "#ffb13b",
+        "#6a2cff"
+      ],
+      "custom": {
+        "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nvar swell = 0.0;\nvar ridge = 0.0;\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let drift = noise(vec2<f32>(px * 0.3 + k * 5.0, depth * 0.4 + t * 0.05 * wave_speed));\n    let ph = px * (1.2 + k * 0.7) + drift * 4.0 * wave_height + depth * 0.25 * (1.0 + k * 0.4) - t * wave_speed * (0.9 + k * 0.5);\n    let wv = 0.5 + 0.5 * sin(ph);\n    swell += wv / (1.0 + k);\n    ridge = max(ridge, pow(wv, 6.0 + 4.0 * k));\n}\nlet swell_n = swell / 2.083;\nlet crest = smoothstep(0.3, 1.0, ridge);\nlet glint_x = p.x - 0.42 + (swell_n - 0.5) * 0.15 * (1.0 + depth * 0.2);\nlet glint = (1.0 - smoothstep(0.0, 0.1, abs(glint_x))) * (0.3 + 0.7 * fog) * (0.4 + 0.6 * crest);\nlet spark_cell = floor(vec2<f32>(px * 10.0, depth * 3.0 - t * wave_speed * 0.5));\nlet sparkle = step(0.985, hash(spark_cell)) * crest * fog;\nlet water = mix(c1 * 0.8, c2, swell_n) * (0.5 + 0.5 * fog) + c3 * crest * 0.7 + c4 * glint * 0.9 + c4 * sparkle * 1.2 + c5 * (1.0 - fog) * 0.4;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c3 * 0.3, c5 * 0.6, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = (1.0 - smoothstep(0.0, 0.02, abs(p.y - hz))) * (0.4 + 0.6 * swell_n) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene * 1.1), strength);",
+        "name": "Neon Tidewave",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.899999976158142
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "wave_height",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 8,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 40.0,
+    "simpleNoiseMinBrightness": 15.000000953674316,
+    "simpleNoiseResolution": 60.000003814697266,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-13T15:36:48.419Z",
+    "description": "Ultra-dark indigo backdrop with cherry-blossom pink and mint ANSI — delicate meets electric",
+    "id": "v5-void-blossom-v1",
+    "name": "v5-void blossom v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:v5-void-blossom-v1",
+    "updatedAt": "2026-11-13T15:36:48.419Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff6eb4",
+        "background": "#100820",
+        "buttonBackground": "#100820",
+        "buttonHover": "#3d1a55",
+        "buttonText": "#f0e8ff"
+      },
+      "settings": {
+        "background": "#100820"
+      },
+      "shell": {
+        "accent": "#ff6eb4",
+        "accentHover": "#ff9dd0",
+        "background": "#060411",
+        "backgroundSecondary": "#100820",
+        "border": "#3d1a55",
+        "buttonBackground": "#100820",
+        "paneDivider": {
+          "color": "#ff6eb4",
+          "thickness": 2.0
+        },
+        "textDim": "#a880c8",
+        "textMain": "#f0e8ff"
+      },
+      "statusBar": {
+        "background": "#090616",
+        "border": "#3d1a55",
+        "text": "#f0e8ff",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#060411",
+        "activeBorder": "#ff6eb4",
+        "background": "#100820",
+        "idleBackground": "#100820"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#09060e",
+        "blue": "#7a9dff",
+        "brightBlack": "#4a2060",
+        "brightBlue": "#a8bdff",
+        "brightCyan": "#88e4ff",
+        "brightGreen": "#86f5a8",
+        "brightMagenta": "#f098ff",
+        "brightRed": "#ff80aa",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe7a8",
+        "cyan": "#54d4ff",
+        "green": "#56d983",
+        "magenta": "#f06eff",
+        "red": "#ff4d7d",
+        "white": "#f0e8ff",
+        "yellow": "#ffd580"
+      },
+      "background": "#060411",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f0e8ff",
+      "gradientAngle": 200.0,
+      "gradientAnimation": true,
+      "gradientColors": [
+        "#060411",
+        "#180830",
+        "#3d0d5e",
+        "#8020a0"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

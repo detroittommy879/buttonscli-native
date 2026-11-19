@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#18263e",
+        "#687fc6",
+        "#e18f99",
+        "#ffc18b",
+        "#8de3cf"
+      ],
+      "custom": {
+        "expression": "let clock = fract(t / 3600.0) * 6.283185;\nlet q = rotate(p, bank_angle * sin(clock * 31.0));\nlet h = 0.04 + 0.023 * sin(clock * 23.0);\nlet y = q.y - h;\nlet dusk = exp(-5.2 * abs(y));\nlet vapor = cloud(vec2<f32>(q.x * 3.4 + 0.7 * sin(clock * 13.0), y * 15.0));\nlet sky = mix(c2 * 0.65, c3 * 0.91, dusk);\nlet clouds = smoothstep(0.42, 0.76, vapor) * smoothstep(0.015, 0.15, y);\nlet air = mix(sky, mix(c2, c4, dusk), clouds * 0.42);\n\nlet flanks = smoothstep(0.08, 0.72, abs(q.x));\nlet ridgeFar = flanks * (0.04 + 0.15 * fbm(vec2<f32>(q.x * 4.0 + 0.45 * sin(clock * 17.0), 6.0)));\nlet ridgeNear = flanks * (0.014 + 0.077 * ridged(vec2<f32>(q.x * 7.0 + 0.9 * sin(clock * 17.0), 3.0)));\nlet hills = mix(air, mix(c2 * 0.53, c3 * 0.56, dusk * 0.5), fill(y - ridgeFar));\nlet view = mix(hills, mix(c1, c2 * 0.49, dusk * 0.65), fill(y - ridgeNear));\n\nlet z = max(-y, 0.0);\nlet center = 0.11 * z * sin(clock * 19.0);\nlet x = abs(q.x - center);\nlet width = 0.007 + z * 0.61;\nlet reveal = smoothstep(0.005, 0.063, z);\nlet ground = mix(c1 * 1.27, c2 * 0.52, exp(-6.0 * z));\nlet strip = mix(c1 * 1.85, c2 * 0.66, exp(-4.0 * z));\nlet pavement = mix(view, mix(ground, strip, fill(x - width)), reveal);\nlet depth = 0.62 / (z + 0.068);\nlet phase = fract(t * round(approach_speed * 3600.0) / 3600.0);\nlet dash = abs(fract(depth + phase) - 0.5);\nlet paint = (1.0 - smoothstep(0.13, 0.23, dash)) * fill(x - (0.001 + 0.009 * z));\nlet lamp = abs(x - width);\nlet bead = 1.0 - smoothstep(0.035, 0.15, abs(fract((depth + phase) * 2.0) - 0.5));\nlet edge = c4 * (0.21 * halo(lamp, 0.016) + 0.95 * halo(lamp, 0.007) * bead);\nlet zone = reveal * smoothstep(0.045, 0.15, z);\n\nlet u = vec2<f32>(abs(p.x), p.y - 0.09);\nlet wing = sd_segment(u, vec2<f32>(0.029, 0.0), vec2<f32>(0.097, 0.0));\nlet tip = sd_segment(u, vec2<f32>(0.029, -0.013), vec2<f32>(0.029, 0.0));\nlet sight = min(min(wing, tip), abs(length(u) - 0.010));\nlet ticks = sd_box(vec2<f32>(u.x - 0.145, abs(fract((u.y + 0.035) / 0.07) - 0.5) * 0.07), vec2<f32>(0.011, 0.001));\nlet ladder = halo(ticks, 0.004) * (1.0 - smoothstep(0.12, 0.21, abs(u.y)));\nlet hud = c5 * hud_glow * (0.8 * halo(sight, 0.005) + 0.29 * ladder);\nlet scene = pavement + zone * (edge + c4 * paint * 0.65) + hud;\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Last Light Approach",
+        "variables": [
+          {
+            "max": 1.600000023841858,
+            "min": 0.15000000596046448,
+            "name": "approach_speed",
+            "value": 1.399999976158142
+          },
+          {
+            "max": 0.2199999988079071,
+            "min": 0.0,
+            "name": "bank_angle",
+            "value": 0.07000000029802322
+          },
+          {
+            "max": 1.5,
+            "min": 0.0,
+            "name": "hud_glow",
+            "value": 0.6499999761581421
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 3.700000047683716,
+      "strength": 0.9800000190734864,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Rose dusk over blue ridgelines, amber runway lights, and a mint flight display.",
+    "id": "last-light-approach",
+    "name": "Last Light Approach",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:last-light-approach",
+    "updatedAt": "2026-11-19T19:24:11.657Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#b1f3e2",
+        "background": "#18263e",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#18263e"
+      },
+      "shell": {
+        "accent": "#8de3cf",
+        "accentHover": "#b1f3e2",
+        "background": "#101826",
+        "backgroundSecondary": "#18263e",
+        "border": "#3c4e6c",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#8de3cf",
+          "thickness": 2.0
+        },
+        "textDim": "#a5b4cb",
+        "textMain": "#edf2fa"
+      },
+      "statusBar": {
+        "background": "#18263e",
+        "border": "#3c4e6c",
+        "text": "#a5b4cb",
+        "warning": "#ffc18b"
+      },
+      "tabs": {
+        "activeBackground": "#101826",
+        "activeBorder": "#8de3cf",
+        "background": "#18263e",
+        "idleBackground": "#18263e"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#24324a",
+        "blue": "#9caef3",
+        "brightBlack": "#8292ad",
+        "brightBlue": "#c1cdff",
+        "brightCyan": "#b1f3e2",
+        "brightGreen": "#c2e3b3",
+        "brightMagenta": "#f7b6d2",
+        "brightRed": "#ffaab2",
+        "brightWhite": "#f7faff",
+        "brightYellow": "#ffdbaf",
+        "cyan": "#8de3cf",
+        "green": "#a1c99c",
+        "magenta": "#e18f99",
+        "red": "#ef8998",
+        "white": "#d6dfed",
+        "yellow": "#ffc18b"
+      },
+      "background": "#121c2d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f1f4fa",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#18263e",
+        "#687fc6",
+        "#e18f99",
+        "#ffc18b"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.55
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.35
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 10.0,
+        "fontWeight": 400,
+        "letterSpacing": 1.1
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.65
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

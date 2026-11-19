@@ -1,0 +1,186 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#102b39",
+        "#288a91",
+        "#f1b45e",
+        "#ef7869",
+        "#b9f3d9"
+      ],
+      "custom": {
+        "expression": "let tube = p * vec2<f32>(1.16, 2.0);\nlet q = p * (1.0 + 0.047 * dot(tube, tube));\nlet glass = sd_box(q, vec2<f32>(0.83, 0.445)) - 0.018;\nlet face = 1.0 - smoothstep(-0.002, 0.003, glass);\nlet row = floor(q.y * 225.0);\nlet roll = fract(q.y * 0.91 - t / 12.0);\nlet sync = exp(-90.0 * abs(roll - 0.35));\nlet jitter = hash(vec2<f32>(row, floor(t * 12.0))) - 0.5;\nlet v = q + vec2<f32>(jitter * (0.0009 + 0.006 * sync), 0.0);\nlet rally = t / 3.0 + 0.22;\nlet bx = (1.0 - 2.0 * abs(fract(rally * 0.5) * 2.0 - 1.0)) * 0.717;\nlet by = (1.0 - 2.0 * abs(fract(rally * 0.375 + 0.13) * 2.0 - 1.0)) * 0.344;\nlet left = by * (0.78 - 0.22 * bx / 0.717) + 0.058 * sin(rally * 3.14159);\nlet right = by * (0.78 + 0.22 * bx / 0.717) - 0.047 * sin(rally * 3.14159);\nlet bat = min(sd_box(v - vec2<f32>(-0.74, left), vec2<f32>(0.011, 0.068)), sd_box(v - vec2<f32>(0.74, right), vec2<f32>(0.011, 0.068)));\nlet ball = sd_box(v - vec2<f32>(bx, by), vec2<f32>(0.012));\nlet net = sd_box(vec2<f32>(v.x, (fract(v.y * 22.0 + 0.5) - 0.5) / 22.0), vec2<f32>(0.003, 0.012));\nlet zero = abs(sd_box(vec2<f32>(abs(v.x) - 0.095, v.y - 0.338), vec2<f32>(0.019, 0.029))) - 0.004;\nlet ch = v - vec2<f32>(0.718, 0.367);\nlet bars = sd_box(vec2<f32>(ch.x, min(abs(ch.y), abs(abs(ch.y) - 0.023))), vec2<f32>(0.015, 0.0027));\nlet three = min(bars, sd_box(ch - vec2<f32>(0.013, 0.0), vec2<f32>(0.0025, 0.023)));\nlet game = min(min(ball, bat), zero);\nlet raster = 0.86 + 0.14 * cos(v.y * 1413.717);\nlet grain = hash(floor(v * vec2<f32>(410.0, 225.0)) + vec2<f32>(floor(t * 15.0), 0.0));\nlet field = mix(c1, c2, clamp(0.54 - 0.32 * dot(tube, tube) + 0.09 * sin(v.y * 8.0 - t * 0.21) + grain * 0.08, 0.0, 1.0));\nlet smear = c4 * 0.48 * exp(-max(game, 0.0) * 106.0);\nlet phosphor = mix(field + smear, c3, fill(game));\nlet picture = mix(mix(phosphor, c5 * 0.72, fill(net)), c5, fill(three));\nlet color = mix(c1 * (0.48 + 0.32 * exp(-abs(glass) * 52.0)), picture * raster * (1.0 - 0.18 * sync), face);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "Channel 03 · Pong",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 3.700000047683716,
+      "strength": 0.9800000190734864,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "A violet flight deck with amber accretion light and ice-blue telemetry.",
+    "id": "event-horizon-approach",
+    "name": "Event Horizon Approach",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:event-horizon-approach",
+    "updatedAt": "2026-11-19T20:56:24.745Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#b7f1fa",
+        "background": "#1d1932",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#1d1932"
+      },
+      "shell": {
+        "accent": "#8bdcec",
+        "accentHover": "#b7f1fa",
+        "background": "#110f20",
+        "backgroundSecondary": "#1d1932",
+        "border": "#443964",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#8bdcec",
+          "thickness": 2.0
+        },
+        "textDim": "#b9acd4",
+        "textMain": "#f1ebff"
+      },
+      "statusBar": {
+        "background": "#1d1932",
+        "border": "#443964",
+        "text": "#b9acd4",
+        "warning": "#ffbc82"
+      },
+      "tabs": {
+        "activeBackground": "#110f20",
+        "activeBorder": "#8bdcec",
+        "background": "#1d1932",
+        "idleBackground": "#1d1932"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#28204b",
+        "blue": "#8478f5",
+        "brightBlack": "#9b8cb9",
+        "brightBlue": "#b6aaff",
+        "brightCyan": "#b7f1fa",
+        "brightGreen": "#b8ecc8",
+        "brightMagenta": "#ffafe0",
+        "brightRed": "#ffa5b9",
+        "brightWhite": "#fff6ff",
+        "brightYellow": "#ffdaac",
+        "cyan": "#8bdcec",
+        "green": "#91d4ab",
+        "magenta": "#ed73b3",
+        "red": "#ed829d",
+        "white": "#e5daf1",
+        "yellow": "#ffbc82"
+      },
+      "background": "#151126",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f7effd",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#28204b",
+        "#8478f5",
+        "#ed73b3",
+        "#ffbc82"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.65
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.8
+      },
+      "tabs": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

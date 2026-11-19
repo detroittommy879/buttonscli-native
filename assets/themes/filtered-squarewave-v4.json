@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#14083a",
+        "#0b4f6c",
+        "#7fd8ff",
+        "#ffb3d9",
+        "#6a3fd1"
+      ],
+      "custom": {
+        "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet X = p.x * depth;\nlet Z = depth;\nlet tw = t * wave_speed;\nlet a1 = X * 1.3 + Z * 0.7 - tw * 1.1;\nlet a2 = X * 2.1 - Z * 1.1 + tw * 1.4;\nlet a3 = X * 0.6 + Z * 2.3 - tw * 0.8;\nlet a4 = X * 3.7 + Z * 3.1 + tw * 2.0;\nlet h = sin(a1) * 0.5 + sin(a2) * 0.3 + sin(a3) * 0.2 + sin(a4) * 0.12;\nlet gx = 0.65 * cos(a1) + 0.63 * cos(a2) + 0.12 * cos(a3) + 0.44 * cos(a4);\nlet gz = 0.35 * cos(a1) - 0.33 * cos(a2) + 0.46 * cos(a3) + 0.37 * cos(a4);\nlet slope = 0.2 * wave_height;\nlet fine = noise(vec2<f32>(X * 4.0 - tw * 0.6, Z * 2.0 + tw * 0.3));\nlet nx = (-gx) * slope + (fine - 0.5) * 0.075;\nlet nz = (-gz) * slope;\nlet n = normalize(vec3<f32>(nx, 1.0, nz));\nlet refl_mix = clamp(0.3 + 4.0 * (1.0 - n.y), 0.0, 1.0);\nlet fog = exp(-below * 2.5);\nlet mirror = vec2<f32>(p.x + nx * 0.6, hz + 0.05 + clamp(below * 0.9, 0.0, 0.5));\nlet neb = fbm(mirror * vec2<f32>(3.0, 4.0) + vec2<f32>(t * 0.02, 0.0));\nlet sky_refl = mix(c1 * 0.5, c5 * 0.6, smoothstep(hz, 0.5, mirror.y)) + mix(c5, c4, neb) * neb * nebula_glow * 0.8 + c3 * stars(mirror * 22.0, t) * 0.5;\nlet neb_d = noise(p * vec2<f32>(3.0, 4.0) + vec2<f32>(t * 0.02, 0.0));\nlet stars_v = stars(p * 22.0, t);\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet sky_d = mix(c5 * 0.4, c1 * 0.3, smoothstep(hz, 0.5, p.y)) + mix(c5, c4, neb_d) * neb_d * nebula_glow * 0.8 + c3 * stars_v * 0.8 + c4 * moon;\nlet deep = mix(c1 * 0.8, c2, clamp(0.5 + h * 0.5, 0.0, 1.0)) * (0.5 + 0.5 * fog);\nlet water_base = mix(deep, sky_refl, refl_mix * 0.7);\nlet crest = smoothstep(0.6, 0.95, h * 0.5 + 0.5);\nlet glint_x = p.x - 0.42 + nx * 0.35;\nlet glint = (1.0 - smoothstep(0.0, 0.1, abs(glint_x))) * (0.4 + 0.6 * fog) * (0.4 + 0.6 * crest);\nlet water = water_base + c3 * crest * 0.35 + c4 * glint * 0.9;\nlet foam = (1.0 - smoothstep(0.0, 0.02, abs(p.y - hz))) * (0.5 + 0.5 * fine) * c3;\nlet scene = mix(water + foam, sky_d, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene * 1.2), strength);",
+        "name": "Nebula Tide",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.899999976158142
+          },
+          {
+            "max": 2.0,
+            "min": 0.30000001192092896,
+            "name": "wave_height",
+            "value": 1.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "nebula_glow",
+            "value": 0.5
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-14T23:24:57.362Z",
+    "description": "kinda looks like when you put a strong magnet on top of an old TV",
+    "id": "filtered-squarewave-v4",
+    "name": "Filtered Squarewave v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:filtered-squarewave-v4",
+    "updatedAt": "2026-11-15T01:00:10.849Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#2a1a4a",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#2a1a4a"
+      },
+      "shell": {
+        "accent": "#ff4d4d",
+        "accentHover": "#fc6a6a",
+        "background": "#2a1a4a",
+        "backgroundSecondary": "#3a2a5a",
+        "border": "#61274b",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff4d4d",
+          "thickness": 2.0
+        },
+        "textDim": "#968ba1",
+        "textMain": "#f0f0f0"
+      },
+      "statusBar": {
+        "background": "#772c4b",
+        "border": "#61274b",
+        "text": "#f0f0f0",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#1a0033",
+        "activeBorder": "#ff4d4d",
+        "background": "#2a1a4a",
+        "idleBackground": "#3a2a5a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#4d4dff",
+        "brightBlack": "#565656",
+        "brightBlue": "#8282ff",
+        "brightCyan": "#82ffff",
+        "brightGreen": "#82ff82",
+        "brightMagenta": "#ff82ff",
+        "brightRed": "#ff8282",
+        "brightWhite": "#f5f5f5",
+        "brightYellow": "#ffff82",
+        "cyan": "#4dffff",
+        "green": "#4dff4d",
+        "magenta": "#ff4dff",
+        "red": "#ff4d4d",
+        "white": "#f0f0f0",
+        "yellow": "#ffff4d"
+      },
+      "background": "#1a0033",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Commit Mono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#f0f0f0",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0033",
+        "#2a1a4a",
+        "#3a2a5a",
+        "#005566"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 100,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

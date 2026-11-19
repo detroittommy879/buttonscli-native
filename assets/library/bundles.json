@@ -474,8 +474,7 @@
       }
     ],
     "layout": "grid",
-    "visible_panes": 8,
-    "row_banding_brightness": 8
+    "visible_panes": 8
   },
   {
     "name": "five",
@@ -1320,6 +1319,626 @@
     ],
     "layout": "grid",
     "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "Vah-rye-it-tee-5panes",
+    "theme_id": "gravity-arcade-v6",
+    "app_theme_id": "gravity-arcade-v6",
+    "terminal_theme_id": "gravity-arcade-v6",
+    "gradient_theme_id": "gravity-arcade-v6",
+    "effects_theme_id": "gravity-arcade-v6",
+    "panes": [
+      {
+        "theme_id": "gravity-arcade-v9",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v4",
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v14",
+        "font": null
+      },
+      {
+        "theme_id": null,
+        "font": null
+      },
+      {
+        "theme_id": "gravity-arcade-v13",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "darkniceness",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v10",
+        "font": null
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v2",
+        "font": {
+          "zone": {
+            "family": "Noto Mono (System)",
+            "size": 12.5,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-rain-parallax-v2",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst",
+        "font": {
+          "zone": {
+            "family": "Space Mono (System)",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 2,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "GoldPlated-RedMetallic",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v10",
+        "font": null
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v4",
+        "font": {
+          "zone": {
+            "family": "Noto Mono (System)",
+            "size": 12.5,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v3",
+        "font": null
+      },
+      {
+        "theme_id": "winter-rain-parallax-v2",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst",
+        "font": {
+          "zone": {
+            "family": "Space Mono (System)",
+            "size": 15.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "blue1red2goldmetal3",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v11",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst-v4",
+        "font": {
+          "zone": {
+            "family": "Monoisome Bundled",
+            "size": 11.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v5",
+        "font": {
+          "zone": {
+            "family": "Fira Code Bundled",
+            "size": 12.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-rain-parallax-v2",
+        "font": null
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v6",
+        "font": {
+          "zone": {
+            "family": "Noto Mono (System)",
+            "size": 12.5,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "newfavg5",
+    "theme_id": "ai-glm-harvest-hearth-2",
+    "app_theme_id": "ai-glm-harvest-hearth-2",
+    "terminal_theme_id": "ai-glm-harvest-hearth-2",
+    "gradient_theme_id": "ai-glm-harvest-hearth-2",
+    "effects_theme_id": "ai-glm-harvest-hearth-2",
+    "panes": [
+      {
+        "theme_id": "winter-rain-parallax-v11",
+        "font": null
+      },
+      {
+        "theme_id": "ai-glm-harvest-hearth-v7",
+        "font": {
+          "zone": {
+            "family": "Noto Mono (System)",
+            "size": 12.5,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "signal-trace",
+        "font": {
+          "zone": {
+            "family": "Monoisome Bundled",
+            "size": 14.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-rain-parallax-v2",
+        "font": null
+      },
+      {
+        "theme_id": "dune-sunburst-v5",
+        "font": {
+          "zone": {
+            "family": "Monoisome Bundled",
+            "size": 11.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "audio-scanlines",
+        "font": {
+          "zone": {
+            "family": "Fira Code Bundled",
+            "size": 12.0,
+            "weight": 400,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "MyMix2",
+    "theme_id": "neon-sleet",
+    "app_theme_id": "neon-sleet",
+    "terminal_theme_id": "neon-sleet",
+    "gradient_theme_id": "neon-sleet",
+    "effects_theme_id": "neon-sleet",
+    "panes": [
+      {
+        "theme_id": "candy-shop-v3",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "gravity-arcade-v15",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "blue-triangle-flow-v3",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 14.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "astral-gummy-grins",
+        "font": null
+      },
+      {
+        "theme_id": "neon-sleet-v1",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "purplesmokebubbles",
+    "theme_id": "oscilloscope-fever-v1",
+    "app_theme_id": "oscilloscope-fever-v1",
+    "terminal_theme_id": "oscilloscope-fever-v1",
+    "gradient_theme_id": "gilded-searchlight",
+    "effects_theme_id": "oscilloscope-fever-v1",
+    "panes": [
+      {
+        "theme_id": "oscilloscope-fever-v6",
+        "font": null
+      },
+      {
+        "theme_id": "oscilloscope-fever-v7",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 2,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "pursmobubl2",
+    "theme_id": "oscilloscope-fever-v1",
+    "app_theme_id": "oscilloscope-fever-v1",
+    "terminal_theme_id": "oscilloscope-fever-v1",
+    "gradient_theme_id": "gilded-searchlight",
+    "effects_theme_id": "oscilloscope-fever-v1",
+    "panes": [
+      {
+        "theme_id": "oscilloscope-fever-v6",
+        "font": null
+      },
+      {
+        "theme_id": "oscilloscope-fever-v7",
+        "font": null
+      },
+      {
+        "theme_id": "oscilloscope-fever-v9",
+        "font": null
+      },
+      {
+        "theme_id": "oscilloscope-fever-v8",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "NTSC-TV-3panes",
+    "theme_id": "gravity-arcade-v8",
+    "app_theme_id": "gravity-arcade-v8",
+    "terminal_theme_id": "gravity-arcade-v8",
+    "gradient_theme_id": "gravity-arcade-v8",
+    "effects_theme_id": "gravity-arcade-v8",
+    "panes": [
+      {
+        "theme_id": "electric-downpour-v1",
+        "font": null
+      },
+      {
+        "theme_id": "ghost-channels",
+        "font": null
+      },
+      {
+        "theme_id": "dead-channel",
+        "font": null
+      },
+      {
+        "theme_id": "winter-veil-v7",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "AnalogTVch3,4,5",
+    "theme_id": "oscilloscope-fever-v1",
+    "app_theme_id": "oscilloscope-fever-v1",
+    "terminal_theme_id": "oscilloscope-fever-v1",
+    "gradient_theme_id": "gilded-searchlight",
+    "effects_theme_id": "oscilloscope-fever-v1",
+    "panes": [
+      {
+        "theme_id": "oscilloscope-fever-v14",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Casual Static (System)",
+            "size": 10.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "oscilloscope-fever-v13",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 11.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "oscilloscope-fever-v12",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 400,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 3,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "RetroCommodore5panes",
+    "theme_id": "gravity-arcade-v17",
+    "app_theme_id": "gravity-arcade-v17",
+    "terminal_theme_id": "gravity-arcade-v17",
+    "gradient_theme_id": "gravity-arcade-v17",
+    "effects_theme_id": "gravity-arcade-v17",
+    "panes": [
+      {
+        "theme_id": "blue-channel-basic",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "guru-copperfield",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "dead-channel-v1",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "winter-veil-v15",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      },
+      {
+        "theme_id": "gravity-arcade-v18",
+        "font": {
+          "zone": {
+            "family": "Recursive Mono Csl St Bundled",
+            "size": 13.0,
+            "weight": 300,
+            "letter_spacing": 0.0
+          },
+          "bold_weight": 700,
+          "draw_bold_bright": true
+        }
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 5,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "TelevisionFun-4panes",
+    "theme_id": "prismatic-magenta",
+    "app_theme_id": "prismatic-magenta",
+    "terminal_theme_id": "prismatic-magenta",
+    "gradient_theme_id": "prismatic-magenta",
+    "effects_theme_id": "prismatic-magenta",
+    "panes": [
+      {
+        "theme_id": "prismatic-magenta-v2",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v3",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v4",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v5",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "flying",
+    "theme_id": "prismatic-magenta-v8",
+    "app_theme_id": "prismatic-magenta-v8",
+    "terminal_theme_id": "prismatic-magenta-v8",
+    "gradient_theme_id": "prismatic-magenta-v8",
+    "effects_theme_id": "prismatic-magenta-v8",
+    "panes": [
+      {
+        "theme_id": "bilious-wake",
+        "font": null
+      },
+      {
+        "theme_id": "opal-fault",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v4",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v5",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
+    "row_banding_brightness": 0
+  },
+  {
+    "name": "nov2026",
+    "theme_id": "prismatic-magenta-v8",
+    "app_theme_id": "prismatic-magenta-v8",
+    "terminal_theme_id": "prismatic-magenta-v8",
+    "gradient_theme_id": "prismatic-magenta-v8",
+    "effects_theme_id": "prismatic-magenta-v8",
+    "panes": [
+      {
+        "theme_id": "bilious-wake",
+        "font": null
+      },
+      {
+        "theme_id": "gilded-faults",
+        "font": null
+      },
+      {
+        "theme_id": "wheat-interference",
+        "font": null
+      },
+      {
+        "theme_id": "prismatic-magenta-v5",
+        "font": null
+      }
+    ],
+    "layout": "grid",
+    "visible_panes": 4,
     "row_banding_brightness": 0
   }
 ]

@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5cf2ff",
+        "#c48bff",
+        "#ff7ac8",
+        "#0d1433",
+        "#ffd35c"
+      ],
+      "custom": {
+        "expression": "let sp = t * flow_speed;\nlet w = flow(p * 2.2 + vec2<f32>(sp * 0.3, 0.0), sp);\nlet clouds = fbm(p * 1.5 + vec2<f32>(w * depth_shift * 2.0, sp * 0.1));\nlet deep = mix(c4, c2 * 0.7, smoothstep(0.3, 0.8, clouds));\nlet wash = mix(deep, c1 * 0.8, smoothstep(0.5, 0.9, w) * 0.5);\nlet ring_d = length(p - vec2<f32>(0.4 * sin(sp * 0.3), 0.1 + 0.05 * cos(sp * 0.2))) - 0.25;\nlet ring = stroke(ring_d, 0.012) * 0.7 * c5;\nvar glow = vec3<f32>(0.0);\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let depth = 1.0 + k * 0.7 + depth_shift * k;\n    let g = vec2<f32>(p.x * 4.0 / depth, p.y * 3.0 / depth - sp * (0.12 + 0.08 * k) + k * 3.7);\n    let cell = floor(g);\n    let seed = hash(cell + vec2<f32>(k * 11.0, 2.0));\n    let wob = vec2<f32>(0.18 * sin(sp * 0.6 + seed * 6.28), 0.0);\n    let d = sd_circle(fract(g) - 0.5 - wob, 0.1 * blob_size * (0.6 + 0.4 * seed));\n    let tint = mix(c1, c3, seed);\n    let lit = step(0.35, seed);\n    glow += tint * halo(d, 0.08 / depth) * lit / depth;\n}\nlet color = wash + glow * 1.2 + ring;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Drifting Deep Current",
+        "variables": [
+          {
+            "max": 1.5,
+            "min": 0.20000000298023224,
+            "name": "flow_speed",
+            "value": 1.4800000190734863
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "blob_size",
+            "value": 0.550000011920929
+          },
+          {
+            "max": 0.6000000238418579,
+            "min": 0.0,
+            "name": "depth_shift",
+            "value": 0.4900000095367432
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.5,
+      "speed": 2.299999952316284,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-13T15:55:31.605Z",
+    "description": "Cozy autumn coding nights: espresso-brown canvas warmed by copper, pumpkin and gold, with cranberry and forest-green tones for comfortable long sessions.",
+    "id": "ai-glm-harvest-hearth-v9",
+    "name": "AI Glm - Harvest Hearth v9",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ai-glm-harvest-hearth-v9",
+    "updatedAt": "2026-11-13T16:01:27.645Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e3b341",
+        "background": "#251a10",
+        "buttonBackground": "#362617",
+        "buttonHover": "#4a3420",
+        "buttonText": "#f5e9d8"
+      },
+      "settings": {
+        "background": "#251a10"
+      },
+      "shell": {
+        "accent": "#b35c22",
+        "accentHover": "#8f4517",
+        "background": "#1a120b",
+        "backgroundSecondary": "#251a10",
+        "border": "#8a613a",
+        "buttonBackground": "#362617",
+        "paneDivider": {
+          "color": "#b35c22",
+          "thickness": 2.0
+        },
+        "textDim": "#c9b295",
+        "textMain": "#f5e9d8"
+      },
+      "statusBar": {
+        "background": "#2d1f12",
+        "border": "#8a613a",
+        "text": "#e8d5b5",
+        "warning": "#f2c14e"
+      },
+      "tabs": {
+        "activeBackground": "#1a120b",
+        "activeBorder": "#c97a35",
+        "background": "#251a10",
+        "idleBackground": "#2f2114"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2a1c10",
+        "blue": "#85a3cc",
+        "brightBlack": "#8a7057",
+        "brightBlue": "#a9c3e0",
+        "brightCyan": "#9ed2c4",
+        "brightGreen": "#a8d183",
+        "brightMagenta": "#dfa8cd",
+        "brightRed": "#f28089",
+        "brightWhite": "#fff8ec",
+        "brightYellow": "#f6cf6b",
+        "cyan": "#6fb3a3",
+        "green": "#86b45e",
+        "magenta": "#c586b4",
+        "red": "#d9525f",
+        "white": "#ece2d3",
+        "yellow": "#e3b341"
+      },
+      "background": "#140d07",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#f2e6cf",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

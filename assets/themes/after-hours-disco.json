@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#82446f",
+        "#cf8e86",
+        "#f2b8a0",
+        "#2c192c",
+        "#ad638b"
+      ],
+      "custom": {
+        "expression": "let below = 0.27 - p.y;\nlet depth = max(below, 0.08);\nlet travel = 24.0 * fract(t * round(floor_speed * 150.0) / 3600.0);\nlet grid = vec2<f32>(4.3 * p.x / depth, 2.2 / depth + travel);\nlet cell = floor(grid);\nlet tile = vec2<f32>(cell.x, 24.0 * fract(cell.y / 24.0));\nlet local = fract(grid) - vec2<f32>(0.5);\nlet group = floor((tile + vec2<f32>(1.0, 0.0)) / 3.0);\nlet seed = hash(tile);\nlet cue = hash(group + vec2<f32>(19.0, 4.0));\nlet beat = t * round(pulse_rate * 3600.0) / 3600.0;\nlet phase = fract(beat + cue + 0.14 * seed);\nlet hit = smoothstep(0.01, 0.09, phase) * (1.0 - smoothstep(0.10, 0.40, phase));\nlet echo = smoothstep(0.48, 0.53, phase) * (1.0 - smoothstep(0.55, 0.71, phase));\nlet cluster_gate = smoothstep(1.0 - lit_clusters - 0.06, 1.0 - lit_clusters + 0.06, cue);\nlet pulse = cluster_gate * (hit + 0.57 * echo * smoothstep(0.23, 0.77, seed));\n\nlet resolved = smoothstep(0.10, 0.25, below);\nlet aa = min(0.10, 0.008 + 0.0012 / (depth * depth));\nlet edge = sd_box(local, vec2<f32>(0.43, 0.42)) - 0.016;\nlet face = 1.0 - smoothstep(-aa, aa, edge);\nlet rim = (1.0 - smoothstep(0.008, 0.034 + aa, abs(edge + 0.025))) * face;\nlet sheen = 1.0 - smoothstep(0.0, 0.20, abs(local.y + 0.32 + 0.20 * local.x));\nlet checker = 0.5 + 0.5 * cos(3.141593 * (tile.x + tile.y));\nlet finish = mix(c1 * 0.72, c5 * 0.76, checker * 0.46 + seed * 0.34);\nlet enamel = mix(c5, c2, 0.54 + 0.46 * seed);\n\nlet horizon = exp(-abs(below) * 10.0) * exp(-1.6 * p.x * p.x);\nlet air = mix(c4, c1, 0.58 * horizon) + c2 * (0.085 * horizon);\nlet grout = mix(c4, c1 * 0.66, 0.42 + 0.38 * exp(-depth * 2.7));\nlet glaze = mix(finish, enamel, clamp(pulse * tile_glow, 0.0, 0.95));\nlet lacquer = glaze * (0.88 + 0.18 * sheen) + c3 * (rim * (0.044 + 0.24 * pulse * tile_glow));\nlet floor_rgb = mix(grout, lacquer, face);\nlet haze = mix(air, mix(c1 * 0.84, c2 * 0.63, 0.27), smoothstep(0.0, 0.20, below));\nlet scene = mix(haze, floor_rgb, resolved);\nlet vignette = 0.80 + 0.20 * exp(-1.1 * p.x * p.x);\nreturn mix(bg, clamp(scene * vignette, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+        "name": "After-Hours Disco",
+        "variables": [
+          {
+            "max": 1.5,
+            "min": 0.15000000596046448,
+            "name": "floor_speed",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 1.399999976158142,
+            "min": 0.20000000298023224,
+            "name": "pulse_rate",
+            "value": 0.550000011920929
+          },
+          {
+            "max": 0.8500000238418579,
+            "min": 0.20000000298023224,
+            "name": "lit_clusters",
+            "value": 0.47999998927116394
+          },
+          {
+            "max": 1.399999976158142,
+            "min": 0.30000001192092896,
+            "name": "tile_glow",
+            "value": 0.8999999761581421
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 2.799999952316284,
+      "strength": 0.9800000190734864,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Black-plum chrome and dusty-peach highlights frame a lacquered dance floor that slips away in syncopated flashes.",
+    "id": "after-hours-disco",
+    "name": "After-Hours Disco",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:after-hours-disco",
+    "updatedAt": "2026-11-19T19:14:38.230Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#f2b8a0",
+        "background": "#2c192c",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#2c192c"
+      },
+      "shell": {
+        "accent": "#cf8e86",
+        "accentHover": "#f2b8a0",
+        "background": "#191019",
+        "backgroundSecondary": "#2c192c",
+        "border": "#69405f",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#cf8e86",
+          "thickness": 2.0
+        },
+        "textDim": "#c6a4b7",
+        "textMain": "#f6e5e1"
+      },
+      "statusBar": {
+        "background": "#2c192c",
+        "border": "#69405f",
+        "text": "#c6a4b7",
+        "warning": "#cf8e86"
+      },
+      "tabs": {
+        "activeBackground": "#191019",
+        "activeBorder": "#cf8e86",
+        "background": "#2c192c",
+        "idleBackground": "#2c192c"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#362537",
+        "blue": "#a3a4d8",
+        "brightBlack": "#a58b9e",
+        "brightBlue": "#c2c1f0",
+        "brightCyan": "#b2dcdc",
+        "brightGreen": "#bcdfc1",
+        "brightMagenta": "#e8a0c8",
+        "brightRed": "#f6a3aa",
+        "brightWhite": "#fff3ee",
+        "brightYellow": "#f2b8a0",
+        "cyan": "#8ebbbb",
+        "green": "#9ac1a4",
+        "magenta": "#ad638b",
+        "red": "#df838b",
+        "white": "#e0cad4",
+        "yellow": "#cf8e86"
+      },
+      "background": "#1d1220",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f8e9e4",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#2c192c",
+        "#82446f",
+        "#ad638b",
+        "#cf8e86"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.1
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.4
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.1
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 17.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.6
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

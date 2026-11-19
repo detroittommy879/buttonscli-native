@@ -1,0 +1,188 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff4fd8",
+        "#6fd8ff",
+        "#fff176",
+        "#2a1450",
+        "#9dff7a"
+      ],
+      "custom": {
+        "expression": "let env = 0.6 + 0.4 * sin(p.x * 1.7 + t * 0.35);\nvar y = 0.0;\nvar tg = vec3<f32>(0.0);\nfor (var i = 0; i < 5; i++) {\n    let k = f32(i) + 1.0;\n    let dir = select(1.0, -1.0, i == 1 || i == 3);\n    let yk = 0.12 / k * env * sin(p.x * k * 9.0 + dir * t * (0.8 + 0.5 * k));\n    y += yk;\n    let dk = abs(p.y - yk);\n    let tint = mix(mix(c2, c1, 0.5), c5, f32(i) * 0.2);\n    tg += tint * (0.0002 / (dk * dk + 0.0002)) * 0.3;\n}\nlet dc = abs(p.y - y);\nlet core = exp(-dc * dc * 250000.0);\nlet halo_w = 0.00025 / (dc * dc + 0.00025);\nlet spark = sin(p.x * 140.0 + t * 17.0) * sin(p.x * 53.0 - t * 11.0);\nlet sparks = spark * spark * halo_w * 1.5 * mix(c1, c3, 0.5);\nlet line = vec3<f32>(1.0, 0.97, 1.0) * core * 1.3 + sparks;\nlet haze = mix(c4 * 0.9, c2 * 0.35, smoothstep(-0.5, 0.5, p.y));\nlet grid = pow(abs(sin(p.x * 45.0) * sin(p.y * 45.0)), 8.0) * 0.25;\nlet scan = 0.9 + 0.1 * sin(p.y * 1200.0);\nlet col = (haze + grid * c2 * 0.5) * scan + line + tg * glow_amount + halo_w * c1 * 0.15;\nlet vignette = clamp(1.2 - 1.1 * dot(p, p), 0.0, 1.0);\nreturn mix(bg, tonemap(col * 1.1) * vignette, strength);",
+        "name": "Neon Harmonic Scope",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "glow_amount",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.10999999940395357,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Dark coastal palette inspired by Miami beaches: ocean teal, hot pink neon, sunset coral, warm sand, and tropical green for readable high-contrast controls.",
+    "id": "ai-qwen-miami-night-coast-v5-2",
+    "name": "AI Qwen - Miami Night Coast v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:ai-qwen-miami-night-coast-v5",
+    "updatedAt": "2026-11-18T07:54:10.931Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb066",
+        "background": "#0e1b24",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#0e1b24"
+      },
+      "shell": {
+        "accent": "#007d76",
+        "accentHover": "#00685f",
+        "background": "#071018",
+        "backgroundSecondary": "#0e1b24",
+        "border": "#2f6470",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#b9d6df",
+        "textMain": "#f7fcff"
+      },
+      "statusBar": {
+        "background": "#0e1b24",
+        "border": "#2f6470",
+        "text": "#d8eff5",
+        "warning": "#ffd166"
+      },
+      "tabs": {
+        "activeBackground": "#071018",
+        "activeBorder": "#007d76",
+        "background": "#0e1b24",
+        "idleBackground": "#142733"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101820",
+        "blue": "#4aa8ff",
+        "brightBlack": "#7c8f9a",
+        "brightBlue": "#82c3ff",
+        "brightCyan": "#6ee7e7",
+        "brightGreen": "#6ef0b5",
+        "brightMagenta": "#ff6bb5",
+        "brightRed": "#ff8a8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe08a",
+        "cyan": "#20c5c5",
+        "green": "#2ecf8f",
+        "magenta": "#ff2e88",
+        "red": "#ff5c5c",
+        "white": "#dcecf2",
+        "yellow": "#ffd166"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f2fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

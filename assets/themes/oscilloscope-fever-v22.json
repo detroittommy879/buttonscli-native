@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ffffff",
+        "#9a9a9a",
+        "#5a5a5a",
+        "#0a0a0a",
+        "#f2f2f2"
+      ],
+      "custom": {
+        "expression": "let cell = floor((p + vec2<f32>(0.5, 0.5)) * (120.0 / grain_size));\nlet frame = floor(t * 24.0);\nlet r = hash(cell + vec2<f32>(frame * 13.7, frame * 7.3));\nlet r2 = hash(cell * 1.37 + vec2<f32>(frame * 3.1, 11.0));\nlet grain = mix(r, r2, 0.25);\nlet contrast = smoothstep(0.1, 0.9, grain);\nlet band_y = fract(p.y + 0.5 - t * 0.09);\nlet band = smoothstep(0.0, 0.06, band_y) * (1.0 - smoothstep(0.06, 0.22, band_y));\nlet lift = band * roll * 0.35;\nlet scan = 0.92 + 0.08 * sin((p.y + 0.5) * (120.0 / grain_size) * 3.14159);\nlet base = mix(c4, c2, contrast);\nlet peak = mix(base, c5, smoothstep(0.75, 1.0, contrast) * 0.8);\nlet color = (peak + lift * c2) * scan;\nreturn mix(bg, color, strength);",
+        "name": "Channel 3 Static",
+        "variables": [
+          {
+            "max": 6.0,
+            "min": 1.0,
+            "name": "grain_size",
+            "value": 2.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "roll",
+            "value": 0.5
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Hot magenta and cyan traces on a near-black violet ink, high-energy and high contrast.",
+    "id": "oscilloscope-fever-v22",
+    "name": "Oscilloscope Fever v22",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:oscilloscope-fever-v22",
+    "updatedAt": "2026-11-19T04:08:07.832Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#00e5ff",
+        "background": "#120c1f",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#120c1f"
+      },
+      "shell": {
+        "accent": "#ff2e88",
+        "accentHover": "#00e5ff",
+        "background": "#07050d",
+        "backgroundSecondary": "#120c1f",
+        "border": "#3a1f57",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#9a93b8",
+        "textMain": "#eef0ff"
+      },
+      "statusBar": {
+        "background": "#120c1f",
+        "border": "#3a1f57",
+        "text": "#9a93b8",
+        "warning": "#ffe14d"
+      },
+      "tabs": {
+        "activeBackground": "#07050d",
+        "activeBorder": "#ff2e88",
+        "background": "#120c1f",
+        "idleBackground": "#120c1f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1c170d",
+        "blue": "#ffa547",
+        "brightBlack": "#7f8a2c",
+        "brightBlue": "#ffc081",
+        "brightCyan": "#ff818c",
+        "brightGreen": "#ffa2f5",
+        "brightMagenta": "#76ffaa",
+        "brightRed": "#81ffc9",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#90b1ff",
+        "cyan": "#ff0d1d",
+        "green": "#ff64ed",
+        "magenta": "#38ff89",
+        "red": "#45ffb3",
+        "white": "#fff8e9",
+        "yellow": "#568eff"
+      },
+      "background": "#1c170d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#fff8e9",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a0418",
+        "#ff2e88",
+        "#00e5ff",
+        "#ffe14d"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

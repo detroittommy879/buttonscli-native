@@ -1,0 +1,217 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#19215b",
+        "#3943a0",
+        "#a9afff",
+        "#727edf",
+        "#d1d4ff"
+      ],
+      "custom": {
+        "expression": "let tick = floor(t*24.0);\nlet line = floor(p.y*480.0);\nlet drift = noise(vec2<f32>(line*0.05,tick));\nlet band = pow(0.5+0.5*cos(6.28318*(p.y-fract(t/9.0))),24.0);\nlet x = p.x+cable_noise*(drift-0.5)*(0.003+band*0.016);\nlet uv = vec2<f32>(x/1.46+0.5,0.5-p.y/0.86);\nlet grid = uv*vec2<f32>(40.0,25.0);\nlet col = i32(floor(grid.x));\nlet row = i32(floor(grid.y));\nlet j = col-select(0,4,row==1);\nlet k = u32(clamp(j,0,39))/4u;\nvar word = 0u;\nif (row==1 && j>=0 && j<32) {\n let a = vec4<u32>(0x01010101u,0x0002181au,0x1a180d18u,0x0b0c0003u);\n let b = vec4<u32>(0x04000506u,0x07080200u,0x090a0001u,0x01010100u);\n word = select(a[k%4u],b[k%4u],k>=4u);\n}\nif (row==4 && k<2u) { word = select(0x0b0c060du,0x0e0f0000u,k==1u); }\nif (row==5 && k<4u) {\n word = vec4<u32>(0x10110012u,0x0b081314u,0x00150203u,0x04151600u)[k];\n}\nif (row==6 && k<3u) {\n word = vec4<u32>(0x0a110017u,0x18141800u,0x10110000u,0u)[k];\n}\nif (row==7 && k==0u) { word = 0x0b191300u; }\nlet count = i32(floor(fract(t/12.0)*88.0));\nlet pos = (row-8)*40+col;\nvar id = (word>>((3u-u32(clamp(j,0,39))%4u)*8u))&255u;\nif (pos>=0 && pos<count) { id = vec3<u32>(2u,3u,4u)[u32(pos)%3u]; }\nvar bits = 0u;\nif (id<8u) {\n bits = select(vec4<u32>(0u,0x05e5e50u,0x788887u,0x68e996u)[id%4u],vec4<u32>(0x99f111u,0xe9e99eu,0x699f99u,0x78611eu)[id%4u],id>=4u);\n} else if (id<16u) {\n bits = select(vec4<u32>(0xe4444eu,0x999996u,0x69124fu,0xe99e99u)[id%4u],vec4<u32>(0xf8e88fu,0xe9999eu,0x996444u,0x000044u)[id%4u],id>=12u);\n} else if (id<24u) {\n bits = select(vec4<u32>(0x4c444eu,0x699996u,0xe99e88u,0x9ddbb9u)[id%4u],vec4<u32>(0xe44444u,0xaa0000u,0x040046u,0x788b97u)[id%4u],id>=20u);\n} else { bits = vec3<u32>(0x699996u,0x999996u,0x9ff999u)[min(id-24u,2u)]; }\nlet px = vec2<u32>(fract(grid)*vec2<f32>(5.0,8.0));\nlet lit = f32((bits>>(4u*(5u-min(px.y,5u))+3u-min(px.x,3u)))&1u);\nlet glyph = select(0.0,lit,px.x<4u && px.y<6u);\nlet area = fill(sd_box(uv-0.5,vec2<f32>(0.5)));\nlet cursor = select(0.0,1.0,pos==count && fract(t*1.5)<0.5);\nlet blue = mix(c2,c4*0.9,1.0-area);\nlet snow = hash(vec2<f32>(floor(x*610.0)+tick,line));\nlet signal = mix(blue,c3,max(cursor,glyph)*area);\nlet beam = 1.0-scanlines*0.23*(0.5+0.5*cos(p.y*3015.9));\nlet rf = mix(signal,c1,cable_noise*snow*0.16);\nreturn mix(bg,mix(rf,c5,cable_noise*(0.04+0.19*band)*pow(snow,5.0))*beam,strength);",
+        "name": "Blue Channel BASIC",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "cable_noise",
+            "value": 0.7900000214576721
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "scanlines",
+            "value": 0.44999998807907104
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 0.800000011920929,
+      "speed": 2.5,
+      "strength": 0.5699999928474426,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "A blue-on-blue BASIC display with periwinkle phosphor, indigo keys and a little cable snow.",
+    "id": "blue-channel-basic",
+    "name": "Blue Channel BASIC",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:blue-channel-basic",
+    "updatedAt": "2026-11-18T06:33:03.312Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#d1d4ff",
+        "background": "#19215b",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#19215b"
+      },
+      "shell": {
+        "accent": "#a9afff",
+        "accentHover": "#d1d4ff",
+        "background": "#101435",
+        "backgroundSecondary": "#19215b",
+        "border": "#48528a",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#a9afff",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#adb3dc",
+        "textMain": "#ececff"
+      },
+      "statusBar": {
+        "background": "#19215b",
+        "border": "#48528a",
+        "text": "#adb3dc",
+        "warning": "#edcf87"
+      },
+      "tabs": {
+        "activeBackground": "#101435",
+        "activeBorder": "#a9afff",
+        "background": "#19215b",
+        "idleBackground": "#19215b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#252a50",
+        "blue": "#909df3",
+        "brightBlack": "#8891be",
+        "brightBlue": "#a9afff",
+        "brightCyan": "#aff0f1",
+        "brightGreen": "#b1ebb8",
+        "brightMagenta": "#e6bbfc",
+        "brightRed": "#ffaab1",
+        "brightWhite": "#f0f1ff",
+        "brightYellow": "#ffe4a9",
+        "cyan": "#89cfd7",
+        "green": "#90cd9b",
+        "magenta": "#cca0e7",
+        "red": "#e88b98",
+        "white": "#d1d4ff",
+        "yellow": "#edcf87"
+      },
+      "background": "#151b49",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "monof55 Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f0f1ff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#19215b",
+        "#3943a0",
+        "#727edf",
+        "#a9afff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.4
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.1
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.6
+      },
+      "tabs": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.6
+      },
+      "terminal": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff7ad9",
+        "#5cff8a",
+        "#ffa64d",
+        "#0b2a33",
+        "#ffe45c"
+      ],
+      "custom": {
+        "expression": "let k = drift;\nlet back_layer = cloud(p * 1.4 * density + vec2<f32>(-t * 0.03 * k, 0.0));\nlet mid_layer = flow(p * 2.2 * density + vec2<f32>(0.0, t * 0.02 * k), t * 0.2 * k);\nlet front_layer = fbm(p * 3.2 * density + vec2<f32>(t * 0.06 * k, -t * 0.1 * k));\nlet wash = mix(c4, c2 * 0.6, smoothstep(0.25, 0.8, back_layer));\nlet ribbon = mix(c1, c3, smoothstep(0.3, 0.7, mid_layer));\nlet ribbon_mask = smoothstep(0.45, 0.7, mid_layer) * 0.9;\nlet bloom = smoothstep(0.5, 0.85, front_layer);\nlet blobs = c5 * bloom * 0.7 + c2 * smoothstep(0.55, 0.9, back_layer) * 0.3;\nlet color = wash + ribbon * ribbon_mask + blobs;\nreturn mix(bg, tonemap(color * 1.1), strength);",
+        "name": "Drifting Ink Clouds",
+        "variables": [
+          {
+            "max": 3.0,
+            "min": 0.20000000298023224,
+            "name": "drift",
+            "value": 1.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "density",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 4.0,
+      "speed": 6.0,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 55.0,
+    "staticBrightness": 80.0,
+    "staticDensity": 0.6000000238418579,
+    "staticEnabled": false,
+    "staticIntensity": 76.0,
+    "staticOpacity": 0.28999999165534973
+  },
+  "metadata": {
+    "createdAt": "2026-10-30T16:39:21.329Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "solar-splash-v2",
+    "name": "Solar Splash v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:solar-splash-v2",
+    "updatedAt": "2026-11-19T19:28:35.402Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffdd33",
+        "background": "#1a0c0a",
+        "buttonBackground": "#431814",
+        "buttonHover": "#4e1710",
+        "buttonText": "#ffedeb"
+      },
+      "settings": {
+        "background": "#1a0c0a"
+      },
+      "shell": {
+        "accent": "#ff4d33",
+        "accentHover": "#ff7561",
+        "background": "#0c0404",
+        "backgroundSecondary": "#1a0c0a",
+        "border": "#631c12",
+        "buttonBackground": "#100504",
+        "paneDivider": {
+          "color": "#ff4d33",
+          "thickness": 2.0
+        },
+        "textDim": "#c0bfbf",
+        "textMain": "#ffedeb"
+      },
+      "statusBar": {
+        "background": "#140705",
+        "border": "#4a150e",
+        "text": "#ebd2ce",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#2c2525",
+        "activeBorder": "#ffb433",
+        "background": "#240a07",
+        "idleBackground": "#100504"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#310e0a",
+        "blue": "#3399ff",
+        "brightBlack": "#662820",
+        "brightBlue": "#61adff",
+        "brightCyan": "#61ffe5",
+        "brightGreen": "#caff61",
+        "brightMagenta": "#ff61b8",
+        "brightRed": "#ff7561",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffc561",
+        "cyan": "#33ffdd",
+        "green": "#b4ff33",
+        "magenta": "#ff33a1",
+        "red": "#ff4d33",
+        "white": "#ffedeb",
+        "yellow": "#ffb433"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#efdad7",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a1a2e",
+        "#16213e",
+        "#8a2be2",
+        "#ff1493"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

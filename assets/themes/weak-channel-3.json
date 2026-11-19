@@ -1,0 +1,226 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#f2efe4",
+        "#3a7bd5",
+        "#e3523a",
+        "#14181a",
+        "#4fbf6a"
+      ],
+      "custom": {
+        "expression": "let drift = drift_speed;\nlet band = floor(p.y * 45.0);\nlet gate = hash(vec2<f32>(band, floor(t * 8.0)));\nlet jolt = step(1.0 - 0.08 * glitch_rate, gate) * (hash(vec2<f32>(band + 3.0, floor(t * 8.0))) - 0.5) * 0.14;\nlet q = vec2<f32>(p.x + jolt + t * 0.02 * drift, p.y + t * 0.03 * drift);\nlet local = fract(q * vec2<f32>(0.8, 1.0)) - 0.5;\nlet mask = fill(sd_box(local, vec2<f32>(0.4, 0.4)));\nlet kr = clamp(floor((local.x + 0.412) * 6.25), 0.0, 4.0);\nlet kc = clamp(floor((local.x + 0.4) * 6.25), 0.0, 4.0);\nlet kb = clamp(floor((local.x + 0.388) * 6.25), 0.0, 4.0);\nlet cr1 = mix(c1, c2, step(0.5, kr));\nlet cr2 = mix(cr1, c3, step(1.5, kr));\nlet cr3 = mix(cr2, c5, step(2.5, kr));\nlet bar_r = mix(cr3, c4, step(3.5, kr));\nlet cc1 = mix(c1, c2, step(0.5, kc));\nlet cc2 = mix(cc1, c3, step(1.5, kc));\nlet cc3 = mix(cc2, c5, step(2.5, kc));\nlet bar_c = mix(cc3, c4, step(3.5, kc));\nlet cb1 = mix(c1, c2, step(0.5, kb));\nlet cb2 = mix(cb1, c3, step(1.5, kb));\nlet cb3 = mix(cb2, c5, step(2.5, kb));\nlet bar_b = mix(cb3, c4, step(3.5, kb));\nlet picture = vec3<f32>(bar_r.x, bar_c.y, bar_b.z) * mask * 0.75;\nlet scan = 0.8 + 0.2 * sin(p.y * 942.478);\nlet grain = hash(floor(vec2<f32>((p.x + jolt) * 240.0, p.y * 160.0)) + vec2<f32>(floor(t * 30.0) * 13.0, 0.0));\nlet snow_col = c1 * grain * snow_level * 0.3;\nlet col = (picture + snow_col) * scan;\nreturn mix(bg, col, strength);",
+        "name": "Weak Channel 3",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "snow_level",
+            "value": 0.5
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "glitch_rate",
+            "value": 0.5
+          },
+          {
+            "max": 3.0,
+            "min": 0.0,
+            "name": "drift_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7000000476837158,
+      "speed": 5.599999904632568,
+      "strength": 0.949999988079071,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-15T04:50:15.508Z",
+    "description": "A dark NES-era CRT fed a weak, noisy channel 3 signal with a faint drifting station image and line glitches.",
+    "id": "weak-channel-3",
+    "name": "Weak Channel 3",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:weak-channel-3",
+    "updatedAt": "2026-11-15T09:07:21.235Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#d9704f",
+        "background": "#151816",
+        "buttonBackground": "#41595c",
+        "buttonHover": "#619291",
+        "buttonText": "#000000"
+      },
+      "settings": {
+        "background": "#151816"
+      },
+      "shell": {
+        "accent": "#c8553d",
+        "accentHover": "#d9704f",
+        "background": "#0b0c0b",
+        "backgroundSecondary": "#151816",
+        "border": "#2a2f2b",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#c8553d",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8d938c",
+        "textMain": "#e6e2d6"
+      },
+      "statusBar": {
+        "background": "#151816",
+        "border": "#2a2f2b",
+        "text": "#8d938c",
+        "warning": "#d9b44a"
+      },
+      "tabs": {
+        "activeBackground": "#0b0c0b",
+        "activeBorder": "#c8553d",
+        "background": "#151816",
+        "idleBackground": "#151816"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a1d1c",
+        "blue": "#4f7fa6",
+        "brightBlack": "#5a615c",
+        "brightBlue": "#74a3c8",
+        "brightCyan": "#a6d6d2",
+        "brightGreen": "#93b878",
+        "brightMagenta": "#bb8fb0",
+        "brightRed": "#e0765c",
+        "brightWhite": "#f4f1e8",
+        "brightYellow": "#ecd070",
+        "cyan": "#7fb3b0",
+        "green": "#6f9a5a",
+        "magenta": "#9a6a8f",
+        "red": "#c8553d",
+        "white": "#c9c5b9",
+        "yellow": "#d9b44a"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e8e4d8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#050605",
+        "#c8553d",
+        "#5b8fb9",
+        "#e8e4d8"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

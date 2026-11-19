@@ -1,0 +1,212 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff3fa4",
+        "#3fd8ff",
+        "#ffe14d",
+        "#2a0f3a",
+        "#7dff6a"
+      ],
+      "custom": {
+        "expression": "let col_idx = clamp(floor((p.x + 0.9) * 3.9), 0.0, 6.0);\nlet ph = col_idx / 6.0;\nlet bars_c = mix(mix(c1, c2, smoothstep(0.0, 0.4, ph)), mix(c3, c5, smoothstep(0.5, 0.9, ph)), smoothstep(0.35, 0.55, ph));\nlet lower_c = mix(c4, c1, step(0.5, fract(col_idx * 0.5)));\nlet lower = step(p.y, -0.36);\nlet bars_all = mix(bars_c, lower_c, lower);\nlet wrap = fract(p.y * 0.6 - t * roll_speed);\nlet roll = 0.6 + 0.4 * smoothstep(0.0, 0.3, wrap);\nlet scan = 0.82 + 0.18 * smoothstep(0.25, 0.5, fract(p.y * 90.0));\nlet base = bars_all * roll * scan;\nlet y0 = fract(t * 0.13) - 0.5;\nlet w = 1.0 - smoothstep(0.0, 0.05, abs(p.y - y0));\nlet n = hash(floor(p * vec2<f32>(140.0, 70.0)) + vec2<f32>(floor(t * 24.0) * 3.1, 0.0));\nlet color_a = mix(base, vec3<f32>(n), w * noise_amount * 0.8);\nlet frame = stroke(sd_box(p - vec2<f32>(-0.62, 0.36), vec2<f32>(0.12, 0.07)), 0.012);\nlet blink = step(0.5, fract(t * 0.8));\nlet lamp = fill(sd_circle(p - vec2<f32>(-0.5, 0.36), 0.02)) * blink;\nlet color_b = mix(color_a, c3, frame * 0.9);\nlet color = mix(color_b, c5, lamp);\nreturn mix(bg, tonemap(color * 1.1), strength);",
+        "name": "Rolling Test Pattern",
+        "variables": [
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "roll_speed",
+            "value": 0.05999999865889549
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "noise_amount",
+            "value": 0.699999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 0.800000011920929,
+      "speed": 2.0,
+      "strength": 0.2199999988079071,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-10-09T18:53:25.489Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "electric-downpour-v3",
+    "name": "Electric Downpour v3",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:electric-downpour-v3",
+    "updatedAt": "2026-11-19T05:55:43.634Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "animation_fps": 30,
+    "calm_mode": false,
+    "chrome_corner_radius": 4,
+    "dock_opacity": 0.3499999940395355,
+    "effects_focused_pane_only": false,
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#114c0d",
+        "blue": "#90ff6d",
+        "brightBlack": "#55aa45",
+        "brightBlue": "#b0ff9b",
+        "brightCyan": "#e0ff7f",
+        "brightGreen": "#ffc97f",
+        "brightMagenta": "#a6fff0",
+        "brightRed": "#8d95ff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#f29aff",
+        "cyan": "#ceff3b",
+        "green": "#ffb93d",
+        "magenta": "#7dffe1",
+        "red": "#6b71ff",
+        "white": "#c1ffb1",
+        "yellow": "#e060ff"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#dfffd3",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#00e5ff",
+        "#ff3cc8",
+        "#ffd23f",
+        "#0b0a1f",
+        "#7cff6b"
+      ],
+      "custom": {
+        "expression": "let amp = wave_height;\nvar col = vec3<f32>(0.0);\nvar lum = 0.0;\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let x = p.x * 2.2;\n    let ph = t * line_speed;\n    let w = sin(x * 3.0 + ph * 2.0 + k * 0.7) * 0.6 + sin(x * 7.3 - ph * 3.1 + k * 1.9) * 0.3 + sin(x * 13.0 + ph * 5.0 + k) * 0.1;\n    let env = 1.0 - smoothstep(0.6, 0.95, abs(p.x * 1.1));\n    let y = (k - 2.5) * 0.09 + amp * w * env;\n    let d = abs(p.y - y);\n    let core = exp(-d * 160.0);\n    let soft = exp(-d * 30.0) * 0.25;\n    let line_col = mix(c1, c2, k * 0.2);\n    col += line_col * (core + soft);\n    lum += core;\n}\nlet glow = tonemap(col * 1.3);\nlet color = glow + c5 * 0.02 * lum;\nreturn mix(bg, color, strength);",
+        "name": "Audio Scanlines",
+        "variables": [
+          {
+            "max": 0.4000000059604645,
+            "min": 0.05000000074505806,
+            "name": "wave_height",
+            "value": 0.20000000298023224
+          },
+          {
+            "max": 3.0,
+            "min": 0.5,
+            "name": "line_speed",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 3.5,
+      "speed": 2.5,
+      "strength": 0.959999978542328,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-13T09:04:06.683Z",
+    "description": "High-contrast black with neon cyan, magenta and amber waveform lines",
+    "id": "audio-scanlines",
+    "name": "Audio Scanlines",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:audio-scanlines",
+    "updatedAt": "2026-11-13T09:54:06.061Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#5ff0ff",
+        "background": "#0d0f1a",
+        "buttonBackground": "#362617",
+        "buttonHover": "#4a3420",
+        "buttonText": "#f5e9d8"
+      },
+      "settings": {
+        "background": "#0d0f1a"
+      },
+      "shell": {
+        "accent": "#00e5ff",
+        "accentHover": "#5ff0ff",
+        "background": "#06070c",
+        "backgroundSecondary": "#0d0f1a",
+        "border": "#1f2a44",
+        "buttonBackground": "#362617",
+        "paneDivider": {
+          "color": "#00e5ff",
+          "thickness": 2.0
+        },
+        "textDim": "#8fa3bf",
+        "textMain": "#e8f4ff"
+      },
+      "statusBar": {
+        "background": "#0d0f1a",
+        "border": "#1f2a44",
+        "text": "#8fa3bf",
+        "warning": "#ffd23f"
+      },
+      "tabs": {
+        "activeBackground": "#06070c",
+        "activeBorder": "#00e5ff",
+        "background": "#0d0f1a",
+        "idleBackground": "#0d0f1a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#000000",
+        "blue": "#4d7cff",
+        "brightBlack": "#4a5670",
+        "brightBlue": "#8aa8ff",
+        "brightCyan": "#7ff3ff",
+        "brightGreen": "#a6ff9a",
+        "brightMagenta": "#ff7ad9",
+        "brightRed": "#ff8aa0",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe47a",
+        "cyan": "#00e5ff",
+        "green": "#7cff6b",
+        "magenta": "#ff3cc8",
+        "red": "#ff4d6d",
+        "white": "#c9d6e8",
+        "yellow": "#ffd23f"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e8f4ff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#000000",
+        "#00e5ff",
+        "#ff3cc8",
+        "#ffd23f"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

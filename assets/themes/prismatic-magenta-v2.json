@@ -1,0 +1,267 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#2f6d78",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 3.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#f05248",
+        "#42bfc4",
+        "#f2c75c",
+        "#172535",
+        "#ede3c9"
+      ],
+      "custom": {
+        "expression": "let col_idx = clamp(floor((p.x + 0.9) * 3.9), 0.0, 6.0);\nlet ph = col_idx / 6.0;\nlet bars_c = mix(mix(c5, c3, smoothstep(0.0, 0.3, ph)), mix(c2, c1, smoothstep(0.55, 1.0, ph)), smoothstep(0.3, 0.65, ph));\nlet lower_c = mix(c4, c1 * 0.75, step(0.5, fract(col_idx * 0.5)));\nlet lower = 1.0 - smoothstep(-0.365, -0.355, p.y);\nlet bars_all = mix(bars_c, lower_c, lower);\nlet wrap = fract(p.y * 0.6 - t * roll_speed);\nlet roll = mix(0.76, 1.0, smoothstep(0.0, 0.14, wrap));\nlet field = floor(t * 30.0);\nlet line = floor(p.y * 450.0 + 0.5 * fract(field * 0.5));\nlet interlace = mix(0.88, 1.0, step(0.5, fract(line * 0.5 + field * 0.5)));\nlet scan = 0.94 + 0.06 * cos(p.y * 565.48);\nlet base = bars_all * roll * interlace * scan;\nlet y0 = fract(t * 0.13) - 0.5;\nlet band = 1.0 - smoothstep(0.015, 0.055, abs(p.y - y0));\nlet grain = hash(floor(p * vec2<f32>(140.0, 70.0)) + vec2<f32>(field * 3.1, 0.0));\nlet static_tint = mix(c4, c5, grain);\nlet color_a = mix(base, static_tint, band * noise_amount * 0.7);\nlet frame_d = sd_box(p - vec2<f32>(-0.62, 0.36), vec2<f32>(0.12, 0.07));\nlet frame = stroke(frame_d, 0.012);\nlet blink = step(0.5, fract(t * 0.8));\nlet lamp = fill(sd_circle(p - vec2<f32>(-0.5, 0.36), 0.02)) * blink;\nlet color_b = mix(color_a, c4, frame * 0.95);\nlet color = mix(color_b, c3, lamp);\nreturn mix(bg, color, strength);",
+        "name": "Broadcast 900",
+        "variables": [
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "roll_speed",
+            "value": 0.05999999865889549
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "noise_amount",
+            "value": 0.699999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "curtains",
+      "scale": 1.0,
+      "speed": 3.799999952316284,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 33.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 74.0,
+    "staticAmplitude": 12.0,
+    "staticBrightness": 32.0,
+    "staticDensity": 0.119999997317791,
+    "staticEnabled": false,
+    "staticIntensity": 9.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-19T01:30:45.342Z",
+    "description": "Pitch black void cut by brutal, chaotic sweeping conic rainbows recreating dynamic mainstage lighting.",
+    "id": "prismatic-magenta-v2",
+    "name": "Prismatic Magenta v2",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:prismatic-magenta-v2",
+    "updatedAt": "2026-11-19T01:47:32.736Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "assistant": null,
+      "controls": null,
+      "layout": null,
+      "presetDock": {
+        "accent": "#fff62e",
+        "activeBackground": null,
+        "activeForeground": null,
+        "background": "#1a0011",
+        "border": null,
+        "buttonBackground": "#500035",
+        "buttonHover": "#6b0047",
+        "buttonText": "#ffffff",
+        "foreground": null,
+        "headerBackground": null,
+        "itemGap": null,
+        "padding": null,
+        "text": null,
+        "widthAccent": null
+      },
+      "settings": {
+        "background": "#050505"
+      },
+      "shell": {
+        "accent": "#ff00aa",
+        "accentHover": "#ff2eb9",
+        "background": "#000000",
+        "backgroundSecondary": "#1f0015",
+        "border": "#222222",
+        "borderColor": null,
+        "buttonBackground": "#14000d",
+        "foreground": null,
+        "paneDivider": {
+          "color": "#00ff00",
+          "thickness": 2.0
+        },
+        "shadow": null,
+        "shadowColor": null,
+        "textDim": "#a8a8a8",
+        "textMain": "#ffffff"
+      },
+      "statusBar": {
+        "accent": null,
+        "background": "#33022b",
+        "border": "#cf008a",
+        "borderColor": null,
+        "error": null,
+        "foreground": null,
+        "height": null,
+        "success": null,
+        "text": "#ffffff",
+        "warning": "#9aa832"
+      },
+      "tabs": {
+        "0": null,
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": null,
+        "active": null,
+        "activeBackground": "#111111",
+        "activeBorder": "#ff00aa",
+        "activeBorderColor": null,
+        "activeForeground": null,
+        "activeTabBackground": null,
+        "activeTabForeground": null,
+        "background": "#000000",
+        "border": null,
+        "foreground": null,
+        "gap": null,
+        "height": null,
+        "hoverBackground": null,
+        "idleBackground": "#14000d",
+        "inactiveBackground": null,
+        "inactiveForeground": null,
+        "inactiveTabForeground": null,
+        "paddingX": null,
+        "radius": null,
+        "separator": null,
+        "textActive": null,
+        "textIdle": null
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#222222",
+        "blue": "#ffff55",
+        "brightBlack": "#555555",
+        "brightBlue": "#ffff88",
+        "brightCyan": "#ff8888",
+        "brightGreen": "#ff88ff",
+        "brightMagenta": "#88ff88",
+        "brightRed": "#88ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#8888ff",
+        "cyan": "#ff3333",
+        "green": "#ff33ff",
+        "magenta": "#33ff33",
+        "red": "#33ffff",
+        "white": "#eeeeee",
+        "yellow": "#3333ff"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Symbols Nerd Font Mono Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 700,
+      "foreground": "#ffffff",
+      "gradientAngle": 90.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#1a0000",
+        "#1a1a00",
+        "#001a00",
+        "#001a1a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15000000596046448
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3499999940395355
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "Symbols Nerd Font Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

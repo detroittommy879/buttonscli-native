@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff5d3a",
+        "#ffc83d",
+        "#f4ead5",
+        "#2ec4b6",
+        "#7b5cff"
+      ],
+      "custom": {
+        "expression": "let ow = outline_w;\nlet g1 = p * 3.0 + vec2<f32>(t * 0.06 * drift, 0.0);\nlet k1 = floor(g1);\nlet f1 = fract(g1) - 0.5;\nlet h1 = hash(k1);\nlet r1 = rotate(f1, t * spin * (0.25 + 0.5 * h1) + h1 * 6.28);\nlet ba = vec2<f32>(0.1 * (0.8 + 0.2 * sin(t + h1 * 9.0)), 0.0);\nlet mol = min(min(sd_circle(r1 - ba, 0.035), sd_circle(r1 + ba, 0.035)), sd_segment(r1, -ba, ba) - 0.012);\nlet c_far = mix(c4, c5, h1);\nvar col = bg;\ncol = mix(col, c_far, fill(mol));\ncol = mix(col, bg, stroke(mol, ow * 0.6));\nlet g2 = p * 2.0 + vec2<f32>(-t * 0.12 * drift, 0.0);\nlet k2 = floor(g2);\nlet f2 = fract(g2) - 0.5;\nlet h2 = hash(k2);\nlet m2 = 0.3 * sin(t * 0.8 * spin + h2 * 6.28);\nlet q2 = f2 * vec2<f32>(1.0 + m2, 1.0 - m2);\nlet oval = sd_circle(q2, 0.15 + 0.03 * h2);\ncol = mix(col, mix(c2, c3, h2), fill(oval));\ncol = mix(col, bg, stroke(oval, ow * 0.6));\nlet wave = stroke(p.y + 0.2 - 0.08 * cos(p.x * 14.0 + t * 1.5 * spin), ow * 0.5);\ncol = mix(col, c1, wave);\nlet dotw = sd_circle(p - vec2<f32>(0.35, -0.12 + 0.03 * sin(t * spin * 2.0)), 0.03);\ncol = mix(col, c4, fill(dotw));\nlet g3 = p * 1.4 + vec2<f32>(t * 0.2 * drift, 0.0);\nlet k3 = floor(g3);\nlet f3 = fract(g3) - 0.5;\nlet h3 = hash(k3);\nlet r3 = rotate(f3, sin(t * 0.5 * spin + h3 * 6.28) * 0.6 + floor(h3 * 4.0) * 1.5708);\nlet corner = min(sd_box(r3 - vec2<f32>(-0.08, -0.17), vec2<f32>(0.2, 0.05)), sd_box(r3 - vec2<f32>(-0.22, -0.02), vec2<f32>(0.05, 0.2)));\nlet spark = sd_circle(r3 - vec2<f32>(0.2, 0.2), 0.05 + 0.03 * h3);\nlet sym = min(corner, spark);\ncol = mix(col, mix(c1, c3, h3 * 0.5), fill(sym));\ncol = mix(col, bg, stroke(sym, ow * 0.6));\nreturn mix(bg, col, strength);",
+        "name": "Molecular Poster",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "drift",
+            "value": 1.0
+          },
+          {
+            "max": 3.0,
+            "min": 0.0,
+            "name": "spin",
+            "value": 1.0
+          },
+          {
+            "max": 0.03999999910593033,
+            "min": 0.0,
+            "name": "outline_w",
+            "value": 0.014000000432133676
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "nebula",
+      "scale": 4.0,
+      "speed": 2.0,
+      "strength": 0.25,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T16:07:12.337Z",
+    "description": "Native ButtonsCLI foundation theme",
+    "id": "gravity-arcade-v16",
+    "name": "Gravity Arcade v16",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:gravity-arcade-v16",
+    "updatedAt": "2026-11-15T05:17:37.260Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#c084fc",
+        "background": "#101525",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#101525"
+      },
+      "shell": {
+        "accent": "#38bdf8",
+        "accentHover": "#5bc8f9",
+        "background": "#090c16",
+        "backgroundSecondary": "#101525",
+        "border": "#3f4350",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#e8f00b",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#8b97ab",
+        "textMain": "#e2e8f0"
+      },
+      "statusBar": {
+        "background": "#1e2332",
+        "border": "#3f4350",
+        "text": "#8b97ab",
+        "warning": "#fbbf24"
+      },
+      "tabs": {
+        "activeBackground": "#090c16",
+        "activeBorder": "#38bdf8",
+        "background": "#101525",
+        "idleBackground": "#1e2332"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#232736",
+        "blue": "#6da8ff",
+        "brightBlack": "#697386",
+        "brightBlue": "#9bc1ff",
+        "brightCyan": "#8ceaf2",
+        "brightGreen": "#98e6b8",
+        "brightMagenta": "#e1a6ff",
+        "brightRed": "#ff8da8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe29a",
+        "cyan": "#55d9e5",
+        "green": "#65d79b",
+        "magenta": "#c792ea",
+        "red": "#ff6b8a",
+        "white": "#c9d4e7",
+        "yellow": "#f5c36a"
+      },
+      "background": "#090c16",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 300,
+      "foreground": "#e2e8f0",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "CommitMono (System)",
+        "fontSize": 13.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}
