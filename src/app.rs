@@ -816,6 +816,9 @@ enum SettingsTab {
     /// Debug tools: shaders four at a time with picks for a showcase.
     #[cfg(not(target_arch = "wasm32"))]
     Gallery,
+    /// Local feature flags (`admin` flag).
+    #[cfg(not(target_arch = "wasm32"))]
+    FeatureFlags,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2324,6 +2327,9 @@ impl ButtonsApp {
         };
         let mut chosen = None;
         let mut open_import = false;
+        let mut create: Option<String> = None;
+        let mut rename: Option<(String, String)> = None;
+        let mut cancel_rename = false;
         let label = format!(
             "{} {}",
             crate::i18n::literal(&self.locale, "Profile:"),
@@ -2341,18 +2347,71 @@ impl ButtonsApp {
                 .small(),
             );
             ui.separator();
+            let rename_id = egui::Id::new("profile-rename");
+            let mut renaming: Option<(String, String)> = ui.ctx().data(|data| data.get_temp(rename_id));
             for profile in profiles.iter() {
+                if let Some((from, draft)) = renaming.as_mut().filter(|(from, _)| *from == profile.name) {
+                    ui.horizontal(|ui| {
+                        let response = ui.add(egui::TextEdit::singleline(draft).desired_width(160.0));
+                        let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                        if enter || ui.small_button(crate::i18n::literal(&self.locale, "Rename")).clicked() {
+                            rename = Some((from.clone(), draft.trim().to_owned()));
+                        }
+                        if ui.small_button("×").on_hover_text(crate::i18n::literal(&self.locale, "Cancel")).clicked() {
+                            cancel_rename = true;
+                        }
+                    });
+                    continue;
+                }
                 let text = format!(
                     "{}{}  ·  {} themes",
                     if profile.active { "✓ " } else { "" },
                     profile.name,
                     profile.themes
                 );
-                if ui.spaced_selectable_label(profile.active, text).clicked() && !profile.active {
-                    chosen = Some(profile.name.clone());
+                ui.horizontal(|ui| {
+                    if ui.spaced_selectable_label(profile.active, text).clicked() && !profile.active {
+                        chosen = Some(profile.name.clone());
+                        ui.close_menu();
+                    }
+                    let rename_button = ui.add_enabled(!profile.active, egui::Button::new("✎").small())
+                        .on_hover_text(crate::i18n::literal(&self.locale, "Rename this profile"))
+                        .on_disabled_hover_text(crate::i18n::literal(&self.locale, "Switch to another profile to rename this one."));
+                    if rename_button.clicked() {
+                        renaming = Some((profile.name.clone(), profile.name.clone()));
+                    }
+                });
+            }
+            if cancel_rename || rename.is_some() {
+                renaming = None;
+            }
+            ui.ctx().data_mut(|data| match &renaming {
+                Some(value) => data.insert_temp(rename_id, value.clone()),
+                None => data.remove::<(String, String)>(rename_id),
+            });
+            ui.separator();
+            let draft_id = egui::Id::new("profile-new-name");
+            let mut draft: String = ui.ctx().data(|data| data.get_temp(draft_id)).unwrap_or_default();
+            ui.horizontal(|ui| {
+                let response = ui.add(
+                    egui::TextEdit::singleline(&mut draft)
+                        .hint_text(crate::i18n::literal(&self.locale, "New profile name"))
+                        .desired_width(160.0),
+                );
+                let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                if (enter
+                    || ui
+                        .add_enabled(!draft.trim().is_empty(), egui::Button::new(crate::i18n::literal(&self.locale, "New profile")))
+                        .on_hover_text(crate::i18n::literal(&self.locale, "A blank profile with default settings and no saved themes, then switch to it. Letters, digits, - and _ only."))
+                        .clicked())
+                    && !draft.trim().is_empty()
+                {
+                    create = Some(draft.trim().to_owned());
+                    draft.clear();
                     ui.close_menu();
                 }
-            }
+            });
+            ui.ctx().data_mut(|data| data.insert_temp(draft_id, draft));
             ui.separator();
             if ui
                 .spaced_button(crate::i18n::literal(&self.locale, "Import from original…"))
@@ -2365,6 +2424,28 @@ impl ButtonsApp {
         if response.response.clicked() {
             // Re-read on every open so new or imported profiles show up.
             self.native_profiles = None;
+        }
+        if let Some(name) = create {
+            match store.create_profile(&name) {
+                Ok(name) => {
+                    self.native_profiles = None;
+                    self.switch_native_profile(&name, ctx);
+                }
+                Err(error) => {
+                    self.notice = Some(format!("Could not create profile {name}: {error}"))
+                }
+            }
+        }
+        if let Some((from, to)) = rename.filter(|(from, to)| from != to && !to.is_empty()) {
+            match store.rename_profile(&from, &to) {
+                Ok(to) => {
+                    self.native_profiles = None;
+                    self.notice = Some(format!("Renamed profile {from} to {to}."));
+                }
+                Err(error) => {
+                    self.notice = Some(format!("Could not rename profile {from}: {error}"))
+                }
+            }
         }
         if let Some(name) = chosen {
             self.switch_native_profile(&name, ctx);
@@ -4426,6 +4507,16 @@ impl ButtonsApp {
                     ui.separator();
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "File"), |ui| {
                         #[cfg(not(target_arch = "wasm32"))]
+                        if shader_window::available()
+                            && ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "New shader window"))
+                                .on_hover_text(crate::i18n::literal(&self.locale, "A window with only a shader in it. Hover it for the picker; double-click for full screen."))
+                                .clicked()
+                        {
+                            shader_window::open(ctx);
+                            ui.close_menu();
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
                         if ui
                             .spaced_button(crate::i18n::literal(
                                 &self.locale,
@@ -4501,6 +4592,16 @@ impl ButtonsApp {
                         }
                     });
                     ui.spaced_menu_button(crate::i18n::literal(&self.locale, "View"), |ui| {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if rich_chat::available()
+                            && ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "AI chat"))
+                                .on_hover_text(crate::i18n::literal(&self.locale, "Chat with your AI provider in its own window, with styled text and no terminal."))
+                                .clicked()
+                        {
+                            rich_chat::open(ctx);
+                            ui.close_menu();
+                        }
                         ui.spaced_checkbox(
                             &mut self.preferences.show_sidebar,
                             crate::i18n::literal(&self.locale, "Left commands"),
@@ -5360,8 +5461,35 @@ impl ButtonsApp {
                 {
                     self.preferences.show_sidebar = false;
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let arranging = dock_arrange::arranging(ui.ctx());
+                    if self.preferences.ssh_presets.len() > 1
+                        && ui
+                            .add(
+                                egui::Button::new(crate::i18n::literal(&self.locale, "✎"))
+                                    .small()
+                                    .selected(arranging),
+                            )
+                            .on_hover_text(crate::i18n::literal(
+                                &self.locale,
+                                "Arrange: drag buttons into a new order",
+                            ))
+                            .clicked()
+                    {
+                        dock_arrange::set_arranging(ui.ctx(), !arranging);
+                    }
+                }
             });
         });
+        #[cfg(not(target_arch = "wasm32"))]
+        if dock_arrange::arranging(ui.ctx()) {
+            ui.add_space(6.0);
+            if self.dock_arrange_list(ui) {
+                self.persist_native_preferences();
+            }
+            return;
+        }
         if controls_available {
             wrapping_row(ui, |ui| {
                 ui.spaced_checkbox(
@@ -5612,7 +5740,7 @@ impl ButtonsApp {
                         ui.separator();
                         self.text_backing_controls(ui);
                         ui.spaced_label(crate::i18n::literal(&self.locale, "Row banding"));
-                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text(crate::i18n::literal(&self.locale, "For readability: alternate background brightness above and below the theme color. 0 disables this adjustment; the theme editor has additional controls."));
+                        let banding = ui.add(egui::DragValue::new(&mut self.preferences.row_banding_brightness).range(0..=64).prefix("± ").speed(0.25)).on_hover_text(crate::i18n::literal(&self.locale, "For readability: alternate row brightness above and below the theme background in every pane, replacing shaders while it is on. 0 turns it off and brings the shaders back."));
                         // Save when a drag ends or a typed value lands, like Motion.
                         if banding.drag_stopped() || (banding.changed() && !banding.dragged()) {
                             self.persist_native_preferences();
@@ -6185,6 +6313,14 @@ impl ButtonsApp {
                         "Gallery",
                     );
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                if feature_flags::available() {
+                    ui.spaced_selectable_value(
+                        &mut self.settings_tab,
+                        SettingsTab::FeatureFlags,
+                        crate::i18n::literal(&self.locale, "Feature flags"),
+                    );
+                }
             });
         });
         ui.separator();
@@ -6264,6 +6400,8 @@ impl ButtonsApp {
                 SettingsTab::Debug => self.debug_settings(ui),
                 #[cfg(not(target_arch = "wasm32"))]
                 SettingsTab::Gallery => self.gallery_settings(ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                SettingsTab::FeatureFlags => self.feature_flag_settings(ui),
             });
         #[cfg(not(target_arch = "wasm32"))]
         self.process_theme_editor_preview(ctx);
@@ -6290,8 +6428,7 @@ impl ButtonsApp {
                 {
                     *close_action = Some(SettingsCloseAction::Keep);
                 }
-                if ui
-                    .spaced_button(crate::i18n::text(
+                if crate::ui_text::safe_button(ui, crate::i18n::text(
                         &self.locale,
                         crate::i18n::MessageKey::SettingsRevertClose,
                         &[],
@@ -10182,7 +10319,7 @@ impl ButtonsApp {
                         });
                         if self.shader_ai.undo.is_some()
                             && !self.shader_ai.busy
-                            && ui.spaced_button(crate::i18n::literal(&self.locale, "Undo AI change")).clicked()
+                            && crate::ui_text::safe_button(ui, crate::i18n::literal(&self.locale, "Undo AI change")).clicked()
                         {
                             custom.expression = self.shader_ai.undo.take().unwrap_or_default();
                             self.shader_ai.message = None;
@@ -10411,9 +10548,11 @@ impl ButtonsApp {
                     {
                         self.save_personal_theme_draft();
                     }
-                    if ui
-                        .spaced_button(crate::i18n::literal(&self.locale, "Discard changes"))
-                        .clicked()
+                    if crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&self.locale, "Discard changes"),
+                    )
+                    .clicked()
                     {
                         self.cancel_personal_theme_draft();
                     }
@@ -10680,9 +10819,11 @@ impl ButtonsApp {
                     )
                 });
                 ui.ctx().request_repaint_after(Duration::from_millis(250));
-                cancel = ui
-                    .spaced_button(crate::i18n::literal(&locale, "Cancel generation"))
-                    .clicked();
+                cancel = crate::ui_text::safe_button(
+                    ui,
+                    crate::i18n::literal(&locale, "Cancel generation"),
+                )
+                .clicked();
             } else {
                 generate = ui
                     .add_enabled(
@@ -10747,15 +10888,22 @@ impl ButtonsApp {
                     )
                 });
                 wrapping_row(ui, |ui| {
-                    save = ui
-                        .spaced_button(crate::i18n::literal(&self.locale, "Save as theme"))
-                        .clicked();
-                    edit = ui
-                        .spaced_button(crate::i18n::literal(&locale, "Edit in theme library"))
-                        .clicked();
-                    discard = ui
-                        .spaced_button(crate::i18n::literal(&locale, "Discard candidate"))
-                        .clicked();
+                    // Theme-proof: the candidate being previewed may be unreadable.
+                    save = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&self.locale, "Save as theme"),
+                    )
+                    .clicked();
+                    edit = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&locale, "Edit in theme library"),
+                    )
+                    .clicked();
+                    discard = crate::ui_text::safe_button(
+                        ui,
+                        crate::i18n::literal(&locale, "Discard candidate"),
+                    )
+                    .clicked();
                 });
             });
             if save {
@@ -10894,6 +11042,16 @@ impl ButtonsApp {
             self.import_personal_theme_draft();
         }
 
+        // Say who the edits reach (one pane, or only panes without a theme
+        // of their own), as the Shaders and AI tabs do; otherwise sliders
+        // look broken after a bundle gives every pane its own theme.
+        if self.look_target_hint(ui) {
+            self.use_look_everywhere();
+            return;
+        }
+        let pane_mode = self
+            .theme_editor_pane
+            .is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
         let Some(mut document) = self.theme_editor_document.clone() else {
             if let Some(status) = &self.theme_editor_status {
                 ui.spaced_label(status);
@@ -10903,9 +11061,14 @@ impl ButtonsApp {
 
         let before_edits = document.clone();
         edit_theme_metadata(ui, &locale, &mut document);
-        let resolved_document = ThemeDefinition::editor_document(&document)
-            .map(|theme| crate::theme_files::document_from_theme(&theme, &theme.name))
-            .unwrap_or(Value::Null);
+        let resolved_document = color_adjust::editor_resolved_document(&document);
+        color_adjust::quick_adjust_section(
+            ui,
+            &locale,
+            &mut document,
+            &resolved_document,
+            pane_mode,
+        );
         for (section, fields) in APP_THEME_COLOR_GROUPS {
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -11067,6 +11230,17 @@ impl ButtonsApp {
                 crate::i18n::key("Use gradient"),
                 "/theme/terminal/useGradient",
             );
+            if color_adjust::document_shader_on(&document)
+                && document["theme"]["terminal"]["useGradient"] == true
+            {
+                ui.spaced_label(
+                    RichText::new(crate::i18n::literal(
+                        &locale,
+                        "The shader is drawn instead of the gradient. Turn the shader off (above Quick adjust) to see it.",
+                    ))
+                    .small(),
+                );
+            }
             if document["theme"]["terminal"]["useGradient"] == true {
                 let gradient_types = [
                     (crate::i18n::key("linear"), crate::i18n::key("Linear")),
@@ -11390,10 +11564,7 @@ impl ButtonsApp {
             {
                 self.save_personal_theme_draft();
             }
-            if ui
-                .spaced_button(crate::i18n::literal(&locale, "Cancel"))
-                .clicked()
-            {
+            if crate::ui_text::safe_button(ui, crate::i18n::literal(&locale, "Cancel")).clicked() {
                 self.cancel_personal_theme_draft();
             }
             if self.theme_editor_file_exists {
@@ -12417,12 +12588,17 @@ impl ButtonsApp {
                 .unwrap();
         }
         let name = shader.shader.name.clone();
+        let count = list.len();
         match list.iter_mut().find(|item| item.shader.name == name) {
             Some(item) => *item = shader,
-            None => {
-                list.insert(0, shader);
-                list.truncate(crate::settings::MAX_SAVED_SHADERS);
+            // Full: refuse, never drop the oldest saved shader.
+            None if count >= crate::settings::MAX_SAVED_SHADERS => {
+                self.notice = Some(format!(
+                    "{count} shaders are saved, the most there can be. Delete one to save {name}."
+                ));
+                return name;
             }
+            None => list.insert(0, shader),
         }
         self.persist_native_preferences();
         name
@@ -13106,6 +13282,8 @@ impl ButtonsApp {
 
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         #[cfg(not(target_arch = "wasm32"))]
+        let fonts_before = (self.preferences.typography.clone(), self.pane_fonts.clone());
+        #[cfg(not(target_arch = "wasm32"))]
         let original_terminal_defaults = fonts::PaneFont::from(&self.preferences.typography);
         #[cfg(target_arch = "wasm32")]
         let _ = ctx;
@@ -13352,6 +13530,9 @@ impl ButtonsApp {
                     self.pane_fonts.insert(tab.id, edited.clone());
                 }
                 ctx.request_repaint_of(egui::ViewportId::ROOT);
+            }
+            if fonts_before.0 != self.preferences.typography || fonts_before.1 != self.pane_fonts {
+                self.keep_font_edit();
             }
         }
     }
@@ -13799,6 +13980,47 @@ impl ButtonsApp {
         } else {
             self.start_personal_theme_draft();
         }
+        self.adopt_live_fonts_into_draft();
+    }
+
+    /// Fonts are owned by Settings → Fonts (shared) and per-pane fonts. A
+    /// draft of the look on screen carries the fonts in use, in both the draft
+    /// and its original (adopting them is not an edit). Otherwise every live
+    /// preview and save put the theme file's older font back.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn adopt_live_fonts_into_draft(&mut self) {
+        let pane = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
+        if pane.is_none() && !self.preferences.theme_apply.fonts {
+            // Shared previews and saves leave fonts alone with Fonts unticked.
+            return;
+        }
+        let pane_font = pane.map(|tab| self.font_for_pane(tab));
+        let typography = self.preferences.typography.clone();
+        for document in [
+            &mut self.theme_editor_document,
+            &mut self.theme_editor_original_document,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            match &pane_font {
+                Some(font) => crate::theme_files::set_document_terminal_font(document, font),
+                None => crate::theme_files::set_document_typography(document, &typography),
+            }
+        }
+    }
+
+    /// A font change in Settings → Fonts is a real change, not part of a
+    /// theme preview: Revert must keep it and the open draft adopts it.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn keep_font_edit(&mut self) {
+        if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
+            snapshot.preferences.typography = self.preferences.typography.clone();
+            snapshot.applied_preferences.typography = self.preferences.typography.clone();
+        }
+        self.adopt_live_fonts_into_draft();
     }
 
     /// Ends a pane-look edit before another pane's theme changes. A pane draft
@@ -14045,7 +14267,7 @@ impl ButtonsApp {
             .and_then(|index| displayed.iter().position(|slot| *slot == index))
             .map_or("All panes".to_owned(), |slot| format!("Pane {}", slot + 1));
         // Switching keeps the edits: they are saved under the next numbered name.
-        let saved = match self.autosave_theme_draft() {
+        let saved = match self.retarget_theme_editor(wanted) {
             Ok(saved) => saved,
             Err(error) => {
                 ui.spaced_colored_label(
@@ -14062,11 +14284,25 @@ impl ButtonsApp {
                 return;
             }
         };
-        self.discard_theme_editor_session();
-        self.theme_editor_pane = wanted;
         if let Some(name) = saved {
             self.theme_editor_status = Some(format!("{current}'s changes were saved as {name}."));
         }
+    }
+
+    /// Points the editor at another pane (`None` = all panes). The current
+    /// draft is saved first (numbered name) and the editor starts fresh from
+    /// the new target's theme. The only way the editor target changes, so the
+    /// UI and the tests run the same steps.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn retarget_theme_editor(
+        &mut self,
+        wanted: Option<u64>,
+    ) -> Result<Option<String>, String> {
+        let saved = self.autosave_theme_draft()?;
+        self.discard_theme_editor_session();
+        self.theme_editor_pane = wanted;
+        self.sync_theme_editor_to_current();
+        Ok(saved)
     }
 
     /// Saves every pane's current look as a theme bundle straight from the
@@ -16105,8 +16341,11 @@ fn terminal_surface(
         ui.available_rect_before_wrap().min,
         egui::vec2((available.x - scrollbar_width).max(1.0), available.y),
     );
+    // Row banding is a readability override: while it is on, every pane
+    // shows plain bands instead of its shader (which comes back at 0).
     let shader = theme.effects.shader_background.as_ref().filter(|shader| {
-        interaction.shader_backgrounds_enabled
+        interaction.row_brightness == 0
+            && interaction.shader_backgrounds_enabled
             && local_feature_available(crate::features::catalog::FeatureKey::ShaderBackgrounds)
             && shader.strength > 0.0
     });
@@ -16141,11 +16380,9 @@ fn terminal_surface(
             interaction.keyboard.bracketed_paste,
             interaction.keyboard.option_as_meta,
         )
-        .set_row_brightness(if theme.effects.master_disabled {
-            0
-        } else {
-            interaction.row_brightness
-        })
+        // Applies to every pane, even where effects are off or limited
+        // to the focused pane.
+        .set_row_brightness(interaction.row_brightness)
         .set_row_banding(if effects_master_switch_available() {
             crate::plugins::effects::row_banding::overlay_color(&theme.effects)
         } else {
@@ -16155,14 +16392,16 @@ fn terminal_surface(
             if interaction.text_backing.available && interaction.text_backing.enabled {
                 Some(egui_term::TextBacking {
                     opacity: interaction.text_backing.opacity.min(100) as f32 / 100.0,
-                    feather: interaction.text_backing.feather.min(20) as f32,
+                    feather: (interaction.text_backing.feather as f32).min(egui_term::MAX_FEATHER),
                     whole_line: interaction.text_backing.whole_line,
                     invert: interaction.text_backing.invert,
+                    text_color: interaction.text_backing.text_color(),
+                    recolor_all: interaction.text_backing.recolor_all,
+                    min_contrast: interaction.text_backing.contrast_target(),
                     // A pane's theme colors win over the colors set for all panes.
-                    palette: theme
+                    palette: interaction
                         .text_backing
-                        .clone()
-                        .or_else(|| interaction.text_backing.custom_colors())
+                        .colors_for(theme.text_backing.clone())
                         .and_then(|colors| {
                             // Moving rings: repaint on the animation tick.
                             if moving
@@ -16173,6 +16412,12 @@ fn terminal_surface(
                             }
                             backing_palette(&colors, time)
                         }),
+                })
+            } else if interaction.text_backing.available && interaction.text_backing.auto_contrast {
+                // Auto contrast works without backing too (against the pane background).
+                Some(egui_term::TextBacking {
+                    min_contrast: interaction.text_backing.contrast_target(),
+                    ..egui_term::TextBacking::default()
                 })
             } else {
                 None
@@ -18387,12 +18632,18 @@ mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
 #[cfg(not(target_arch = "wasm32"))]
+mod color_adjust;
+#[cfg(not(target_arch = "wasm32"))]
 mod command_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod copied_toast;
 #[cfg(not(target_arch = "wasm32"))]
+mod dock_arrange;
+#[cfg(not(target_arch = "wasm32"))]
 mod dock_nav;
 mod docs_capture;
+#[cfg(not(target_arch = "wasm32"))]
+mod feature_flags;
 #[cfg(not(target_arch = "wasm32"))]
 mod gallery;
 #[cfg(not(target_arch = "wasm32"))]
@@ -18407,6 +18658,10 @@ mod notices;
 mod power;
 #[cfg(not(target_arch = "wasm32"))]
 mod release_picks;
+#[cfg(not(target_arch = "wasm32"))]
+mod rich_chat;
+#[cfg(not(target_arch = "wasm32"))]
+mod shader_window;
 #[cfg(not(target_arch = "wasm32"))]
 mod shuffle;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -18591,6 +18846,10 @@ impl eframe::App for ButtonsApp {
         self.command_history_popup(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.text_backing_colors_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.shader_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.rich_chat_window(ctx);
 
         self.settings_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]

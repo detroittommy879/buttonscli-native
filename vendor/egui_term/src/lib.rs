@@ -7,8 +7,9 @@ mod theme;
 mod types;
 mod view;
 pub use text_backing::{
-    backing_shapes, last_copied, note_copied, BackingPalette, BackingStyle,
-    RingStyle, TextBacking,
+    backing_shapes, contrast_ratio, ensure_contrast, last_copied, note_copied,
+    relative_luminance, BackingPalette, BackingStyle, RingStyle, TextBacking,
+    MAX_FEATHER,
 };
 
 pub use alacritty_terminal::event_loop::SensitiveInput;

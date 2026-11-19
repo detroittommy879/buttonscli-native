@@ -50,6 +50,31 @@ pub(crate) fn button(ui: &Ui, text: impl Into<WidgetText>) -> egui::Button<'stat
     egui::Button::new(spaced_text(ui, text))
 }
 
+/// A button the theme cannot restyle: white text on near-black with a
+/// white outline. For Cancel, Undo, Discard and Revert, so a generated or
+/// half-edited theme can never make the way back unreadable.
+pub(crate) fn safe_button(ui: &mut Ui, text: impl Into<String>) -> Response {
+    let text: String = text.into();
+    ui.scope(|ui| {
+        let visuals = &mut ui.style_mut().visuals;
+        let outline = egui::Stroke::new(1.0f32, Color32::WHITE);
+        for (widget, fill) in [
+            (&mut visuals.widgets.inactive, Color32::from_rgb(16, 16, 16)),
+            (&mut visuals.widgets.hovered, Color32::from_rgb(58, 58, 58)),
+            (&mut visuals.widgets.active, Color32::from_rgb(90, 90, 90)),
+        ] {
+            widget.bg_fill = fill;
+            widget.weak_bg_fill = fill;
+            widget.bg_stroke = outline;
+            widget.fg_stroke = outline;
+        }
+        visuals.widgets.noninteractive.fg_stroke = outline;
+        let label = RichText::new(text).color(Color32::WHITE);
+        ui.add(button(ui, label))
+    })
+    .inner
+}
+
 pub(crate) trait SpacedUi {
     fn spaced_label(&mut self, text: impl Into<WidgetText>) -> Response;
     fn spaced_heading(&mut self, text: impl Into<RichText>) -> Response;

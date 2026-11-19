@@ -32,6 +32,8 @@ pub enum StoreError {
     InstallerCollision,
     SourceChanged,
     ThemeChanged,
+    ProfileExists,
+    ActiveProfile,
     Io(io::Error),
 }
 
@@ -64,6 +66,10 @@ impl std::fmt::Display for StoreError {
                 f,
                 "this theme changed in another window; reload it before saving"
             ),
+            Self::ProfileExists => write!(f, "a profile with that name already exists"),
+            Self::ActiveProfile => {
+                write!(f, "switch to another profile before renaming this one")
+            }
             Self::Io(error) => write!(f, "native settings I/O: {error}"),
         }
     }
@@ -529,6 +535,69 @@ impl NativeStore {
         })
     }
 
+    /// The requested profile name if it is already safe, so users see
+    /// exactly what they typed (no silent `_` replacements).
+    fn checked_profile_name(name: &str) -> Result<String, StoreError> {
+        let name = name.trim();
+        let profile = sanitize_profile_name(name).map_err(|_| StoreError::InvalidProfile)?;
+        if profile != name || profile.starts_with('.') {
+            return Err(StoreError::InvalidProfile);
+        }
+        Ok(profile)
+    }
+
+    /// Create an empty profile folder (default settings, no themes). It is
+    /// not made active.
+    pub(crate) fn create_profile(&self, name: &str) -> Result<String, StoreError> {
+        let profile = Self::checked_profile_name(name)?;
+        let _lock = self.acquire_root_lock()?;
+        let profiles = self.root.0.join("profiles");
+        ensure_native_path(&self.root.0, &profiles)?;
+        fs::create_dir_all(&profiles)?;
+        let directory = profiles.join(&profile);
+        ensure_native_path(&self.root.0, &directory)?;
+        if directory.exists() {
+            return Err(StoreError::ProfileExists);
+        }
+        fs::create_dir(&directory)?;
+        fs::create_dir(directory.join("themes"))?;
+        Ok(profile)
+    }
+
+    /// Rename a profile that is not active. Its saved references to its
+    /// own themes (`personal:<old>:<stem>`) are rewritten to the new name.
+    pub(crate) fn rename_profile(&self, old: &str, new: &str) -> Result<String, StoreError> {
+        let old = Self::checked_profile_name(old)?;
+        let new = Self::checked_profile_name(new)?;
+        if old == self.profile {
+            return Err(StoreError::ActiveProfile);
+        }
+        let _lock = self.acquire_root_lock()?;
+        let profiles = self.root.0.join("profiles");
+        let from = profiles.join(&old);
+        let to = profiles.join(&new);
+        ensure_native_path(&self.root.0, &from)?;
+        ensure_native_path(&self.root.0, &to)?;
+        if !from.is_dir() {
+            return Err(StoreError::InvalidProfile);
+        }
+        // Windows paths are case-insensitive: "work" -> "Work" renames the
+        // same folder, not a collision.
+        if to.exists() && !old.eq_ignore_ascii_case(&new) {
+            return Err(StoreError::ProfileExists);
+        }
+        fs::rename(&from, &to)?;
+        let settings = to.join("native.json");
+        if let Ok(text) = fs::read_to_string(&settings) {
+            let renamed =
+                text.replace(&format!("\"personal:{old}:"), &format!("\"personal:{new}:"));
+            if renamed != text {
+                atomic_replace(&settings, renamed.as_bytes())?;
+            }
+        }
+        Ok(new)
+    }
+
     pub(crate) fn native_root(&self) -> &Path {
         &self.root.0
     }
@@ -876,6 +945,40 @@ mod tests {
         ));
         fs::create_dir(&base).unwrap();
         (base.join("native"), base.join("original"))
+    }
+
+    #[test]
+    fn profiles_can_be_created_and_renamed_with_their_theme_references() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        assert_eq!(store.create_profile("work").unwrap(), "work");
+        assert!(matches!(
+            store.create_profile("work"),
+            Err(StoreError::ProfileExists)
+        ));
+        assert!(matches!(
+            store.create_profile("../escape"),
+            Err(StoreError::InvalidProfile)
+        ));
+        let dir = native.join("profiles").join("work");
+        assert!(dir.join("themes").is_dir());
+        fs::write(
+            dir.join("native.json"),
+            r#"{"theme_id":"personal:work:blue","other":"personal:default:x"}"#,
+        )
+        .unwrap();
+        assert_eq!(store.rename_profile("work", "studio").unwrap(), "studio");
+        let text =
+            fs::read_to_string(native.join("profiles").join("studio").join("native.json")).unwrap();
+        assert!(text.contains("personal:studio:blue"));
+        assert!(text.contains("personal:default:x"));
+        assert!(!dir.exists());
+        let active = store.profile_name().to_owned();
+        assert!(matches!(
+            store.rename_profile(&active, "elsewhere"),
+            Err(StoreError::ActiveProfile)
+        ));
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 
     #[test]

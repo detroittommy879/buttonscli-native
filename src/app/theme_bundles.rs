@@ -13,6 +13,11 @@ pub(super) struct PendingPaneLooks {
     used_tabs: std::collections::BTreeSet<u64>,
 }
 
+/// Height of the bundle list in the File and status-bar menus.
+pub(super) fn bundle_list_height(screen_height: f32) -> f32 {
+    (screen_height * 0.6).max(160.0)
+}
+
 impl ButtonsApp {
     /// Tab indices by pane slot: displayed panes (P1, P2, …), then the rest in
     /// tab order.
@@ -168,8 +173,16 @@ impl ButtonsApp {
         self.restore_personal_theme_preview();
         let bundle = self.capture_theme_bundle(&name);
         let bundles = &mut self.preferences.theme_bundles;
+        let count = bundles.len();
         match bundles.iter_mut().find(|existing| existing.name == name) {
             Some(existing) => *existing = bundle,
+            // Loading truncates to the cap, so a bundle past it would vanish
+            // on the next start: refuse it now instead.
+            None if count >= crate::settings::MAX_THEME_BUNDLES => {
+                return Err(format!(
+                    "You have {count} theme bundles, the most that can be saved. Delete one first."
+                ));
+            }
             None => bundles.push(bundle),
         }
         self.persist_native_preferences();
@@ -333,12 +346,23 @@ impl ButtonsApp {
                 }
                 ui.separator();
             }
-            for (name, mark) in names {
-                if ui.spaced_button(format!("{mark} {name}")).clicked() {
-                    apply = Some(name);
-                    ui.close_menu();
-                }
-            }
+            // Long lists ran past the bottom of the window: scroll instead.
+            // The height is a share of the window, not "space below the
+            // cursor": the status-bar menu opens at the bottom and egui moves
+            // it up afterwards, so that left a 120 pt list. Same height from
+            // both places; the bar stays visible so the list looks scrollable.
+            egui::ScrollArea::vertical()
+                .id_salt("bundle-menu-list")
+                .max_height(bundle_list_height(ui.ctx().screen_rect().height()))
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .show(ui, |ui| {
+                    for (name, mark) in names {
+                        if ui.spaced_button(format!("{mark} {name}")).clicked() {
+                            apply = Some(name);
+                            ui.close_menu();
+                        }
+                    }
+                });
         };
         let menu = if top_level {
             ui.solo_menu_button("status-bundles", text, contents)

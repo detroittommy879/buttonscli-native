@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+- **Readable text presets**: Backing options → **White on black** / **Black
+  on white** put a solid backing and a fixed text color in every pane, over
+  any shader. **Theme colors** goes back. Backing colors also have **Black**
+  and **White** presets, and a pane's own theme colors can be overridden.
+- **Text color**: Backing and text colors… → **Own text color** draws text
+  in one color (optionally colored ANSI text too).
+- **Auto contrast**: keeps every glyph at a minimum WCAG contrast ratio
+  against what is drawn behind it (default 4.5:1, the AA level), moving
+  only the text that falls short toward white or black.
+- Text backing defaults to 100% opacity and feather 20; feather goes up
+  to 30. Settings → Experimental now shows the backing options inline.
+- **Row banding** (status bar ±) now applies to every pane, including
+  unfocused panes and themes with effects off. While it is on, panes show
+  plain bands instead of their shaders; 0 brings the shaders back.
+- **Theme editor → Quick adjust**: Hue, Saturation, Brightness and Contrast
+  sliders move all terminal colors (or all interface colors) at once, with
+  Reset. Results are a normal draft you can keep as a new variant.
+- Cancel, Discard, Undo and Revert buttons in theme generation, the theme
+  editor and Settings now ignore the theme (white on black), so they stay
+  readable even when a generated theme is not.
+- **Profiles**: the Profile menu can create a new blank profile and rename
+  profiles that are not active.
+- File → Apply theme bundle and the status-bar Bundles menu scroll when the
+  list is taller than the window, with a visible scroll bar; the status-bar
+  list was opening only a few rows tall.
+- Fixed: with Auto UI size on a 2560x1440 monitor at 100% scaling, the window
+  kept switching between two sizes many times a second.
+- Fixed: saving more than 64 theme bundles or saved shaders silently lost the
+  extra ones. Up to 512 of each are kept now, and saving past that says so.
+- **Theme editor → Shader background** switch: turn a theme's shader off to
+  see its gradient or plain background (turning it on restores the same
+  shader). "Use gradient" notes when the shader hides the gradient.
+- Theme editor (Edit tab) says when edits don't reach a pane, for example
+  after a bundle gives every pane its own theme, with **Use on the whole
+  app**. Quick adjust's interface sliders are off while editing one pane
+  (app colors are shared), and the sliders are more robust to theme files
+  that list ANSI colors or leave some out.
+- Fixed: a font picked in Settings → Fonts jumped back to the theme's older
+  font whenever the theme editor previewed or saved (each Quick adjust slider
+  move). The editor now keeps the fonts in use, saving a theme stores them,
+  and Revert no longer undoes a font change.
+- **Arrange left commands**: the ✎ button in the left panel's header turns
+  its buttons into drag handles; drop one above or below another to move it.
+- **Feature flags tab** (local `admin` flag): Settings → Feature flags turns
+  the local flags in `feature-flags.json` on and off, applied at once.
+- **Shader window** (local `shader_window` flag, off by default): File → New
+  shader window opens a window with only a shader in it.
+- **AI chat** (local `rich_chat` flag, off by default): View → AI chat, a
+  chat window without a terminal where the model can style words with
+  sizes, fonts, colors, gradients and gentle motion through a small,
+  whitelisted markup; every glyph keeps a 4.5:1 contrast.
+
 - **Letter outlines**: text backing rings can trace the letters themselves
   instead of a box around them (**Follow letter shapes**, on by default).
 - **Outline rings blend**: text backing rings now fade into each other, so

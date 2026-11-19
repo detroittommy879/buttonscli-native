@@ -27,6 +27,7 @@ The shaders can be written for you by AI.
 | Add an animated background behind the text | [Shader backgrounds](shaders.md) |
 | Have AI write shaders for you | [AI shaders](ai-shaders.md) |
 | Have AI make a whole theme | [AI themes](ai-themes.md) |
+| Let an AI agent (Claude Code, Codex, Cursor…) drive your terminals over MCP | [AI agents and MCP](agents.md) |
 | Connect ChatGPT or an API key | [Set up AI](ai-setup.md) |
 | Write or tweak shader code yourself | [Shader code reference](shader-code.md) |
 | Share your looks or ship them with the app | [Sharing looks](sharing.md) |
@@ -40,6 +41,8 @@ The shaders can be written for you by AI.
 - **Nothing blocks you.** Switching panes or closing Settings never asks you to
   save first; unsaved edits are saved as a numbered copy.
 - **Text stays readable.** Shaders sit *behind* the text. The Strength slider
-  is how bright they get, and terminal text is never distorted.
+  is how bright they get, and terminal text is never distorted. [Text
+  backing](themes.md#text-backing-text-you-can-always-read) and auto contrast
+  keep it readable over anything.
 - **AI is optional.** Everything works without it. When you use it, you pick
   the provider and model, and keys stay in your system's credential store.

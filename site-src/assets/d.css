@@ -2,18 +2,21 @@
    green accent, monospace headings. Loaded after base.css, so it only sets
    tokens and flattens the soft/rainbow parts of the base. */
 :root {
-  --font-display: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
-  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Recursive Sans Casual (CASL 1, MONO 0) for all page text; code and
+     terminal mockups keep JetBrains Mono. */
+  --font-display: "Recursive", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Recursive", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
   --radius: 2px;
   --btn-radius: 2px;
-  --bg: #0a0c10;
-  --bg-2: #11141a;
-  --surface: #161b24;
-  --text: #d4d8df;
+  /* Darker page, brighter text: body text ~17:1, muted ~9:1 (WCAG AAA). */
+  --bg: #050608;
+  --bg-2: #0b0d11;
+  --surface: #12161d;
+  --text: #eceef2;
   --strong: #ffffff;
-  --muted: #8b939f;
-  --line: #222934;
+  --muted: #a9b1bc;
+  --line: #2a3240;
   --accent-1: #5fd685;
   --accent-2: #7ec4d8;
   --accent-3: #e4ad55;
@@ -23,8 +26,8 @@
   --glow: transparent;
   --link: #5fd685;
   --focus: #5fd685;
-  --code-bg: #0d1015;
-  --code-text: #d4d8df;
+  --code-bg: #08090c;
+  --code-text: #e4e7ec;
   --grid-line: rgba(156, 163, 175, 0.07);
 }
 :root[data-theme="light"] {
@@ -71,6 +74,7 @@
 
 /* A faint engineering grid behind the page instead of glows. */
 body {
+  font-variation-settings: "CASL" 1, "MONO" 0;
   background-color: var(--bg);
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
@@ -213,4 +217,22 @@ figure {
 .section-head {
   max-width: 760px;
   margin-bottom: 2.25rem;
+}
+
+/* Recursive for the whole page: labels, buttons and tags too. Code,
+   terminal mockups, card icons and the brand mark stay monospace. */
+.btn,
+.eyebrow,
+.hero-meta,
+.tag,
+.site-nav,
+.site-nav a {
+  font-family: var(--font-body);
+}
+
+/* A fifth card fills the rest of its row in the 3- and 2-column grids. */
+@media (min-width: 700px) {
+  .cards > .card-wide:last-child {
+    grid-column: span 2;
+  }
 }

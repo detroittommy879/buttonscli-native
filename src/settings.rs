@@ -440,7 +440,10 @@ pub(crate) const MAX_UI_SCALE: f32 = 2.0;
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 /// Longest workspace message timeout offered in Settings.
 pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
-pub(crate) const MAX_SAVED_SHADERS: usize = 64;
+/// Caps keep native.json bounded. Saving past one is refused with a message
+/// (never by dropping the oldest), so a cap must sit far above real use.
+pub(crate) const MAX_SAVED_SHADERS: usize = 512;
+pub(crate) const MAX_THEME_BUNDLES: usize = 512;
 /// Most pane slots a theme bundle or the saved pane looks remember.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
@@ -793,6 +796,19 @@ pub(crate) struct TextBacking {
     pub(crate) ring_width: u8,
     /// Blend, repeats, taper and the other rings options.
     pub(crate) rings: crate::theme::RingOptions,
+    /// "#rrggbb" for text on the default background while backing is on;
+    /// empty = the theme's colors.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub(crate) text_color: String,
+    /// The text color also replaces colored (ANSI) text.
+    pub(crate) recolor_all: bool,
+    /// `colors` win over a pane theme's own backing colors (set by the
+    /// readable presets).
+    pub(crate) override_theme_colors: bool,
+    /// Keep every glyph at `min_contrast` against what is behind it.
+    pub(crate) auto_contrast: bool,
+    /// WCAG contrast ratio in tenths (45 = 4.5:1, the AA level for text).
+    pub(crate) min_contrast: u8,
 }
 
 impl TextBacking {
@@ -812,6 +828,42 @@ impl TextBacking {
             rings: self.rings.normalized(),
         })
     }
+
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) const MIN_CONTRAST_RANGE: std::ops::RangeInclusive<u8> = 10..=150;
+    pub(crate) const DEFAULT_MIN_CONTRAST: u8 = 45;
+
+    /// Backing colors for a pane whose theme brings `theme_colors`.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn colors_for(
+        &self,
+        theme_colors: Option<crate::theme::TextBackingColors>,
+    ) -> Option<crate::theme::TextBackingColors> {
+        if self.override_theme_colors {
+            self.custom_colors().or(theme_colors)
+        } else {
+            theme_colors.or_else(|| self.custom_colors())
+        }
+    }
+
+    /// The text color override, if one is set.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn text_color(&self) -> Option<egui::Color32> {
+        crate::theme::parse_color(&self.text_color)
+    }
+
+    /// The contrast ratio to enforce, or 1 when auto contrast is off.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub(crate) fn contrast_target(&self) -> f32 {
+        if self.auto_contrast {
+            f32::from(self.min_contrast.clamp(
+                *Self::MIN_CONTRAST_RANGE.start(),
+                *Self::MIN_CONTRAST_RANGE.end(),
+            )) / 10.0
+        } else {
+            1.0
+        }
+    }
 }
 
 impl Default for TextBacking {
@@ -819,14 +871,19 @@ impl Default for TextBacking {
         Self {
             available: true,
             enabled: true,
-            opacity: 75,
-            feather: 6,
+            opacity: 100,
+            feather: 20,
             whole_line: false,
             invert: false,
             colors: Vec::new(),
             style: "vertical".into(),
             ring_width: 3,
             rings: crate::theme::RingOptions::default(),
+            text_color: String::new(),
+            recolor_all: false,
+            override_theme_colors: false,
+            auto_contrast: false,
+            min_contrast: Self::DEFAULT_MIN_CONTRAST,
         }
     }
 }
@@ -1007,7 +1064,7 @@ impl Preferences {
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
         self.pane_looks.truncate(MAX_PANE_LOOKS);
-        self.theme_bundles.truncate(64);
+        self.theme_bundles.truncate(MAX_THEME_BUNDLES);
         self.saved_shaders.truncate(MAX_SAVED_SHADERS);
         for bundle in &mut self.theme_bundles {
             bundle.panes.truncate(MAX_PANE_LOOKS);

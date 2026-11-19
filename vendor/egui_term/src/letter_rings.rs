@@ -373,7 +373,7 @@ pub(crate) fn shapes(
     }
     let opacity = opacity.min(1.0);
     let feather = if feather.is_finite() {
-        feather.clamp(0.75, 20.0)
+        feather.clamp(0.75, crate::text_backing::MAX_FEATHER)
     } else {
         0.75
     };

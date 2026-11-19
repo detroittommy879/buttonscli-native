@@ -319,6 +319,38 @@ pub(crate) fn document_from_theme(theme: &ThemeDefinition, name: &str) -> Value 
     document
 }
 
+/// Writes a terminal font into a theme document, where `document_from_theme`
+/// puts it (the terminal keys win over `typography.terminal` when parsed).
+pub(crate) fn set_document_terminal_font(document: &mut Value, font: &crate::fonts::PaneFont) {
+    let terminal = &mut document["theme"]["terminal"];
+    terminal["fontFamily"] = json!(font.zone.family);
+    terminal["fontSize"] = json!(font.zone.size);
+    terminal["fontWeight"] = json!(font.zone.weight);
+    terminal["letterSpacing"] = json!(font.zone.letter_spacing);
+    terminal["fontWeightBold"] = json!(font.bold_weight);
+    terminal["drawBoldTextInBrightColors"] = json!(font.draw_bold_bright);
+    if document["theme"]["typography"].is_object() {
+        document["theme"]["typography"]["terminal"] = font_zone(&font.zone);
+    }
+}
+
+/// Writes every font zone into a theme document.
+pub(crate) fn set_document_typography(document: &mut Value, typography: &crate::fonts::Typography) {
+    set_document_terminal_font(document, &crate::fonts::PaneFont::from(typography));
+    let zones = &mut document["theme"]["typography"];
+    for (key, zone) in [
+        ("shell", &typography.shell),
+        ("tabs", &typography.tabs),
+        ("presetDock", &typography.preset_dock),
+        ("settings", &typography.settings),
+        ("assistant", &typography.assistant),
+        ("statusBar", &typography.status_bar),
+        ("terminal", &typography.terminal),
+    ] {
+        zones[key] = font_zone(zone);
+    }
+}
+
 fn font_zone(zone: &FontZone) -> Value {
     json!({
         "fontFamily": zone.family,

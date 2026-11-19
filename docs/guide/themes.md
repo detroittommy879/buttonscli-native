@@ -107,21 +107,37 @@ panes**, makes every pane use the shared theme again.
 the rest of the UI. A pane can also have its own terminal font. Bundled fonts
 work offline; you can import TTF/OTF files too.
 
-## Text backing
+## Text backing: text you can always read
 
 Busy shaders can make text hard to read. **Text backing** in the status bar
-puts a soft panel behind the text in every pane, in that pane's own colors,
-while the shader stays visible around it. **Backing options** next to it:
+puts a soft panel behind the text in every pane, so the text is readable over
+any shader, gradient or picture, while the shader stays visible around it.
+That is its main job; it also happens to look good. **Backing options** next
+to it:
 
-- **Opacity %** and **Feather** (how soft the edges are).
+- **Readable: White on black** puts a solid black panel behind every line of
+  text and draws the text white, in every pane, over anything. **Black on
+  white** does the opposite (it works even if you dislike light themes: only
+  the text panels are light). **Theme colors** goes back to each pane's own
+  colors.
+- **Opacity %** and **Feather** (how soft the edges are, up to 30). 100% and
+  20 is a good start.
 - **Whole lines** backs each line edge to edge instead of only the words.
 - **Invert text and backing colors** uses the text colors as the panel and
   draws the text dark, for very bright shaders. Selections and TUI
   backgrounds keep their own colors.
-- **Backing colors…** opens a small window. Tick **Custom colors for all
-  panes** to swap the pane colors for your own: up to
+- **Auto contrast** keeps every letter readable on its own: any text that is
+  too close in brightness to what is behind it is moved toward white or black
+  until it reaches **Minimum contrast** (see below). Text that is already
+  readable is left alone. It works with backing off too.
+- **Backing and text colors…** opens a small window. **Own text color** draws
+  text on the default background in one color instead of the theme's (tick
+  **Colored text too** to also replace colored output such as errors or file
+  types). Tick **Custom colors for all panes** to swap the pane colors for
+  your own: up to
   eight colors (**+** adds one, **×** removes one), or a preset (Rainbow,
-  Sunset, Ocean, Fade to black, the theme's colors). **Layout** picks how they
+  Sunset, Ocean, Fade to black, Black, White, the theme's colors). **Also in
+  panes whose theme has its own** makes them win everywhere. **Layout** picks how they
   are used:
   - **Gradient top to bottom** or **left to right** across the pane.
   - **One color per line**, cycling.
@@ -144,6 +160,25 @@ while the shader stays visible around it. **Backing options** next to it:
     For text that stays easy to read, make the first color one that
     contrasts with the text (black around light text), or keep some
     **Fade from text**.
+
+### What "contrast" means
+
+Contrast here is the **WCAG contrast ratio**, the measure web accessibility
+checkers use when they flag a site for low contrast. It compares the
+brightness of two colors as the eye sees it (green looks brighter than blue
+at the same strength), from **1:1** (identical) to **21:1** (black on white):
+
+| Ratio | Meaning |
+| --- | --- |
+| 3:1 | Minimum for large text (WCAG AA) |
+| 4.5:1 | Minimum for normal text (WCAG AA), the usual standard and the default here |
+| 7:1 | Enhanced (WCAG AAA), recommended for low vision |
+
+**Minimum contrast** goes from 1 to 15; the **AA 4.5** and **AAA 7** buttons
+set the standard levels. Auto contrast compares each letter with the backing
+under it (or the pane background when backing is off). It cannot see the
+shader itself, so with backing off and a very bright shader, raise backing
+opacity rather than the ratio.
 
 To give one pane its own colors, right-click it and choose **Text backing
 colors…**. That opens the theme editor for that pane with **Own text backing

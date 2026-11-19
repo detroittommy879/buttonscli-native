@@ -113,8 +113,8 @@ VARIANTS = {
     "d": {
         "name": "Hairline",
         "blurb": "Near-black, square corners, 1px hairlines, one green accent and monospace headings.",
-        "fonts": ["inter", "jetbrains-mono"],
-        "preload": ["jetbrains-mono-latin-0a7197f9.woff2", "inter-latin-6ab57b19.woff2"],
+        "fonts": ["recursive", "jetbrains-mono"],
+        "preload": ["recursive-latin-4f28f889.woff2", "jetbrains-mono-latin-0a7197f9.woff2"],
         "css": "d.css",
         "alt_class": "band",
     },
@@ -264,6 +264,7 @@ def hero(v):
         "AI shader generation", "Command buttons", "Agent control over MCP", "555 themes",
         "Per-pane fonts", "Up to 12 shader drafts at once", "Alacritty engine", "Custom WGSL",
         "Bring your own AI", "COL · ROW · GRID", "Analog TV static", "Tab groups",
+        "Always-readable text", "WCAG auto contrast",
     ]
     lis = "".join(f"<li>{escape(x)}</li>" for x in marquee_items * 2)
     hero_c = HERO_TEXT.replace(
@@ -442,6 +443,7 @@ def sections(v):
       <article class="card" data-reveal style="--c:var(--accent-2);--d:.06s"><div class="card-icon" aria-hidden="true">▦</div><h3>Auto-arranging panes</h3><p>COL, ROW or GRID layouts, as many visible panes as fit your screen, draggable dividers and saved tab groups.</p></article>
       <article class="card" data-reveal style="--c:var(--accent-4);--d:.12s"><div class="card-icon" aria-hidden="true">Aa</div><h3>Fonts everywhere</h3><p>A different font for each pane and each part of the UI. Bundled fonts work offline, or import your own TTF/OTF.</p></article>
       <article class="card" data-reveal style="--c:var(--accent-5);--d:.18s"><div class="card-icon" aria-hidden="true">⚡</div><h3>Fast and light</h3><p>Native Rust on the Alacritty engine. No webview, so RAM stays low even with lots of panes and effects.</p></article>
+      <article class="card card-wide" data-reveal style="--c:var(--accent-1);--d:.24s"><div class="card-icon" aria-hidden="true">◧</div><h3>Text you can always read</h3><p>Text backing puts a soft panel behind every line, so text stays readable over any shader, and it looks good too. One click for white on black. Auto contrast holds every letter to the WCAG 4.5:1 standard (or 7:1).</p></article>
     </div>
     <div class="shot-pair" style="margin-top:2rem">
       <div data-reveal>{picture("seven-panes-fonts", "Seven terminal panes with colorful shader backgrounds and a right-click menu open on the terminal font picker", "(max-width: 560px) 100vw, 580px", caption="Pick a font per pane from the right-click menu.")}</div>
