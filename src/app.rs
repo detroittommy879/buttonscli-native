@@ -11042,6 +11042,16 @@ impl ButtonsApp {
             self.import_personal_theme_draft();
         }
 
+        // Say who the edits reach (one pane, or only panes without a theme
+        // of their own), as the Shaders and AI tabs do; otherwise sliders
+        // look broken after a bundle gives every pane its own theme.
+        if self.look_target_hint(ui) {
+            self.use_look_everywhere();
+            return;
+        }
+        let pane_mode = self
+            .theme_editor_pane
+            .is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
         let Some(mut document) = self.theme_editor_document.clone() else {
             if let Some(status) = &self.theme_editor_status {
                 ui.spaced_label(status);
@@ -11051,10 +11061,14 @@ impl ButtonsApp {
 
         let before_edits = document.clone();
         edit_theme_metadata(ui, &locale, &mut document);
-        let resolved_document = ThemeDefinition::editor_document(&document)
-            .map(|theme| crate::theme_files::document_from_theme(&theme, &theme.name))
-            .unwrap_or(Value::Null);
-        color_adjust::quick_adjust_section(ui, &locale, &mut document, &resolved_document);
+        let resolved_document = color_adjust::editor_resolved_document(&document);
+        color_adjust::quick_adjust_section(
+            ui,
+            &locale,
+            &mut document,
+            &resolved_document,
+            pane_mode,
+        );
         for (section, fields) in APP_THEME_COLOR_GROUPS {
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 egui::CollapsingHeader::new(crate::ui_text::spaced_text(
@@ -11216,6 +11230,17 @@ impl ButtonsApp {
                 crate::i18n::key("Use gradient"),
                 "/theme/terminal/useGradient",
             );
+            if color_adjust::document_shader_on(&document)
+                && document["theme"]["terminal"]["useGradient"] == true
+            {
+                ui.spaced_label(
+                    RichText::new(crate::i18n::literal(
+                        &locale,
+                        "The shader is drawn instead of the gradient. Turn the shader off (above Quick adjust) to see it.",
+                    ))
+                    .small(),
+                );
+            }
             if document["theme"]["terminal"]["useGradient"] == true {
                 let gradient_types = [
                     (crate::i18n::key("linear"), crate::i18n::key("Linear")),
@@ -12563,12 +12588,17 @@ impl ButtonsApp {
                 .unwrap();
         }
         let name = shader.shader.name.clone();
+        let count = list.len();
         match list.iter_mut().find(|item| item.shader.name == name) {
             Some(item) => *item = shader,
-            None => {
-                list.insert(0, shader);
-                list.truncate(crate::settings::MAX_SAVED_SHADERS);
+            // Full: refuse, never drop the oldest saved shader.
+            None if count >= crate::settings::MAX_SAVED_SHADERS => {
+                self.notice = Some(format!(
+                    "{count} shaders are saved, the most there can be. Delete one to save {name}."
+                ));
+                return name;
             }
+            None => list.insert(0, shader),
         }
         self.persist_native_preferences();
         name
@@ -14191,7 +14221,7 @@ impl ButtonsApp {
             .and_then(|index| displayed.iter().position(|slot| *slot == index))
             .map_or("All panes".to_owned(), |slot| format!("Pane {}", slot + 1));
         // Switching keeps the edits: they are saved under the next numbered name.
-        let saved = match self.autosave_theme_draft() {
+        let saved = match self.retarget_theme_editor(wanted) {
             Ok(saved) => saved,
             Err(error) => {
                 ui.spaced_colored_label(
@@ -14208,11 +14238,25 @@ impl ButtonsApp {
                 return;
             }
         };
-        self.discard_theme_editor_session();
-        self.theme_editor_pane = wanted;
         if let Some(name) = saved {
             self.theme_editor_status = Some(format!("{current}'s changes were saved as {name}."));
         }
+    }
+
+    /// Points the editor at another pane (`None` = all panes). The current
+    /// draft is saved first (numbered name) and the editor starts fresh from
+    /// the new target's theme. The only way the editor target changes, so the
+    /// UI and the tests run the same steps.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn retarget_theme_editor(
+        &mut self,
+        wanted: Option<u64>,
+    ) -> Result<Option<String>, String> {
+        let saved = self.autosave_theme_draft()?;
+        self.discard_theme_editor_session();
+        self.theme_editor_pane = wanted;
+        self.sync_theme_editor_to_current();
+        Ok(saved)
     }
 
     /// Saves every pane's current look as a theme bundle straight from the
