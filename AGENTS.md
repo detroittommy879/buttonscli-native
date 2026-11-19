@@ -259,7 +259,22 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   folded, so side effects (taking a worker result) must not live only there.
 - Left-panel folder buttons (`src/app/dock_nav.rs`, Settings → Experimental)
   read the screen via `TerminalBackend::screen_rows`, never the disk. Test
-  with a long listing: the `ls` line scrolls off screen.
+  with a long listing: the `ls` line scrolls off screen. In-terminal folder
+  buttons (`src/app/folder_chips.rs`, `DockNavigation::in_terminal`) reuse
+  that parser; spans are cached per pane by output sequence/scroll/size.
+- Shell integration (OSC 133/633): vte ignores these, so
+  `session::marks::MarkScanner` finds them in `OutputCapture`'s raw observer
+  and keeps a `CommandLog` (exit codes, absolute output positions). Scripts:
+  `assets/shell-integration/`, injected by `src/shell_integration.rs` only
+  for shells started without their own args (PowerShell inline via
+  `-EncodedCommand`; bash `--rcfile`; zsh `ZDOTDIR`; fish
+  `--init-command`). `BackendSettings::env` carries extra env. ConPTY passes
+  the marks through: `powershell_integration_reports_exit_codes` (ignored
+  probe) checks it. A D mark without a C mark is not a command (empty Enter).
+  Alerts/badges: `src/app/command_alerts.rs`.
+- The shader window is a deferred viewport (own clock via `advance_clock`,
+  state in an `Arc<Mutex>` in ctx data): an immediate viewport only redraws
+  when the main window does, which ran it at a few FPS.
 - OSC 52 copy arrives as `PtyEvent::ClipboardStore` in
   `process_terminal_events` (`program_clipboard`); reads stay denied.
 - Python edit scripts: pass `encoding='utf-8'` (the default here is cp1252).

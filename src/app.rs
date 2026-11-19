@@ -564,6 +564,10 @@ pub struct ButtonsApp {
     /// Idle glow → All panes: panes the user turned off while it is on.
     #[cfg(not(target_arch = "wasm32"))]
     idle_glow_off: std::collections::BTreeSet<u64>,
+    /// Shell integration: finished-command counts seen per PTY, and the
+    /// tab badges (exit codes) waiting to be seen.
+    #[cfg(not(target_arch = "wasm32"))]
+    command_alerts: command_alerts::CommandAlerts,
     /// When Idle glow → All panes last went on (ms); 0 at startup.
     #[cfg(not(target_arch = "wasm32"))]
     idle_glow_all_since: u64,
@@ -1265,6 +1269,9 @@ enum PaneAction {
     /// Shader controls in the pane menu and status bar: they edit that pane's
     /// look the same way "Edit for: Pane N" does.
     ShaderStrength(f32),
+    /// The shader's own Animate switch and Speed (Settings → Shaders);
+    /// Motion % scales this speed for every pane.
+    ShaderMotion(bool, f32),
     PaneBackground(String),
     UseShader(Box<crate::theme::SavedShader>),
     ShaderSettings,
@@ -1272,6 +1279,8 @@ enum PaneAction {
     TextBackingColors,
     /// Type a tmux command into this pane.
     Tmux(tmux::TmuxAction),
+    /// Type a command and Enter into this pane (in-terminal folder buttons).
+    RunCommand(String),
     /// Pick a command from shell history for this pane.
     CommandHistory,
     ResetSimulation,
@@ -1473,6 +1482,8 @@ impl ButtonsApp {
         app.apply_style(&cc.egui_ctx);
         #[cfg(not(target_arch = "wasm32"))]
         app.apply_shader_lab();
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::shell_integration::set_enabled(app.preferences.shell_integration.enabled);
         #[cfg(not(target_arch = "wasm32"))]
         app.open_startup_tabs(&cc.egui_ctx, startup);
         #[cfg(not(target_arch = "wasm32"))]
@@ -1697,6 +1708,8 @@ impl ButtonsApp {
             idle_glow_panes: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             idle_glow_off: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            command_alerts: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             idle_glow_all_since: 0,
             #[cfg(not(target_arch = "wasm32"))]
@@ -2024,23 +2037,15 @@ impl ButtonsApp {
             return;
         }
         let step = 1.0 / f64::from(self.effective_animation_fps().max(1));
-        let Some(last) = self.motion_clock_at else {
-            self.motion_clock_at = Some(now);
-            return;
-        };
-        if now < last + step - ANIMATION_TICK_SLACK.min(step * 0.5) {
+        if !advance_clock(
+            &mut self.motion_clock_at,
+            &mut self.motion_time,
+            now,
+            step,
+            self.preferences.motion_speed,
+        ) {
             return;
         }
-        // Behind by more than a step (idle, a slow frame): start again from now.
-        let tick = if now - (last + step) > step {
-            now
-        } else {
-            last + step
-        };
-        let elapsed = (tick - last).clamp(0.0, 1.0);
-        self.motion_time += elapsed * f64::from(self.preferences.motion_speed);
-        self.motion_time %= 3600.0 * 24.0;
-        self.motion_clock_at = Some(tick);
         self.power.ticks.push_back(now);
         while self.power.ticks.len() > 2 * crate::settings::MAX_ANIMATION_FPS as usize {
             self.power.ticks.pop_front();
@@ -2551,6 +2556,7 @@ impl ButtonsApp {
                 let line = tmux::command(tmux_action, &self.tabs[index].title);
                 self.tabs[index].write(line);
             }
+            PaneAction::RunCommand(command) => self.tabs[index].run(&command),
             PaneAction::ToggleIdleGlow => self.toggle_idle_glow(id),
             PaneAction::SelectAll => self.tabs[index].backend.select_all(),
             PaneAction::Clear => self.tabs[index].backend.clear_screen(),
@@ -2574,6 +2580,12 @@ impl ButtonsApp {
             PaneAction::ShaderStrength(value) => self.edit_pane_look(index, |document| {
                 if document["effects"]["shaderBackground"].is_object() {
                     document["effects"]["shaderBackground"]["strength"] = json!(value);
+                }
+            }),
+            PaneAction::ShaderMotion(animated, speed) => self.edit_pane_look(index, |document| {
+                if document["effects"]["shaderBackground"].is_object() {
+                    document["effects"]["shaderBackground"]["animated"] = json!(animated);
+                    document["effects"]["shaderBackground"]["speed"] = json!(speed);
                 }
             }),
             PaneAction::PaneBackground(color) => self.edit_pane_look(index, |document| {
@@ -3823,6 +3835,7 @@ impl ButtonsApp {
             hovered_tab: self.hovered_tab,
             indicator_colors,
             distinct_pane_colors: self.preferences.pane_colors_distinct,
+            folder_chips: self.preferences.dock_navigation.in_terminal,
             right_click_copies_selection: self.preferences.right_click_copies_selection,
             advanced_effects: self.preferences.advanced_effects,
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
@@ -5100,6 +5113,11 @@ impl ButtonsApp {
                         }
                         if let Some(number) = pane_number {
                             label.push_str(&format!(" · P{number}"));
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if let Some(badge) = self.command_alerts.badge(tab.id) {
+                            label.push_str(" · ");
+                            label.push_str(&badge);
                         }
                         if tab.exited {
                             label.push_str(" · exited");
@@ -14382,6 +14400,12 @@ impl ButtonsApp {
         ui.push_id("settings-workspace", |ui| {
             #[cfg(not(target_arch = "wasm32"))]
             self.announcement_settings(ui);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                ui.separator();
+                self.shell_integration_settings(ui);
+                ui.separator();
+            }
             ui.horizontal(|ui| {
                 let label = ui.spaced_label(crate::i18n::literal(&self.locale, "Left panel name"));
                 ui.add(egui::TextEdit::singleline(&mut self.preferences.dock_title).char_limit(60)).labelled_by(label.id);
@@ -16170,6 +16194,31 @@ const SIMPLE_NOISE_HIDDEN: bool = true;
 #[cfg(not(target_arch = "wasm32"))]
 const ANIMATION_TICK_SLACK: f64 = 0.002;
 
+/// One motion-clock step: moves `time` on by one tick of length `step`
+/// (scaled by `speed`) when a tick is due at `now`. False when no tick was
+/// due. The first call only starts the clock. Behind by more than a step
+/// (idle, a slow frame), the clock restarts from `now` instead of jumping.
+#[cfg(not(target_arch = "wasm32"))]
+fn advance_clock(at: &mut Option<f64>, time: &mut f64, now: f64, step: f64, speed: f32) -> bool {
+    let Some(last) = *at else {
+        *at = Some(now);
+        return false;
+    };
+    if now < last + step - ANIMATION_TICK_SLACK.min(step * 0.5) {
+        return false;
+    }
+    let tick = if now - (last + step) > step {
+        now
+    } else {
+        last + step
+    };
+    let elapsed = (tick - last).clamp(0.0, 1.0);
+    *time += elapsed * f64::from(speed);
+    *time %= 3600.0 * 24.0;
+    *at = Some(tick);
+    true
+}
+
 /// Real time stepped to the FPS limit, for previews outside the panes
 /// (the panes use the motion clock, which steps the same way).
 #[cfg(not(target_arch = "wasm32"))]
@@ -16846,6 +16895,8 @@ struct PaneRenderState<'a> {
     hovered_tab: Option<u64>,
     indicator_colors: crate::theme::AppColors,
     distinct_pane_colors: bool,
+    /// Experimental: folder names in listings drawn as buttons.
+    folder_chips: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -16896,6 +16947,15 @@ fn render_pane_tree(
                 state.override_themes.get(&tab.id).unwrap_or(state.theme),
                 state.latest_activity_at_ms,
             );
+            if state.folder_chips && !state.modal_open {
+                let font_id = state.font_catalog.font_id(&font.zone, true);
+                let accent = state.indicator_colors.accent;
+                if let Some(command) =
+                    folder_chips::paint(&mut pane, tab, response.rect, &font_id, accent)
+                {
+                    *state.action = Some((tab.id, PaneAction::RunCommand(command)));
+                }
+            }
             if clicked {
                 *state.clicked = Some(*index);
             }
@@ -17491,6 +17551,30 @@ fn pane_shader_menu(
             ))
             .weak(),
         );
+    }
+    if let Some(shader) = shader {
+        // The same Animate/Speed as Settings → Themes → Shaders: Motion %
+        // multiplies this speed, so a low speed leaves Motion little to do.
+        let (mut animated, mut speed) = (shader.animated, shader.speed);
+        let mut changed = false;
+        wrapping_row(ui, |ui| {
+            changed |= ui
+                .spaced_checkbox(&mut animated, crate::i18n::literal(locale, "Animate"))
+                .changed();
+            let response = ui.add_enabled(
+                animated,
+                egui::Slider::new(&mut speed, crate::theme::ShaderBackground::SPEED)
+                    .text(crate::i18n::literal(locale, "Speed")),
+            );
+            changed |= response.changed();
+            response.on_hover_text(crate::i18n::literal(
+                locale,
+                "This shader's own speed, the same slider as Settings → Themes → Shaders. Motion % in the status bar multiplies it.",
+            ));
+        });
+        if changed {
+            *action = Some(PaneAction::ShaderMotion(animated, speed));
+        }
     }
     egui::CollapsingHeader::new(crate::i18n::literal(locale, "Background color"))
         .id_salt("pane-shader-background")
@@ -18634,6 +18718,8 @@ mod announcements;
 #[cfg(not(target_arch = "wasm32"))]
 mod color_adjust;
 #[cfg(not(target_arch = "wasm32"))]
+mod command_alerts;
+#[cfg(not(target_arch = "wasm32"))]
 mod command_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod copied_toast;
@@ -18644,6 +18730,8 @@ mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
 mod feature_flags;
+#[cfg(not(target_arch = "wasm32"))]
+mod folder_chips;
 #[cfg(not(target_arch = "wasm32"))]
 mod gallery;
 #[cfg(not(target_arch = "wasm32"))]
@@ -18755,6 +18843,8 @@ impl eframe::App for ButtonsApp {
         self.deliver_menu_paste(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.update_power_status(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.poll_command_alerts(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.process_shuffle(ctx);
         #[cfg(not(target_arch = "wasm32"))]
@@ -24621,6 +24711,15 @@ Start-Sleep -Seconds 300
         pick(&mut app, first, "E");
         assert_eq!(shader_of(&app, first).as_deref(), Some("E"));
         assert_eq!(shader_of(&app, second).as_deref(), Some("D1"));
+        // The status bar's Speed is the shader's own (Settings → Shaders).
+        app.perform_pane_action(first, PaneAction::ShaderMotion(true, 2.5), &ctx);
+        let speed = |app: &ButtonsApp, id: u64| {
+            let shader = app.terminal_presentation_for(id).effects.shader_background;
+            shader.map(|shader| (shader.animated, shader.speed))
+        };
+        assert_eq!(speed(&app, first), Some((true, 2.5)));
+        assert_eq!(shader_of(&app, first).as_deref(), Some("E"));
+        assert_ne!(speed(&app, second), Some((true, 2.5)));
         // A theme pick on pane 2 (pane menu, Favorites, Random) keeps pane 1's edit.
         let other = app
             .themes

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Shell integration**: PowerShell, bash, zsh and fish tabs mark each
+  command's start, end and exit code (OSC 133). The agent `run` tool waits
+  for the real finish and returns `exitCode` and the command's output; new
+  `commands` route/tool/CLI command lists recent commands. A command that
+  finishes out of view marks its tab with ✓ or ✗ and the exit code, and long
+  ones show a message and flash the taskbar (Settings → Workspace).
+- **MCP `batch`** runs up to 20 tool calls in one call, stopping at the
+  first error or failed command.
+- **Look → Basic**: a new first stop that makes every pane plain black and
+  still (no shaders, Motion 0%), uses the bundled Recursive fonts across the
+  app and keeps text at 7:1 contrast. New built-in theme **Readable Black**.
+- The status bar's **✦ Shader** menu has the shader's own **Animate** and
+  **Speed** (the same setting as Settings → Themes → Shaders). Motion %
+  multiplies that speed, so a low Speed was why Motion seemed to do little.
+- Fixed: the shader window (File → New shader window) ran at a few frames a
+  second and ignored Motion. It now has its own clock at the FPS limit,
+  follows Motion, and keeps animating while the main window is minimized.
+- **Experimental**: Settings → Experimental → folder names in an `ls`/`dir`
+  listing can become buttons inside the terminal; click one to `cd` into it.
+- New built-in themes, shaders and bundles from the author's profile.
 - **Readable text presets**: Backing options → **White on black** / **Black
   on white** put a solid backing and a fixed text color in every pane, over
   any shader. **Theme colors** goes back. Backing colors also have **Black**
