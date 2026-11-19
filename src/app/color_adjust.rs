@@ -593,6 +593,77 @@ mod tests {
         state.write(document);
     }
 
+    fn with_fonts(app: &ButtonsApp, terminal: &str, shell: &str) -> crate::fonts::Typography {
+        let mut typography = app.preferences.typography.clone();
+        typography.terminal.family = terminal.into();
+        typography.shell.family = shell.into();
+        typography
+    }
+
+    /// A font picked in Settings → Fonts must survive theme editor previews,
+    /// saves and Revert, in pane mode and for all panes. Previews used to put
+    /// the theme file's older font back on every slider move.
+    #[test]
+    fn theme_editor_previews_and_saves_keep_the_fonts_in_use() {
+        let (_ctx, mut app, base) = test_app(2, "editor-fonts");
+        let pane = app.tabs[1].id;
+        // A personal theme saved and applied with font A.
+        app.retarget_theme_editor(None).unwrap();
+        let old = with_fonts(&app, "Fira Code Bundled", "Commit Mono Bundled");
+        let mut document = app.theme_editor_document.clone().unwrap();
+        crate::theme_files::set_document_typography(&mut document, &old);
+        app.theme_editor_document = Some(document);
+        app.save_personal_theme_draft();
+        assert_eq!(
+            app.preferences.typography, old,
+            "theme A applied with its fonts"
+        );
+        app.discard_theme_editor_session();
+
+        // Font B picked in Settings → Fonts (no editor open).
+        let picked = with_fonts(&app, "JetBrains Mono Bundled", "Go Noto Current Bundled");
+        app.preferences.typography = picked.clone();
+        app.keep_font_edit();
+
+        // One pane: its preview keeps the font it shows.
+        app.retarget_theme_editor(Some(pane)).unwrap();
+        adjust_and_preview(&mut app);
+        assert_eq!(
+            app.font_for_pane(pane).zone.family,
+            picked.terminal.family,
+            "pane preview"
+        );
+
+        // All panes: previews and saving keep font B, and the file stores it.
+        app.retarget_theme_editor(None).unwrap();
+        adjust_and_preview(&mut app);
+        assert_eq!(app.preferences.typography, picked, "shared preview");
+        app.save_personal_theme_draft();
+        assert_eq!(app.preferences.typography, picked, "after saving");
+        let saved = app.themes.get(&app.preferences.theme_id).typography.clone();
+        assert_eq!(
+            saved.as_ref().map(|t| &t.terminal.family),
+            Some(&picked.terminal.family)
+        );
+
+        // A font change while a preview is open is kept by Revert.
+        adjust_and_preview(&mut app);
+        let later = with_fonts(&app, "Commit Mono Bundled", "Fira Code Bundled");
+        app.preferences.typography = later.clone();
+        app.keep_font_edit();
+        adjust_and_preview(&mut app);
+        assert_eq!(
+            app.preferences.typography, later,
+            "preview after a font change"
+        );
+        app.discard_theme_editor_session();
+        assert_eq!(
+            app.preferences.typography, later,
+            "Revert keeps the font change"
+        );
+        let _ = std::fs::remove_dir_all(base);
+    }
+
     fn darker() -> Adjustment {
         Adjustment {
             brightness: -0.5,

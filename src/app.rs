@@ -13282,6 +13282,8 @@ impl ButtonsApp {
 
     fn font_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         #[cfg(not(target_arch = "wasm32"))]
+        let fonts_before = (self.preferences.typography.clone(), self.pane_fonts.clone());
+        #[cfg(not(target_arch = "wasm32"))]
         let original_terminal_defaults = fonts::PaneFont::from(&self.preferences.typography);
         #[cfg(target_arch = "wasm32")]
         let _ = ctx;
@@ -13528,6 +13530,9 @@ impl ButtonsApp {
                     self.pane_fonts.insert(tab.id, edited.clone());
                 }
                 ctx.request_repaint_of(egui::ViewportId::ROOT);
+            }
+            if fonts_before.0 != self.preferences.typography || fonts_before.1 != self.pane_fonts {
+                self.keep_font_edit();
             }
         }
     }
@@ -13975,6 +13980,47 @@ impl ButtonsApp {
         } else {
             self.start_personal_theme_draft();
         }
+        self.adopt_live_fonts_into_draft();
+    }
+
+    /// Fonts are owned by Settings → Fonts (shared) and per-pane fonts. A
+    /// draft of the look on screen carries the fonts in use, in both the draft
+    /// and its original (adopting them is not an edit). Otherwise every live
+    /// preview and save put the theme file's older font back.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn adopt_live_fonts_into_draft(&mut self) {
+        let pane = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
+        if pane.is_none() && !self.preferences.theme_apply.fonts {
+            // Shared previews and saves leave fonts alone with Fonts unticked.
+            return;
+        }
+        let pane_font = pane.map(|tab| self.font_for_pane(tab));
+        let typography = self.preferences.typography.clone();
+        for document in [
+            &mut self.theme_editor_document,
+            &mut self.theme_editor_original_document,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            match &pane_font {
+                Some(font) => crate::theme_files::set_document_terminal_font(document, font),
+                None => crate::theme_files::set_document_typography(document, &typography),
+            }
+        }
+    }
+
+    /// A font change in Settings → Fonts is a real change, not part of a
+    /// theme preview: Revert must keep it and the open draft adopts it.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn keep_font_edit(&mut self) {
+        if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
+            snapshot.preferences.typography = self.preferences.typography.clone();
+            snapshot.applied_preferences.typography = self.preferences.typography.clone();
+        }
+        self.adopt_live_fonts_into_draft();
     }
 
     /// Ends a pane-look edit before another pane's theme changes. A pane draft

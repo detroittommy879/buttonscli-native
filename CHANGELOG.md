@@ -39,6 +39,10 @@
   app**. Quick adjust's interface sliders are off while editing one pane
   (app colors are shared), and the sliders are more robust to theme files
   that list ANSI colors or leave some out.
+- Fixed: a font picked in Settings → Fonts jumped back to the theme's older
+  font whenever the theme editor previewed or saved (each Quick adjust slider
+  move). The editor now keeps the fonts in use, saving a theme stores them,
+  and Revert no longer undoes a font change.
 - **Arrange left commands**: the ✎ button in the left panel's header turns
   its buttons into drag handles; drop one above or below another to move it.
 - **Feature flags tab** (local `admin` flag): Settings → Feature flags turns
