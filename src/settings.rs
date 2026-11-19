@@ -440,7 +440,10 @@ pub(crate) const MAX_UI_SCALE: f32 = 2.0;
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 /// Longest workspace message timeout offered in Settings.
 pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
-pub(crate) const MAX_SAVED_SHADERS: usize = 64;
+/// Caps keep native.json bounded. Saving past one is refused with a message
+/// (never by dropping the oldest), so a cap must sit far above real use.
+pub(crate) const MAX_SAVED_SHADERS: usize = 512;
+pub(crate) const MAX_THEME_BUNDLES: usize = 512;
 /// Most pane slots a theme bundle or the saved pane looks remember.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
@@ -1061,7 +1064,7 @@ impl Preferences {
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
         self.pane_looks.truncate(MAX_PANE_LOOKS);
-        self.theme_bundles.truncate(64);
+        self.theme_bundles.truncate(MAX_THEME_BUNDLES);
         self.saved_shaders.truncate(MAX_SAVED_SHADERS);
         for bundle in &mut self.theme_bundles {
             bundle.panes.truncate(MAX_PANE_LOOKS);
