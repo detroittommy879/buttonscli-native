@@ -101,10 +101,13 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   new zoom after: use the gather zoom (`ui_scale.rs`), or Auto UI size loops.
 - Panes draw the shader instead of the gradient; the theme editor's
   "Shader background" switch stashes it in `effects.shaderBackgroundOff`.
-- Theme-applying buttons each change a different subset of state today
-  (`apply_theme`, `set_theme_all`, `set_theme_for_tab`, `apply_theme_bundle`,
-  `use_look_everywhere`): table and plan in
-  `.private/dev-notes/LOOK-STATE-PLAN-2026-11-20.md`. Don't add another.
+- "Use this theme" goes through `apply_look(id, LookTarget)`
+  (`src/app/apply_look.rs`): WholeApp {scopes, calm} (Library Apply/Calm,
+  status-bar pick), AllTerminals, Pane. `apply_theme`/`set_theme_all`/
+  `set_theme_for_tab` are wrappers; add new buttons there, not new paths.
+  Its table test covers every button × (fresh, after bundle, mid pane edit).
+  Bundles (`apply_theme_bundle`) and Shuffle still have their own paths;
+  plan: `.private/dev-notes/LOOK-STATE-PLAN-2026-11-20.md`.
 
 ## Pane and input rules
 
