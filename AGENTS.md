@@ -101,6 +101,10 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   new zoom after: use the gather zoom (`ui_scale.rs`), or Auto UI size loops.
 - Panes draw the shader instead of the gradient; the theme editor's
   "Shader background" switch stashes it in `effects.shaderBackgroundOff`.
+- Theme-applying buttons each change a different subset of state today
+  (`apply_theme`, `set_theme_all`, `set_theme_for_tab`, `apply_theme_bundle`,
+  `use_look_everywhere`): table and plan in
+  `.private/dev-notes/LOOK-STATE-PLAN-2026-11-20.md`. Don't add another.
 
 ## Pane and input rules
 
