@@ -281,7 +281,7 @@ fn backing_options_body(
         .changed();
     changed |= ui
         .spaced_checkbox(&mut backing.invert, text("Invert text and backing colors"))
-        .on_hover_text(text("Use text colors as backing with dark text. Whole lines use the pane foreground; selection and TUI backgrounds stay unchanged."))
+        .on_hover_text(text("Use text colors as backing with dark text. Whole lines use the color of each line's first character. Custom backing colors are not used while this is on; selection and TUI backgrounds stay unchanged."))
         .changed();
     ui.separator();
     changed |= ui
@@ -450,22 +450,28 @@ impl ButtonsApp {
                 ui.separator();
                 ui.spaced_label(RichText::new(crate::i18n::literal(&locale, "Backing")).strong());
                 let mut custom = backing.custom_colors();
-                let mut use_custom = custom.is_some();
-                if ui
-                    .spaced_checkbox(&mut use_custom, crate::i18n::literal(&locale, "Custom colors for all panes"))
-                    .on_hover_text(crate::i18n::literal(&locale, "A pane whose theme has its own backing colors keeps them (right-click a pane → Text backing colors…)."))
-                    .changed()
-                {
-                    custom = use_custom.then(|| starter_backing_colors(base));
-                    changed = true;
+                let inverted = backing.invert;
+                if inverted {
+                    ui.spaced_label(crate::i18n::literal(&locale, "Invert is on: each line is backed with its own text color, so custom colors are not used. They come back when Invert is off."));
                 }
-                if let Some(colors) = custom.as_mut() {
-                    changed |= backing_colors_editor(ui, &locale, "global-text-backing", colors, &theme_colors);
-                    changed |= ui
-                        .spaced_checkbox(&mut backing.override_theme_colors, crate::i18n::literal(&locale, "Also in panes whose theme has its own"))
-                        .on_hover_text(crate::i18n::literal(&locale, "Use these colors everywhere, even where a theme brings its own backing colors."))
-                        .changed();
-                }
+                ui.add_enabled_ui(!inverted, |ui| {
+                    let mut use_custom = custom.is_some();
+                    if ui
+                        .spaced_checkbox(&mut use_custom, crate::i18n::literal(&locale, "Custom colors for all panes"))
+                        .on_hover_text(crate::i18n::literal(&locale, "A pane whose theme has its own backing colors keeps them (right-click a pane → Text backing colors…)."))
+                        .changed()
+                    {
+                        custom = use_custom.then(|| starter_backing_colors(base));
+                        changed = true;
+                    }
+                    if let Some(colors) = custom.as_mut() {
+                        changed |= backing_colors_editor(ui, &locale, "global-text-backing", colors, &theme_colors);
+                        changed |= ui
+                            .spaced_checkbox(&mut backing.override_theme_colors, crate::i18n::literal(&locale, "Also in panes whose theme has its own"))
+                            .on_hover_text(crate::i18n::literal(&locale, "Use these colors everywhere, even where a theme brings its own backing colors."))
+                            .changed();
+                    }
+                });
                 if changed {
                     store_global_backing(backing, custom.as_ref());
                 }

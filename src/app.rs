@@ -2211,7 +2211,8 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn set_theme_all(&mut self, theme_id: &str) {
-        self.restore_personal_theme_preview();
+        // Keeps a pane's edit as its own theme file before it is replaced.
+        self.settle_pane_draft(None);
         if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
             return;
         }
@@ -8863,26 +8864,65 @@ impl ButtonsApp {
         }
     }
 
+    /// The theme the editor works on (the "Edit for" target): the edited
+    /// pane's own theme, else the shared one. While a pane previews a draft
+    /// this is the theme it had before. The pane number is its displayed slot.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn edit_target_theme(&self) -> (String, Option<usize>) {
+        let Some(tab) = self
+            .theme_editor_pane
+            .filter(|tab| self.tabs.iter().any(|t| t.id == *tab))
+        else {
+            return (self.preferences.theme_id.clone(), None);
+        };
+        let previewed = self
+            .theme_editor_preview_snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.pane.clone())
+            .filter(|(pane, _)| *pane == tab)
+            .map(|(_, previous)| previous);
+        let id = match previewed {
+            Some(previous) => previous,
+            None => self.theme_overrides.get(&tab).cloned(),
+        }
+        .filter(|id| !id.starts_with("preview:"))
+        .unwrap_or_else(|| self.preferences.theme_id.clone());
+        let displayed = if self.rendered_panes.is_empty() {
+            &self.visible_panes
+        } else {
+            &self.rendered_panes
+        };
+        let number = self
+            .tabs
+            .iter()
+            .position(|t| t.id == tab)
+            .and_then(|index| displayed.iter().position(|slot| *slot == index))
+            .map(|slot| slot + 1);
+        (id, number)
+    }
+
     fn theme_settings(&mut self, ui: &mut egui::Ui) {
         #[cfg(not(target_arch = "wasm32"))]
-        if self
-            .themes
-            .personal_document(&self.preferences.theme_id)
-            .is_some()
-        {
+        let (target_id, target_pane) = self.edit_target_theme();
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.themes.personal_document(&target_id).is_some() {
             ui.horizontal(|ui| {
-                ui.label(crate::i18n::formatted_literal(
-                    &self.locale,
-                    "Loaded: {name}",
-                    &[(
-                        "name",
-                        &(self.themes.get(&self.preferences.theme_id).name).to_string(),
-                    )],
-                ));
+                let name = self.themes.get(&target_id).name.clone();
+                ui.label(match target_pane {
+                    Some(number) => crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Pane {number} theme: {name}",
+                        &[("number", &number.to_string()), ("name", &name)],
+                    ),
+                    None => crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Shared theme: {name}",
+                        &[("name", &name)],
+                    ),
+                });
                 ui.menu_button(crate::i18n::literal(&self.locale, "Rename theme…"), |ui| {
                     if self.theme_rename.is_empty() {
-                        self.theme_rename =
-                            self.themes.get(&self.preferences.theme_id).name.clone();
+                        self.theme_rename = name.clone();
                     }
                     ui.text_edit_singleline(&mut self.theme_rename);
                     if ui
@@ -9362,6 +9402,7 @@ impl ButtonsApp {
                                                         crate::i18n::literal(&self.locale, "Apply")
                                                     }),
                                                 )
+                                                .on_hover_text(crate::i18n::literal(&self.locale, "Use this theme for the parts ticked under Apply to (app colors, shared terminal theme, fonts, gradient, effects). Panes with a theme of their own keep it."))
                                                 .clicked()
                                             {
                                                 apply = Some((index, false));
@@ -9372,7 +9413,7 @@ impl ButtonsApp {
                                                     crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Calm")),
                                                 )
                                                 .on_hover_text(
-                                                    crate::i18n::literal(&self.locale, "Apply selected sections without animation or noise"),
+                                                    crate::i18n::literal(&self.locale, "Apply, and turn on Calm (no animation or noise in any pane). Look → Calm effects turns it off again."),
                                                 )
                                                 .clicked()
                                             {
@@ -9396,7 +9437,11 @@ impl ButtonsApp {
                                                     !self.tabs.is_empty(),
                                                     crate::ui_text::button(ui, text(&self.locale, MessageKey::ThemeAll, &[])),
                                                 )
-                                                .on_hover_text(text(&self.locale, MessageKey::ThemeAllHelp, &[]))
+                                                .on_hover_text(format!(
+                                                    "{}\n{}",
+                                                    text(&self.locale, MessageKey::ThemeAllHelp, &[]),
+                                                    crate::i18n::literal(&self.locale, "The app's own colors stay as they are: Apply changes those."),
+                                                ))
                                                 .clicked()
                                             {
                                                 all_theme = Some(theme.id.clone());
@@ -9654,6 +9699,7 @@ impl ButtonsApp {
                                 .clicked()
                             {
                                 shader.preset = value.into();
+                                self.shader_ai.list_note = None;
                                 // Keep the code to switch back to it later.
                                 if let Some(custom) = shader.custom.take() {
                                     self.shader_ai.stash = Some(custom);
@@ -9672,6 +9718,10 @@ impl ButtonsApp {
                         .chain(built_in)
                         .any(|item| &item.shader == custom)
                 };
+                if pick_blank || pick_code || pick_saved.is_some() {
+                    // A note about the previous shader would name the wrong one.
+                    self.shader_ai.list_note = None;
+                }
                 if pick_blank || pick_saved.is_some() {
                     // Unsaved code is set aside, so "Your code" can bring it back.
                     if let Some(current) = shader.custom.take().filter(|c| !listed(c)) {
@@ -12364,7 +12414,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn rename_loaded_theme(&mut self) {
-        let id = self.preferences.theme_id.clone();
+        let (id, _) = self.edit_target_theme();
         let (Some(store), Some(mut document)) = (
             &self.native_store,
             self.themes.personal_document(&id).cloned(),
@@ -12509,6 +12559,9 @@ impl ButtonsApp {
         self.theme_editor_file_digest = None;
         self.theme_editor_confirm_delete = false;
         self.theme_editor_status = None;
+        // Notes and names about the old target would describe another theme.
+        self.shader_ai.list_note = None;
+        self.theme_rename.clear();
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -13167,15 +13220,14 @@ impl ButtonsApp {
 
     fn apply_theme(&mut self, index: usize, calm: bool) {
         let theme = self.themes.all()[index].clone();
+        // A pane being edited keeps its edit (saved under the next numbered
+        // name); restoring the preview put that pane back on an older look.
         #[cfg(not(target_arch = "wasm32"))]
-        self.restore_personal_theme_preview();
+        self.settle_pane_draft(None);
         self.apply_theme_sources(theme, calm);
         #[cfg(not(target_arch = "wasm32"))]
         {
-            self.theme_editor_document = None;
-            self.theme_editor_original_document = None;
-            self.theme_editor_source_id = None;
-            self.theme_rename.clear();
+            self.discard_theme_editor_session();
             self.appearance_save_status = None;
             self.appearance_baseline = Some(self.appearance_fingerprint());
         }
@@ -13204,8 +13256,12 @@ impl ButtonsApp {
                 self.preferences.typography = typography;
             }
         }
-        if self.preferences.theme_apply.gradient || self.preferences.theme_apply.effects {
-            self.preferences.calm_mode = calm;
+        // Calm is a live switch (Look menu): the Calm button turns it on
+        // whatever the Apply-to boxes say, and Apply leaves it as it is. It
+        // used to be set only with Gradient/Effects ticked, and Apply turned
+        // it off.
+        if calm {
+            self.preferences.calm_mode = true;
         }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(document) = self.themes.personal_document(&self.preferences.theme_id) {
@@ -16448,9 +16504,12 @@ fn terminal_surface(
                     recolor_all: interaction.text_backing.recolor_all,
                     min_contrast: interaction.text_backing.contrast_target(),
                     // A pane's theme colors win over the colors set for all panes.
+                    // Invert backs each run with its own text color, so custom
+                    // colors (kept for when Invert is off) would undo it.
                     palette: interaction
                         .text_backing
                         .colors_for(theme.text_backing.clone())
+                        .filter(|_| !interaction.text_backing.invert)
                         .and_then(|colors| {
                             // Moving rings: repaint on the animation tick.
                             if moving
@@ -23902,6 +23961,36 @@ Start-Sleep -Seconds 300
         assert_eq!(app.preferences.app_theme_id, "aurora");
         assert_eq!(app.preferences.terminal_theme_id, "basic2");
         assert_eq!(app.preferences.gradient_theme_id, "basic2");
+    }
+
+    #[test]
+    fn library_calm_turns_calm_on_and_apply_leaves_it() {
+        // Only App ticked: Calm used to do nothing without Gradient/Effects.
+        let mut preferences = Preferences {
+            theme_apply: ThemeApplyScopes {
+                app: true,
+                terminal: false,
+                fonts: false,
+                gradient: false,
+                effects: false,
+            },
+            calm_mode: false,
+            ..Default::default()
+        };
+        preferences.normalize_theme_sources();
+        let mut app = ButtonsApp::empty(preferences);
+        let index = app
+            .themes
+            .all()
+            .iter()
+            .position(|theme| theme.id == "aurora")
+            .unwrap();
+        app.apply_theme(index, true);
+        assert!(app.preferences.calm_mode);
+        // Apply used to switch Calm back off.
+        app.preferences.theme_apply.effects = true;
+        app.apply_theme(index, false);
+        assert!(app.preferences.calm_mode);
     }
 
     #[cfg(not(target_arch = "wasm32"))]

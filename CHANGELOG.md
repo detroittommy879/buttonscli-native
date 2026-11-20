@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Fixed: Settings → Themes named the shared theme ("Loaded: …") while
+  editing one pane, and **Rename theme…** renamed that shared theme. The
+  header now says **Pane N theme** or **Shared theme** and renames the one
+  being edited. The "Saved … to the shader list" note no longer lingers
+  after picking another shader or pane.
+- Fixed: **Invert text and backing colors** lost its colors when custom
+  backing colors were on (they are now set aside while Invert is on and come
+  back after), and with **Whole lines** every line used the plain text
+  color; each line now takes the color of its first character.
+- Fixed: Library **Apply**, **Theme all** and applying a bundle threw away
+  an unsaved edit of one pane; it is saved under the next numbered name,
+  as switching panes does.
+- Fixed: Library **Calm** did nothing unless Gradient or Effects was ticked
+  under Apply to, and **Apply** turned Calm off. Calm now always turns it
+  on and Apply leaves it alone. Apply, Calm and Theme all say what they
+  change.
+- Fixed: a bundle loaded later could show other fonts: panes without a font
+  of their own saved none and took whatever the shared font was by then.
+  Bundles now keep each pane's font, and loading one names any font that
+  is not installed (Recursive Mono Casual is used instead).
 - **Shell integration**: PowerShell, bash, zsh and fish tabs mark each
   command's start, end and exit code (OSC 133). The agent `run` tool waits
   for the real finish and returns `exitCode` and the command's output; new

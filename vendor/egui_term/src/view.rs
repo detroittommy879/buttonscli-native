@@ -601,6 +601,43 @@ impl<'a> TerminalView<'a> {
             ));
         }
 
+        // Inverted whole lines: each line is backed with the color of its
+        // first visible character, so lines keep their colors instead of all
+        // turning the plain foreground (which looked like color was lost).
+        let cell_fg = |c: &alacritty_terminal::grid::Indexed<cell::Cell>| {
+            let mut fg = if self.draw_bold_bright
+                && c.flags
+                    .intersects(cell::Flags::BOLD | cell::Flags::DIM_BOLD)
+            {
+                self.theme.get_bold_color(c.fg)
+            } else {
+                self.theme.get_color(c.fg)
+            };
+            if c.flags.intersects(cell::Flags::DIM | cell::Flags::DIM_BOLD) {
+                fg = fg.linear_multiply(0.7);
+            }
+            fg
+        };
+        let mut line_colors = std::collections::HashMap::new();
+        if self
+            .text_backing
+            .is_some_and(|backing| backing.invert && backing.whole_line)
+        {
+            for c in content.cells.iter().filter(|c| {
+                !c.flags.intersects(
+                    cell::Flags::HIDDEN | cell::Flags::WIDE_CHAR_SPACER,
+                ) && c.c != ' '
+                    && c.c != '\t'
+            }) {
+                line_colors
+                    .entry(c.point.line.0)
+                    .or_insert_with(|| cell_fg(c));
+            }
+        }
+        let foreground =
+            self.theme.get_color(Color::Named(NamedColor::Foreground));
+        let line_color =
+            |line: i32| line_colors.get(&line).copied().unwrap_or(foreground);
         if let Some(backing) = self.text_backing {
             let cells = content
                 .cells
@@ -634,23 +671,9 @@ impl<'a> TerminalView<'a> {
                     );
                     let color = if backing.invert {
                         if backing.whole_line {
-                            self.theme
-                                .get_color(Color::Named(NamedColor::Foreground))
+                            line_color(c.point.line.0)
                         } else {
-                            let mut fg = if self.draw_bold_bright
-                                && c.flags.intersects(
-                                    cell::Flags::BOLD | cell::Flags::DIM_BOLD,
-                                ) {
-                                self.theme.get_bold_color(c.fg)
-                            } else {
-                                self.theme.get_color(c.fg)
-                            };
-                            if c.flags.intersects(
-                                cell::Flags::DIM | cell::Flags::DIM_BOLD,
-                            ) {
-                                fg = fg.linear_multiply(0.7);
-                            }
-                            fg
+                            cell_fg(c)
                         }
                     } else {
                         global_bg
@@ -803,7 +826,7 @@ impl<'a> TerminalView<'a> {
                 let run = if !inverted {
                     global_bg
                 } else if backing.whole_line {
-                    self.theme.get_color(Color::Named(NamedColor::Foreground))
+                    line_color(indexed.point.line.0)
                 } else {
                     fg
                 };
@@ -2335,6 +2358,43 @@ mod render_parity_tests {
             }),
         );
         assert_eq!(texts(&zero), original);
+    }
+
+    #[test]
+    fn inverted_whole_lines_keep_each_line_color() {
+        // Whole lines used to back every line with the plain foreground, so
+        // Invert + Whole lines lost all color.
+        let input = b"\x1b[?25l\x1b[31mred\r\n\x1b[0mplain";
+        let (plain, _) = render(input, true);
+        let (backed, _) = render_backing(
+            input,
+            true,
+            Some(crate::TextBacking {
+                opacity: 1.0,
+                feather: 0.0,
+                whole_line: true,
+                invert: true,
+                palette: None,
+                ..Default::default()
+            }),
+        );
+        let original = texts(&plain);
+        let red = original[0].2;
+        let foreground = original[original.len() - 1].2;
+        assert_ne!(red, foreground);
+        let colors: Vec<Color32> = backed
+            .iter()
+            .filter_map(|s| match s {
+                Shape::Mesh(m) => Some(m.vertices.iter().map(|v| v.color)),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        assert!(colors.contains(&red), "the red line keeps its color");
+        assert!(
+            colors.contains(&foreground),
+            "the plain line keeps the foreground"
+        );
     }
 
     #[test]
