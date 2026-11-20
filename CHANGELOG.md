@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **AI Help → New chat** starts a blank conversation (the AI forgets the
+  old one); the chosen terminal and options stay.
 - Fixed: Settings → Themes named the shared theme ("Loaded: …") while
   editing one pane, and **Rename theme…** renamed that shared theme. The
   header now says **Pane N theme** or **Shared theme** and renames the one
