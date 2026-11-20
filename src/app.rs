@@ -2197,43 +2197,6 @@ impl ButtonsApp {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn set_theme_for_tab(&mut self, index: usize, theme_id: &str) {
-        self.settle_pane_draft(self.tabs.get(index).map(|tab| tab.id));
-        let Some(tab) = self.tabs.get(index) else {
-            return;
-        };
-        if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
-            return;
-        }
-        self.theme_overrides.insert(tab.id, theme_id.to_owned());
-        self.pane_fonts.remove(&tab.id);
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn set_theme_all(&mut self, theme_id: &str) {
-        // Keeps a pane's edit as its own theme file before it is replaced.
-        self.settle_pane_draft(None);
-        if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
-            return;
-        }
-        self.preferences.theme_id = theme_id.to_owned();
-        self.preferences.terminal_theme_id = theme_id.to_owned();
-        self.preferences.gradient_theme_id = theme_id.to_owned();
-        self.preferences.effects_theme_id = theme_id.to_owned();
-        self.theme_overrides.clear();
-        self.pane_fonts.clear();
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            self.pending_pane_looks = None;
-        }
-        if self.preferences.theme_apply.fonts {
-            if let Some(typography) = self.themes.get(theme_id).typography.clone() {
-                self.preferences.typography = typography;
-            }
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
     fn random_theme_id(&self, current: &str) -> Option<String> {
         let candidates: Vec<_> = self
             .themes
@@ -2486,13 +2449,15 @@ impl ButtonsApp {
             // Status controls always apply the complete theme, regardless of editor scopes.
             // Use the same appearance path as Library apply, so saved window, shader and
             // chrome settings come with it and old chrome overrides are cleared.
-            let theme = self.themes.get(&id).clone();
-            // take() leaves the default scopes (all on) in place for the duration of the apply.
-            let scopes = std::mem::take(&mut self.preferences.theme_apply);
-            self.set_theme_all(&id);
+            // Every part (default scopes, all on), whatever Apply to says.
             let calm = self.preferences.calm_mode;
-            self.apply_theme_sources(theme, calm);
-            self.preferences.theme_apply = scopes;
+            self.apply_look(
+                &id,
+                apply_look::LookTarget::WholeApp {
+                    scopes: Default::default(),
+                    calm,
+                },
+            );
         }
     }
 
@@ -9320,7 +9285,7 @@ impl ButtonsApp {
                                                 per_tab_theme = Some(theme.id.clone());
                                             }
                                             #[cfg(not(target_arch = "wasm32"))]
-                                            if ui.add_enabled(!self.tabs.is_empty(), crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "All terminals")).small()).clicked() {
+                                            if ui.add_enabled(!self.tabs.is_empty(), crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "All terminals")).small()).on_hover_text(crate::i18n::literal(&self.locale, ALL_TERMINALS_HELP)).clicked() {
                                                 all_theme = Some(theme.id.clone());
                                             }
                                         });
@@ -9402,7 +9367,7 @@ impl ButtonsApp {
                                                         crate::i18n::literal(&self.locale, "Apply")
                                                     }),
                                                 )
-                                                .on_hover_text(crate::i18n::literal(&self.locale, "Use this theme for the parts ticked under Apply to (app colors, shared terminal theme, fonts, gradient, effects). Panes with a theme of their own keep it."))
+                                                .on_hover_text(crate::i18n::literal(&self.locale, "Use this theme for the parts ticked under Apply to (app colors, terminals, fonts, gradient, effects). With Terminal ticked, panes with a theme of their own switch to this one too."))
                                                 .clicked()
                                             {
                                                 apply = Some((index, false));
@@ -9435,13 +9400,9 @@ impl ButtonsApp {
                                             if ui
                                                 .add_enabled(
                                                     !self.tabs.is_empty(),
-                                                    crate::ui_text::button(ui, text(&self.locale, MessageKey::ThemeAll, &[])),
+                                                    crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "All terminals")),
                                                 )
-                                                .on_hover_text(format!(
-                                                    "{}\n{}",
-                                                    text(&self.locale, MessageKey::ThemeAllHelp, &[]),
-                                                    crate::i18n::literal(&self.locale, "The app's own colors stay as they are: Apply changes those."),
-                                                ))
+                                                .on_hover_text(crate::i18n::literal(&self.locale, ALL_TERMINALS_HELP))
                                                 .clicked()
                                             {
                                                 all_theme = Some(theme.id.clone());
@@ -13220,17 +13181,16 @@ impl ButtonsApp {
 
     fn apply_theme(&mut self, index: usize, calm: bool) {
         let theme = self.themes.all()[index].clone();
-        // A pane being edited keeps its edit (saved under the next numbered
-        // name); restoring the preview put that pane back on an older look.
-        #[cfg(not(target_arch = "wasm32"))]
-        self.settle_pane_draft(None);
-        self.apply_theme_sources(theme, calm);
+        // Library Apply/Calm: the shared theme for the ticked parts, through
+        // the one look transition (settles a pane edit, clears pane themes
+        // when Terminal is ticked).
         #[cfg(not(target_arch = "wasm32"))]
         {
-            self.discard_theme_editor_session();
-            self.appearance_save_status = None;
-            self.appearance_baseline = Some(self.appearance_fingerprint());
+            let scopes = self.preferences.theme_apply.clone();
+            self.apply_look(&theme.id, apply_look::LookTarget::WholeApp { scopes, calm });
         }
+        #[cfg(target_arch = "wasm32")]
+        self.apply_theme_sources(theme, calm);
     }
 
     fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
@@ -18237,6 +18197,10 @@ fn preset_action_menu(
     }
 }
 
+/// Library "All terminals" hover text (cards and the compact list).
+#[cfg(not(target_arch = "wasm32"))]
+const ALL_TERMINALS_HELP: &str = crate::i18n::key("Every terminal uses this theme: colors, shader and gradient, and its font when Fonts is ticked under Apply to. The app's own colors stay: Apply changes those.");
+
 #[cfg(not(target_arch = "wasm32"))]
 const NATIVE_APPEARANCE_FIELDS: &[(&str, &str)] = &[
     ("pane_divider", "app"),
@@ -18774,6 +18738,8 @@ fn set_theme_document_value(document: &mut Value, pointer: &str, value: Value) {
 mod ai_help;
 #[cfg(not(target_arch = "wasm32"))]
 mod announcements;
+#[cfg(not(target_arch = "wasm32"))]
+mod apply_look;
 #[cfg(not(target_arch = "wasm32"))]
 mod color_adjust;
 #[cfg(not(target_arch = "wasm32"))]

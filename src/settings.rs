@@ -479,6 +479,21 @@ pub(crate) struct ThemeBundle {
     /// bundles) keeps the current value.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) row_banding_brightness: Option<u8>,
+    /// Left panel / status bar colors picked by right-click, saved with the
+    /// bundle. `None` (older bundles): a bundle that sets the app theme
+    /// clears them, as Apply does, so the bars never keep a stale color.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) chrome: Option<BundleChrome>,
+}
+
+/// The app chrome colors a bundle carries besides its app theme.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub(crate) struct BundleChrome {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) dock_background: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) status_background: Option<String>,
 }
 
 /// A sanity guard on panes shown at once (not a design limit): how many

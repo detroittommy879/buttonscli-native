@@ -162,6 +162,10 @@ impl ButtonsApp {
             layout: layout_name(self.pane_layout).into(),
             visible_panes: self.visible_panes.len(),
             row_banding_brightness: Some(self.preferences.row_banding_brightness),
+            chrome: Some(crate::settings::BundleChrome {
+                dock_background: self.preferences.dock_background_override.clone(),
+                status_background: self.preferences.status_background_override.clone(),
+            }),
         }
     }
 
@@ -216,8 +220,11 @@ impl ButtonsApp {
             .chain(crate::library::bundles())
             .find(|bundle| bundle.name == name)
             .cloned()?;
-        // Keeps a pane's edit as its own theme file before it is replaced.
+        // Keeps a pane's edit as its own theme file before it is replaced;
+        // the editor then follows the new looks instead of the old draft.
         self.settle_pane_draft(None);
+        self.discard_theme_editor_session();
+        let app_theme_before = self.preferences.app_theme_id.clone();
         let mut skipped = 0;
         for (target, id) in [
             (&mut self.preferences.theme_id, &bundle.theme_id),
@@ -242,6 +249,22 @@ impl ButtonsApp {
             }
         }
         self.preferences.normalize_theme_sources();
+        // Bar colors: the bundle's own, or none when it brings an app theme
+        // (a color picked for the old theme made the top bar and the left
+        // panel disagree).
+        match &bundle.chrome {
+            Some(chrome) => {
+                self.preferences.dock_background_override = chrome.dock_background.clone();
+                self.preferences.status_background_override = chrome.status_background.clone();
+            }
+            None if self.preferences.app_theme_id != app_theme_before
+                || !bundle.app_theme_id.is_empty() =>
+            {
+                self.preferences.dock_background_override = None;
+                self.preferences.status_background_override = None;
+            }
+            None => {}
+        }
         if let Some(brightness) = bundle.row_banding_brightness {
             self.preferences.row_banding_brightness = brightness.min(64);
         }

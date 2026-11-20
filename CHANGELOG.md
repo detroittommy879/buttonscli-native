@@ -4,6 +4,15 @@
 
 - **AI Help → New chat** starts a blank conversation (the AI forgets the
   old one); the chosen terminal and options stay.
+- Library theme buttons now behave the same from any state. **Apply** (with
+  Terminal colors ticked) changes every pane, including panes that had a
+  theme of their own (after a bundle, Apply used to change only the app
+  colors). **Theme all** is now called **All terminals**: every pane, app
+  colors unchanged.
+- Fixed: the status bar and the left panel could keep a background color
+  picked for an older theme after a bundle or **All terminals**, so they
+  disagreed. Bundles now save those bar colors; older bundles that set an app
+  theme clear them.
 - Fixed: Settings → Themes named the shared theme ("Loaded: …") while
   editing one pane, and **Rename theme…** renamed that shared theme. The
   header now says **Pane N theme** or **Shared theme** and renames the one
