@@ -13,9 +13,9 @@ A fast terminal app for people who'd rather use a mouse: click buttons instead o
 
 </div>
 
-![Three stacked terminals with animated shader backgrounds and a command dock, next to Settings showing four AI-generated shader versions](docs/images/main.png)
+![Three stacked terminals with shader backgrounds and readable text backing, a command dock with folder buttons, and clickable folder names in an ls listing (hovering home shows cd "home")](docs/images/main-2026-11-20.png)
 
-*Some shaders in this picture are saved with a higher Strength than the default (0.35), so their motion shows. Strength fades a shader toward the background color, which keeps text readable; lower it any time.*
+*Each pane has its own theme and shader; text backing keeps the text readable over them. Folder names in an `ls` listing can become buttons that `cd` into them (Settings → Experimental).*
 
 ## AI features and other things to save time
 

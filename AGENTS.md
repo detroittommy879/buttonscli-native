@@ -101,13 +101,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   new zoom after: use the gather zoom (`ui_scale.rs`), or Auto UI size loops.
 - Panes draw the shader instead of the gradient; the theme editor's
   "Shader background" switch stashes it in `effects.shaderBackgroundOff`.
-- "Use this theme" goes through `apply_look(id, LookTarget)`
-  (`src/app/apply_look.rs`): WholeApp {scopes, calm} (Library Apply/Calm,
-  status-bar pick), AllTerminals, Pane. `apply_theme`/`set_theme_all`/
-  `set_theme_for_tab` are wrappers; add new buttons there, not new paths.
-  Its table test covers every button × (fresh, after bundle, mid pane edit).
-  Bundles (`apply_theme_bundle`) and Shuffle still have their own paths;
-  plan: `.private/dev-notes/LOOK-STATE-PLAN-2026-11-20.md`.
+- **Look state (themes, shaders, fonts, backing, Calm, chrome colors):
+  read `docs/dev/LOOK-STATE.md` before changing any of it.** It lists where
+  each fact lives, how a pane's look is resolved, and what every button
+  changes. Rules in short:
+  - "Use this theme" goes through `apply_look(id, LookTarget)`
+    (`src/app/apply_look.rs`: WholeApp {scopes, calm}, AllTerminals, Pane);
+    `apply_theme`/`set_theme_all`/`set_theme_for_tab` are wrappers. Never
+    write `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from a
+    new button. Bundles and Shuffle still have their own paths.
+  - Anything that replaces a pane's theme calls `settle_pane_draft` first.
+  - Only the Calm button turns Calm on; Apply leaves it alone.
+  - Labels name the edit target (`edit_target_theme`), not the shared theme.
+  - Add a row to `every_button_from_every_state_gives_one_consistent_result`
+    for any new button or starting state, and update the doc's tables.
 
 ## Pane and input rules
 
@@ -150,8 +157,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   stamped from egui's font atlas into a mask, a chamfer distance map (capped
   at 0.9 MP, rebuilt only when the text on screen changes), colored through
   `ring_stops` and drawn as one texture.
-  Inversion backs runs with their foreground (whole rows use default foreground),
-  uses background for ink, and preserves explicit TUI/selection/search colors.
+  Inversion backs runs with their foreground (whole rows use the color of
+  the row's first visible character), uses background for ink, ignores custom
+  backing palettes while on, and preserves explicit TUI/selection/search colors.
   Web backing lives in `shader-playground/text-backing.js`; layout switches must
   preserve `backing-*` classes. Deploy the JS module along with app.js.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover

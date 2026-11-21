@@ -75,6 +75,8 @@ palette, fonts, gradient, and special effects. This keeps an app-only apply from
 silently replacing terminal colors (or vice versa). Calm apply uses the chosen
 gradient colors but disables gradient motion, static, and scanlines. Preferences
 from the earlier single-theme schema migrate that one ID into all five sources.
+Per-pane themes, fonts, bundles, the theme editor and how each button changes
+them are described in [LOOK-STATE.md](LOOK-STATE.md).
 
 The 26 scalable legacy font binaries and bundled emoji face are embedded and
 registered at startup. The native catalog also discovers local system folders
