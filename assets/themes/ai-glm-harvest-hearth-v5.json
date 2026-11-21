@@ -1,0 +1,200 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff7a45",
+        "#ffb347",
+        "#7a2e8e",
+        "#1a0f2e",
+        "#ffe9c7"
+      ],
+      "custom": {
+        "expression": "let warp = noise(vec2<f32>(p.x * 2.0 + t * 0.1, p.y * 1.5)) - 0.5;\nvar acc = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let phase = k * 0.9 + warp * 2.0;\n    let freq = 2.0 + 0.4 * k;\n    let base = (k - 2.5) * 0.09;\n    let wave_y = base + wave_amp * sin(p.x * freq + t * (wave_speed + 0.05 * k) + phase) * (1.0 - 0.1 * k);\n    let dist = abs(p.y - wave_y - warp * 0.05);\n    let crisp = 1.0 - smoothstep(0.0, line_width * (1.0 + 0.3 * k), dist);\n    let glow_band = exp(-dist * 28.0) * 0.35;\n    let tint = mix(mix(c3, c2, k / 5.0), c5, step(4.0, k));\n    acc += tint * (crisp + glow_band) * (0.6 + 0.4 * k / 5.0);\n}\nlet wash = mix(c4 * 0.6, c3 * 0.35, smoothstep(-0.5, 0.5, p.y));\nlet color = wash + acc * mix(c1, c2, 0.5);\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Ember Tide Waves",
+        "variables": [
+          {
+            "max": 0.4000000059604645,
+            "min": 0.05000000074505806,
+            "name": "wave_amp",
+            "value": 0.20000000298023224
+          },
+          {
+            "max": 1.5,
+            "min": 0.10000000149011612,
+            "name": "wave_speed",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 0.019999999552965164,
+            "min": 0.0020000000949949026,
+            "name": "line_width",
+            "value": 0.006000000052154064
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.1599999964237213,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-13T09:04:06.683Z",
+    "description": "Cozy autumn coding nights: espresso-brown canvas warmed by copper, pumpkin and gold, with cranberry and forest-green tones for comfortable long sessions.",
+    "id": "ai-glm-harvest-hearth-v5",
+    "name": "AI Glm - Harvest Hearth v5",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ai-glm-harvest-hearth-v5",
+    "updatedAt": "2026-11-13T09:32:51.375Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e3b341",
+        "background": "#0c0500",
+        "buttonBackground": "#362617",
+        "buttonHover": "#4a3420",
+        "buttonText": "#f5e9d8"
+      },
+      "settings": {
+        "background": "#251a10"
+      },
+      "shell": {
+        "accent": "#b35c22",
+        "accentHover": "#8f4517",
+        "background": "#1a120b",
+        "backgroundSecondary": "#251a10",
+        "border": "#8a613a",
+        "buttonBackground": "#362617",
+        "paneDivider": {
+          "color": "#b35c22",
+          "thickness": 2.0
+        },
+        "textDim": "#c9b295",
+        "textMain": "#f5e9d8"
+      },
+      "statusBar": {
+        "background": "#1b0e0e",
+        "border": "#8a613a",
+        "text": "#e8d5b5",
+        "warning": "#f2c14e"
+      },
+      "tabs": {
+        "activeBackground": "#1a120b",
+        "activeBorder": "#c97a35",
+        "background": "#251a10",
+        "idleBackground": "#2f2114"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2a1c10",
+        "blue": "#85a3cc",
+        "brightBlack": "#8a7057",
+        "brightBlue": "#a9c3e0",
+        "brightCyan": "#9ed2c4",
+        "brightGreen": "#a8d183",
+        "brightMagenta": "#dfa8cd",
+        "brightRed": "#f28089",
+        "brightWhite": "#fff8ec",
+        "brightYellow": "#f6cf6b",
+        "cyan": "#6fb3a3",
+        "green": "#86b45e",
+        "magenta": "#c586b4",
+        "red": "#d9525f",
+        "white": "#ece2d3",
+        "yellow": "#e3b341"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f2e6cf",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

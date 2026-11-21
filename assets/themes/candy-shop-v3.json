@@ -10,25 +10,42 @@
     "shaderBackground": {
       "animated": true,
       "colors": [
-        "#c20606",
-        "#0a5e00",
-        "#04004c"
+        "#ff9f1c",
+        "#ff2bd6",
+        "#00e5ff",
+        "#2a0f3d",
+        "#ffe066"
       ],
       "custom": {
-        "expression": "let x = p.x * (3.0 + amount * 0.65);\nlet drift = t * 0.7;\nlet envelope = 0.18 + 0.52 * noise(vec2<f32>(p.x * 1.2 - t * 0.3, t * 0.18));\nlet a = envelope * (0.68 * sin(x * 4.1 + drift + noise(vec2<f32>(x * 0.8, t * 0.6)) * 12.0) + 0.32 * sin(x * 11.3 - t * 2.0));\nlet b = envelope * (0.65 * sin(x * 3.7 - drift + noise(vec2<f32>(x * 0.9 + 17.0, t * 0.5)) * 14.0) + 0.35 * cos(x * 9.7 + t * 1.5));\nlet d = envelope * (0.72 * cos(x * 4.8 + drift + noise(vec2<f32>(x * 0.7 + 31.0, t * 0.4)) * 11.0) + 0.28 * sin(x * 13.1 - t * 1.8));\nlet da = abs(p.y - a);\nlet db = abs(p.y - b);\nlet dd = abs(p.y - d);\nlet lineA = 0.62 * exp(-da * 170.0) + 0.085 * exp(-da * 22.0);\nlet lineB = 0.58 * exp(-db * 190.0) + 0.075 * exp(-db * 25.0);\nlet lineC = 0.55 * exp(-dd * 210.0) + 0.07 * exp(-dd * 28.0);\nlet colorA = hsv(fract(0.48 + p.x * 0.035 + t * 0.018), 0.92, 1.0);\nlet colorB = hsv(fract(0.89 - p.x * 0.04 - t * 0.014), 0.95, 1.0);\nlet colorC = hsv(fract(0.08 + p.x * 0.025 + t * 0.012), 0.96, 1.0);\nlet gridPos = abs(fract(p * vec2<f32>(6.0, 9.0) + vec2<f32>(0.5)) - vec2<f32>(0.5));\nlet grid = exp(-min(gridPos.x, gridPos.y) * 140.0);\nlet base = mix(c1, c3, 0.5 + 0.5 * sin(p.x * 0.6)) * vec3<f32>(0.022) + c2 * vec3<f32>(grid * 0.012);\nlet signal = colorA * vec3<f32>(lineA) + colorB * vec3<f32>(lineB) + colorC * vec3<f32>(lineC);\nreturn clamp(base + signal, vec3<f32>(0.0), vec3<f32>(0.8));",
+        "expression": "let q = p * density;\nlet r = vec2<f32>(1.0, 1.7320508);\nlet h = r * 0.5;\nlet ga = (fract(q / r) - 0.5) * r;\nlet gb = (fract((q - h) / r) - 0.5) * r;\nlet gv = select(gb, ga, length(ga) < length(gb));\nlet cell = q - gv;\nlet e = abs(gv);\nlet hd = max(dot(e, vec2<f32>(0.5, 0.8660254)), e.x);\nlet edge = max(0.5 - hd, 0.0);\nlet idh = hash(cell);\nlet on = step(0.45, idh);\nlet lane = hash(vec2<f32>(floor(cell.y * 0.5), 7.0)) * 3.0;\nlet front = fract(cell.x * 0.12 - t * pulse_speed + lane);\nlet pk = exp(-front * 12.0) * on;\nlet body = mix(c4, c2 * 0.25, idh * 0.6) * (0.6 + 0.4 * on);\nlet edge_col = mix(c1, c2, hash(cell + vec2<f32>(3.1, 7.7)));\nlet line_glow = exp(-edge * 60.0) + exp(-edge * 12.0) * 0.3 * glow_amount;\nlet packet = c5 * pk * 1.4 + c1 * pk * 0.4 * (0.5 + idh);\nlet color = body + edge_col * line_glow * (0.5 + 0.5 * on) + packet;\nreturn mix(bg, tonemap(color), strength);",
+        "name": "Hive Circuit",
         "variables": [
           {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "amount",
-            "value": 3.799999952316284
+            "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "pulse_speed",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 16.0,
+            "min": 6.0,
+            "name": "density",
+            "value": 11.0
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "glow_amount",
+            "value": 1.0
           }
-        ]
+        ],
+        "y_up": true
       },
       "preset": "candy",
       "scale": 2.4000000953674316,
       "speed": 2.0,
       "strength": 0.6499999761581421,
+      "theme_colors": false,
       "version": 1
     },
     "simpleNoiseAmount": 24.0,
@@ -55,7 +72,7 @@
     "name": "Candy Shop v3",
     "nativeThemeVersion": 1,
     "releasePickFrom": "personal:imported-default-da364bab3a22:candy-shop-v3",
-    "updatedAt": "2026-10-28T21:13:10.467Z"
+    "updatedAt": "2026-11-15T02:31:37.991Z"
   },
   "nativeAppearance": {
     "advanced_effects": true,

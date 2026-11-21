@@ -69,6 +69,15 @@ fn long_listing_folder(row: &str) -> Option<String> {
     Some(rest.trim().to_owned())
 }
 
+/// The row after the newest listing command on screen (0 if it scrolled off).
+pub(super) fn listing_start(rows: &[(String, Vec<bool>)]) -> usize {
+    rows.iter()
+        .rposition(|(text, _)| {
+            typed_command(text).is_some_and(|command| first_word_in(command, &LIST_COMMANDS))
+        })
+        .map_or(0, |row| row + 1)
+}
+
 /// Folder names in the newest listing on screen. `rows` are the displayed
 /// lines with a flag per character for folder-colored cells.
 pub(super) fn listed_folders(rows: &[(String, Vec<bool>)]) -> Vec<String> {
@@ -264,6 +273,13 @@ impl ButtonsApp {
                 crate::i18n::literal(&self.locale, "A button for each folder after ls or dir"),
             )
             .on_hover_text(crate::i18n::literal(&self.locale, "Reads the folders from the listing on screen (colored names, a trailing slash, or the d / <DIR> column), so it also works over SSH. Clicking one types cd \"name\". The buttons go away after the next cd."))
+            .changed();
+        changed |= ui
+            .spaced_checkbox(
+                &mut navigation.in_terminal,
+                crate::i18n::literal(&self.locale, "Folder names in the listing become buttons inside the terminal"),
+            )
+            .on_hover_text(crate::i18n::literal(&self.locale, "Draws each folder name of the newest ls or dir as a button over its own text, in every pane. Click to cd into it; dragging over it still selects text. Full-screen programs never get buttons. The screen is only re-read when output changes."))
             .changed();
         ui.spaced_label(
             RichText::new(crate::i18n::literal(&self.locale, "Folder buttons depend on how your shell prints listings. A plain ls with colors off and no -F shows no folders."))

@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#241e40",
+        "#514879",
+        "#ff6554",
+        "#ffd79b",
+        "#75cec9"
+      ],
+      "custom": {
+        "expression": "let tick=floor(t*24.0);\nlet roll=1.0-smoothstep(0.0,0.045,abs(fract(t/8.0-p.y)-0.5));\nlet n=hash(vec2<f32>(floor(p.y*360.0),tick));\nlet q=p+vec2<f32>((n-0.5)*(0.002+roll*0.014)*cable_noise,0.0);\nlet wave=q.y+0.025*sin(q.x*3.0+t*0.18);\nlet copper=0.5+0.5*cos(floor(wave*100.0)*0.32-t*0.24);\nvar rgb=mix(c2,c5*0.74,copper*copper*0.82);\nlet h=max(-0.12-q.y,0.0);\nlet uv=vec2<f32>(q.x,0.43)/(h+0.035)+vec2<f32>(0.0,t*0.24);\nlet grid=abs(fract(uv)-0.5);\nlet wire=(1.0-smoothstep(0.012,0.045,min(grid.x,grid.y)))*smoothstep(0.01,0.16,h);\nrgb=mix(rgb,mix(c2*0.68,c5,wire*0.7),smoothstep(0.0,0.012,h));\nlet cx=0.38*sin(t*0.31+0.8);\nlet lift=abs(sin(t*0.74));\nlet shadow=length((q-vec2<f32>(cx,-0.39))*vec2<f32>(1.0,4.8));\nrgb=mix(rgb,c1,(1.0-smoothstep(0.0,0.21,shadow))*(0.83-0.4*lift));\nlet xy=q-vec2<f32>(cx,-0.235+0.25*lift);\nvar z=0.32;\nfor(var i=0;i<20;i++){\nlet d=length(vec3<f32>(xy,z))-0.15;\nz-=clamp(d,0.0,0.09);\n}\nlet norm=normalize(vec3<f32>(xy,max(z,0.001)));\nlet tile=floor(atan2(norm.z,norm.x)*1.91+t*0.52)+floor(atan2(norm.y,length(norm.xz))*2.55);\nlet shell=mix(c3,c4,fract(tile*0.5)*2.0);\nrgb=mix(rgb,shell*(0.52+0.48*saturate(dot(norm,vec3<f32>(-0.42,0.62,0.66)))),fill(length(xy)-0.15));\nlet panel=q-vec2<f32>(0.0,0.32);\nlet box=sd_box(panel,vec2<f32>(0.544,0.096));\nrgb=mix(rgb,c1*0.66,fill(box));\nrgb=mix(rgb,c3,stroke(box+0.008,0.0025)*(0.6+0.4*cos(t*2.1)));\nlet g=(vec2<f32>(panel.x,-panel.y)+vec2<f32>(0.414,0.055))*vec2<f32>(26.5,18.0);\nlet col=i32(floor(g.x));\nlet row=i32(floor(g.y));\nlet b=col/4;\nvar w=0u;\nif(row==0){if(b==0){w=0x534F4654u;}if(b==1){w=0x57415245u;}if(b==2){w=0x20464149u;}if(b==3){w=0x4C555245u;}}\nif(row==1){if(b==0){w=0x47555255u;}if(b==1){w=0x204D4544u;}if(b==2){w=0x49544154u;}if(b==3){w=0x494F4E20u;}if(b==4){w=0x23303030u;}if(b==5){w=0x34000000u;}}\nlet a=(w>>(8u*(3u-(u32(max(col,0))&3u))))&255u;\nvar f=0u;\nif(a==83u){f=0x74217u;}if(a==79u||a==48u){f=0x75557u;}if(a==70u){f=0x74644u;}if(a==84u){f=0x72222u;}if(a==87u){f=0x55775u;}if(a==65u){f=0x25755u;}if(a==82u){f=0x65655u;}if(a==69u){f=0x74647u;}if(a==73u){f=0x72227u;}if(a==76u){f=0x44447u;}if(a==85u){f=0x55557u;}if(a==71u){f=0x34553u;}if(a==77u){f=0x57755u;}if(a==68u){f=0x65556u;}if(a==78u){f=0x57775u;}if(a==35u){f=0x57575u;}if(a==52u){f=0x55711u;}\nlet u=fract(g)*vec2<f32>(4.0,7.0);\nfor(var i=0;i<2;i++){\nlet x=u.x-f32(1-i)*color_bleed*0.7;\nlet k=u32(max(4.0-floor(u.y),0.0))*4u+u32(max(2.0-floor(x),0.0));\nif(col>=0&&x>=0.0&&x<3.0&&u.y<5.0&&((f>>k)&1u)>0u){rgb=select(c2,c3,i==1);}\n}\nreturn mix(bg,mix(rgb,c5,n*roll*cable_noise*0.16),strength);",
+        "name": "Guru Copperfield Amiga 500",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "cable_noise",
+            "value": 0.7699999809265137
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "color_bleed",
+            "value": 0.6499999761581421
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "galaxy",
+      "scale": 0.8999999761581421,
+      "speed": 2.799999952316284,
+      "strength": 0.8500000238418579,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-16T22:14:35.440Z",
+    "description": "A coral fault light over copper-list seafoam and plum, with warm ivory type.",
+    "id": "guru-copperfield",
+    "name": "Guru Copperfield",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:guru-copperfield",
+    "updatedAt": "2026-11-18T06:36:08.059Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffa38d",
+        "background": "#29243c",
+        "buttonBackground": "#232736",
+        "buttonHover": "#363a47",
+        "buttonText": "#dae2f2"
+      },
+      "settings": {
+        "background": "#29243c"
+      },
+      "shell": {
+        "accent": "#ff6554",
+        "accentHover": "#ffa38d",
+        "background": "#171426",
+        "backgroundSecondary": "#29243c",
+        "border": "#655978",
+        "buttonBackground": "#232736",
+        "paneDivider": {
+          "color": "#ff6554",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#c2b4ca",
+        "textMain": "#fff0df"
+      },
+      "statusBar": {
+        "background": "#29243c",
+        "border": "#655978",
+        "text": "#c2b4ca",
+        "warning": "#ffd79b"
+      },
+      "tabs": {
+        "activeBackground": "#171426",
+        "activeBorder": "#ff6554",
+        "background": "#29243c",
+        "idleBackground": "#29243c"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#241e40",
+        "blue": "#a8adf0",
+        "brightBlack": "#988ba8",
+        "brightBlue": "#cdceff",
+        "brightCyan": "#a4eee4",
+        "brightGreen": "#b9e9aa",
+        "brightMagenta": "#ffd0e3",
+        "brightRed": "#ffa38d",
+        "brightWhite": "#fff6eb",
+        "brightYellow": "#ffe8ba",
+        "cyan": "#75cec9",
+        "green": "#9bcb91",
+        "magenta": "#eca2c5",
+        "red": "#ff6554",
+        "white": "#e8dcce",
+        "yellow": "#ffd79b"
+      },
+      "background": "#191627",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "monof55 Bundled",
+      "fontSize": 16.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#fff0df",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#241e40",
+        "#514879",
+        "#75cec9",
+        "#ff6554"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.3
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.7
+      },
+      "tabs": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.6
+      },
+      "terminal": {
+        "fontFamily": "monof55 Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

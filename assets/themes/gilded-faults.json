@@ -1,0 +1,279 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#2f6d78",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 3.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#291b24",
+        "#b57a50",
+        "#ffbc56",
+        "#b98ae8",
+        "#ffe09a"
+      ],
+      "custom": {
+        "expression": "let clock = t * (6.2831853 / 3600.0);\nlet drift = vec2<f32>(sin(clock * 47.0), cos(clock * 59.0));\nlet g = rotate(p, -0.19) * (5.7 / plate_size);\nlet strain = vec2<f32>(1.0 + 0.045 * drift.x, 1.0 - 0.038 * drift.y);\nlet warp_at = g * 0.68 + drift * 0.19;\nlet warp = vec2<f32>(noise(warp_at), noise(warp_at + vec2<f32>(19.3, 7.1)));\nlet q = g * strain + (warp - vec2<f32>(0.5)) * 0.61 + drift * 0.14;\nlet cell = voronoi(q);\nlet probe = voronoi(q + vec2<f32>(-0.020, 0.021));\nlet slope = clamp((probe.y - cell.y) / 0.028, -1.0, 1.0);\n\nlet breath = 0.5 + 0.5 * sin(clock * 87.0 + dot(q, vec2<f32>(0.73, -0.51)));\nlet lip = cell.y - fault_width * (0.76 + 0.48 * breath);\nlet face = smoothstep(-0.006, 0.012, lip);\nlet bevel = 1.0 - smoothstep(0.009, 0.069, lip);\nlet spill = exp(-max(lip, 0.0) * 20.0);\n\nlet oxide = fbm(q * 3.3 + vec2<f32>(cell.z * 13.0, 4.6));\nlet grain = noise(rotate(q, cell.z * 2.6) * vec2<f32>(12.0, 92.0));\nlet pits = smoothstep(0.73, 0.92, noise(q * 48.0));\nlet polish = clamp(0.34 + cell.z * 0.29 + (oxide - 0.45) * 1.16\n    + (grain - 0.5) * 0.16 - pits * 0.25 - cell.x * 0.13, 0.17, 0.96);\nlet bronze = mix(c1, c2, polish);\nlet cut = bronze * (1.0 - bevel * 0.44 * max(-slope, 0.0));\n\nlet wave = sin(dot(p, vec2<f32>(9.0, 4.2)) + warp.x * 0.75\n    - clock * round(141.0 * sheen_speed));\nlet flash = smoothstep(0.83, 0.998, wave) * violet_sheen;\nlet current = noise(q * 5.7 + drift * 0.64);\nlet heart = 1.0 - smoothstep(0.003, fault_width * 0.8, cell.y);\nlet honey = mix(c3 * 0.74, c5, heart * (0.32 + 0.48 * current));\nlet melt = mix(honey, c4, flash * (0.53 + 0.24 * heart));\nlet glint = bevel * smoothstep(0.04, 0.92, slope);\nlet rim = mix(c3, c4, flash * 0.82);\nlet plate = mix(cut, rim, spill * 0.12 + glint * 0.49);\nreturn mix(bg, mix(melt, plate, face), strength);",
+        "name": "Gilded Faults",
+        "variables": [
+          {
+            "max": 1.649999976158142,
+            "min": 0.6499999761581421,
+            "name": "plate_size",
+            "value": 1.4299999475479126
+          },
+          {
+            "max": 0.08500000089406967,
+            "min": 0.02500000037252903,
+            "name": "fault_width",
+            "value": 0.07000000029802322
+          },
+          {
+            "max": 2.0,
+            "min": 0.25,
+            "name": "sheen_speed",
+            "value": 1.7000000476837158
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "violet_sheen",
+            "value": 0.8700000047683716
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "curtains",
+      "scale": 0.6000000238418579,
+      "speed": 5.400000095367432,
+      "strength": 0.7699999809265137,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 33.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 74.0,
+    "staticAmplitude": 12.0,
+    "staticBrightness": 32.0,
+    "staticDensity": 0.119999997317791,
+    "staticEnabled": false,
+    "staticIntensity": 9.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-19T01:30:45.342Z",
+    "description": "Smoked bronze plates with molten honey seams and a passing violet sheen.",
+    "id": "gilded-faults",
+    "name": "Gilded Faults",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:gilded-faults",
+    "updatedAt": "2026-11-19T02:17:37.790Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "assistant": null,
+      "controls": null,
+      "layout": null,
+      "presetDock": {
+        "accent": "#ffe09a",
+        "activeBackground": null,
+        "activeForeground": null,
+        "background": "#211820",
+        "border": null,
+        "buttonBackground": "#500035",
+        "buttonHover": "#6b0047",
+        "buttonText": "#ffffff",
+        "foreground": null,
+        "headerBackground": null,
+        "itemGap": null,
+        "padding": null,
+        "text": null,
+        "widthAccent": null
+      },
+      "settings": {
+        "background": "#211820"
+      },
+      "shell": {
+        "accent": "#ffbc56",
+        "accentHover": "#ffe09a",
+        "background": "#130f13",
+        "backgroundSecondary": "#211820",
+        "border": "#563c37",
+        "borderColor": null,
+        "buttonBackground": "#14000d",
+        "foreground": null,
+        "paneDivider": {
+          "color": "#ffbc56",
+          "thickness": 2.0
+        },
+        "shadow": null,
+        "shadowColor": null,
+        "textDim": "#b6a099",
+        "textMain": "#f1e4d4"
+      },
+      "statusBar": {
+        "accent": null,
+        "background": "#211820",
+        "border": "#563c37",
+        "borderColor": null,
+        "error": null,
+        "foreground": null,
+        "height": null,
+        "success": null,
+        "text": "#b6a099",
+        "warning": "#ffbc56"
+      },
+      "tabs": {
+        "0": null,
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": null,
+        "active": null,
+        "activeBackground": "#130f13",
+        "activeBorder": "#ffbc56",
+        "activeBorderColor": null,
+        "activeForeground": null,
+        "activeTabBackground": null,
+        "activeTabForeground": null,
+        "background": "#211820",
+        "border": null,
+        "foreground": null,
+        "gap": null,
+        "height": null,
+        "hoverBackground": null,
+        "idleBackground": "#211820",
+        "inactiveBackground": null,
+        "inactiveForeground": null,
+        "inactiveTabForeground": null,
+        "paddingX": null,
+        "radius": null,
+        "separator": null,
+        "textActive": null,
+        "textIdle": null
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#291b24",
+        "blue": "#91a5ce",
+        "brightBlack": "#8e746e",
+        "brightBlue": "#b5c8ef",
+        "brightCyan": "#a8dad5",
+        "brightGreen": "#c0d4a0",
+        "brightMagenta": "#dbb6ff",
+        "brightRed": "#ffa499",
+        "brightWhite": "#fff2e4",
+        "brightYellow": "#ffe09a",
+        "cyan": "#82bbb8",
+        "green": "#a1b785",
+        "magenta": "#b98ae8",
+        "red": "#e17f76",
+        "white": "#e3cdb9",
+        "yellow": "#ffbc56"
+      },
+      "background": "#100c10",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "iA Writer Mono S Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f7ebdd",
+      "gradientAngle": 90.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#291b24",
+        "#b57a50",
+        "#ffbc56",
+        "#b98ae8"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.25
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15
+      },
+      "shell": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.1
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.55
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.65
+      },
+      "terminal": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

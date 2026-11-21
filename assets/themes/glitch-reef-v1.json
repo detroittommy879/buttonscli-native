@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff4fd8",
+        "#6fd3ff",
+        "#ffe866",
+        "#2a1450",
+        "#9dff7a"
+      ],
+      "custom": {
+        "expression": "let tt = t * wave_speed;\nlet grid = abs(fract(p * vec2<f32>(10.0, 6.0)) - 0.5);\nlet grid_line = smoothstep(0.46, 0.5, max(grid.x, grid.y));\nlet base = mix(bg, c4, smoothstep(-0.5, 0.5, p.y) * 0.8) + c2 * grid_line * 0.08;\nvar glow_col = vec3<f32>(0.0);\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let f = 1.0 + k * 0.6;\n    let x = p.x * 3.14159 * f + tt * (0.6 + 0.3 * k);\n    let amp = 0.16 - 0.025 * k;\n    let fund = sin(x + k * 1.7);\n    let h2 = sin(2.0 * x - tt * 0.9 + k) * harmonic_mix * 0.45;\n    let h3 = sin(3.0 * x + tt * 0.4) * harmonic_mix * 0.2;\n    let y = (fund + h2 + h3) * amp;\n    let d = abs(p.y - y);\n    let wave_line = 1.0 - smoothstep(0.0015, 0.0045, d);\n    let bloom = exp(-d * 30.0) * 0.5;\n    let tint = mix(mix(c1, c2, smoothstep(0.5, 1.5, k)), mix(c3, c5, smoothstep(2.5, 3.0, k)), smoothstep(1.5, 2.5, k));\n    glow_col += tint * (wave_line + bloom);\n}\nreturn mix(bg, tonemap(base + glow_col * 1.3), strength);",
+        "name": "Harmonic Wave",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "harmonic_mix",
+            "value": 0.5
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "ocean",
+      "scale": 2.299999952316284,
+      "speed": 2.4000000953674316,
+      "strength": 0.12999999523162842,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T00:44:37.407Z",
+    "description": "Deep teal reef with scrambled ANSI colors: red is green, green is blue, blue is amber.",
+    "id": "glitch-reef-v1",
+    "name": "Glitch Reef v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:glitch-reef-v1",
+    "updatedAt": "2026-11-14T22:35:16.479Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff8ff7",
+        "background": "#0d2a2f",
+        "buttonBackground": "#170f10",
+        "buttonHover": "#482327",
+        "buttonText": "#e5eaf2"
+      },
+      "settings": {
+        "background": "#0d2a2f"
+      },
+      "shell": {
+        "accent": "#ff3df0",
+        "accentHover": "#ff8ff7",
+        "background": "#06191c",
+        "backgroundSecondary": "#0d2a2f",
+        "border": "#1f5257",
+        "buttonBackground": "#170f10",
+        "paneDivider": {
+          "color": "#ff3df0",
+          "thickness": 2.0
+        },
+        "textDim": "#9fd6c8",
+        "textMain": "#f0fff4"
+      },
+      "statusBar": {
+        "background": "#0d2a2f",
+        "border": "#1f5257",
+        "text": "#9fd6c8",
+        "warning": "#ff3df0"
+      },
+      "tabs": {
+        "activeBackground": "#06191c",
+        "activeBorder": "#ff3df0",
+        "background": "#0d2a2f",
+        "idleBackground": "#0d2a2f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#ff5ea8",
+        "blue": "#ffb020",
+        "brightBlack": "#ffd166",
+        "brightBlue": "#ffc86b",
+        "brightCyan": "#ff7a5c",
+        "brightGreen": "#8fb8ff",
+        "brightMagenta": "#7bf0ff",
+        "brightRed": "#9dff6a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ff8fe8",
+        "cyan": "#ff4d2e",
+        "green": "#6aa8ff",
+        "magenta": "#00d9ff",
+        "red": "#3dff7a",
+        "white": "#c9f7e6",
+        "yellow": "#ff3df0"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f0fff4",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0b2a2e",
+        "#ff3df0",
+        "#ffb020",
+        "#00d9ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Noto Sans KR Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Code New Roman Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

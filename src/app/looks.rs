@@ -8,11 +8,18 @@ pub(super) const SHOWOFF_BUNDLE: &str = "summer-storm-winter-autumn";
 pub(super) const MODERATE_BUNDLE: &str = "Pane Focus / Spectrum Steps";
 /// Plain near-black theme for the "Minimal" look.
 const MINIMAL_THEME: &str = "basic2";
+/// Plain black, high-contrast theme for the "Basic" look.
+pub(super) const BASIC_THEME: &str = "readable-black";
+/// Auto contrast floor the "Basic" look turns on (7:1, WCAG AAA).
+const BASIC_MIN_CONTRAST: u8 = 70;
 /// Moderate motion: half of each theme's own speed.
 const MODERATE_MOTION: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum LookPreset {
+    /// Everything plain and still: black panes, no shaders, Motion 0%,
+    /// the bundled Recursive fonts everywhere and auto contrast on.
+    Basic,
     /// Hidden left panel, plain black, no shaders or motion.
     Minimal,
     /// Mild shader backgrounds and a different color per pane.
@@ -23,10 +30,12 @@ pub(super) enum LookPreset {
 }
 
 impl LookPreset {
-    pub(super) const ALL: [LookPreset; 3] = [Self::Minimal, Self::Moderate, Self::Showoff];
+    pub(super) const ALL: [LookPreset; 4] =
+        [Self::Basic, Self::Minimal, Self::Moderate, Self::Showoff];
 
     pub(super) fn label(self) -> &'static str {
         match self {
+            Self::Basic => crate::i18n::key("Basic"),
             Self::Minimal => crate::i18n::key("Minimal"),
             Self::Moderate => crate::i18n::key("Moderate"),
             Self::Showoff => crate::i18n::key("Showoff"),
@@ -35,6 +44,9 @@ impl LookPreset {
 
     pub(super) fn description(self) -> &'static str {
         match self {
+            Self::Basic => crate::i18n::key(
+                "Every pane plain black and still: no shaders or motion, Recursive fonts across the app, and text kept at 7:1 contrast.",
+            ),
             Self::Minimal => {
                 crate::i18n::key("Plain black panes, left panel hidden, no shader backgrounds or motion.")
             }
@@ -48,35 +60,38 @@ impl LookPreset {
     }
 }
 
-/// A three-stop slider (Minimal, Moderate, Showoff) with the stop names under it.
+/// A slider with one stop per look (Basic … Showoff) and the names under it.
 /// Returns true when the choice changed.
 pub(super) fn look_slider(locale: &str, ui: &mut egui::Ui, look: &mut LookPreset) -> bool {
     let mut index = LookPreset::ALL
         .iter()
         .position(|candidate| candidate == look)
-        .unwrap_or(1);
+        .unwrap_or(2);
     let before = index;
     ui.vertical(|ui| {
         let width = ui.available_width().min(360.0);
         ui.spacing_mut().slider_width = width;
         let slider = ui.add(
-            egui::Slider::new(&mut index, 0..=2)
+            egui::Slider::new(&mut index, 0..=LookPreset::ALL.len() - 1)
                 .show_value(false)
                 .trailing_fill(true),
         );
-        // Each name sits under its stop: left, centre and right of the track.
+        // Each name sits under its stop; the end names align to the track ends.
         let font = egui::TextStyle::Body.resolve(ui.style());
         let (row, _) = ui.allocate_exact_size(
             egui::vec2(slider.rect.width(), font.size + 6.0),
             egui::Sense::hover(),
         );
         for (stop, preset) in LookPreset::ALL.iter().enumerate() {
-            let anchor = [
-                egui::Align2::LEFT_TOP,
-                egui::Align2::CENTER_TOP,
-                egui::Align2::RIGHT_TOP,
-            ][stop];
-            let x = row.left() + row.width() * stop as f32 / 2.0;
+            let last = LookPreset::ALL.len() - 1;
+            let anchor = if stop == 0 {
+                egui::Align2::LEFT_TOP
+            } else if stop == last {
+                egui::Align2::RIGHT_TOP
+            } else {
+                egui::Align2::CENTER_TOP
+            };
+            let x = row.left() + row.width() * stop as f32 / last as f32;
             let color = if stop == index {
                 ui.visuals().strong_text_color()
             } else {
@@ -121,11 +136,52 @@ pub(super) fn motion_speed_drag(locale: &str, ui: &mut egui::Ui, speed: &mut f32
     response.drag_stopped() || (response.changed() && !response.dragged())
 }
 
+/// The bundled Recursive Casual faces everywhere: Sans for the app's
+/// chrome, Mono for terminals. Sizes stay as they are.
+fn use_basic_fonts(typography: &mut crate::fonts::Typography) {
+    for zone in [
+        &mut typography.shell,
+        &mut typography.tabs,
+        &mut typography.preset_dock,
+        &mut typography.settings,
+        &mut typography.assistant,
+        &mut typography.status_bar,
+    ] {
+        zone.family = crate::fonts::DEFAULT_DISPLAY_FONT.into();
+        zone.weight = 400;
+        zone.letter_spacing = 0.0;
+    }
+    typography.terminal.family = crate::fonts::DEFAULT_MONO_FONT.into();
+    typography.terminal.weight = 400;
+    typography.terminal.letter_spacing = 0.0;
+}
+
 impl ButtonsApp {
     /// Applies a whole-app look: panel, shaders, motion and themes.
     pub(super) fn apply_look_preset(&mut self, ctx: &egui::Context, look: LookPreset) {
         let prefs = &mut self.preferences;
         match look {
+            LookPreset::Basic => {
+                prefs.show_sidebar = false;
+                prefs.shader_backgrounds_enabled = false;
+                prefs.pane_colors_distinct = false;
+                prefs.calm_mode = true;
+                prefs.classic_effects = false;
+                prefs.motion_speed = 0.0;
+                prefs.shuffle.enabled = false;
+                prefs.strength_override.enabled = false;
+                // Black is already readable: no backing colors, just the floor.
+                prefs.text_backing.colors.clear();
+                prefs.text_backing.text_color.clear();
+                prefs.text_backing.override_theme_colors = false;
+                prefs.text_backing.auto_contrast = true;
+                prefs.text_backing.min_contrast = BASIC_MIN_CONTRAST;
+                self.perform_global_theme_action(PaneAction::Theme(BASIC_THEME.into()));
+                // After the theme, which may bring its own typography.
+                use_basic_fonts(&mut self.preferences.typography);
+                self.pane_fonts.clear();
+                ctx.request_repaint();
+            }
             LookPreset::Minimal => {
                 prefs.show_sidebar = false;
                 prefs.shader_backgrounds_enabled = false;
@@ -156,7 +212,10 @@ impl ButtonsApp {
     /// The look currently on screen, when it still matches a preset's switches.
     fn current_look(&self) -> Option<LookPreset> {
         let prefs = &self.preferences;
-        if !prefs.shader_backgrounds_enabled && prefs.calm_mode && !prefs.show_sidebar {
+        let plain = !prefs.shader_backgrounds_enabled && prefs.calm_mode && !prefs.show_sidebar;
+        if plain && prefs.motion_speed == 0.0 && prefs.theme_id == BASIC_THEME {
+            Some(LookPreset::Basic)
+        } else if plain {
             Some(LookPreset::Minimal)
         } else if prefs.shader_backgrounds_enabled && !prefs.calm_mode {
             Some(if prefs.motion_speed < 1.0 {
@@ -451,5 +510,27 @@ mod tests {
         assert!(app.theme_overrides.is_empty());
         assert_eq!(app.preferences.theme_id, MINIMAL_THEME);
         assert_eq!(app.current_look(), Some(LookPreset::Minimal));
+
+        app.apply_look_preset(&ctx, LookPreset::Showoff);
+        app.apply_look_preset(&ctx, LookPreset::Basic);
+        let prefs = &app.preferences;
+        assert!(!prefs.shader_backgrounds_enabled && prefs.calm_mode);
+        assert_eq!(prefs.motion_speed, 0.0);
+        assert!(app.theme_overrides.is_empty(), "every pane goes plain");
+        assert_eq!(prefs.theme_id, BASIC_THEME);
+        assert_eq!(
+            app.terminal_presentation().terminal_colors.background,
+            "#000000"
+        );
+        assert!(prefs.text_backing.auto_contrast);
+        assert_eq!(
+            prefs.typography.terminal.family,
+            crate::fonts::DEFAULT_MONO_FONT
+        );
+        assert_eq!(
+            prefs.typography.shell.family,
+            crate::fonts::DEFAULT_DISPLAY_FONT
+        );
+        assert_eq!(app.current_look(), Some(LookPreset::Basic));
     }
 }

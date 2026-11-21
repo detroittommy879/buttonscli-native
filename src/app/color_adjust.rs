@@ -789,6 +789,30 @@ mod tests {
         let _ = std::fs::remove_dir_all(base);
     }
 
+    /// Library "Theme all" (and Apply, bundles) used to restore the preview,
+    /// throwing away a pane's unsaved edit. It is kept as its own theme now.
+    #[test]
+    fn theme_all_keeps_a_pane_edit_and_the_header_names_the_edited_theme() {
+        let (_ctx, mut app, base) = test_app(2, "theme-all-keeps-edit");
+        let pane = app.tabs[1].id;
+        app.retarget_theme_editor(Some(pane)).unwrap();
+        let edited = adjust_and_preview(&mut app);
+        let (target, _) = app.edit_target_theme();
+        assert!(!target.starts_with("preview:"), "{target}");
+        app.shader_ai.list_note = Some("Saved \"old\" to the shader list.".into());
+
+        app.set_theme_all("aurora");
+        assert!(app.theme_overrides.is_empty());
+        assert!(app.theme_editor_document.is_none(), "session ended");
+        assert!(app.shader_ai.list_note.is_none(), "stale note cleared");
+        let kept = app.themes.all().iter().any(|theme| {
+            theme.id.starts_with("personal:")
+                && crate::theme::parse_color(&theme.terminal_colors.background) == Some(edited)
+        });
+        assert!(kept, "the pane's edit was saved as a theme");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
     #[test]
     fn shader_switch_shows_the_gradient_and_restores_the_same_shader() {
         let (_ctx, mut app, base) = test_app(1, "shader-switch");

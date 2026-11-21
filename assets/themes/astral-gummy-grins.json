@@ -9,34 +9,34 @@
     "scanlinesStrength": 0.0,
     "shaderBackground": {
       "animated": true,
-      "colors": null,
+      "colors": [
+        "#c2ff6a",
+        "#ff3fa4",
+        "#5b1f6e",
+        "#ff709c",
+        "#5ef2d0"
+      ],
       "custom": {
-        "expression": "let trip = m * 0.1;\nlet drift = p * vec2<f32>(density) + vec2<f32>(t * 0.045, -t * 0.035);\nlet uv = drift + vec2<f32>(sin(drift.y * 3.2 + t * 0.7), cos(drift.x * 2.8 - t * 0.6)) * vec2<f32>(wobble * (0.04 + trip * 0.18));\nlet seed = hash(floor(uv));\nlet q = fract(uv) - vec2<f32>(0.5);\nlet hue = seed + t * 0.025 + trip * 0.12 * sin(t * 0.4 + seed * 9.0);\nlet candy = mix(c1 * vec3<f32>(4.0) + vec3<f32>(0.22, 0.10, 0.28), palette(hue), 0.7);\nlet ground = mix(c2 * vec3<f32>(2.0) + vec3<f32>(0.06, 0.025, 0.10), palette(hue + 0.45) * vec3<f32>(0.33), 0.55);\nlet d = length(max(abs(q) - vec2<f32>(0.21, 0.19), vec2<f32>(0.0))) - 0.15;\nlet body = 1.0 - smoothstep(-0.008, 0.012, d);\nlet ripple = 0.5 + 0.5 * sin(length(q) * (24.0 + trip * 28.0) - t * 2.0 + seed * 8.0);\nlet face = mix(ground + candy * vec3<f32>(exp(-15.0 * abs(d)) * glow * 0.32), candy * vec3<f32>(0.73 + 0.25 * ripple), body);\nlet eyes = 1.0 - smoothstep(0.052, 0.065, length(vec2<f32>(abs(q.x) - 0.12, q.y + 0.075)));\nlet smile = (1.0 - smoothstep(0.012, 0.024, abs(length(q - vec2<f32>(0.0, 0.015)) - 0.175))) * smoothstep(0.025, 0.065, q.y - 0.015);\nlet third = (1.0 - smoothstep(0.027, 0.043, length(q - vec2<f32>(0.0, -0.225)))) * trip;\nlet color = mix(mix(mix(face, vec3<f32>(0.72, 0.83, 0.65), eyes), c3, smile), palette(hue + 0.5), third);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
-        "name": "Astral Gummy Grins",
+        "expression": "let wob = wobble * (0.6 * sin(t * 0.37 + p.x * 2.3) + 0.4 * sin(t * 0.91 - p.x * 5.1));\nlet hz = 0.04 + wob;\nlet floor_mask = 1.0 - step(hz, p.y);\nlet d = max(hz - p.y, 0.015);\nlet depth = 1.0 / d;\nlet gz = depth * 0.35 + t * speed;\nlet gx = p.x * depth * 0.5;\nlet hd = abs(fract(gz + 0.5) - 0.5);\nlet vd = abs(fract(gx + 0.5) - 0.5);\nlet hl = 1.0 - smoothstep(0.0, line_w, hd);\nlet vl = 1.0 - smoothstep(0.0, line_w * 0.8, vd);\nlet row = hash(vec2<f32>(floor(gz), 3.0));\nlet flick = 0.6 + 0.4 * sin(t * 2.0 + row * 6.28);\nlet vis = smoothstep(0.015, 0.4, d);\nlet grid = max(hl, vl * 0.9) * vis * flick;\nlet glow_line = smoothstep(0.5, 0.0, hd) * 0.2 * vis;\nlet floor_col = c2 * (grid * 1.2 + glow_line) + c3 * 0.15 * vis;\nlet horizon = c2 * 0.35 * exp(-abs(p.y - hz) * 18.0);\nlet mist = noise(vec2<f32>(p.x * 3.0 + t * 0.05, p.y * 4.0)) * exp(-abs(p.y - hz) * 6.0);\nlet sky = horizon + c3 * 0.25 * mist;\nlet scene = mix(sky, floor_col, floor_mask);\nreturn mix(bg, tonemap(bg + scene), strength);",
+        "name": "Sick Grid",
         "variables": [
           {
-            "max": 10.0,
-            "min": 0.0,
-            "name": "m",
-            "value": 7.099999904632568
-          },
-          {
-            "max": 4.0,
-            "min": 0.800000011920929,
-            "name": "density",
-            "value": 3.25
-          },
-          {
             "max": 1.0,
+            "min": 0.10000000149011612,
+            "name": "speed",
+            "value": 0.4000000059604645
+          },
+          {
+            "max": 0.119999997317791,
             "min": 0.0,
             "name": "wobble",
-            "value": 0.8100000023841858
+            "value": 0.05000000074505806
           },
           {
-            "max": 1.0,
-            "min": 0.0,
-            "name": "glow",
-            "value": 0.6700000166893005
+            "max": 0.20000000298023224,
+            "min": 0.019999999552965164,
+            "name": "line_w",
+            "value": 0.07000000029802322
           }
         ],
         "y_up": true
@@ -44,7 +44,7 @@
       "preset": "silk",
       "scale": 0.800000011920929,
       "speed": 4.699999809265137,
-      "strength": 0.1599999964237213,
+      "strength": 0.119999997317791,
       "theme_colors": false,
       "version": 1
     },
@@ -72,7 +72,7 @@
     "name": "Astral Gummy Grins",
     "nativeThemeVersion": 1,
     "releasePickFrom": "personal:imported-default-da364bab3a22:astral-gummy-grins",
-    "updatedAt": "2026-11-01T00:04:03.607Z"
+    "updatedAt": "2026-11-12T07:30:06.302Z"
   },
   "nativeAppearance": {
     "advanced_effects": true,
@@ -158,7 +158,7 @@
         "white": "#888888",
         "yellow": "#0000ff"
       },
-      "background": "#060a09",
+      "background": "#000000",
       "drawBoldTextInBrightColors": true,
       "fontFamily": "saxmono Bundled",
       "fontSize": 13.0,

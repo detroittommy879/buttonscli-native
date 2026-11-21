@@ -132,6 +132,22 @@ impl ButtonsApp {
     }
 
     pub(super) fn capture_theme_bundle(&self, name: &str) -> ThemeBundle {
+        // Every open pane records the font it shows. Without one, loading the
+        // bundle later gave such panes whatever the shared font was by then.
+        let mut panes = self.current_pane_looks();
+        for (slot, index) in self
+            .slot_order()
+            .into_iter()
+            .take(MAX_PANE_LOOKS)
+            .enumerate()
+        {
+            if panes.len() <= slot {
+                panes.resize(slot + 1, PaneLook::default());
+            }
+            if panes[slot].font.is_none() {
+                panes[slot].font = Some(self.font_for_pane(self.tabs[index].id));
+            }
+        }
         ThemeBundle {
             name: name.trim().to_owned(),
             theme_id: self.preferences.theme_id.clone(),
@@ -139,14 +155,17 @@ impl ButtonsApp {
             terminal_theme_id: self.preferences.terminal_theme_id.clone(),
             gradient_theme_id: self.preferences.gradient_theme_id.clone(),
             effects_theme_id: self.preferences.effects_theme_id.clone(),
-            panes: self
-                .current_pane_looks()
+            panes: panes
                 .into_iter()
                 .take(self.tabs.len().min(MAX_PANE_LOOKS))
                 .collect(),
             layout: layout_name(self.pane_layout).into(),
             visible_panes: self.visible_panes.len(),
             row_banding_brightness: Some(self.preferences.row_banding_brightness),
+            chrome: Some(crate::settings::BundleChrome {
+                dock_background: self.preferences.dock_background_override.clone(),
+                status_background: self.preferences.status_background_override.clone(),
+            }),
         }
     }
 
@@ -201,7 +220,11 @@ impl ButtonsApp {
             .chain(crate::library::bundles())
             .find(|bundle| bundle.name == name)
             .cloned()?;
-        self.restore_personal_theme_preview();
+        // Keeps a pane's edit as its own theme file before it is replaced;
+        // the editor then follows the new looks instead of the old draft.
+        self.settle_pane_draft(None);
+        self.discard_theme_editor_session();
+        let app_theme_before = self.preferences.app_theme_id.clone();
         let mut skipped = 0;
         for (target, id) in [
             (&mut self.preferences.theme_id, &bundle.theme_id),
@@ -226,6 +249,22 @@ impl ButtonsApp {
             }
         }
         self.preferences.normalize_theme_sources();
+        // Bar colors: the bundle's own, or none when it brings an app theme
+        // (a color picked for the old theme made the top bar and the left
+        // panel disagree).
+        match &bundle.chrome {
+            Some(chrome) => {
+                self.preferences.dock_background_override = chrome.dock_background.clone();
+                self.preferences.status_background_override = chrome.status_background.clone();
+            }
+            None if self.preferences.app_theme_id != app_theme_before
+                || !bundle.app_theme_id.is_empty() =>
+            {
+                self.preferences.dock_background_override = None;
+                self.preferences.status_background_override = None;
+            }
+            None => {}
+        }
         if let Some(brightness) = bundle.row_banding_brightness {
             self.preferences.row_banding_brightness = brightness.min(64);
         }
@@ -271,6 +310,15 @@ impl ButtonsApp {
             pending.used_slots.insert(slot);
             pending.used_tabs.insert(id);
         }
+        // A font that is not installed falls back to the default terminal
+        // font; say so instead of changing the look silently.
+        let mut missing_fonts: Vec<String> = Vec::new();
+        for font in bundle.panes.iter().filter_map(|look| look.font.as_ref()) {
+            let family = &font.zone.family;
+            if !self.font_catalog.is_available(family) && !missing_fonts.contains(family) {
+                missing_fonts.push(family.clone());
+            }
+        }
         let waiting = pending.looks.len().saturating_sub(pending.used_slots.len());
         self.pending_pane_looks = (waiting > 0).then_some(pending);
         let mut summary = format!("Applied theme bundle \"{name}\".");
@@ -284,6 +332,13 @@ impl ButtonsApp {
             summary.push_str(&format!(
                 " {skipped} missing theme{} skipped.",
                 if skipped == 1 { " was" } else { "s were" }
+            ));
+        }
+        if !missing_fonts.is_empty() {
+            summary.push_str(&format!(
+                " Font not found: {}; {} is used instead.",
+                missing_fonts.join(", "),
+                crate::fonts::DEFAULT_MONO_FONT.trim_end_matches(" Bundled"),
             ));
         }
         // Save now (row banding, layout, pane looks): waiting for the periodic
@@ -650,6 +705,45 @@ mod tests {
         assert_eq!(later.theme_overrides.get(&third), Some(&themes[2]));
         assert!(later.pending_pane_looks.is_none());
         assert!(later.apply_theme_bundle(&ctx, "missing").is_none());
+    }
+
+    #[test]
+    fn bundles_keep_the_font_on_screen_and_name_missing_fonts() {
+        let (ctx, mut app) = app_with_tabs(2);
+        app.set_pane_layout(PaneLayout::Columns, &ctx);
+        let shown = crate::fonts::DEFAULT_MONO_FONT;
+        let other = "Recursive Mono Lnr St Bundled";
+        assert!(app.font_catalog.is_available(other));
+        app.preferences.typography.terminal.family = shown.into();
+        // Neither pane has a font of its own: they show the shared one.
+        assert!(app.pane_fonts.is_empty());
+        app.save_theme_bundle("fonts").unwrap();
+        let saved = &app.preferences.theme_bundles[0];
+        assert!(saved
+            .panes
+            .iter()
+            .all(|look| look.font.as_ref().is_some_and(|f| f.zone.family == shown)));
+
+        // Later the shared font changes; the bundle still brings its font back.
+        app.preferences.typography.terminal.family = other.into();
+        let summary = app.apply_theme_bundle(&ctx, "fonts").unwrap();
+        assert!(!summary.contains("Font not found"), "{summary}");
+        for tab in &app.tabs {
+            assert_eq!(app.font_for_pane(tab.id).zone.family, shown);
+        }
+
+        // A font that is not installed is named instead of silently replaced.
+        app.preferences.theme_bundles[0].panes[0]
+            .font
+            .as_mut()
+            .unwrap()
+            .zone
+            .family = "No Such Font".into();
+        let summary = app.apply_theme_bundle(&ctx, "fonts").unwrap();
+        assert!(
+            summary.contains("Font not found: No Such Font"),
+            "{summary}"
+        );
     }
 
     #[test]

@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#282044",
+        "#6356a8",
+        "#f36c9c",
+        "#ffbd74",
+        "#68dfb6"
+      ],
+      "custom": {
+        "expression": "let res = 280.0 / pixel_size;\nlet q = (floor(p * res) + 0.5) / res;\nlet tick = t * round(drive_speed * 3300.0) / 3600.0;\nlet sway = sin(tick * 0.6283185);\nlet x = q.x + 0.018 * sway;\nlet h = q.y + 0.105;\nlet sky = mix(mix(c3,c4,0.45),c2,smoothstep(0.0,0.58,h));\nlet s = vec2<f32>(x + 0.27,h - 0.19);\nlet bands = smoothstep(0.18,0.39,fract(s.y * 49.0));\nlet sun = fill(length(s) - 0.142) * mix(bands,1.0,smoothstep(-0.073,0.025,s.y));\nlet far = fill(h - 0.025 - 0.16 * noise(vec2<f32>(x * 2.8,7.0)));\nlet ridge = 0.12 * noise(vec2<f32>(x * 5.7,2.0)) + 0.017 * hash(vec2<f32>(floor(x * 111.0),9.0));\nlet near = fill(h - ridge);\nlet d = max(-h,0.0);\nlet land = mix(c2 * 0.72,c5 * 0.48,smoothstep(0.0,0.39,d));\nlet hills = mix(mix(mix(sky,c4,sun),c2 * 0.92,far),land,near);\nlet bend = 0.02 - 0.80 * d * d + 0.04 * d * sway;\nlet u = abs(x - bend) / (d + 0.007);\nlet z = 0.42 / (d + 0.048) + tick;\nlet f = fract(z);\nlet dash = smoothstep(0.13,0.19,f) * (1.0 - smoothstep(0.52,0.58,f));\nlet fog = smoothstep(0.012,0.069,d);\nlet road = (1.0 - smoothstep(1.24,1.29,u)) * smoothstep(0.0,0.016,d);\nlet mid = (1.0 - smoothstep(0.022,0.049,u)) * dash * fog;\nlet edge = 1.0 - smoothstep(0.017,0.040,abs(u - 1.13));\nlet curb = (1.0 - smoothstep(0.042,0.078,abs(u - 1.23))) * fog;\nlet stone = mix(c2 * 0.89,mix(c1,c2,0.44),smoothstep(0.0,0.40,d));\nlet lanes = mix(mix(mix(stone,c4,mid),c5,edge * fog),mix(c3,c4,dash),curb * 0.8);\nlet scene = mix(hills,lanes,road);\nlet a = vec2<f32>(x - 0.38,q.y - 0.076);\nlet board = sd_box(a,vec2<f32>(0.143,0.052));\nlet post = fill(sd_box(a + vec2<f32>(0.0,0.121),vec2<f32>(0.006,0.084)));\nlet g = vec2<f32>(a.x + 0.125,0.036 - a.y) * 156.0;\nlet j = floor(g.x * 0.25);\nlet k = floor(g.x) - j * 4.0;\nlet row = floor(g.y);\nlet top = select(0.0,29847.0,j==0.0)+select(0.0,448.0,j==1.0)+select(0.0,29330.0,j==2.0)+select(0.0,31183.0,j==3.0)+select(0.0,24557.0,j==5.0)+select(0.0,31599.0,j==6.0)+select(0.0,27565.0,j==7.0)+select(0.0,29842.0,j==8.0)+select(0.0,23533.0,j==9.0);\nlet low = select(0.0,23469.0,j==1.0)+select(0.0,31143.0,j==2.0)+select(0.0,24557.0,j==3.0)+select(0.0,29842.0,j==4.0)+select(0.0,23407.0,j==5.0)+select(0.0,31015.0,j==6.0)+select(0.0,23469.0,j==7.0)+select(0.0,23186.0,j==8.0);\nlet r = select(row,row - 7.0,row >= 7.0);\nlet bits = select(top,low,row >= 7.0);\nlet ink = step(0.5,fract(0.5 * floor(bits / pow(2.0,clamp(14.0 - 3.0*r - k,0.0,14.0))))) * step(0.0,r) * (1.0-step(5.0,r)) * (1.0-step(3.0,k));\nlet signface = mix(mix(c1,c5,0.25),c5,max(ink,stroke(board + 0.006,0.0017)));\nlet frame = mix(mix(scene,c2 * 0.77,post),signface,fill(board));\nreturn mix(bg,frame * (1.0 - scanlines * (0.5 + 0.5 * cos(p.y * 850.0))),strength);",
+        "name": "Bluegrass 75 North",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "drive_speed",
+            "value": 0.8500000238418579
+          },
+          {
+            "max": 1.7999999523162842,
+            "min": 0.6499999761581421,
+            "name": "pixel_size",
+            "value": 1.0
+          },
+          {
+            "max": 0.3499999940395355,
+            "min": 0.0,
+            "name": "scanlines",
+            "value": 0.12999999523162842
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7999999523162842,
+      "speed": 2.200000047683716,
+      "strength": 0.8999999761581421,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-02T23:55:40.829Z",
+    "description": "A Kentucky sunset in arcade pixels, with violet asphalt, amber lane paint, and mint interstate signage.",
+    "id": "bluegrass-75-north",
+    "name": "Bluegrass 75 North",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:bluegrass-75-north",
+    "updatedAt": "2026-11-19T19:26:11.808Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9bf4d5",
+        "background": "#282044",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#282044"
+      },
+      "shell": {
+        "accent": "#68dfb6",
+        "accentHover": "#9bf4d5",
+        "background": "#161325",
+        "backgroundSecondary": "#282044",
+        "border": "#554673",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#68dfb6",
+          "thickness": 2.0
+        },
+        "textDim": "#bcadd4",
+        "textMain": "#f4e8ff"
+      },
+      "statusBar": {
+        "background": "#282044",
+        "border": "#554673",
+        "text": "#bcadd4",
+        "warning": "#ffbd74"
+      },
+      "tabs": {
+        "activeBackground": "#161325",
+        "activeBorder": "#68dfb6",
+        "background": "#282044",
+        "idleBackground": "#282044"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#33294c",
+        "blue": "#9c9af0",
+        "brightBlack": "#9789ac",
+        "brightBlue": "#bcbbff",
+        "brightCyan": "#9bf4d5",
+        "brightGreen": "#b6eba7",
+        "brightMagenta": "#ffa2c9",
+        "brightRed": "#ff9c9e",
+        "brightWhite": "#fff8f2",
+        "brightYellow": "#ffdc9f",
+        "cyan": "#68dfb6",
+        "green": "#91cf8f",
+        "magenta": "#f36c9c",
+        "red": "#f47983",
+        "white": "#e7dcee",
+        "yellow": "#ffbd74"
+      },
+      "background": "#1d192f",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#fff5e8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#282044",
+        "#6356a8",
+        "#f36c9c",
+        "#ffbd74"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.1
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.75
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.35
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Mono Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.65
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

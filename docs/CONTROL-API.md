@@ -118,7 +118,8 @@ for normal desktop use.
 | `POST /v1/tabs` | Create a named terminal, optionally selecting a shell command and working directory |
 | `GET /v1/tabs/{selector}/read` | Read a bounded head/tail by characters or lines |
 | `POST /v1/tabs/{selector}/send` | Send literal text/base64, optionally with Enter |
-| `POST /v1/tabs/{selector}/run` | Send input, then wait for matching text, quiet output, or the timeout |
+| `POST /v1/tabs/{selector}/run` | Send input, then wait for the command-finished mark (shell integration), matching text, quiet output, or the timeout |
+| `GET /v1/tabs/{selector}/commands` | Recent commands with exit codes and durations, and the last command's output (shell integration) |
 | `POST /v1/tabs/{selector}/key` | Send `ctrl+c`, `ctrl+d`, `ctrl+z`, Enter, Tab, or Escape |
 | `POST /v1/tabs/{selector}/rename` | Rename a terminal tab |
 | `POST /v1/layout/open` | Create named tabs and arrange them horizontally, vertically, or in a grid |
@@ -145,10 +146,67 @@ delivery; bytes already sent cannot be recalled.
 
 The output observer is attached to the existing PTY reader. The service keeps a
 Unicode-safe tail of at most 200,000 characters per open terminal. It preserves
-raw ANSI/control text and does not provide a shell exit code. `run` reports why
-it stopped observing; `quiet` means no new output was observed for the requested
-interval, not that a command succeeded. `wait-for-text` and `wait-for-quiet`
-are CLI-side polling commands built on bounded reads.
+raw ANSI/control text. `run` reports why it stopped observing in
+`completionReason`: `command-finished` (shell integration, below; the response
+then has `exitCode`, `command` and `commandOutput`), `matched-text`, `quiet`
+(no new output for the requested interval, not proof that a command
+succeeded), or `timeout`. `wait-for-text` and `wait-for-quiet` are CLI-side
+polling commands built on bounded reads.
+
+## Shell integration (exit codes and "command finished")
+
+Shells ButtonsCLI starts send OSC 133 marks around each command: prompt
+start (`A`), input start (`B`), command start (`C`) and command finished with
+its exit code (`D;<code>`); PowerShell also sends the command line
+(`633;E`, VS Code's spelling, also understood). The output observer reads
+them, so:
+
+- `run` waits for the command to finish instead of guessing from quiet
+  output (a silent build is not a finished one), and returns `exitCode` and
+  the command's own output (`commandOutput`, without the prompt). Pass
+  `"waitFor": "quiet"` for the old behavior, for example for a long-running
+  server. `maxWaitMs` still caps the wait (at most 60 s).
+- Tab summaries carry `shellIntegration`, `commandRunning`,
+  `commandsFinished` and `lastCommand` (`exitCode`, `durationMs`,
+  `command`).
+- `GET /v1/tabs/{selector}/commands` (`buttonsclictl commands`, MCP
+  `commands`) lists the last 64 commands.
+- In the app, a command that finishes out of view leaves ✓ or ✗ and its exit
+  code on its tab, and long ones show a message and flash the taskbar
+  (Settings → Workspace → Shell integration).
+
+It is on by default for PowerShell (5.1 and 7), bash, zsh and fish tabs that
+ButtonsCLI starts with no arguments of their own (a login flag is fine).
+PowerShell gets the script inline (`-EncodedCommand`, so execution policy
+does not block it); bash gets `--rcfile` (loading your `~/.bashrc`, or your
+login files for `-l`); zsh gets a `ZDOTDIR` that loads your files first; fish
+gets `--init-command`. The scripts are in `assets/shell-integration/` and,
+for bash/zsh/fish, copied to `~/.buttonscli-native/shell-integration/`.
+cmd.exe has no hooks for exit codes and gets none.
+
+Over SSH, in WSL, or in a shell started with its own arguments, add the
+script yourself (each one loads once): source `bashrc` from `~/.bashrc`,
+`zshrc` from `~/.zshrc`, `buttonscli.fish` from `config.fish`, or dot-source
+`buttonscli.ps1` from your PowerShell `$PROFILE`. Without marks everything
+works as before.
+
+## Batch (MCP)
+
+The MCP `batch` tool runs up to 20 tool calls in order in one call and
+returns each step's result:
+
+```json
+{ "steps": [
+  { "tool": "create_tab", "arguments": { "name": "build" } },
+  { "tool": "run", "arguments": { "tab": "build", "text": "cargo build" } },
+  { "tool": "run", "arguments": { "tab": "build", "text": "cargo test" } }
+], "stopOnError": true }
+```
+
+A step fails when the tool returns an error or a `run` finishes with a
+nonzero `exitCode`; by default the batch stops there (`stopOnError: false`
+runs every step). Steps cannot be `batch`. There is no rollback: steps that
+ran stay done.
 
 On Windows, ConPTY can insert cursor movement and wrap/redraw sequences inside
 text that looks continuous on screen, especially in narrow panes. A long
@@ -164,7 +222,7 @@ Terminal command text is sent as input to the selected PTY; it is not evaluated
 by the control server itself.
 
 The native control API and helpers have passed Windows source/build checks and
-Node syntax checks. `node scripts/test-mcp-smoke.mjs` exercises all 14 MCP tools
+Node syntax checks. `node scripts/test-mcp-smoke.mjs` exercises the original 14 MCP tools
 against a test-owned fake API, including route/body mapping, bearer auth,
 server-side feature denial, and a stopped-server error. This is protocol-only
 evidence. `pwsh -NoProfile -File scripts/test-control-live.ps1` also confirms

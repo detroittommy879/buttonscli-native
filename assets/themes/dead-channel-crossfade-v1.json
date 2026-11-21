@@ -1,0 +1,214 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5ee6ff",
+        "#ff5fa2",
+        "#ffe15a",
+        "#1a0f2e",
+        "#e8f7ff"
+      ],
+      "custom": {
+        "expression": "let rowid = floor(p.y * 90.0);\nlet rowhash = hash(vec2<f32>(rowid, floor(t * 8.0)));\nlet shift = (rowhash - 0.5) * 0.08 * step(0.7, rowhash);\nlet sigA = noise(vec2<f32>((p.x + shift) * 6.0 + t * 0.4, p.y * 3.0));\nlet sigB = noise(vec2<f32>(p.x * 4.0 - t * 0.25, p.y * 2.0 + 7.0));\nlet grain = hash(vec2<f32>(floor(p.x * 260.0), floor(p.y * 140.0) + floor(t * 24.0)));\nlet bar = 0.85 + 0.15 * smoothstep(0.0, 0.15, fract(p.y * 0.7 - t * 0.05));\nlet plane_x = fract(t * plane_speed) * 2.4 - 1.2;\nlet plane_y = 0.12 + 0.06 * sin(t * 0.37);\nlet dx = p.x - plane_x;\nlet blip = halo(sd_circle(p - vec2<f32>(plane_x, plane_y), 0.015), 0.04);\nlet ghost = halo(sd_circle(p - vec2<f32>(plane_x - 0.18, plane_y - 0.03), 0.012), 0.03) * 0.5;\nlet block = mix(0.15, 1.0, smoothstep(0.0, 0.3, abs(dx)));\nlet a = smoothstep(0.42, 0.72, sigA + grain * 0.12);\nlet b = smoothstep(0.42, 0.72, sigB + grain * 0.12) * block;\nlet collide = a * b;\nlet sc = 0.7 + 0.3 * smoothstep(0.0, 0.5, fract(p.y * 120.0));\nlet color = c4 * 0.5 + c1 * a * 0.7 + c3 * b * 0.6 + c2 * collide * 1.6 + c5 * grain * grain * 0.5 + c5 * blip * 0.9 + c1 * ghost * 0.5;\nlet result = tonemap(color * sc * bar);\nreturn mix(bg, result, strength);",
+        "name": "Dead Channel Crossfade",
+        "variables": [
+          {
+            "max": 0.25,
+            "min": 0.019999999552965164,
+            "name": "plane_speed",
+            "value": 0.22499999403953552
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 4.699999809265137,
+      "speed": 2.200000047683716,
+      "strength": 0.8100000023841858,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-15T04:50:15.508Z",
+    "description": "Night-broadcast NTSC static: two far channels collide while a passing aircraft blocks one of them.",
+    "id": "dead-channel-crossfade-v1",
+    "name": "Dead Channel Crossfade v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:dead-channel-crossfade-v1",
+    "updatedAt": "2026-11-15T07:30:12.141Z"
+  },
+  "nativeAppearance": {
+    "advanced_effects": true,
+    "calm_mode": false,
+    "chrome_corner_radius": 7,
+    "dock_opacity": 0.30000001192092896,
+    "effects_focused_pane_only": false,
+    "pane_divider": {
+      "color_override": null,
+      "thickness_override": null
+    },
+    "pane_hover_label": {
+      "enabled": true,
+      "font": {
+        "family": "Go Noto Current Bundled",
+        "letter_spacing": 0.0,
+        "size": 28.0,
+        "weight": 400
+      },
+      "opacity": 0.44999998807907104
+    },
+    "row_banding_brightness": 0,
+    "shader_backgrounds_enabled": true,
+    "window_opacity": 1.0
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#8ff0ff",
+        "background": "#161229",
+        "buttonBackground": "#41595c",
+        "buttonHover": "#619291",
+        "buttonText": "#000000"
+      },
+      "settings": {
+        "background": "#161229"
+      },
+      "shell": {
+        "accent": "#5ee6ff",
+        "accentHover": "#8ff0ff",
+        "background": "#0a0812",
+        "backgroundSecondary": "#161229",
+        "border": "#2e2750",
+        "buttonBackground": "#2d2d30",
+        "paneDivider": {
+          "color": "#5ee6ff",
+          "thickness": 2.5999999046325684
+        },
+        "textDim": "#9a93b8",
+        "textMain": "#e8f7ff"
+      },
+      "statusBar": {
+        "background": "#161229",
+        "border": "#2e2750",
+        "text": "#9a93b8",
+        "warning": "#ffe15a"
+      },
+      "tabs": {
+        "activeBackground": "#0a0812",
+        "activeBorder": "#5ee6ff",
+        "background": "#161229",
+        "idleBackground": "#161229"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1a0f2e",
+        "blue": "#4d7cff",
+        "brightBlack": "#5a5275",
+        "brightBlue": "#8fb0ff",
+        "brightCyan": "#b5f5ff",
+        "brightGreen": "#9dffc4",
+        "brightMagenta": "#ffa6cf",
+        "brightRed": "#ff8fa8",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff2a0",
+        "cyan": "#5ee6ff",
+        "green": "#5cff9e",
+        "magenta": "#ff5fa2",
+        "red": "#ff4d6d",
+        "white": "#e8f7ff",
+        "yellow": "#ffe15a"
+      },
+      "background": "#050309",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e8f7ff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0d0a1a",
+        "#5ee6ff",
+        "#ff5fa2",
+        "#ffe15a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "radial",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "presetDock": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

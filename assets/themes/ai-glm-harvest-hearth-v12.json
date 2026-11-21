@@ -1,0 +1,157 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": null,
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-19T16:40:00.501Z",
+    "description": "Cozy autumn coding nights: espresso-brown canvas warmed by copper, pumpkin and gold, with cranberry and forest-green tones for comfortable long sessions.",
+    "id": "ai-glm-harvest-hearth-v12",
+    "name": "AI Glm - Harvest Hearth v12",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:ai-glm-harvest-hearth-v12",
+    "updatedAt": "2026-11-19T16:40:00.501Z"
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#7660cb",
+        "background": "#00000d",
+        "buttonBackground": "#0a0b1f",
+        "buttonHover": "#181934",
+        "buttonText": "#f3f2ff"
+      },
+      "settings": {
+        "background": "#00000d"
+      },
+      "shell": {
+        "accent": "#364096",
+        "accentHover": "#222c72",
+        "background": "#000002",
+        "backgroundSecondary": "#00000d",
+        "border": "#424277",
+        "buttonBackground": "#0a0b1f",
+        "paneDivider": {
+          "color": "#b35c22",
+          "thickness": 2.0
+        },
+        "textDim": "#a9a7ca",
+        "textMain": "#f3f2ff"
+      },
+      "statusBar": {
+        "background": "#030415",
+        "border": "#424277",
+        "text": "#d2cdef",
+        "warning": "#8670dd"
+      },
+      "tabs": {
+        "activeBackground": "#000002",
+        "activeBorder": "#4e51b0",
+        "background": "#00000d",
+        "idleBackground": "#060618"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2a1c10",
+        "blue": "#85a3cc",
+        "brightBlack": "#8a7057",
+        "brightBlue": "#a9c3e0",
+        "brightCyan": "#9ed2c4",
+        "brightGreen": "#a8d183",
+        "brightMagenta": "#dfa8cd",
+        "brightRed": "#f28089",
+        "brightWhite": "#fff8ec",
+        "brightYellow": "#f6cf6b",
+        "cyan": "#6fb3a3",
+        "green": "#86b45e",
+        "magenta": "#c586b4",
+        "red": "#d9525f",
+        "white": "#ece2d3",
+        "yellow": "#e3b341"
+      },
+      "background": "#140d07",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f2e6cf",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.20000000298023224
+      },
+      "shell": {
+        "fontFamily": "Ubuntu Mono (System)",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      },
+      "statusBar": {
+        "fontFamily": "Recursive Mono Casual Static (System)",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

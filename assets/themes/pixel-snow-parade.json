@@ -1,0 +1,220 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5ef0ff",
+        "#ff8ad8",
+        "#ffd27a",
+        "#04101a",
+        "#5cffc8"
+      ],
+      "custom": {
+        "expression": "let grain = 260.0 * grain_size;\nlet frame = floor(t * (8.0 + 18.0 * line_speed));\nlet grid = p * grain + vec2<f32>(0.0, t * line_speed * 5.0);\nlet jitter = vec2<f32>(frame * 17.0, -frame * 11.0);\nlet cell = floor(grid + jitter);\nlet rnd = hash2(cell);\nlet gray = pow(rnd.x, 1.15);\nlet tintA = mix(c1, c5, smoothstep(0.0, 0.48, rnd.y));\nlet tintB = mix(tintA, c2, smoothstep(0.45, 0.85, rnd.y));\nlet tint = mix(tintB, c3, smoothstep(0.84, 1.0, rnd.y));\nlet neutral = vec3<f32>(gray, gray, gray);\nlet snow = mix(neutral, tint * (0.35 + 1.05 * gray), chroma_level);\nlet roll = wave_height * sin(p.x * 5.0 + t * 0.18 * line_speed) + 0.2 * sin(t * 0.07 * line_speed);\nlet bandD = (p.y - roll) * 7.0;\nlet band = exp(-bandD * bandD);\nlet scan = 0.86 + 0.14 * sin(p.y * grain * 3.14159);\nlet color = (mix(c4 * 0.75, snow, 0.86 + 0.14 * band) + tint * band * 0.22) * scan;\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Pixel Snow Parade",
+        "variables": [
+          {
+            "max": 0.4000000059604645,
+            "min": 0.05000000074505806,
+            "name": "wave_height",
+            "value": 0.19499999284744263
+          },
+          {
+            "max": 3.0,
+            "min": 0.5,
+            "name": "line_speed",
+            "value": 1.2999999523162842
+          },
+          {
+            "max": 2.0,
+            "min": 0.5,
+            "name": "grain_size",
+            "value": 1.0
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "chroma_level",
+            "value": 0.41999998688697815
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Dark midnight blues with restrained neon TV snow, crisp mono text, and a playful pixel-static accent.",
+    "id": "pixel-snow-parade",
+    "name": "Pixel Snow Parade",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:pixel-snow-parade",
+    "updatedAt": "2026-11-18T19:24:20.327Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ff8ad8",
+        "background": "#0b2233",
+        "buttonBackground": "#164260",
+        "buttonHover": "#8a7dff",
+        "buttonText": "#e6fbff"
+      },
+      "settings": {
+        "background": "#0b2233"
+      },
+      "shell": {
+        "accent": "#5cffc8",
+        "accentHover": "#ff8ad8",
+        "background": "#071825",
+        "backgroundSecondary": "#0b2233",
+        "border": "#8a7dff",
+        "buttonBackground": "#103047",
+        "paneDivider": {
+          "color": "#5cffc8",
+          "thickness": 2.0
+        },
+        "textDim": "#8fc7d9",
+        "textMain": "#e6fbff"
+      },
+      "statusBar": {
+        "background": "#0b2233",
+        "border": "#8a7dff",
+        "text": "#8fc7d9",
+        "warning": "#ffd27a"
+      },
+      "tabs": {
+        "activeBackground": "#071825",
+        "activeBorder": "#5cffc8",
+        "background": "#0b2233",
+        "idleBackground": "#0b2233"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#17313f",
+        "blue": "#62b6ff",
+        "brightBlack": "#4f7385",
+        "brightBlue": "#95ceff",
+        "brightCyan": "#94f5ff",
+        "brightGreen": "#93ffdb",
+        "brightMagenta": "#dcb3ff",
+        "brightRed": "#ff9cb2",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffeca8",
+        "cyan": "#5ef0ff",
+        "green": "#5cffc8",
+        "magenta": "#c58bff",
+        "red": "#ff6f8f",
+        "white": "#d8eef7",
+        "yellow": "#ffd27a"
+      },
+      "background": "#04101a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 12.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e6fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#04101a",
+        "#5ef0ff",
+        "#ff8ad8",
+        "#ffd27a"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "textBacking": {
+        "colors": [
+          "#04101a",
+          "#0b2233",
+          "#17313f"
+        ],
+        "ringWidth": 3.0,
+        "style": "lines"
+      },
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.6
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.8
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Daddy Time Mono Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.4
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 10.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.7
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 17.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

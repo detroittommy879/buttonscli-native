@@ -1,0 +1,181 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff5d4d",
+        "#ffc83d",
+        "#f5f1e6",
+        "#1f7ae0",
+        "#2bb673"
+      ],
+      "custom": {
+        "expression": "let jitter = (hash(vec2<f32>(floor(p.y * 90.0), floor(t * 12.0))) - 0.5) * 0.035;\nlet px = p.x + jitter;\nlet u = clamp((px + 0.9) / 1.8, 0.0, 0.9999);\nlet k = floor(u * 5.0);\nlet fx = fract(u * 5.0);\nlet c_a = mix(c1, c2, step(1.0, k));\nlet c_b = mix(c_a, c3, step(2.0, k));\nlet c_c = mix(c_b, c4, step(3.0, k));\nlet bars = mix(c_c, c5, step(4.0, k));\nlet edge_d = min(fx, 1.0 - fx) * 0.36;\nlet outline = stroke(edge_d, 0.012);\nlet scan = 0.82 + 0.18 * sin(p.y * 376.99);\nlet rb = fract(p.y - t * 0.08);\nlet roll = mix(0.5, 1.0, smoothstep(0.0, 0.1, rb));\nlet snow = hash(floor(p * vec2<f32>(160.0, 110.0)) + vec2<f32>(floor(t * 24.0) * 7.0, 3.0));\nlet base_col = mix(bars, c4 * 0.3, outline * 0.85) * scan * roll;\nlet grain = base_col + vec3<f32>(snow * 0.12);\nlet sway = 0.03 * sin(t * 0.5);\nlet ant_base = vec2<f32>(0.0, 0.2);\nlet tip_l = vec2<f32>(-0.26 + sway, 0.46);\nlet tip_r = vec2<f32>(0.26 - sway, 0.46);\nlet ant_d = min(sd_segment(p, ant_base, tip_l), sd_segment(p, ant_base, tip_r));\nlet ant = max(stroke(ant_d, 0.016), fill(sd_circle(p - ant_base, 0.035)));\nlet color = mix(grain, c3, ant * 0.9);\nreturn mix(bg, color, strength);",
+        "name": "Rabbit Ears Static",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "Dark coastal palette inspired by Miami beaches: ocean teal, hot pink neon, sunset coral, warm sand, and tropical green for readable high-contrast controls.",
+    "id": "ai-qwen-miami-night-coast-v7",
+    "name": "AI Qwen - Miami Night Coast v7",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:ai-qwen-miami-night-coast-v7",
+    "updatedAt": "2026-11-19T20:59:43.411Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb066",
+        "background": "#0e1b24",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#0e1b24"
+      },
+      "shell": {
+        "accent": "#007d76",
+        "accentHover": "#00685f",
+        "background": "#071018",
+        "backgroundSecondary": "#0e1b24",
+        "border": "#2f6470",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#b9d6df",
+        "textMain": "#f7fcff"
+      },
+      "statusBar": {
+        "background": "#0e1b24",
+        "border": "#2f6470",
+        "text": "#d8eff5",
+        "warning": "#ffd166"
+      },
+      "tabs": {
+        "activeBackground": "#071018",
+        "activeBorder": "#007d76",
+        "background": "#0e1b24",
+        "idleBackground": "#142733"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101820",
+        "blue": "#4aa8ff",
+        "brightBlack": "#7c8f9a",
+        "brightBlue": "#82c3ff",
+        "brightCyan": "#6ee7e7",
+        "brightGreen": "#6ef0b5",
+        "brightMagenta": "#ff6bb5",
+        "brightRed": "#ff8a8a",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#ffe08a",
+        "cyan": "#20c5c5",
+        "green": "#2ecf8f",
+        "magenta": "#ff2e88",
+        "red": "#ff5c5c",
+        "white": "#dcecf2",
+        "yellow": "#ffd166"
+      },
+      "background": "#050c12",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Recursive Mono Csl St Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 300,
+      "fontWeightBold": 700,
+      "foreground": "#f2fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "terminal": {
+        "fontFamily": "Recursive Mono Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

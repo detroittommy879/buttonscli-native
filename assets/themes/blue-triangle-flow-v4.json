@@ -1,0 +1,194 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff5fa2",
+        "#5ee6ff",
+        "#ffe15a",
+        "#1a0f2e",
+        "#e8f7ff"
+      ],
+      "custom": {
+        "expression": "let frame = floor(t * 30.0);\nlet grain = hash(floor(p * vec2<f32>(260.0, 140.0)) + vec2<f32>(frame * 13.0, 0.0));\nlet row = hash(vec2<f32>(floor(p.y * 140.0), frame * 3.0));\nlet s = grain * 0.7 + row * 0.3;\nlet roll = fract(p.y * 0.6 + t * roll_speed);\nlet bar = smoothstep(0.75, 1.0, roll) * 0.35;\nlet base = mix(c4 + vec3<f32>(0.05, 0.04, 0.08), c5, s * 0.75 + bar);\nlet q = p - vec2<f32>(0.1 * sin(t * 0.13), 0.02 * sin(t * 0.3));\nlet head = stroke(sd_circle(q, 0.2), 0.015);\nlet eyes = fill(sd_circle(q - vec2<f32>(-0.07, 0.06), 0.022)) + fill(sd_circle(q - vec2<f32>(0.07, 0.06), 0.022));\nlet smile = stroke(abs(length(q - vec2<f32>(0.0, 0.04)) - 0.1), 0.014) * (1.0 - smoothstep(0.03, 0.05, q.y));\nlet face = clamp(head + eyes + smile, 0.0, 1.0);\nlet presence = smoothstep(0.5, 0.85, cloud(vec2<f32>(t * 0.15, 2.0)));\nlet sig = face * presence * signal_level;\nlet sig_col = mix(c1, c3, fract(p.y * 2.0 + t * 0.1));\nlet scan = 0.85 + 0.15 * step(0.5, fract(p.y * 140.0));\nlet color = mix(base, sig_col, clamp(sig * 1.2, 0.0, 1.0)) * scan;\nreturn mix(bg, color, strength);",
+        "name": "Dead Air Smiley",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.20000000298023224,
+            "name": "signal_level",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "roll_speed",
+            "value": 0.07999999821186066
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 1.7999999523162842,
+      "speed": 1.899999976158142,
+      "strength": 0.5,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 0.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.019999999552965164,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-14T22:29:48.095Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "blue-triangle-flow-v4",
+    "name": "Blue Triangle Flow v4",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:blue-triangle-flow-v4",
+    "updatedAt": "2026-11-15T06:42:17.023Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

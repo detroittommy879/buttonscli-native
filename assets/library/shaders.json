@@ -3607,5 +3607,789 @@
       "#1c1c1c",
       "#8a8a8a"
     ]
+  },
+  {
+    "name": "Rolling channel static",
+    "expression": "let line = floor(p.y * 90.0);\nlet jitter = hash(vec2<f32>(line, floor(t * 15.0))) - 0.5;\nlet wob = 0.04 * sin(p.y * 18.0 + t * 1.5) + 0.03 * jitter;\nlet k = floor(fract((p.x + 1.0 + wob) * 0.5) * 5.0);\nlet pick_a = mix(c1, c5, step(0.5, fract(k * 0.37)));\nlet pick_b = mix(c2, c3, step(0.5, fract(k * 0.61)));\nlet pic = mix(pick_a, pick_b, step(0.5, fract(k * 0.5 + 0.25)));\nlet roll = fract(t * 0.08);\nlet d = fract(p.y - roll + 0.5) - 0.5;\nlet band = 1.0 - smoothstep(0.0, 0.08, abs(d));\nlet grain = hash(vec2<f32>(floor(p.x * 140.0), line + floor(t * 30.0)));\nlet amount = clamp(static_amount + band * 0.85, 0.0, 1.0);\nlet snow = c4 * grain * 0.8;\nlet frame = mix(pic * 0.9, snow, amount);\nlet scan = 0.78 + 0.22 * step(0.5, fract(line * 0.5));\nlet color = frame * scan;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "static_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.25
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff7a59",
+      "#2f5fb8",
+      "#6fa8e0",
+      "#d9e2ec",
+      "#0d1b2e"
+    ]
+  },
+  {
+    "name": "Rolling Test Pattern",
+    "expression": "let col_idx = clamp(floor((p.x + 0.9) * 3.9), 0.0, 6.0);\nlet ph = col_idx / 6.0;\nlet bars_c = mix(mix(c1, c2, smoothstep(0.0, 0.4, ph)), mix(c3, c5, smoothstep(0.5, 0.9, ph)), smoothstep(0.35, 0.55, ph));\nlet lower_c = mix(c4, c1, step(0.5, fract(col_idx * 0.5)));\nlet lower = step(p.y, -0.36);\nlet bars_all = mix(bars_c, lower_c, lower);\nlet wrap = fract(p.y * 0.6 - t * roll_speed);\nlet roll = 0.6 + 0.4 * smoothstep(0.0, 0.3, wrap);\nlet scan = 0.82 + 0.18 * smoothstep(0.25, 0.5, fract(p.y * 90.0));\nlet base = bars_all * roll * scan;\nlet y0 = fract(t * 0.13) - 0.5;\nlet w = 1.0 - smoothstep(0.0, 0.05, abs(p.y - y0));\nlet n = hash(floor(p * vec2<f32>(140.0, 70.0)) + vec2<f32>(floor(t * 24.0) * 3.1, 0.0));\nlet color_a = mix(base, vec3<f32>(n), w * noise_amount * 0.8);\nlet frame = stroke(sd_box(p - vec2<f32>(-0.62, 0.36), vec2<f32>(0.12, 0.07)), 0.012);\nlet blink = step(0.5, fract(t * 0.8));\nlet lamp = fill(sd_circle(p - vec2<f32>(-0.5, 0.36), 0.02)) * blink;\nlet color_b = mix(color_a, c3, frame * 0.9);\nlet color = mix(color_b, c5, lamp);\nreturn mix(bg, tonemap(color * 1.1), strength);",
+    "variables": [
+      {
+        "name": "roll_speed",
+        "min": 0.0,
+        "max": 0.3,
+        "value": 0.06
+      },
+      {
+        "name": "noise_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.7
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff3fa4",
+      "#3fd8ff",
+      "#ffe14d",
+      "#2a0f3a",
+      "#7dff6a"
+    ]
+  },
+  {
+    "name": "Dead Channel",
+    "expression": "let rows = floor(p.y * 140.0);\nlet frame = floor(t * 24.0);\nlet line_noise = hash(vec2<f32>(rows, frame));\nlet grain = hash(floor(p * vec2<f32>(260.0, 150.0)) + vec2<f32>(frame * 7.0, 0.0));\nlet thresh = mix(0.9, 0.45, snow_amount);\nlet snow = smoothstep(thresh, thresh + 0.08, grain * (0.4 + 0.6 * line_noise));\nlet snow_color = mix(mix(c1, c2, line_noise), c3, grain);\nlet roll_y = fract(p.y * 0.6 - t * roll_speed);\nlet bar = smoothstep(0.0, 0.2, roll_y) * (1.0 - smoothstep(0.6, 0.9, roll_y));\nlet picture = mix(c4, c5, 0.5 + 0.5 * sin(p.x * 3.0 + t * 0.3 + p.y * 2.0));\nlet blob = 1.0 - smoothstep(0.0, 0.35, length((p - vec2<f32>(0.1 * sin(t * 0.2), 0.05)) * vec2<f32>(1.0, 1.6)));\nlet base = picture * (0.25 + 0.5 * blob + 0.35 * bar);\nlet tear = smoothstep(0.96, 0.99, hash(vec2<f32>(floor(p.y * 8.0), frame + 11.0)));\nlet scan = 0.8 + 0.2 * sin(p.y * 420.0);\nlet lit = base + snow * snow_color * 0.9 + tear * c3 * 0.6;\nlet color = tonemap(lit * scan);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "snow_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.6
+      },
+      {
+        "name": "roll_speed",
+        "min": 0.0,
+        "max": 0.5,
+        "value": 0.1
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff3d7f",
+      "#ffd23d",
+      "#f5f1e6",
+      "#2a3dff",
+      "#3dffb0"
+    ]
+  },
+  {
+    "name": "Analog Channel Surf",
+    "expression": "let u = (p.x + sin(p.y * 30.0 + t * 4.0) * 0.01) / 1.8 + 0.5;\nlet idx = floor(clamp(u, 0.0, 0.999) * 7.0);\nlet ch = floor(t * 0.3);\nlet pk = hash(vec2<f32>(idx, ch));\nlet bar_a = mix(mix(c1, c2, step(0.33, pk)), c3, step(0.66, pk));\nlet bars = mix(bar_a, c5, step(0.88, pk)) * 0.75;\nlet bd = abs(fract(p.y * 0.8 - t * roll_speed) - 0.5);\nlet band = 1.0 - smoothstep(0.0, 0.12, bd);\nlet frame = floor(t * 24.0);\nlet grain = hash(floor((p + vec2<f32>(0.5, 0.5)) * vec2<f32>(200.0, 120.0)) + vec2<f32>(frame * 13.1, frame * 7.7));\nlet snow = vec3<f32>(grain) * mix(c2, vec3<f32>(1.0), 0.4);\nlet static_mix = clamp(static_amount * (0.25 + 0.75 * band), 0.0, 1.0);\nlet picture = mix(bars, snow, static_mix);\nlet scan = 0.8 + 0.2 * sin(p.y * 420.0);\nlet vignette = clamp(1.0 - 0.6 * dot(p, p), 0.0, 1.0);\nlet color = picture * scan * vignette;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "roll_speed",
+        "min": 0.05,
+        "max": 0.6,
+        "value": 0.2
+      },
+      {
+        "name": "static_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff4fd8",
+      "#3ee8ff",
+      "#ffe066",
+      "#1a0b2e",
+      "#7dff6a"
+    ]
+  },
+  {
+    "name": "Rabbit Ears Static",
+    "expression": "let jitter = (hash(vec2<f32>(floor(p.y * 90.0), floor(t * 12.0))) - 0.5) * 0.035;\nlet px = p.x + jitter;\nlet u = clamp((px + 0.9) / 1.8, 0.0, 0.9999);\nlet k = floor(u * 5.0);\nlet fx = fract(u * 5.0);\nlet c_a = mix(c1, c2, step(1.0, k));\nlet c_b = mix(c_a, c3, step(2.0, k));\nlet c_c = mix(c_b, c4, step(3.0, k));\nlet bars = mix(c_c, c5, step(4.0, k));\nlet edge_d = min(fx, 1.0 - fx) * 0.36;\nlet outline = stroke(edge_d, 0.012);\nlet scan = 0.82 + 0.18 * sin(p.y * 376.99);\nlet rb = fract(p.y - t * 0.08);\nlet roll = mix(0.5, 1.0, smoothstep(0.0, 0.1, rb));\nlet snow = hash(floor(p * vec2<f32>(160.0, 110.0)) + vec2<f32>(floor(t * 24.0) * 7.0, 3.0));\nlet base_col = mix(bars, c4 * 0.3, outline * 0.85) * scan * roll;\nlet grain = base_col + vec3<f32>(snow * 0.12);\nlet sway = 0.03 * sin(t * 0.5);\nlet ant_base = vec2<f32>(0.0, 0.2);\nlet tip_l = vec2<f32>(-0.26 + sway, 0.46);\nlet tip_r = vec2<f32>(0.26 - sway, 0.46);\nlet ant_d = min(sd_segment(p, ant_base, tip_l), sd_segment(p, ant_base, tip_r));\nlet ant = max(stroke(ant_d, 0.016), fill(sd_circle(p - ant_base, 0.035)));\nlet color = mix(grain, c3, ant * 0.9);\nreturn mix(bg, color, strength);",
+    "variables": [],
+    "y_up": true,
+    "colors": [
+      "#ff5d4d",
+      "#ffc83d",
+      "#f5f1e6",
+      "#1f7ae0",
+      "#2bb673"
+    ]
+  },
+  {
+    "name": "Channel 3 Weak Signal",
+    "expression": "let row = floor(p.y * 110.0);\nlet gtime = floor(t * 7.0);\nlet gr = hash(vec2<f32>(row, gtime));\nlet gon = step(0.9 - 0.05 * glitch_amount, gr) * glitch_amount;\nlet gshift = (hash(vec2<f32>(row + 17.0, gtime)) - 0.5) * 0.3 * gon;\nlet base = p + vec2<f32>(0.2 + 0.1 * sin(t * 0.05), 0.2 + 0.1 * sin(t * 0.037 + 1.0)) + vec2<f32>(gshift, 0.0);\nlet xr = (base.x + 0.008 + 1.0) * 3.5;\nlet xg = (base.x + 1.0) * 3.5;\nlet xb = (base.x - 0.008 + 1.0) * 3.5;\nlet sr = hsv(fract(floor(xr) * 0.15), 0.9, 1.0).r;\nlet sg = hsv(fract(floor(xg) * 0.15), 0.9, 1.0).g;\nlet sb = hsv(fract(floor(xb) * 0.15), 0.9, 1.0).b;\nlet fade = 0.75 + 0.25 * smoothstep(-0.5, 0.5, base.y);\nlet stat = vec3<f32>(sr, sg, sb) * fade;\nlet ball = fill(sd_circle(base - vec2<f32>(0.0, 0.05), 0.16));\nlet station = mix(stat, c3, ball * 0.85);\nlet noise_level = clamp(static_amount * (0.4 + 0.6 * noise(vec2<f32>(p.y * 8.0, t * 1.5))), 0.0, 1.0);\nlet cell = floor(p * vec2<f32>(220.0, 160.0)) + vec2<f32>(floor(t * 24.0) * 3.1, floor(t * 24.0) * 1.7);\nlet grain = hash(cell);\nlet snow = vec3<f32>(grain) * c2;\nlet vis = mix(station, snow, noise_level);\nlet scan = 0.8 + 0.2 * sin(p.y * 440.0);\nlet color = vis * scan;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "static_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.6
+      },
+      {
+        "name": "glitch_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.7
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ffe94d",
+      "#00e5ff",
+      "#ff2e88",
+      "#14002b",
+      "#39ff14"
+    ]
+  },
+  {
+    "name": "NTSC Snow",
+    "expression": "let rowid = floor(p.y * 90.0);\nlet rowhash = hash(vec2<f32>(rowid, floor(t * 8.0)));\nlet shift = (rowhash - 0.5) * 0.08 * step(0.7, rowhash);\nlet q = vec2<f32>(p.x + shift, p.y);\nlet roll = fract(p.y * 0.5 - t * 0.05);\nlet roll_dark = 0.7 + 0.3 * smoothstep(0.0, 0.15, roll);\nlet u = (q.x + 0.9) / 1.8;\nlet k = clamp(floor(u * 6.0), 0.0, 5.0);\nlet fx = fract(u * 6.0);\nlet v_edge = min(fx, 1.0 - fx) * 0.3;\nlet v_line = 1.0 - smoothstep(0.008, 0.016, v_edge);\nlet c_a = mix(c1, c2, step(1.0, k));\nlet c_b = mix(c_a, c3, step(2.0, k));\nlet c_c = mix(c_b, c4, step(3.0, k));\nlet bars = mix(c_c, c5, step(4.0, k)) * roll_dark;\nlet top = step(-0.25, p.y);\nlet h_line = 1.0 - smoothstep(0.008, 0.016, abs(p.y + 0.25));\nlet grain = hash(vec2<f32>(floor(p.x * 160.0), floor(p.y * 120.0) + floor(t * 24.0)));\nlet snow = mix(c4 * 0.6, c5, step(0.45, grain));\nlet base = mix(bars, snow, (1.0 - top) * static_level);\nlet ink = max(v_line * top, h_line);\nlet frame = mix(base, bg, clamp(ink, 0.0, 1.0));\nlet plane_x = fract(t * plane_speed) * 2.4 - 1.2;\nlet plane_y = 0.12 + 0.06 * sin(t * 0.37);\nlet sp = sd_box(p - vec2<f32>(plane_x, plane_y), vec2<f32>(0.07, 0.035));\nlet sprite = mix(c2, bg, stroke(sp, 0.012));\nlet with_sprite = mix(frame, sprite, fill(sp));\nlet sc = 0.8 + 0.2 * step(0.5, fract(p.y * 120.0));\nlet result = with_sprite * sc;\nreturn mix(bg, result, strength);",
+    "variables": [
+      {
+        "name": "plane_speed",
+        "min": 0.02,
+        "max": 0.25,
+        "value": 0.225
+      },
+      {
+        "name": "static_level",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.6
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ffd23f",
+      "#ff2e8a",
+      "#00d1ff",
+      "#1b1464",
+      "#3dff8a"
+    ]
+  },
+  {
+    "name": "Dead Channel Crossfade",
+    "expression": "let rowid = floor(p.y * 90.0);\nlet rowhash = hash(vec2<f32>(rowid, floor(t * 8.0)));\nlet shift = (rowhash - 0.5) * 0.08 * step(0.7, rowhash);\nlet sigA = noise(vec2<f32>((p.x + shift) * 6.0 + t * 0.4, p.y * 3.0));\nlet sigB = noise(vec2<f32>(p.x * 4.0 - t * 0.25, p.y * 2.0 + 7.0));\nlet grain = hash(vec2<f32>(floor(p.x * 260.0), floor(p.y * 140.0) + floor(t * 24.0)));\nlet bar = 0.85 + 0.15 * smoothstep(0.0, 0.15, fract(p.y * 0.7 - t * 0.05));\nlet plane_x = fract(t * plane_speed) * 2.4 - 1.2;\nlet plane_y = 0.12 + 0.06 * sin(t * 0.37);\nlet dx = p.x - plane_x;\nlet blip = halo(sd_circle(p - vec2<f32>(plane_x, plane_y), 0.015), 0.04);\nlet ghost = halo(sd_circle(p - vec2<f32>(plane_x - 0.18, plane_y - 0.03), 0.012), 0.03) * 0.5;\nlet block = mix(0.15, 1.0, smoothstep(0.0, 0.3, abs(dx)));\nlet a = smoothstep(0.42, 0.72, sigA + grain * 0.12);\nlet b = smoothstep(0.42, 0.72, sigB + grain * 0.12) * block;\nlet collide = a * b;\nlet sc = 0.7 + 0.3 * smoothstep(0.0, 0.5, fract(p.y * 120.0));\nlet color = c4 * 0.5 + c1 * a * 0.7 + c3 * b * 0.6 + c2 * collide * 1.6 + c5 * grain * grain * 0.5 + c5 * blip * 0.9 + c1 * ghost * 0.5;\nlet result = tonemap(color * sc * bar);\nreturn mix(bg, result, strength);",
+    "variables": [
+      {
+        "name": "plane_speed",
+        "min": 0.02,
+        "max": 0.25,
+        "value": 0.07
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#5ee6ff",
+      "#ff5fa2",
+      "#ffe15a",
+      "#1a0f2e",
+      "#e8f7ff"
+    ]
+  },
+  {
+    "name": "Dead Channel Snow",
+    "expression": "let grid = vec2<f32>(160.0, 90.0);\nlet flick = hash(vec2<f32>(floor(t * 2.0), 1.0));\nlet jitter = (hash(vec2<f32>(floor(p.y * 90.0), floor(t * 4.0))) - 0.5) * 0.03 * step(0.85, flick);\nlet px = p + vec2<f32>(jitter, 0.0);\nlet bar_idx = clamp(floor((px.x + 0.9) / 1.8 * bar_count), 0.0, bar_count - 1.0);\nlet pick = hash(vec2<f32>(bar_idx, floor(t * 0.4) + 3.0));\nlet bar_col = mix(mix(c1, c2, step(0.25, pick)), mix(c3, c5, step(0.6, pick)), step(0.5, pick));\nlet scan = 0.8 + 0.2 * step(0.5, fract(p.y * 90.0));\nlet roll = smoothstep(0.9, 1.0, fract(p.y * 2.0 - t * roll_speed));\nlet body = bar_col * scan * (0.85 + 0.15 * sin(p.x * 3.0 + t)) + c3 * roll * 0.35;\nlet cell = floor((p + vec2<f32>(0.9, 0.5)) * grid);\nlet nv = hash(cell + floor(t * 24.0) * vec2<f32>(13.0, 7.0));\nlet snow = step(1.0 - 0.3 * snow_amount, nv) * snow_amount;\nlet with_snow = mix(body, c5 * 1.2, snow * 0.8);\nlet vignette = clamp(1.2 - dot(p, p) * 1.6, 0.0, 1.0);\nlet color = with_snow * vignette;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "roll_speed",
+        "min": 0.05,
+        "max": 0.5,
+        "value": 0.15
+      },
+      {
+        "name": "snow_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.5
+      },
+      {
+        "name": "bar_count",
+        "min": 3.0,
+        "max": 10.0,
+        "value": 6.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff3cac",
+      "#2b86c5",
+      "#ffe66d",
+      "#0b0a2a",
+      "#3dffb0"
+    ]
+  },
+  {
+    "name": "Dead Air Smiley",
+    "expression": "let frame = floor(t * 30.0);\nlet grain = hash(floor(p * vec2<f32>(260.0, 140.0)) + vec2<f32>(frame * 13.0, 0.0));\nlet row = hash(vec2<f32>(floor(p.y * 140.0), frame * 3.0));\nlet s = grain * 0.7 + row * 0.3;\nlet roll = fract(p.y * 0.6 + t * roll_speed);\nlet bar = smoothstep(0.75, 1.0, roll) * 0.35;\nlet base = mix(c4 + vec3<f32>(0.05, 0.04, 0.08), c5, s * 0.75 + bar);\nlet q = p - vec2<f32>(0.1 * sin(t * 0.13), 0.02 * sin(t * 0.3));\nlet head = stroke(sd_circle(q, 0.2), 0.015);\nlet eyes = fill(sd_circle(q - vec2<f32>(-0.07, 0.06), 0.022)) + fill(sd_circle(q - vec2<f32>(0.07, 0.06), 0.022));\nlet smile = stroke(abs(length(q - vec2<f32>(0.0, 0.04)) - 0.1), 0.014) * (1.0 - smoothstep(0.03, 0.05, q.y));\nlet face = clamp(head + eyes + smile, 0.0, 1.0);\nlet presence = smoothstep(0.5, 0.85, cloud(vec2<f32>(t * 0.15, 2.0)));\nlet sig = face * presence * signal_level;\nlet sig_col = mix(c1, c3, fract(p.y * 2.0 + t * 0.1));\nlet scan = 0.85 + 0.15 * step(0.5, fract(p.y * 140.0));\nlet color = mix(base, sig_col, clamp(sig * 1.2, 0.0, 1.0)) * scan;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "signal_level",
+        "min": 0.2,
+        "max": 1.0,
+        "value": 0.6
+      },
+      {
+        "name": "roll_speed",
+        "min": 0.0,
+        "max": 0.3,
+        "value": 0.08
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#ff5fa2",
+      "#5ee6ff",
+      "#ffe15a",
+      "#1a0f2e",
+      "#e8f7ff"
+    ]
+  },
+  {
+    "name": "Blank Channel",
+    "expression": "let fr = floor(t * 24.0);\nlet bx = floor((p.x + 1.0) * 4.0);\nlet k1 = fract(bx * 0.37);\nlet k2 = fract(bx * 0.61);\nlet tint = mix(mix(c2, c3, k1), c5, step(0.6, k2));\nlet env = smoothstep(0.55, 0.05, abs(p.y));\nlet level = 0.5 + 0.25 * sin(t * 0.5 + p.x * 3.0);\nlet g = hash(floor(p * vec2<f32>(220.0, 130.0)) + vec2<f32>(fr * 13.1, fr * 7.7));\nlet sig = env * (1.0 - smoothstep(level - 0.1, level + 0.1, g));\nlet sl = 0.7 + 0.3 * step(0.5, fract(p.y * 130.0));\nlet roll_d = abs(fract(p.y + 0.5 - t * 0.07) - 0.5);\nlet bar = 1.0 - smoothstep(0.0, 0.03, roll_d);\nlet snow = c1 * g * 0.45;\nlet color = (snow + tint * sig * 0.9 + c4 * 0.4) * sl + c5 * bar * 0.8;\nreturn mix(bg, tonemap(color), strength);",
+    "variables": [],
+    "y_up": true,
+    "colors": [
+      "#e8e4d8",
+      "#5fd0c4",
+      "#e0587a",
+      "#142030",
+      "#f2b84b"
+    ]
+  },
+  {
+    "name": "Signal Lines",
+    "expression": "let tt = t * wave_speed;\nvar light = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let x = p.x * 2.4 + k * 0.4;\n    let w = sin(x * (2.5 + k * 0.6) + tt * (1.6 + k * 0.25)) * 0.55\n          + sin(x * 6.1 - tt * 2.9 + k * 1.7) * 0.3\n          + sin(x * 15.0 + tt * 5.3 + k * 2.1) * 0.12;\n    let env = 0.35 + 0.65 * abs(sin(p.x * 1.1 + tt * 0.4 + k * 0.9));\n    let y = (k - 2.5) * 0.085 + w * env * wave_amp * 0.09;\n    let d = abs(p.y - y);\n    let core = 1.0 - smoothstep(line_width * 0.5, line_width, d);\n    let glow = exp(-d * 60.0) * 0.4;\n    let col = mix(mix(c1, c2, smoothstep(0.0, 2.5, k)), c3, smoothstep(2.5, 5.0, k));\n    light += col * (core * 1.4 + glow);\n}\nlet color = tonemap(light * 1.1 + c4 * 0.8);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "wave_amp",
+        "min": 0.2,
+        "max": 2.0,
+        "value": 2.0
+      },
+      {
+        "name": "wave_speed",
+        "min": 0.2,
+        "max": 3.0,
+        "value": 0.85
+      },
+      {
+        "name": "line_width",
+        "min": 0.002,
+        "max": 0.02,
+        "value": 0.002
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#00f0ff",
+      "#ff2e9a",
+      "#f5ff3d",
+      "#0b0620",
+      "#7b5cff"
+    ]
+  },
+  {
+    "name": "Live Wire Oscilloscope",
+    "expression": "var hue = vec3<f32>(0.0);\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let env = 0.55 + 0.45 * sin(t * (0.9 + k * 0.23) + k * 2.1);\n    let wave = 0.6 * sin(p.x * (3.0 + k * 1.1) + t * (1.2 + k * 0.4) + k * 1.3)\n             + 0.4 * sin(p.x * (8.0 + k) - t * (2.1 + k * 0.3) + k * 2.2);\n    let spike = sin(p.x * 14.0 + t * 7.0 + k * 3.0) * 0.12 * env;\n    let yl = -0.3 + k * 0.12 + wave_height * env * (wave + spike);\n    let d = abs(p.y - yl);\n    let line = 1.0 - smoothstep(0.0, 0.006, d);\n    let bloom = exp(-d * 30.0) * glow_amount * 0.35;\n    let col = mix(c1, c2, k / 5.0);\n    hue += col * (line + bloom);\n}\nlet haze = c4 * 0.4 * (1.0 - abs(p.y) * 1.5);\nreturn mix(bg, tonemap(hue * 1.2 + haze), strength);",
+    "variables": [
+      {
+        "name": "wave_height",
+        "min": 0.05,
+        "max": 0.4,
+        "value": 0.35
+      },
+      {
+        "name": "glow_amount",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.75
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#00f0ff",
+      "#ff2bd6",
+      "#ffe14d",
+      "#06041a",
+      "#3dffa0"
+    ]
+  },
+  {
+    "name": "Audio Scanlines",
+    "expression": "let amp = wave_height;\nvar col = vec3<f32>(0.0);\nvar lum = 0.0;\nfor (var i = 0; i < 6; i++) {\n    let k = f32(i);\n    let x = p.x * 2.2;\n    let ph = t * line_speed;\n    let w = sin(x * 3.0 + ph * 2.0 + k * 0.7) * 0.6 + sin(x * 7.3 - ph * 3.1 + k * 1.9) * 0.3 + sin(x * 13.0 + ph * 5.0 + k) * 0.1;\n    let env = 1.0 - smoothstep(0.6, 0.95, abs(p.x * 1.1));\n    let y = (k - 2.5) * 0.09 + amp * w * env;\n    let d = abs(p.y - y);\n    let core = exp(-d * 160.0);\n    let soft = exp(-d * 30.0) * 0.25;\n    let line_col = mix(c1, c2, k * 0.2);\n    col += line_col * (core + soft);\n    lum += core;\n}\nlet glow = tonemap(col * 1.3);\nlet color = glow + c5 * 0.02 * lum;\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "wave_height",
+        "min": 0.05,
+        "max": 0.4,
+        "value": 0.2
+      },
+      {
+        "name": "line_speed",
+        "min": 0.5,
+        "max": 3.0,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#00e5ff",
+      "#ff3cc8",
+      "#ffd23f",
+      "#0b0a1f",
+      "#7cff6b"
+    ]
+  },
+  {
+    "name": "Plucked Signal",
+    "expression": "var ink = vec3<f32>(0.0, 0.0, 0.0);\nfor (var i = 0; i < 14; i++) {\n    let k = f32(i);\n    let f = k / 13.0;\n    let ph = t * wave_speed;\n    let wv = sin(p.x * 7.0 + ph + k * 0.5) * 0.5 + sin(p.x * 17.0 - ph * 1.6 + k * 1.3) * 0.3 * sin(ph * 0.4 + k);\n    let amp = 0.5 + 0.5 * sin(k * 0.9 + t * 0.7);\n    let line_y = (f - 0.5) * 0.85 + wave_height * wv * amp;\n    let d = abs(p.y - line_y);\n    let core = 1.0 - smoothstep(0.0, 0.006, d);\n    let glow = exp(-d * 45.0) * 0.35;\n    let tint = mix(c1, c2, f);\n    let hot = mix(tint, c3, step(0.7, f));\n    ink += hot * (core + glow);\n}\nlet color = tonemap(ink * 1.1 + c4 * 0.15);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "wave_height",
+        "min": 0.04,
+        "max": 0.4,
+        "value": 0.16
+      },
+      {
+        "name": "wave_speed",
+        "min": 0.5,
+        "max": 3.0,
+        "value": 1.4
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#00e5ff",
+      "#ff3dcb",
+      "#ffe14d",
+      "#1a0b3d",
+      "#7cff6b"
+    ]
+  },
+  {
+    "name": "Guru Copperfield Amiga 500",
+    "expression": "let tick=floor(t*24.0);\nlet roll=1.0-smoothstep(0.0,0.045,abs(fract(t/8.0-p.y)-0.5));\nlet n=hash(vec2<f32>(floor(p.y*360.0),tick));\nlet q=p+vec2<f32>((n-0.5)*(0.002+roll*0.014)*cable_noise,0.0);\nlet wave=q.y+0.025*sin(q.x*3.0+t*0.18);\nlet copper=0.5+0.5*cos(floor(wave*100.0)*0.32-t*0.24);\nvar rgb=mix(c2,c5*0.74,copper*copper*0.82);\nlet h=max(-0.12-q.y,0.0);\nlet uv=vec2<f32>(q.x,0.43)/(h+0.035)+vec2<f32>(0.0,t*0.24);\nlet grid=abs(fract(uv)-0.5);\nlet wire=(1.0-smoothstep(0.012,0.045,min(grid.x,grid.y)))*smoothstep(0.01,0.16,h);\nrgb=mix(rgb,mix(c2*0.68,c5,wire*0.7),smoothstep(0.0,0.012,h));\nlet cx=0.38*sin(t*0.31+0.8);\nlet lift=abs(sin(t*0.74));\nlet shadow=length((q-vec2<f32>(cx,-0.39))*vec2<f32>(1.0,4.8));\nrgb=mix(rgb,c1,(1.0-smoothstep(0.0,0.21,shadow))*(0.83-0.4*lift));\nlet xy=q-vec2<f32>(cx,-0.235+0.25*lift);\nvar z=0.32;\nfor(var i=0;i<20;i++){\nlet d=length(vec3<f32>(xy,z))-0.15;\nz-=clamp(d,0.0,0.09);\n}\nlet norm=normalize(vec3<f32>(xy,max(z,0.001)));\nlet tile=floor(atan2(norm.z,norm.x)*1.91+t*0.52)+floor(atan2(norm.y,length(norm.xz))*2.55);\nlet shell=mix(c3,c4,fract(tile*0.5)*2.0);\nrgb=mix(rgb,shell*(0.52+0.48*saturate(dot(norm,vec3<f32>(-0.42,0.62,0.66)))),fill(length(xy)-0.15));\nlet panel=q-vec2<f32>(0.0,0.32);\nlet box=sd_box(panel,vec2<f32>(0.544,0.096));\nrgb=mix(rgb,c1*0.66,fill(box));\nrgb=mix(rgb,c3,stroke(box+0.008,0.0025)*(0.6+0.4*cos(t*2.1)));\nlet g=(vec2<f32>(panel.x,-panel.y)+vec2<f32>(0.414,0.055))*vec2<f32>(26.5,18.0);\nlet col=i32(floor(g.x));\nlet row=i32(floor(g.y));\nlet b=col/4;\nvar w=0u;\nif(row==0){if(b==0){w=0x534F4654u;}if(b==1){w=0x57415245u;}if(b==2){w=0x20464149u;}if(b==3){w=0x4C555245u;}}\nif(row==1){if(b==0){w=0x47555255u;}if(b==1){w=0x204D4544u;}if(b==2){w=0x49544154u;}if(b==3){w=0x494F4E20u;}if(b==4){w=0x23303030u;}if(b==5){w=0x34000000u;}}\nlet a=(w>>(8u*(3u-(u32(max(col,0))&3u))))&255u;\nvar f=0u;\nif(a==83u){f=0x74217u;}if(a==79u||a==48u){f=0x75557u;}if(a==70u){f=0x74644u;}if(a==84u){f=0x72222u;}if(a==87u){f=0x55775u;}if(a==65u){f=0x25755u;}if(a==82u){f=0x65655u;}if(a==69u){f=0x74647u;}if(a==73u){f=0x72227u;}if(a==76u){f=0x44447u;}if(a==85u){f=0x55557u;}if(a==71u){f=0x34553u;}if(a==77u){f=0x57755u;}if(a==68u){f=0x65556u;}if(a==78u){f=0x57775u;}if(a==35u){f=0x57575u;}if(a==52u){f=0x55711u;}\nlet u=fract(g)*vec2<f32>(4.0,7.0);\nfor(var i=0;i<2;i++){\nlet x=u.x-f32(1-i)*color_bleed*0.7;\nlet k=u32(max(4.0-floor(u.y),0.0))*4u+u32(max(2.0-floor(x),0.0));\nif(col>=0&&x>=0.0&&x<3.0&&u.y<5.0&&((f>>k)&1u)>0u){rgb=select(c2,c3,i==1);}\n}\nreturn mix(bg,mix(rgb,c5,n*roll*cable_noise*0.16),strength);",
+    "variables": [
+      {
+        "name": "cable_noise",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.77
+      },
+      {
+        "name": "color_bleed",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.65
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#241e40",
+      "#514879",
+      "#ff6554",
+      "#ffd79b",
+      "#75cec9"
+    ]
+  },
+  {
+    "name": "Guru Copperfield",
+    "expression": "let tick=floor(t*24.0);\nlet roll=1.0-smoothstep(0.0,0.045,abs(fract(t/8.0-p.y)-0.5));\nlet n=hash(vec2<f32>(floor(p.y*360.0),tick));\nlet q=p+vec2<f32>((n-0.5)*(0.002+roll*0.014)*cable_noise,0.0);\nlet wave=q.y+0.025*sin(q.x*3.0+t*0.18);\nlet copper=0.5+0.5*cos(floor(wave*100.0)*0.32-t*0.24);\nvar rgb=mix(c2,c5*0.74,copper*copper*0.82);\nlet h=max(-0.12-q.y,0.0);\nlet uv=vec2<f32>(q.x,0.43)/(h+0.035)+vec2<f32>(0.0,t*0.24);\nlet grid=abs(fract(uv)-0.5);\nlet wire=(1.0-smoothstep(0.012,0.045,min(grid.x,grid.y)))*smoothstep(0.01,0.16,h);\nrgb=mix(rgb,mix(c2*0.68,c5,wire*0.7),smoothstep(0.0,0.012,h));\nlet cx=0.38*sin(t*0.31+0.8);\nlet lift=abs(sin(t*0.74));\nlet shadow=length((q-vec2<f32>(cx,-0.39))*vec2<f32>(1.0,4.8));\nrgb=mix(rgb,c1,(1.0-smoothstep(0.0,0.21,shadow))*(0.83-0.4*lift));\nlet xy=q-vec2<f32>(cx,-0.235+0.25*lift);\nvar z=0.32;\nfor(var i=0;i<20;i++){\nlet d=length(vec3<f32>(xy,z))-0.15;\nz-=clamp(d,0.0,0.09);\n}\nlet norm=normalize(vec3<f32>(xy,max(z,0.001)));\nlet tile=floor(atan2(norm.z,norm.x)*1.91+t*0.52)+floor(atan2(norm.y,length(norm.xz))*2.55);\nlet shell=mix(c3,c4,fract(tile*0.5)*2.0);\nrgb=mix(rgb,shell*(0.52+0.48*saturate(dot(norm,vec3<f32>(-0.42,0.62,0.66)))),fill(length(xy)-0.15));\nlet panel=q-vec2<f32>(0.0,0.32);\nlet box=sd_box(panel,vec2<f32>(0.544,0.096));\nrgb=mix(rgb,c1*0.66,fill(box));\nrgb=mix(rgb,c3,stroke(box+0.008,0.0025)*(0.6+0.4*cos(t*2.1)));\nlet g=(vec2<f32>(panel.x,-panel.y)+vec2<f32>(0.414,0.055))*vec2<f32>(26.5,18.0);\nlet col=i32(floor(g.x));\nlet row=i32(floor(g.y));\nlet b=col/4;\nvar w=0u;\nif(row==0){if(b==0){w=0x534F4654u;}if(b==1){w=0x57415245u;}if(b==2){w=0x20464149u;}if(b==3){w=0x4C555245u;}}\nif(row==1){if(b==0){w=0x47555255u;}if(b==1){w=0x204D4544u;}if(b==2){w=0x49544154u;}if(b==3){w=0x494F4E20u;}if(b==4){w=0x23303030u;}if(b==5){w=0x34000000u;}}\nlet a=(w>>(8u*(3u-(u32(max(col,0))&3u))))&255u;\nvar f=0u;\nif(a==83u){f=0x74217u;}if(a==79u||a==48u){f=0x75557u;}if(a==70u){f=0x74644u;}if(a==84u){f=0x72222u;}if(a==87u){f=0x55775u;}if(a==65u){f=0x25755u;}if(a==82u){f=0x65655u;}if(a==69u){f=0x74647u;}if(a==73u){f=0x72227u;}if(a==76u){f=0x44447u;}if(a==85u){f=0x55557u;}if(a==71u){f=0x34553u;}if(a==77u){f=0x57755u;}if(a==68u){f=0x65556u;}if(a==78u){f=0x57775u;}if(a==35u){f=0x57575u;}if(a==52u){f=0x55711u;}\nlet u=fract(g)*vec2<f32>(4.0,7.0);\nfor(var i=0;i<2;i++){\nlet x=u.x-f32(1-i)*color_bleed*0.7;\nlet k=u32(max(4.0-floor(u.y),0.0))*4u+u32(max(2.0-floor(x),0.0));\nif(col>=0&&x>=0.0&&x<3.0&&u.y<5.0&&((f>>k)&1u)>0u){rgb=select(c2,c3,i==1);}\n}\nreturn mix(bg,mix(rgb,c5,n*roll*cable_noise*0.16),strength);",
+    "variables": [
+      {
+        "name": "cable_noise",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.45
+      },
+      {
+        "name": "color_bleed",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.65
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#241e40",
+      "#514879",
+      "#ff6554",
+      "#ffd79b",
+      "#75cec9"
+    ]
+  },
+  {
+    "name": "Blue Channel BASIC",
+    "expression": "let tick = floor(t*24.0);\nlet line = floor(p.y*480.0);\nlet drift = noise(vec2<f32>(line*0.05,tick));\nlet band = pow(0.5+0.5*cos(6.28318*(p.y-fract(t/9.0))),24.0);\nlet x = p.x+cable_noise*(drift-0.5)*(0.003+band*0.016);\nlet uv = vec2<f32>(x/1.46+0.5,0.5-p.y/0.86);\nlet grid = uv*vec2<f32>(40.0,25.0);\nlet col = i32(floor(grid.x));\nlet row = i32(floor(grid.y));\nlet j = col-select(0,4,row==1);\nlet k = u32(clamp(j,0,39))/4u;\nvar word = 0u;\nif (row==1 && j>=0 && j<32) {\n let a = vec4<u32>(0x01010101u,0x0002181au,0x1a180d18u,0x0b0c0003u);\n let b = vec4<u32>(0x04000506u,0x07080200u,0x090a0001u,0x01010100u);\n word = select(a[k%4u],b[k%4u],k>=4u);\n}\nif (row==4 && k<2u) { word = select(0x0b0c060du,0x0e0f0000u,k==1u); }\nif (row==5 && k<4u) {\n word = vec4<u32>(0x10110012u,0x0b081314u,0x00150203u,0x04151600u)[k];\n}\nif (row==6 && k<3u) {\n word = vec4<u32>(0x0a110017u,0x18141800u,0x10110000u,0u)[k];\n}\nif (row==7 && k==0u) { word = 0x0b191300u; }\nlet count = i32(floor(fract(t/12.0)*88.0));\nlet pos = (row-8)*40+col;\nvar id = (word>>((3u-u32(clamp(j,0,39))%4u)*8u))&255u;\nif (pos>=0 && pos<count) { id = vec3<u32>(2u,3u,4u)[u32(pos)%3u]; }\nvar bits = 0u;\nif (id<8u) {\n bits = select(vec4<u32>(0u,0x05e5e50u,0x788887u,0x68e996u)[id%4u],vec4<u32>(0x99f111u,0xe9e99eu,0x699f99u,0x78611eu)[id%4u],id>=4u);\n} else if (id<16u) {\n bits = select(vec4<u32>(0xe4444eu,0x999996u,0x69124fu,0xe99e99u)[id%4u],vec4<u32>(0xf8e88fu,0xe9999eu,0x996444u,0x000044u)[id%4u],id>=12u);\n} else if (id<24u) {\n bits = select(vec4<u32>(0x4c444eu,0x699996u,0xe99e88u,0x9ddbb9u)[id%4u],vec4<u32>(0xe44444u,0xaa0000u,0x040046u,0x788b97u)[id%4u],id>=20u);\n} else { bits = vec3<u32>(0x699996u,0x999996u,0x9ff999u)[min(id-24u,2u)]; }\nlet px = vec2<u32>(fract(grid)*vec2<f32>(5.0,8.0));\nlet lit = f32((bits>>(4u*(5u-min(px.y,5u))+3u-min(px.x,3u)))&1u);\nlet glyph = select(0.0,lit,px.x<4u && px.y<6u);\nlet area = fill(sd_box(uv-0.5,vec2<f32>(0.5)));\nlet cursor = select(0.0,1.0,pos==count && fract(t*1.5)<0.5);\nlet blue = mix(c2,c4*0.9,1.0-area);\nlet snow = hash(vec2<f32>(floor(x*610.0)+tick,line));\nlet signal = mix(blue,c3,max(cursor,glyph)*area);\nlet beam = 1.0-scanlines*0.23*(0.5+0.5*cos(p.y*3015.9));\nlet rf = mix(signal,c1,cable_noise*snow*0.16);\nreturn mix(bg,mix(rf,c5,cable_noise*(0.04+0.19*band)*pow(snow,5.0))*beam,strength);",
+    "variables": [
+      {
+        "name": "cable_noise",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.55
+      },
+      {
+        "name": "scanlines",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.45
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#19215b",
+      "#3943a0",
+      "#a9afff",
+      "#727edf",
+      "#d1d4ff"
+    ]
+  },
+  {
+    "name": "Channel 03 · Pong",
+    "expression": "let tube = p * vec2<f32>(1.16, 2.0);\nlet q = p * (1.0 + 0.047 * dot(tube, tube));\nlet glass = sd_box(q, vec2<f32>(0.83, 0.445)) - 0.018;\nlet face = 1.0 - smoothstep(-0.002, 0.003, glass);\nlet row = floor(q.y * 225.0);\nlet roll = fract(q.y * 0.91 - t / 12.0);\nlet sync = exp(-90.0 * abs(roll - 0.35));\nlet jitter = hash(vec2<f32>(row, floor(t * 12.0))) - 0.5;\nlet v = q + vec2<f32>(jitter * (0.0009 + 0.006 * sync), 0.0);\nlet rally = t / 3.0 + 0.22;\nlet bx = (1.0 - 2.0 * abs(fract(rally * 0.5) * 2.0 - 1.0)) * 0.717;\nlet by = (1.0 - 2.0 * abs(fract(rally * 0.375 + 0.13) * 2.0 - 1.0)) * 0.344;\nlet left = by * (0.78 - 0.22 * bx / 0.717) + 0.058 * sin(rally * 3.14159);\nlet right = by * (0.78 + 0.22 * bx / 0.717) - 0.047 * sin(rally * 3.14159);\nlet bat = min(sd_box(v - vec2<f32>(-0.74, left), vec2<f32>(0.011, 0.068)), sd_box(v - vec2<f32>(0.74, right), vec2<f32>(0.011, 0.068)));\nlet ball = sd_box(v - vec2<f32>(bx, by), vec2<f32>(0.012));\nlet net = sd_box(vec2<f32>(v.x, (fract(v.y * 22.0 + 0.5) - 0.5) / 22.0), vec2<f32>(0.003, 0.012));\nlet zero = abs(sd_box(vec2<f32>(abs(v.x) - 0.095, v.y - 0.338), vec2<f32>(0.019, 0.029))) - 0.004;\nlet ch = v - vec2<f32>(0.718, 0.367);\nlet bars = sd_box(vec2<f32>(ch.x, min(abs(ch.y), abs(abs(ch.y) - 0.023))), vec2<f32>(0.015, 0.0027));\nlet three = min(bars, sd_box(ch - vec2<f32>(0.013, 0.0), vec2<f32>(0.0025, 0.023)));\nlet game = min(min(ball, bat), zero);\nlet raster = 0.86 + 0.14 * cos(v.y * 1413.717);\nlet grain = hash(floor(v * vec2<f32>(410.0, 225.0)) + vec2<f32>(floor(t * 15.0), 0.0));\nlet field = mix(c1, c2, clamp(0.54 - 0.32 * dot(tube, tube) + 0.09 * sin(v.y * 8.0 - t * 0.21) + grain * 0.08, 0.0, 1.0));\nlet smear = c4 * 0.48 * exp(-max(game, 0.0) * 106.0);\nlet phosphor = mix(field + smear, c3, fill(game));\nlet picture = mix(mix(phosphor, c5 * 0.72, fill(net)), c5, fill(three));\nlet color = mix(c1 * (0.48 + 0.32 * exp(-abs(glass) * 52.0)), picture * raster * (1.0 - 0.18 * sync), face);\nreturn mix(bg, clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), strength);",
+    "variables": [],
+    "y_up": true,
+    "colors": [
+      "#102b39",
+      "#288a91",
+      "#f1b45e",
+      "#ef7869",
+      "#b9f3d9"
+    ]
+  },
+  {
+    "name": "Broadcast 900",
+    "expression": "let col_idx = clamp(floor((p.x + 0.9) * 3.9), 0.0, 6.0);\nlet ph = col_idx / 6.0;\nlet bars_c = mix(mix(c5, c3, smoothstep(0.0, 0.3, ph)), mix(c2, c1, smoothstep(0.55, 1.0, ph)), smoothstep(0.3, 0.65, ph));\nlet lower_c = mix(c4, c1 * 0.75, step(0.5, fract(col_idx * 0.5)));\nlet lower = 1.0 - smoothstep(-0.365, -0.355, p.y);\nlet bars_all = mix(bars_c, lower_c, lower);\nlet wrap = fract(p.y * 0.6 - t * roll_speed);\nlet roll = mix(0.76, 1.0, smoothstep(0.0, 0.14, wrap));\nlet field = floor(t * 30.0);\nlet line = floor(p.y * 450.0 + 0.5 * fract(field * 0.5));\nlet interlace = mix(0.88, 1.0, step(0.5, fract(line * 0.5 + field * 0.5)));\nlet scan = 0.94 + 0.06 * cos(p.y * 565.48);\nlet base = bars_all * roll * interlace * scan;\nlet y0 = fract(t * 0.13) - 0.5;\nlet band = 1.0 - smoothstep(0.015, 0.055, abs(p.y - y0));\nlet grain = hash(floor(p * vec2<f32>(140.0, 70.0)) + vec2<f32>(field * 3.1, 0.0));\nlet static_tint = mix(c4, c5, grain);\nlet color_a = mix(base, static_tint, band * noise_amount * 0.7);\nlet frame_d = sd_box(p - vec2<f32>(-0.62, 0.36), vec2<f32>(0.12, 0.07));\nlet frame = stroke(frame_d, 0.012);\nlet blink = step(0.5, fract(t * 0.8));\nlet lamp = fill(sd_circle(p - vec2<f32>(-0.5, 0.36), 0.02)) * blink;\nlet color_b = mix(color_a, c4, frame * 0.95);\nlet color = mix(color_b, c3, lamp);\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "roll_speed",
+        "min": 0.0,
+        "max": 0.3,
+        "value": 0.06
+      },
+      {
+        "name": "noise_amount",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.7
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#f05248",
+      "#42bfc4",
+      "#f2c75c",
+      "#172535",
+      "#ede3c9"
+    ]
+  },
+  {
+    "name": "Bilious Wake",
+    "expression": "let tau = 6.2831853;\nlet hour = t / 3600.0;\nlet eye = wander * vec2<f32>(\n    0.103 * sin(tau * hour * 53.0) + 0.027 * sin(tau * hour * 127.0),\n    0.072 * sin(tau * hour * 41.0 + 1.2)\n);\nlet q = polar((p - eye) * vec2<f32>(0.91, 1.0) + vec2<f32>(0.000001, 0.0));\nlet r = q.x;\nlet depth = log(1.0 + r * 19.0);\nlet aperture = smoothstep(0.028, 0.215, r);\nlet rib = 0.5 + 0.5 * cos(tau * q.y * 9.0 + 0.42 * sin(depth * 2.1));\nlet wall = 0.32 + 0.34 * rib + 0.18 * smoothstep(0.18, 0.65, r);\nlet wash = mix(c1 * 0.72, mix(c2, c3, rib * 0.52), wall);\n\nlet wave = fract(r * 0.72 - hour * 219.0 + 0.31) - 0.5;\nlet crest = exp(-abs(wave) * 39.0);\nlet afterglow = exp(-abs(wave + 0.045) * 13.0);\nlet pulse = pulse_glow * (crest * 0.20 + afterglow * 0.17);\n\nvar wake = vec3<f32>(0.0);\nfor (var i = 0; i < 2; i++) {\n    let k = f32(i);\n    let lanes = mix(104.0, 59.0, k);\n    let a = fract(q.y + k * 0.173) * lanes;\n    let lane = floor(a);\n    let seed = hash(vec2<f32>(lane, 3.0 + k));\n    let cycles = round(3600.0 * wake_speed * (1.9 + 0.82 * k + 0.55 * seed) / 64.0);\n    let z = depth * (6.1 - 2.5 * k) - 64.0 * fract(hour * cycles) + seed * 23.0;\n    let tile = 64.0 * fract(floor(z) / 64.0);\n    let h = hash(vec2<f32>(lane + k * 133.0, tile));\n    let x = abs(fract(a) - (0.31 + 0.38 * seed));\n    let core = 1.0 - smoothstep(0.026 + 0.028 * h, 0.094 + 0.053 * h, x);\n    let fringe = 1.0 - smoothstep(0.07, 0.25, x);\n    let f = fract(z);\n    let start = 0.94 - streak_length * (0.54 + 0.44 * h);\n    let dash = smoothstep(start, 0.87, f) * (1.0 - smoothstep(0.91, 0.99, f));\n    let tint = mix(mix(c2, c3, h), c4, smoothstep(0.74, 1.0, h) * 0.7);\n    let lit = smoothstep(0.27, 0.68, h);\n    wake += tint * dash * lit * (core + 0.21 * fringe) * (0.78 + 0.42 * k + pulse);\n}\nlet scene = wash + c3 * pulse + wake;\nreturn mix(bg, tonemap(scene * aperture), strength);",
+    "variables": [
+      {
+        "name": "wake_speed",
+        "min": 0.4,
+        "max": 2.5,
+        "value": 1.25
+      },
+      {
+        "name": "streak_length",
+        "min": 0.25,
+        "max": 0.9,
+        "value": 0.68
+      },
+      {
+        "name": "wander",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.65
+      },
+      {
+        "name": "pulse_glow",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.35
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#17270d",
+      "#518746",
+      "#9ccb36",
+      "#dce779"
+    ]
+  },
+  {
+    "name": "Banked Embers",
+    "expression": "let clock = t * 0.00174532925;\nlet slow = vec2<f32>(sin(clock * 23.0), cos(clock * 23.0));\nlet fast = vec2<f32>(sin(clock * 47.0 + 1.4), cos(clock * 47.0 + 1.4));\nlet bed = -0.432 + 0.006 * sin(p.x * 14.0 + slow.x) + 0.004 * sin(p.x * 37.0);\nlet rise = p.y - bed;\n\nlet left = p - vec2<f32>(-0.70 + 0.045 * slow.x, -0.255 + 0.022 * slow.y);\nlet right = p - vec2<f32>(0.70 + 0.045 * fast.y, -0.252 + 0.022 * slow.x);\nlet dl = dot(left, left);\nlet dr = dot(right, right);\nlet twist_l = curl_amount * (2.75 + 0.45 * slow.y) * exp(-17.0 * dl);\nlet twist_r = curl_amount * (2.95 + 0.38 * fast.x) * exp(-16.0 * dr);\nlet bend = rotate(left, twist_l) - left + rotate(right, -twist_r) - right;\nlet q = p + bend + vec2<f32>(0.095 * sin(rise * 7.5 + slow.x), 0.0);\n\nlet a = q * vec2<f32>(2.8, 4.8) + slow * vec2<f32>(0.61, 0.24);\nlet warp_a = vec2<f32>(noise(a + vec2<f32>(4.2, 8.1)), noise(a + vec2<f32>(-5.4, 2.6))) - vec2<f32>(0.5);\nlet bank = fbm(a + warp_a * 2.7);\nlet b = (q + bend * 0.19) * vec2<f32>(4.7, 10.6) + fast * vec2<f32>(0.82, 0.39);\nlet warp_b = vec2<f32>(noise(b * 0.57 + vec2<f32>(8.3, -3.1)), noise(b * 0.57 + vec2<f32>(2.7, 5.8))) - vec2<f32>(0.5);\nlet filament = cloud(b + warp_b * 2.35);\n\nlet lift = smoothstep(-0.022, 0.075, rise);\nlet dissolve = 1.0 - smoothstep(0.17, 0.83, rise + 0.20 * (0.52 - bank));\nlet plume = lift * dissolve;\nlet corners = exp(-13.0 * min(dl, dr));\nlet body = smoothstep(0.27, 0.73, bank + (smoke_density - 1.0) * 0.13);\nlet thread = exp(-16.0 * abs(filament - 0.56)) * smoothstep(0.31, 0.61, bank);\nlet wash = c1 * (0.32 + plume * (0.53 + body));\nlet smoke_tint = mix(c2, c3, smoothstep(0.06, 0.48, rise));\nlet smoke = smoke_tint * plume * body * (0.58 + 0.38 * corners) * smoke_density;\nlet wisp_tint = mix(c3, c4, corners * (1.0 - smoothstep(0.07, 0.40, rise)));\nlet wisps = wisp_tint * plume * thread * (0.23 + 0.89 * corners) * smoke_density;\n\nlet coal = noise(vec2<f32>(p.x * 39.0 + 0.23 * fast.x, 4.0 + 0.28 * fast.y));\nlet seam = exp(-abs(rise) * 245.0) * (0.24 + 0.76 * smoothstep(0.28, 0.72, coal));\nlet ember = c2 * (seam * 0.66 + exp(-abs(rise) * 43.0) * 0.14) * ember_glow;\nreturn mix(bg, tonemap(wash + smoke + wisps + ember), strength);",
+    "variables": [
+      {
+        "name": "smoke_density",
+        "min": 0.45,
+        "max": 1.55,
+        "value": 1.0
+      },
+      {
+        "name": "curl_amount",
+        "min": 0.0,
+        "max": 1.6,
+        "value": 1.0
+      },
+      {
+        "name": "ember_glow",
+        "min": 0.0,
+        "max": 1.5,
+        "value": 0.75
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#1b1419",
+      "#bc4a37",
+      "#a67d89",
+      "#f2a477"
+    ]
+  },
+  {
+    "name": "roadflight",
+    "expression": "let clock = fract(t / 3600.0) * 6.283185;\nlet q = rotate(p, bank_angle * sin(clock * 31.0));\nlet h = 0.04 + 0.023 * sin(clock * 23.0);\nlet y = q.y - h;\nlet dusk = exp(-5.2 * abs(y));\nlet vapor = cloud(vec2<f32>(q.x * 3.4 + 0.7 * sin(clock * 13.0), y * 15.0));\nlet sky = mix(c2 * 0.65, c3 * 0.91, dusk);\nlet clouds = smoothstep(0.42, 0.76, vapor) * smoothstep(0.015, 0.15, y);\nlet air = mix(sky, mix(c2, c4, dusk), clouds * 0.42);\n\nlet flanks = smoothstep(0.08, 0.72, abs(q.x));\nlet ridgeFar = flanks * (0.04 + 0.15 * fbm(vec2<f32>(q.x * 4.0 + 0.45 * sin(clock * 17.0), 6.0)));\nlet ridgeNear = flanks * (0.014 + 0.077 * ridged(vec2<f32>(q.x * 7.0 + 0.9 * sin(clock * 17.0), 3.0)));\nlet hills = mix(air, mix(c2 * 0.53, c3 * 0.56, dusk * 0.5), fill(y - ridgeFar));\nlet view = mix(hills, mix(c1, c2 * 0.49, dusk * 0.65), fill(y - ridgeNear));\n\nlet z = max(-y, 0.0);\nlet center = 0.11 * z * sin(clock * 19.0);\nlet x = abs(q.x - center);\nlet width = 0.007 + z * 0.61;\nlet reveal = smoothstep(0.005, 0.063, z);\nlet ground = mix(c1 * 1.27, c2 * 0.52, exp(-6.0 * z));\nlet strip = mix(c1 * 1.85, c2 * 0.66, exp(-4.0 * z));\nlet pavement = mix(view, mix(ground, strip, fill(x - width)), reveal);\nlet depth = 0.62 / (z + 0.068);\nlet phase = fract(t * round(approach_speed * 3600.0) / 3600.0);\nlet dash = abs(fract(depth + phase) - 0.5);\nlet paint = (1.0 - smoothstep(0.13, 0.23, dash)) * fill(x - (0.001 + 0.009 * z));\nlet lamp = abs(x - width);\nlet bead = 1.0 - smoothstep(0.035, 0.15, abs(fract((depth + phase) * 2.0) - 0.5));\nlet edge = c4 * (0.21 * halo(lamp, 0.016) + 0.95 * halo(lamp, 0.007) * bead);\nlet zone = reveal * smoothstep(0.045, 0.15, z);\n\nlet u = vec2<f32>(abs(p.x), p.y - 0.09);\nlet wing = sd_segment(u, vec2<f32>(0.029, 0.0), vec2<f32>(0.097, 0.0));\nlet tip = sd_segment(u, vec2<f32>(0.029, -0.013), vec2<f32>(0.029, 0.0));\nlet sight = min(min(wing, tip), abs(length(u) - 0.010));\nlet ticks = sd_box(vec2<f32>(u.x - 0.145, abs(fract((u.y + 0.035) / 0.07) - 0.5) * 0.07), vec2<f32>(0.011, 0.001));\nlet ladder = halo(ticks, 0.004) * (1.0 - smoothstep(0.12, 0.21, abs(u.y)));\nlet hud = c5 * hud_glow * (0.8 * halo(sight, 0.005) + 0.29 * ladder);\nlet scene = pavement + zone * (edge + c4 * paint * 0.65) + hud;\nreturn mix(bg, tonemap(scene), strength);",
+    "variables": [
+      {
+        "name": "approach_speed",
+        "min": 0.15,
+        "max": 1.6,
+        "value": 1.4
+      },
+      {
+        "name": "bank_angle",
+        "min": 0.0,
+        "max": 0.22,
+        "value": 0.07
+      },
+      {
+        "name": "hud_glow",
+        "min": 0.0,
+        "max": 1.5,
+        "value": 0.65
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#18263e",
+      "#687fc6",
+      "#e18f99",
+      "#ffc18b",
+      "#8de3cf"
+    ]
+  },
+  {
+    "name": "I‑75 North · Kentucky",
+    "expression": "let x = p.x;\nlet y = p.y;\nlet drive = t * cruise_speed;\nlet ink = c1 * 0.74;\nlet sun = sd_circle(p - vec2<f32>(-0.39, 0.28), sun_size);\nlet sky = mix(c2, mix(c2, c4, 0.73), 1.0 - smoothstep(0.02, 0.47, y));\nlet vapor = noise(vec2<f32>(x * 4.2 - t * 0.075, y * 29.0));\nlet air = mix(sky, c4, 0.30 * smoothstep(0.53, 0.77, vapor));\nlet dawn = mix(air, c4, max(fill(sun), halo(sun, 0.087) * 0.26));\n\nlet far = y - 0.131 - 0.042 * sin(x * 6.8) - 0.021 * cos(x * 14.0);\nlet hills = mix(dawn, mix(c2, c3, 0.48), fill(far));\nlet near = y - 0.064 - 0.035 * cos(x * 8.2) - 0.021 * sin(x * 16.0);\nlet z = 0.084 - y;\nlet d = max(z, 0.025);\nlet cx = -0.15 * exp(-d * 9.0) - 0.045;\nlet u = x - cx;\nlet w = 0.008 + d * 1.09;\nlet travel = 0.36 / d + drive * 0.82;\nlet turf = noise(vec2<f32>(u / (d + 0.06) * 2.5, travel * 1.65));\nlet green = mix(c3, mix(c1, c3, 0.56), turf * smoothstep(0.035, 0.15, z));\nlet fields = mix(hills, green, fill(near));\nlet verge = mix(fields, mix(c3, c4, 0.42), fill(max(abs(u) - w - 0.027, -z)));\nlet slab = mix(c1, c2, 0.29 + 0.19 * exp(-d * 8.0));\nlet road = mix(verge, slab, fill(max(abs(u) - w, -z)));\nlet f = fract(travel);\nlet dash = smoothstep(0.07, 0.14, f) * (1.0 - smoothstep(0.47, 0.54, f));\nlet marks = max(dash * fill(abs(u) - d * 0.027), fill(abs(abs(u) - w * 0.91) - d * 0.012));\nlet paved = mix(road, c4, marks * smoothstep(0.044, 0.09, z));\n\nlet q = p - vec2<f32>(0.44, 0.026);\nlet pole = sd_box(q + vec2<f32>(0.0, 0.175), vec2<f32>(0.009, 0.147));\nlet post = mix(paved, mix(c1, c2, 0.62), fill(pole));\nlet badge = max(abs(q.y) - 0.088, abs(q.x) - 0.077 - min(q.y + 0.024, 0.0));\nlet rim = mix(post, c4, fill(badge));\nlet enamel = mix(c1, c5, smoothstep(0.023, 0.028, q.y));\nlet face = mix(rim, enamel, fill(badge + 0.006));\nlet n = q - vec2<f32>(0.0, 0.051);\nlet north = min(sd_box(vec2<f32>(abs(n.x) - 0.010, n.y), vec2<f32>(0.002, 0.010)), sd_segment(n, vec2<f32>(-0.010, 0.009), vec2<f32>(0.010, -0.009)) - 0.0024);\nlet a = q - vec2<f32>(-0.024, -0.010);\nlet seven = min(sd_box(a - vec2<f32>(0.0, 0.018), vec2<f32>(0.015, 0.003)), sd_segment(a, vec2<f32>(0.013, 0.017), vec2<f32>(-0.006, -0.020)) - 0.003);\nlet b = q - vec2<f32>(0.022, -0.010);\nlet bars = sd_box(vec2<f32>(b.x, min(abs(b.y), abs(abs(b.y) - 0.019))), vec2<f32>(0.014, 0.003));\nlet five = min(bars, sd_box(vec2<f32>(b.x + 0.013 * sign(b.y), abs(b.y) - 0.0095), vec2<f32>(0.003, 0.010)));\nlet scene = mix(face, c4, fill(min(north, min(seven, five))));\nlet hood = y + 0.425 + 0.24 * x * x + 0.004 * sin(drive * 3.7);\nlet car = mix(mix(scene, ink, fill(hood)), mix(c5, c4, 0.32 * exp(-abs(x + 0.19) * 4.0)), fill(hood + 0.009));\nreturn mix(bg, car, strength);",
+    "variables": [
+      {
+        "name": "cruise_speed",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 0.9
+      },
+      {
+        "name": "sun_size",
+        "min": 0.04,
+        "max": 0.15,
+        "value": 0.1
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#26364d",
+      "#6d9ec5",
+      "#70a979",
+      "#ffd28a",
+      "#f07861"
+    ]
+  },
+  {
+    "name": "Minnow Sweater",
+    "expression": "let tau = 6.2831853;\nlet g = p / scale_size;\nlet pitch = 0.48;\nlet base_row = floor(g.y / pitch);\nlet clock = tau * fract(t * (round(ripple_speed * 3600.0) / 3600.0));\nlet aa = clamp(0.0018 / scale_size, 0.009, 0.03);\nvar cloth = c1 * 0.82;\n\nfor (var i = 0; i < 3; i++) {\n    let row = base_row + f32(i) - 1.0;\n    let stagger = 0.5 * fract(row * 0.5) * 2.0;\n    let phase = g.x * 1.48 - clock - row * 0.86;\n    let lift = row_lift * sin(phase);\n    let u = g.x + stagger - 0.065 * cos(phase);\n    let x = fract(u) - 0.5;\n    let arc = 0.55 - sqrt(0.4096 - x * x);\n    let depth = g.y - row * pitch - arc - lift;\n    let cover = smoothstep(-aa, aa, depth);\n\n    let seed = hash(vec2<f32>(floor(u), row));\n    let center = 1.0 - smoothstep(0.33, 0.50, abs(x));\n    let amber_row = 1.0 - smoothstep(0.10, 0.44, fract(row / 3.0 + 0.08));\n    let warm = mix(0.08 + 0.70 * amber_row, 0.18 + 0.76 * seed, center * 0.42);\n    let body = mix(c2, c3, warm);\n    let trough = 1.0 - smoothstep(0.02, 0.13, depth);\n    let belly = mix(body * (0.84 + 0.12 * center), c1, trough * 0.76);\n\n    let ribs = 0.5 + 0.5 * cos(tau * 14.0 * x);\n    let ply = 0.5 + 0.5 * cos(tau * 8.0 * depth + 1.8 * cos(tau * 14.0 * x));\n    let knit = belly * (0.88 + 0.08 * ribs + 0.06 * ply);\n    let welt = 1.0 - smoothstep(aa * 0.5, aa + 0.018, abs(depth - 0.041));\n    let glint = 0.5 + 0.5 * cos(phase + 0.8);\n    let thread = mix(c4, c3, 0.22 + 0.7 * warm) * (0.78 + 0.22 * ribs);\n    let yarn = mix(knit, thread, welt * (0.63 + 0.27 * glint));\n    cloth = mix(cloth, yarn, cover);\n}\n\nlet edge = smoothstep(0.22, 1.25, length(p * vec2<f32>(0.8, 1.0)));\nreturn mix(bg, cloth * (1.0 - 0.17 * edge), strength);",
+    "variables": [
+      {
+        "name": "scale_size",
+        "min": 0.06,
+        "max": 0.22,
+        "value": 0.12
+      },
+      {
+        "name": "ripple_speed",
+        "min": 0.0,
+        "max": 0.5,
+        "value": 0.19
+      },
+      {
+        "name": "row_lift",
+        "min": 0.0,
+        "max": 0.18,
+        "value": 0.13
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#166367",
+      "#329e99",
+      "#f2d487",
+      "#90d8c4"
+    ]
+  },
+  {
+    "name": "Hologram Bloom",
+    "expression": "let tide = noise(p * 2.8 + vec2<f32>(0.08 * cos(t * 0.11), 0.12 * sin(t * 0.09)));\nlet shaft = 0.5 + 0.5 * sin(6.0 * p.x - 2.6 * p.y + tide * 2.0);\nlet water = mix(c1, c2, 0.14 + 0.49 * tide + 0.15 * shaft);\nlet motes = stars(p * 34.0 + vec2<f32>(0.0, -0.012 * t), t);\nvar light = water * 1.12 + c4 * motes * 0.16;\nfor (var i = 0; i < 3; i++) {\n    let k = f32(i);\n    let depth = 0.64 + 0.36 * exp(-2.0 * (k - 1.0) * (k - 1.0));\n    let climb = fract(t * (0.037 + 0.017 * depth) * rise_speed + k * 0.37 + 0.23);\n    let life = smoothstep(0.0, 0.13, climb) * (1.0 - smoothstep(0.86, 1.0, climb));\n    let beat = 6.283185 * (climb * 6.0 + k * 0.29);\n    let pump = sin(beat);\n    let center = vec2<f32>((k - 1.0) * 0.53 + 0.073 * sin(beat / 3.0), -0.79 + 1.95 * climb + 0.025 * pump);\n    let q = (p - center) / (0.157 * depth * bell_size);\n    let x = q.x / (1.0 + 0.13 * pump);\n    let y = q.y / (0.79 - 0.12 * pump);\n    let lip = -0.32 + 0.19 * x * x + 0.027 * cos(x * 13.0 + beat);\n    let dome = length(vec2<f32>(x, y)) - 1.0;\n    let bell = max(dome, lip - y);\n    let body = 1.0 - smoothstep(-0.06, 0.018, bell);\n    let rim = exp(-39.0 * abs(bell));\n    let angle = atan2(y, x + 0.00001);\n    let flash = pow(0.5 + 0.5 * cos(3.0 * angle + 0.28 * sin(beat)), 4.0);\n    let enamel = mix(c5, c4, saturate(flash * edge_shimmer));\n    let ribs = pow(0.5 + 0.5 * cos(18.0 * x / max(0.36, 1.12 - y)), 7.0);\n    let cup = c3 * (0.22 + 0.17 * saturate(y) + 0.10 * ribs) * body;\n    let bloom = c3 * exp(-5.5 * abs(bell)) * 0.16;\n    let seam = exp(-47.0 * abs(y - lip - 0.085)) * body;\n    light += life * depth * (cup + bloom + enamel * rim * 0.70 + c5 * seam * 0.23);\n    for (var j = 0; j < 5; j++) {\n        let n = f32(j) - 2.0;\n        let root = -0.32 + 0.19 * (n * 0.4) * (n * 0.4);\n        let down = (root - y) / ribbon_length;\n        let u = max(0.0, down);\n        let path = n * (0.40 + 0.049 * u) + (0.12 + 0.08 * u) * (sin(4.0 * u - beat + n * 1.2) - exp(-3.0 * u) * sin(-beat + n * 1.2));\n        let ribbon = abs(x - path);\n        let taper = smoothstep(-0.05, 0.15, down) * (1.0 - smoothstep(0.6, 2.95 - 0.31 * abs(n), down));\n        let fold = 0.47 + 0.53 * cos(6.0 * u - beat + n) * cos(6.0 * u - beat + n);\n        let ribbon_tint = mix(c3, c4, 0.22 * smoothstep(0.7, 2.4, u));\n        light += ribbon_tint * taper * life * depth * (0.37 * exp(-ribbon * (29.0 + 11.0 * u) / fold) + 0.10 * exp(-14.0 * ribbon));\n    }\n}\nreturn mix(bg, tonemap(light), strength);",
+    "variables": [
+      {
+        "name": "rise_speed",
+        "min": 0.4,
+        "max": 1.8,
+        "value": 1.0
+      },
+      {
+        "name": "bell_size",
+        "min": 0.75,
+        "max": 1.3,
+        "value": 1.0
+      },
+      {
+        "name": "ribbon_length",
+        "min": 0.65,
+        "max": 1.45,
+        "value": 1.0
+      },
+      {
+        "name": "edge_shimmer",
+        "min": 0.0,
+        "max": 1.5,
+        "value": 1.0
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#0b2234",
+      "#17617b",
+      "#b49afe",
+      "#70e7b3",
+      "#e0cbff"
+    ]
+  },
+  {
+    "name": "Gilded Faults",
+    "expression": "let clock = t * (6.2831853 / 3600.0);\nlet drift = vec2<f32>(sin(clock * 47.0), cos(clock * 59.0));\nlet g = rotate(p, -0.19) * (5.7 / plate_size);\nlet strain = vec2<f32>(1.0 + 0.045 * drift.x, 1.0 - 0.038 * drift.y);\nlet warp_at = g * 0.68 + drift * 0.19;\nlet warp = vec2<f32>(noise(warp_at), noise(warp_at + vec2<f32>(19.3, 7.1)));\nlet q = g * strain + (warp - vec2<f32>(0.5)) * 0.61 + drift * 0.14;\nlet cell = voronoi(q);\nlet probe = voronoi(q + vec2<f32>(-0.020, 0.021));\nlet slope = clamp((probe.y - cell.y) / 0.028, -1.0, 1.0);\n\nlet breath = 0.5 + 0.5 * sin(clock * 87.0 + dot(q, vec2<f32>(0.73, -0.51)));\nlet lip = cell.y - fault_width * (0.76 + 0.48 * breath);\nlet face = smoothstep(-0.006, 0.012, lip);\nlet bevel = 1.0 - smoothstep(0.009, 0.069, lip);\nlet spill = exp(-max(lip, 0.0) * 20.0);\n\nlet oxide = fbm(q * 3.3 + vec2<f32>(cell.z * 13.0, 4.6));\nlet grain = noise(rotate(q, cell.z * 2.6) * vec2<f32>(12.0, 92.0));\nlet pits = smoothstep(0.73, 0.92, noise(q * 48.0));\nlet polish = clamp(0.34 + cell.z * 0.29 + (oxide - 0.45) * 1.16\n    + (grain - 0.5) * 0.16 - pits * 0.25 - cell.x * 0.13, 0.17, 0.96);\nlet bronze = mix(c1, c2, polish);\nlet cut = bronze * (1.0 - bevel * 0.44 * max(-slope, 0.0));\n\nlet wave = sin(dot(p, vec2<f32>(9.0, 4.2)) + warp.x * 0.75\n    - clock * round(141.0 * sheen_speed));\nlet flash = smoothstep(0.83, 0.998, wave) * violet_sheen;\nlet current = noise(q * 5.7 + drift * 0.64);\nlet heart = 1.0 - smoothstep(0.003, fault_width * 0.8, cell.y);\nlet honey = mix(c3 * 0.74, c5, heart * (0.32 + 0.48 * current));\nlet melt = mix(honey, c4, flash * (0.53 + 0.24 * heart));\nlet glint = bevel * smoothstep(0.04, 0.92, slope);\nlet rim = mix(c3, c4, flash * 0.82);\nlet plate = mix(cut, rim, spill * 0.12 + glint * 0.49);\nreturn mix(bg, mix(melt, plate, face), strength);",
+    "variables": [
+      {
+        "name": "plate_size",
+        "min": 0.65,
+        "max": 1.65,
+        "value": 1.0
+      },
+      {
+        "name": "fault_width",
+        "min": 0.025,
+        "max": 0.085,
+        "value": 0.046
+      },
+      {
+        "name": "sheen_speed",
+        "min": 0.25,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "violet_sheen",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.72
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#291b24",
+      "#b57a50",
+      "#ffbc56",
+      "#b98ae8",
+      "#ffe09a"
+    ]
+  },
+  {
+    "name": "Glass Hive",
+    "expression": "let g = p * cell_density;\nlet pitch = vec2<f32>(1.0, 1.7320508);\nlet offset = pitch * 0.5;\nlet a = g - pitch * round(g / pitch);\nlet b = g - offset - pitch * round((g - offset) / pitch);\nlet q = select(b, a, dot(a, a) < dot(b, b));\nlet center = round((g - q) * 1024.0) / 1024.0;\nlet aq = abs(q);\nlet hex = max(aq.x, dot(aq, vec2<f32>(0.5, 0.8660254)));\nlet d = hex - 0.466;\nlet glass = fill(d);\nlet seed = hash(center);\n\nlet turn = t * 0.00174532925;\nlet phase_a = turn * round(119.0 * flash_speed);\nlet phase_b = turn * round(86.0 * flash_speed);\nlet wav_a = 0.5 + 0.5 * sin(dot(center + q * 0.32, vec2<f32>(0.89, 0.72)) - phase_a + seed * 0.58);\nlet wav_b = 0.5 + 0.5 * sin(dot(center + q * 0.32, vec2<f32>(0.77, -0.96)) + phase_b + seed * 0.58);\nlet lilac = smoothstep(0.42, 0.98, wav_a);\nlet foam = smoothstep(0.42, 0.98, wav_b);\nlet crosslight = lilac * foam;\n\nlet tint = mix(c1, c2, smoothstep(-0.65, 0.65, wav_b - wav_a + (seed - 0.5) * 0.35));\nlet opal = mix(tint, c3, crosslight * 0.42);\nlet tilt = clamp(0.5 + dot(q, vec2<f32>(-0.38, 0.86)), 0.0, 1.0);\nlet bevel = glass * smoothstep(-0.095, -0.008, d);\nlet inner_edge = stroke(d + 0.064, 0.009) * glass;\nlet face = mix(c4, opal, 0.37 + 0.22 * tilt + 0.12 * max(lilac, foam));\nlet flash = (c1 * lilac * lilac + c2 * foam * foam) * 0.30 + c3 * crosslight * 0.18;\nlet edge_tint = mix(opal, c5, 0.10 + 0.35 * crosslight);\nlet polish = bevel * (0.16 + 0.50 * tilt) + inner_edge * (0.07 + 0.22 * glint * crosslight);\nlet seam = mix(bg, c4, 0.43) + tint * halo(d, 0.032) * 0.07;\nlet scene = seam * (1.0 - glass) + (face + flash * glint) * glass + edge_tint * polish;\nreturn mix(bg, tonemap(scene), strength);",
+    "variables": [
+      {
+        "name": "cell_density",
+        "min": 6.0,
+        "max": 22.0,
+        "value": 12.0
+      },
+      {
+        "name": "flash_speed",
+        "min": 0.0,
+        "max": 2.0,
+        "value": 1.0
+      },
+      {
+        "name": "glint",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.65
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#b99af3",
+      "#76dfcd",
+      "#f0b8ab",
+      "#171924",
+      "#e8e8f4"
+    ]
+  },
+  {
+    "name": "Midnight Tuning",
+    "expression": "let roll = fract(t * (round(roll_speed * 3600.0) / 3600.0));\nlet gy = p.y * grid_density - roll;\nlet row = fract(gy);\nlet row_y = p.y + (0.5 - row) / grid_density;\nlet sweep = 6.283185 * fract(t * (173.0 / 3600.0));\nlet tuning = row_y * 5.8 - sweep;\nlet lock_on = smoothstep(0.10, 0.98, cos(tuning));\nlet sway = row_sway * sin(tuning) * mix(1.0, 0.35, lock_on);\nlet gx = p.x * grid_density * 0.84 - sway;\nlet dx = abs(fract(gx + 0.5) - 0.5);\nlet dy = min(row, 1.0 - row);\n\nlet rail = 1.0 - smoothstep(0.012, 0.039, dy);\nlet post = 1.0 - smoothstep(0.009, 0.032, dx);\nlet join = smoothstep(0.004, 0.048, dy);\nlet mesh = max(rail, post * join * mix(0.60, 0.95, lock_on));\nlet junction = rail * post * lock_on;\nlet bleed = max(exp(-dy * 18.0), exp(-dx * 23.0) * join * 0.64);\nlet wake_d = abs(fract(gy + 0.59) - 0.5);\nlet wake = exp(-wake_d * 26.0) * (1.0 - rail);\n\nlet screen = 1.0 - smoothstep(0.18, 1.20, length(p * vec2<f32>(0.78, 1.15)));\nlet raster = 0.5 + 0.5 * cos(p.y * 490.0);\nlet field = mix(c4, c5, screen * (0.52 + 0.23 * lock_on));\nlet wash = field * (0.94 + 0.06 * raster) + c3 * (0.07 * screen * lock_on);\nlet ink = mix(mix(c1, c3, 0.22), c2, lock_on * 0.44);\nlet trace = ink * mesh * (0.78 + 0.50 * lock_on);\nlet bloom = (c1 * bleed * (0.22 + 0.43 * lock_on) + c3 * wake * 0.22) * phosphor_glow;\nlet color = tonemap(wash + (trace + bloom + c2 * junction * 0.15) * (0.72 + 0.28 * screen));\nreturn mix(bg, color, strength);",
+    "variables": [
+      {
+        "name": "roll_speed",
+        "min": 0.06,
+        "max": 0.65,
+        "value": 0.26
+      },
+      {
+        "name": "grid_density",
+        "min": 8.0,
+        "max": 22.0,
+        "value": 13.0
+      },
+      {
+        "name": "row_sway",
+        "min": 0.0,
+        "max": 0.5,
+        "value": 0.22
+      },
+      {
+        "name": "phosphor_glow",
+        "min": 0.0,
+        "max": 1.0,
+        "value": 0.55
+      }
+    ],
+    "y_up": true,
+    "colors": [
+      "#f33aac",
+      "#ff91d6",
+      "#9367ee",
+      "#1d0b24",
+      "#422044"
+    ]
   }
 ]

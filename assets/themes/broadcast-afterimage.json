@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#101a2d",
+        "#f2c94c",
+        "#e15c54",
+        "#50b8b5",
+        "#e8dfca"
+      ],
+      "custom": {
+        "expression": "let wobble = sin(p.y * 27.0 + t * 0.7) * 0.005 * tracking;\nlet q = vec2<f32>(p.x + wobble, p.y);\nlet wash = mix(c1 * 1.3, c4 * 0.55, smoothstep(-0.5, 0.5, q.y));\nlet frame_d = sd_box(q, vec2<f32>(0.69, 0.35));\nlet frame = fill(frame_d);\nlet inner = fill(frame_d + 0.025);\nlet panel = mix(c1 * 1.4, c5 * 0.72, inner);\nlet x = q.x + 0.69;\nlet bar1 = smoothstep(0.20, 0.205, x);\nlet bar2 = smoothstep(0.40, 0.405, x);\nlet bar3 = smoothstep(0.60, 0.605, x);\nlet bar4 = smoothstep(0.80, 0.805, x);\nlet bar5 = smoothstep(1.00, 1.005, x);\nlet bar6 = smoothstep(1.20, 1.205, x);\nlet bars_a = mix(c5, c2, bar1);\nlet bars_b = mix(bars_a, c4, bar2);\nlet bars_c = mix(bars_b, c3, bar3);\nlet bars_d = mix(bars_c, c2 * 0.72, bar4);\nlet bars_e = mix(bars_d, c4 * 0.72, bar5);\nlet bars = mix(bars_e, c3 * 0.72, bar6);\nlet upper = smoothstep(-0.08, -0.075, q.y);\nlet lower = mix(c1 * 1.7, c4 * 0.65, smoothstep(-0.25, -0.245, q.y));\nlet card = mix(lower, bars, upper);\nlet circle_d = sd_circle(q - vec2<f32>(0.0, 0.035), 0.19);\nlet disk = fill(circle_d);\nlet disk_inside = fill(circle_d + 0.012);\nlet disk_color = mix(c1, c5 * 0.88, disk_inside);\nlet cross_x = 1.0 - smoothstep(0.003, 0.006, abs(q.x));\nlet cross_y = 1.0 - smoothstep(0.003, 0.006, abs(q.y - 0.035));\nlet cross = max(cross_x, cross_y) * disk_inside;\nlet center = mix(disk_color, c3, cross);\nlet card_with_disk = mix(card, center, disk);\nlet bordered = mix(panel, card_with_disk, inner);\nlet scene = mix(wash, bordered, frame);\nlet line_phase = q.y * 640.0 + 0.35 * sin(t * 0.7);\nlet lines = 0.5 + 0.5 * cos(line_phase);\nlet line_shade = 1.0 - scanlines * 0.18 * lines;\nlet roll = 1.0 - smoothstep(0.0, 0.018, abs(q.y - 0.65 * sin(t * 0.11)));\nlet final_color = scene * line_shade * (1.0 - roll * tracking * 0.18);\nreturn mix(bg, final_color, strength);",
+        "name": "Broadcast Afterimage",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "tracking",
+            "value": 0.3499999940395355
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "scanlines",
+            "value": 0.8500000238418579
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 2.5,
+      "speed": 4.599999904632568,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "A dark broadcast-console theme with warm phosphor, signal red, and teal test-card accents.",
+    "id": "broadcast-afterimage",
+    "name": "Broadcast Afterimage",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:broadcast-afterimage",
+    "updatedAt": "2026-11-18T01:45:21.047Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#f2c94c",
+        "background": "#172337",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#172337"
+      },
+      "shell": {
+        "accent": "#50b8b5",
+        "accentHover": "#f2c94c",
+        "background": "#0b111d",
+        "backgroundSecondary": "#172337",
+        "border": "#40546a",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#50b8b5",
+          "thickness": 2.0
+        },
+        "textDim": "#aab8c4",
+        "textMain": "#f3ecdd"
+      },
+      "statusBar": {
+        "background": "#172337",
+        "border": "#40546a",
+        "text": "#aab8c4",
+        "warning": "#f2c94c"
+      },
+      "tabs": {
+        "activeBackground": "#0b111d",
+        "activeBorder": "#50b8b5",
+        "background": "#172337",
+        "idleBackground": "#172337"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#101a2d",
+        "blue": "#79a6d2",
+        "brightBlack": "#77899a",
+        "brightBlue": "#a9c9ea",
+        "brightCyan": "#91ddd6",
+        "brightGreen": "#b4ddaa",
+        "brightMagenta": "#f3b1c8",
+        "brightRed": "#ff8d80",
+        "brightWhite": "#fff9ee",
+        "brightYellow": "#ffe184",
+        "cyan": "#50b8b5",
+        "green": "#8dbf8b",
+        "magenta": "#d78ba8",
+        "red": "#e15c54",
+        "white": "#e8dfca",
+        "yellow": "#f2c94c"
+      },
+      "background": "#101a2d",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f7f1e4",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#101a2d",
+        "#f2c94c",
+        "#e15c54",
+        "#50b8b5"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.3
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.1
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.4
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.8
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

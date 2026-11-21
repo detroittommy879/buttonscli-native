@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#68251e",
+        "#bc4d32",
+        "#e0875e",
+        "#251611",
+        "#f2b38b"
+      ],
+      "custom": {
+        "expression": "let tau = 6.2831853;\nlet drift = tau * fract(t / 120.0);\nlet clock = tau * fract(t * round(expansion_rate * 3600.0) / 3600.0);\nlet tide = vec2<f32>(cos(drift), sin(drift));\nlet g = p * 3.8 + tide * 0.37;\nlet warp = vec2<f32>(fbm(g), fbm(g + vec2<f32>(13.4, 7.1))) - vec2<f32>(0.5);\nlet q = p + warp * (0.11 + 0.14 * curl);\nlet a = polar(q - vec2<f32>(-0.30, 0.06) - tide * 0.055);\nlet b = polar(q - vec2<f32>(0.46, -0.19) + tide * 0.043);\nlet edge_a = smoothstep(0.02, 0.18, a.x);\nlet edge_b = smoothstep(0.02, 0.21, b.x);\nlet u = tau * a.x * ring_density - clock;\nlet v = tau * b.x * ring_density * 0.79 - clock + 2.1;\nlet angle_a = tau * a.y + 1.8 * a.x;\nlet angle_b = tau * b.y - 1.6 * b.x;\nlet fold_a = 1.45 * sin(7.0 * angle_a - u + 0.46 * sin(v)) +\n             0.62 * cos(4.0 * angle_a + u);\nlet fold_b = 1.23 * sin(6.0 * angle_b + v + 0.52 * sin(u));\nlet phase_a = u + curl * edge_a * fold_a + 0.42 * edge_b * sin(v);\nlet phase_b = v + curl * edge_b * fold_b + 0.36 * edge_a * sin(u);\nlet wave = cos(phase_a);\nlet echo = cos(phase_b);\nlet plume = cloud(q * 5.0 + tide * 0.23);\nlet bath = mix(c4, c1 * 0.81, smoothstep(0.18, 0.79, plume));\nlet stain_a = (0.23 + 0.77 * edge_a) * (1.0 - 0.33 * smoothstep(0.35, 1.35, a.x));\nlet stain_b = edge_b * (1.0 - 0.62 * smoothstep(0.28, 1.24, b.x));\nlet body_a = smoothstep(-0.55, 0.73, wave) * stain_a;\nlet body_b = smoothstep(0.12, 0.96, echo) * stain_b;\nlet under = mix(bath, mix(c1, c2, 0.64), body_b * ink_body * 0.8);\nlet dye = mix(c2 * 0.85, c2, smoothstep(0.22, 0.73, plume));\nlet ink = mix(under, dye, body_a * (0.34 + 0.66 * ink_body));\nlet lip = (1.0 - smoothstep(0.06, 0.25, abs(wave - 0.69))) *\n          smoothstep(-0.25, 0.23, sin(phase_a)) * stain_a;\nlet wet = smoothstep(0.24, 0.75, plume) * (0.63 + 0.37 * echo);\nlet seam = lip * smoothstep(0.62, 0.98, echo) * stain_b;\nlet rimmed = mix(ink, c3, lip * (0.33 + 0.49 * wet));\nlet finished = mix(rimmed, c5, seam * 0.36);\nreturn mix(bg, finished, strength);",
+        "name": "Ink Interference",
+        "variables": [
+          {
+            "max": 9.0,
+            "min": 3.5,
+            "name": "ring_density",
+            "value": 5.599999904632568
+          },
+          {
+            "max": 0.2199999988079071,
+            "min": 0.03500000014901161,
+            "name": "expansion_rate",
+            "value": 0.10499999672174454
+          },
+          {
+            "max": 1.600000023841858,
+            "min": 0.0,
+            "name": "curl",
+            "value": 1.0499999523162842
+          },
+          {
+            "max": 1.0,
+            "min": 0.25,
+            "name": "ink_body",
+            "value": 0.7200000286102295
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.7999999523162842,
+      "speed": 2.200000047683716,
+      "strength": 0.3199999928474426,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 7.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 100.0,
+    "staticAmplitude": 60.000003814697266,
+    "staticBrightness": 15.000000953674316,
+    "staticDensity": 0.1599999964237213,
+    "staticEnabled": false,
+    "staticIntensity": 72.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-02T23:55:40.829Z",
+    "description": "Warm black lacquer, rust-red ink and copper edges, with narrow mono labels and an ivory terminal face.",
+    "id": "ink-interference",
+    "name": "Ink Interference",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:ink-interference",
+    "updatedAt": "2026-11-19T19:13:00.360Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e0875e",
+        "background": "#251611",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#251611"
+      },
+      "shell": {
+        "accent": "#bc4d32",
+        "accentHover": "#e0875e",
+        "background": "#170f0d",
+        "backgroundSecondary": "#251611",
+        "border": "#68251e",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#bc4d32",
+          "thickness": 2.0
+        },
+        "textDim": "#ba9d8e",
+        "textMain": "#f5e8dd"
+      },
+      "statusBar": {
+        "background": "#251611",
+        "border": "#68251e",
+        "text": "#ba9d8e",
+        "warning": "#d8ae69"
+      },
+      "tabs": {
+        "activeBackground": "#170f0d",
+        "activeBorder": "#bc4d32",
+        "background": "#251611",
+        "idleBackground": "#251611"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#251611",
+        "blue": "#91a2b7",
+        "brightBlack": "#90776a",
+        "brightBlue": "#bac8da",
+        "brightCyan": "#afd4cb",
+        "brightGreen": "#c0ce9b",
+        "brightMagenta": "#dfb4c5",
+        "brightRed": "#f28e76",
+        "brightWhite": "#fff4e8",
+        "brightYellow": "#f2c989",
+        "cyan": "#85b1a6",
+        "green": "#9caa78",
+        "magenta": "#c092a5",
+        "red": "#d86c53",
+        "white": "#e6d4c4",
+        "yellow": "#d8ae69"
+      },
+      "background": "#100b09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "iA Writer Mono S Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f3e7d8",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#251611",
+        "#68251e",
+        "#bc4d32",
+        "#e0875e"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.1
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 17.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.45
+      },
+      "tabs": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.15
+      },
+      "terminal": {
+        "fontFamily": "iA Writer Mono S Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

@@ -23,8 +23,18 @@ Open **Settings → Themes**. It has four tabs:
 
 ## Whole app or one pane
 
-- **Shared theme**: clicking a theme in the Library applies it to the app and
-  to every pane that doesn't have its own theme.
+Each theme card in the Library has four buttons:
+
+- **Apply**: the whole app, for the parts ticked under **Apply to shared**.
+  With Terminal colors ticked, every pane shows it, including panes that had
+  a theme of their own.
+- **Calm**: the same as Apply, and turns on Calm (see below).
+- **This terminal**: only the active pane.
+- **All terminals**: every pane, but the app's own colors stay as they are.
+
+An unsaved edit of one pane is never lost: it is saved as a new numbered
+theme first.
+
 - **One pane**: right-click a pane → **Random theme** or a favorite, or use
   **Edit for: Pane N** (below). That pane keeps its look while the shared
   theme changes.
@@ -200,4 +210,5 @@ tab) when done.
 
 The **Calm** button next to a theme in the Library applies it without
 animation or noise: shaders become a still picture. Good for screen sharing or
-long sessions.
+long sessions. Calm stays on for every theme until you untick **Calm effects**
+in the status bar's **Look** menu; **Apply** doesn't turn it off.

@@ -23,6 +23,21 @@ struct ChatView {
 }
 
 impl AiHelpWindowState {
+    /// "New chat": a blank conversation. The model forgets it too (history),
+    /// while the chosen terminal, context and Agent Mode choices stay.
+    fn new_chat(&mut self) {
+        self.messages.clear();
+        self.history.clear();
+        self.history_target = None;
+        self.message_targets.clear();
+        self.target = None;
+        self.last_request = None;
+        self.reviewed_actions.clear();
+        self.input.clear();
+        self.error = None;
+        self.status = None;
+    }
+
     fn invalidate_context(&mut self) {
         self.context_generation = self.context_generation.wrapping_add(1);
         self.context_preview = None;
@@ -130,6 +145,29 @@ impl ChatView {
                     .clicked()
                 {
                     queue(AiHelpCommand::OpenSettings);
+                }
+                let has_chat = !state.messages.is_empty() || !state.input.is_empty();
+                if ui
+                    .add_enabled(
+                        has_chat && !state.busy,
+                        crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "New chat"))
+                            .small(),
+                    )
+                    .on_hover_text(crate::i18n::literal(
+                        &self.locale,
+                        "Start a blank conversation. The AI forgets this one.",
+                    ))
+                    .on_disabled_hover_text(crate::i18n::literal(
+                        &self.locale,
+                        if state.busy {
+                            "Stop the current answer first."
+                        } else {
+                            "Nothing to clear yet."
+                        },
+                    ))
+                    .clicked()
+                {
+                    state.new_chat();
                 }
             });
         });

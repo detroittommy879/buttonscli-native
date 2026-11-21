@@ -1,0 +1,211 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#5ef0ff",
+        "#62b6ff",
+        "#5cffc8",
+        "#071825",
+        "#e6fbff"
+      ],
+      "custom": {
+        "expression": "let density = (180.0 + wave_height * 900.0) / grain_size;\nlet cell = floor(p * density);\nlet tick = floor(t * (10.0 + line_speed * 18.0));\nlet speck = hash(cell + vec2<f32>(tick * 17.13, tick * 29.71));\nlet shaped = clamp((speck - 0.5) * static_contrast + 0.5, 0.0, 1.0);\nlet lane = hash(cell + vec2<f32>(5.17, 83.91));\nlet tint = mix(c2, c1, lane);\nlet lo = c4 * 0.35;\nlet hi = mix(c5, tint, 0.16 + 0.14 * lane);\nlet grain = mix(lo, hi, shaped);\nlet flashes = mix(c3, c1, lane) * smoothstep(0.88, 0.99, speck) * 0.26;\nlet color = tonemap(grain * 1.25 + flashes);\nreturn mix(bg, color, strength);",
+        "name": "Cobalt Static",
+        "variables": [
+          {
+            "max": 0.4000000059604645,
+            "min": 0.05000000074505806,
+            "name": "wave_height",
+            "value": 0.19499999284744263
+          },
+          {
+            "max": 3.0,
+            "min": 0.5,
+            "name": "line_speed",
+            "value": 1.2999999523162842
+          },
+          {
+            "max": 3.0,
+            "min": 0.5,
+            "name": "grain_size",
+            "value": 1.0
+          },
+          {
+            "max": 1.5,
+            "min": 0.5,
+            "name": "static_contrast",
+            "value": 0.949999988079071
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "A modern dark-blue terminal with cool cyan accents, bright readable text, and a restrained analog-static background.",
+    "id": "cobalt-static-v1",
+    "name": "Cobalt Static v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:cobalt-static-v1",
+    "updatedAt": "2026-11-18T19:25:28.553Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#5ef0ff",
+        "background": "#0b2233",
+        "buttonBackground": "#164260",
+        "buttonHover": "#8a7dff",
+        "buttonText": "#e6fbff"
+      },
+      "settings": {
+        "background": "#0b2233"
+      },
+      "shell": {
+        "accent": "#5cffc8",
+        "accentHover": "#5ef0ff",
+        "background": "#071825",
+        "backgroundSecondary": "#0b2233",
+        "border": "#2d5f7a",
+        "buttonBackground": "#103047",
+        "paneDivider": {
+          "color": "#5cffc8",
+          "thickness": 2.0
+        },
+        "textDim": "#8fc7d9",
+        "textMain": "#e6fbff"
+      },
+      "statusBar": {
+        "background": "#0b2233",
+        "border": "#2d5f7a",
+        "text": "#8fc7d9",
+        "warning": "#ffe27a"
+      },
+      "tabs": {
+        "activeBackground": "#071825",
+        "activeBorder": "#5cffc8",
+        "background": "#0b2233",
+        "idleBackground": "#0b2233"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#24414f",
+        "blue": "#62b6ff",
+        "brightBlack": "#4f7385",
+        "brightBlue": "#95ceff",
+        "brightCyan": "#94f5ff",
+        "brightGreen": "#93ffdb",
+        "brightMagenta": "#dcb3ff",
+        "brightRed": "#ff9cb2",
+        "brightWhite": "#f4fdff",
+        "brightYellow": "#ffeca8",
+        "cyan": "#5ef0ff",
+        "green": "#5cffc8",
+        "magenta": "#c58bff",
+        "red": "#ff6f8f",
+        "white": "#e6fbff",
+        "yellow": "#ffe27a"
+      },
+      "background": "#04101a",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e6fbff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#04101a",
+        "#62b6ff",
+        "#5cffc8",
+        "#5ef0ff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.1
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.6
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.3
+      },
+      "statusBar": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 200,
+        "letterSpacing": 0.4
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

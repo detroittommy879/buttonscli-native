@@ -255,10 +255,12 @@ impl TerminalBackend {
             working_directory: settings.working_directory,
             // Advertise this emulator's capabilities, not those of its launcher.
             // Inheriting TERM=dumb makes SSH/ncurses omit color and cursor motion.
-            env: std::collections::HashMap::from([
-                ("TERM".into(), "xterm-256color".into()),
-                ("COLORTERM".into(), "truecolor".into()),
-            ]),
+            env: {
+                let mut env = settings.env;
+                env.insert("TERM".into(), "xterm-256color".into());
+                env.insert("COLORTERM".into(), "truecolor".into());
+                env
+            },
             ..tty::Options::default()
         };
         // Surface clipboard queries so the adapter can explicitly reply empty.
@@ -1750,6 +1752,7 @@ mod input_recovery_tests {
                     "Start-Sleep -Seconds 30".into(),
                 ],
                 working_directory: None,
+                env: Default::default(),
             },
         )
         .unwrap();

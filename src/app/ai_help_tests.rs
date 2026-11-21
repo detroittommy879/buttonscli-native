@@ -642,3 +642,27 @@ fn ai_help_send_click_streams_without_override_and_switching_terminals_resets_mo
         "ordinary chat never executes a command"
     );
 }
+
+#[test]
+fn new_chat_starts_blank_and_keeps_the_terminal_choice() {
+    let mut state = AiHelpWindowState {
+        input: "half typed".into(),
+        messages: vec![(false, "q".into()), (true, "a".into())],
+        history: vec![(false, "q".into()), (true, "a".into())],
+        history_target: Some(7),
+        target: Some((7, "term1".into())),
+        error: Some("old error".into()),
+        include_context: true,
+        agent_mode: true,
+        ..Default::default()
+    };
+    state.message_targets.insert(1, (7, "term1".into()));
+    state.select_terminal(Some((7, "term1".into())));
+    state.new_chat();
+    assert!(state.messages.is_empty() && state.history.is_empty());
+    assert!(state.input.is_empty() && state.error.is_none());
+    assert!(state.target.is_none() && state.message_targets.is_empty());
+    assert_eq!(state.history_target, None, "the model forgets it too");
+    assert_eq!(state.selected_target.as_ref().map(|t| t.0), Some(7));
+    assert!(state.include_context && state.agent_mode);
+}

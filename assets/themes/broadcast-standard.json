@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#f4d35e",
+        "#53c9d7",
+        "#f074a6",
+        "#202943",
+        "#81d89a"
+      ],
+      "custom": {
+        "expression": "let col_idx = clamp(floor((p.x + 0.9) * 3.9), 0.0, 6.0);\nlet ph = col_idx / 6.0;\nlet bars_c = mix(mix(c1, c2, smoothstep(0.0, 0.4, ph)), mix(c3, c5, smoothstep(0.5, 0.9, ph)), smoothstep(0.35, 0.55, ph));\nlet lower_c = mix(c4, c1, step(0.5, fract(col_idx * 0.5)));\nlet lower = 1.0 - smoothstep(-0.365, -0.355, p.y);\nlet bars_all = mix(bars_c, lower_c, lower);\n\nlet wrap = fract(p.y * 0.6 + t * roll_speed);\nlet roll = 0.7 + 0.3 * smoothstep(0.0, 0.3, wrap);\nlet field = floor(t * 24.0);\nlet line = floor((p.y + 0.5) * 450.0);\nlet interlace = 0.9 + 0.1 * cos(3.14159 * (line + field));\nlet scan = 0.92 + 0.08 * cos(p.y * 5654.8668);\nlet base = bars_all * roll * scan * interlace;\n\nlet y0 = 0.5 - fract(t * 0.13);\nlet w = 1.0 - smoothstep(0.0, 0.05, abs(p.y - y0));\nlet n = hash(floor(p * vec2<f32>(140.0, 70.0)) + vec2<f32>(field * 3.1, 0.0));\nlet static_tint = mix(c4, c2, n);\nlet color_a = mix(base, static_tint, w * noise_amount * 0.8);\n\nlet frame = stroke(sd_box(p - vec2<f32>(-0.62, 0.36), vec2<f32>(0.12, 0.07)), 0.012);\nlet blink = step(0.5, fract(t * 0.8));\nlet lamp = fill(sd_circle(p - vec2<f32>(-0.5, 0.36), 0.02)) * blink;\nlet color_b = mix(color_a, c1, frame * 0.9);\nlet color = mix(color_b, c5, lamp);\nreturn mix(bg, tonemap(color * 1.3), strength);",
+        "name": "Broadcast Standard",
+        "variables": [
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "roll_speed",
+            "value": 0.2300000041723251
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "noise_amount",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.699999988079071,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "A late-night broadcast monitor with phosphor pastels and dark studio chrome.",
+    "id": "broadcast-standard",
+    "name": "Broadcast Standard",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:broadcast-standard",
+    "updatedAt": "2026-11-18T01:42:41.410Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#81d89a",
+        "background": "#171d2b",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#171d2b"
+      },
+      "shell": {
+        "accent": "#53c9d7",
+        "accentHover": "#81d89a",
+        "background": "#0b0e17",
+        "backgroundSecondary": "#171d2b",
+        "border": "#39465a",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#53c9d7",
+          "thickness": 2.0
+        },
+        "textDim": "#a1abb9",
+        "textMain": "#edf1f3"
+      },
+      "statusBar": {
+        "background": "#171d2b",
+        "border": "#39465a",
+        "text": "#a1abb9",
+        "warning": "#f4d35e"
+      },
+      "tabs": {
+        "activeBackground": "#0b0e17",
+        "activeBorder": "#53c9d7",
+        "background": "#171d2b",
+        "idleBackground": "#171d2b"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#080c14",
+        "blue": "#80a9e5",
+        "brightBlack": "#647184",
+        "brightBlue": "#adc8f5",
+        "brightCyan": "#9aeaf0",
+        "brightGreen": "#a8edba",
+        "brightMagenta": "#ffa6c6",
+        "brightRed": "#ffa09f",
+        "brightWhite": "#f7fafc",
+        "brightYellow": "#ffe493",
+        "cyan": "#53c9d7",
+        "green": "#81d89a",
+        "magenta": "#f074a6",
+        "red": "#e67e80",
+        "white": "#d8dfe4",
+        "yellow": "#f4d35e"
+      },
+      "background": "#080c14",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#edf1f3",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#101827",
+        "#53c9d7",
+        "#f074a6",
+        "#f4d35e"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.4
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.4
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

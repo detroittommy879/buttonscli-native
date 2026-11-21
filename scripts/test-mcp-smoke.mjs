@@ -144,8 +144,8 @@ try {
   const tools = listed.result?.tools ?? [];
   const toolNames = tools.map((tool) => tool.name).sort();
   assert.deepEqual(toolNames, [
-    "create_tab", "help", "key", "open_layout", "preset_run", "presets",
-    "read", "rename_tab", "run", "send", "status", "tabs",
+    "batch", "commands", "create_tab", "help", "key", "open_layout", "preset_run",
+    "presets", "read", "rename_tab", "run", "send", "status", "tabs",
     "wait_for_quiet", "wait_for_text",
   ].sort());
   assert.ok(tools.find((tool) => tool.name === "send")?.inputSchema?.properties?.delivery?.enum?.includes("bracketed"));
@@ -182,6 +182,11 @@ try {
   ]);
   assert.ok(requests.every(({ authorization }) => authorization === `Bearer ${authToken}`));
   assert.equal(requests.find(({ url }) => url === "/v1/tabs/active/send")?.body?.delivery, "bracketed");
+
+  assert.equal((await callTool("commands", { tab: "b", chars: 50 })).structuredContent.path, "/v1/tabs/b/commands?chars=50");
+  const batch = (await callTool("batch", { steps: [{ tool: "status" }, { tool: "nope" }, { tool: "tabs" }] })).structuredContent;
+  assert.equal(batch.completed, 2);
+  assert.equal(batch.steps[1].ok, false);
 
   deniedRequest = "POST /v1/tabs/active/send";
   const denied = await callTool("send", { text: "blocked" });

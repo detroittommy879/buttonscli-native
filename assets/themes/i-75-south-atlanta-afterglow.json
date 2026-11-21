@@ -1,0 +1,205 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#302c50",
+        "#858fe0",
+        "#ee7e99",
+        "#ffc179",
+        "#62c7ba"
+      ],
+      "custom": {
+        "expression": "let y=p.y+0.11;\nlet sky=mix(c3*0.77,c2*0.67,smoothstep(0.0,0.55,y));\nvar col=mix(sky,c4*0.83,0.48*exp(-abs(y)*8.0));\nfor(var i=0;i<12;i++){\n let k=f32(i);\n let r=hash(vec2<f32>(k,7.0));\n let x=p.x-(k-5.5)*0.153;\n let h=(0.14+0.36*r)*mix(0.44,1.0,smoothstep(0.02,0.32,abs(p.x)));\n let top=select(h,0.49,i==8);\n let a=abs(x);\n let w=0.046+r*0.029;\n let wall=max(a-w,max(-0.10-y,y-top));\n let crown=max(a-max(0.002,0.037-(y-top)*0.68),max(top-y,y-top-0.087));\n let d=min(wall,select(1.0,crown,i==8));\n let g=vec2<f32>(x*134.0,y*93.0);\n let s=abs(fract(g)-0.5);\n let lit=step(0.46,hash(floor(g)+vec2<f32>(k*17.0,0.0)));\n let win=(1.0-smoothstep(0.24,0.43,max(s.x,s.y)))*lit*window_lights;\n let face=mix(c1,c2,(0.28-0.22*smoothstep(-0.008,0.008,x))+0.12*r);\n let tower=mix(face,mix(c2,c4,r),win*0.82);\n col=mix(col,mix(tower,c4,0.78*(1.0-smoothstep(0.0,0.004,crown))*select(0.0,1.0,i==8)),1.0-smoothstep(0.0,0.002,d));\n}\nlet z=max(-y,0.002);\nlet u=p.x/z;\nlet v=0.22/z+t*cruise_speed;\nlet tick=fract(v);\nlet dash=smoothstep(0.08,0.16,tick)*(1.0-smoothstep(0.43,0.51,tick))*smoothstep(0.027,0.095,z);\nlet lane=fill(abs(abs(p.x)-0.47*z)-0.008*z-0.0008)*dash;\nlet edge=fill(abs(abs(p.x)-1.40*z)-0.012*z-0.0008);\nlet asphalt=mix(c2*0.49,c1*1.36,smoothstep(0.0,0.48,z));\nlet deck=mix(asphalt,c4*0.84,max(lane*0.85,edge*0.67));\nlet rail=fill(abs(abs(p.x)-1.59*z)-0.105*z-0.001);\ncol=mix(col,mix(c1*1.25,c2*0.76,tick*0.55+rail*0.33),rail*fill(y));\ncol=mix(col,deck,fill(abs(u)-1.49)*fill(y));\nlet q=p-vec2<f32>(-0.093,-0.048);\nlet board=sd_box(q,vec2<f32>(0.046,0.022));\nlet pole=sd_box(q+vec2<f32>(0.050,0.065),vec2<f32>(0.002,0.062));\ncol=mix(col,c2*0.52,fill(pole));\ncol=mix(col,c5*0.57,fill(board));\nlet shield=sd_box(q+vec2<f32>(0.026,0.0),vec2<f32>(0.010,0.012));\nlet bars=sd_box(vec2<f32>(q.x-0.009,abs(q.y)-0.006),vec2<f32>(0.019,0.001));\ncol=mix(col,mix(c2,c3,fill(0.004-q.y)),fill(shield));\ncol=mix(col,c5,fill(bars));\nfor(var j=0;j<6;j++){\n let n=f32(j);\n let f=fract(t*cruise_speed*(0.19+0.014*n)+n*0.371);\n let dep=0.037+0.46*f*f;\n let x=(n-3.0*floor(n/3.0)-1.0)*0.94*dep;\n let b=(p-vec2<f32>(x,-0.11-dep))/(dep*0.55);\n let body=min(sd_box(b,vec2<f32>(0.40,0.13)),sd_box(b-vec2<f32>(0.0,0.14),vec2<f32>(0.29,0.11)));\n let rear=sd_box(vec2<f32>(abs(b.x)-0.285,b.y+0.035),vec2<f32>(0.080,0.030));\n let mask=traffic*smoothstep(0.0,0.1,f)*(1.0-smoothstep(0.92,1.0,f));\n let paint=mix(c2,c5,fract(n*0.618))*0.78;\n let glass=sd_box(b-vec2<f32>(0.0,0.158),vec2<f32>(0.23,0.056));\n col=mix(col,mix(paint,c1,1.0-smoothstep(0.0,0.025,glass)),mask*(1.0-smoothstep(0.0,0.025,body)));\n col=mix(col,c3,mask*halo(rear,0.055));\n}\nreturn mix(bg,col,strength);",
+        "name": "I‑75 South · Atlanta Afterglow",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.0,
+            "name": "cruise_speed",
+            "value": 0.800000011920929
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "traffic",
+            "value": 0.800000011920929
+          },
+          {
+            "max": 1.0,
+            "min": 0.0,
+            "name": "window_lights",
+            "value": 0.7200000286102295
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 3.700000047683716,
+      "strength": 0.9800000190734864,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-03T00:45:42.298Z",
+    "description": "A southbound evening drive: periwinkle towers, amber windows, coral brake lights, and teal freeway signs.",
+    "id": "i-75-south-atlanta-afterglow",
+    "name": "I‑75 South · Atlanta Afterglow",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:tom-1:i-75-south-atlanta-afterglow",
+    "updatedAt": "2026-11-19T19:28:20.344Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#9be6d7",
+        "background": "#25223a",
+        "buttonBackground": "#16313c",
+        "buttonHover": "#1f4b5c",
+        "buttonText": "#f7fcff"
+      },
+      "settings": {
+        "background": "#25223a"
+      },
+      "shell": {
+        "accent": "#62c7ba",
+        "accentHover": "#9be6d7",
+        "background": "#181626",
+        "backgroundSecondary": "#25223a",
+        "border": "#494363",
+        "buttonBackground": "#16313c",
+        "paneDivider": {
+          "color": "#62c7ba",
+          "thickness": 2.0
+        },
+        "textDim": "#b8acc9",
+        "textMain": "#f4eaf7"
+      },
+      "statusBar": {
+        "background": "#25223a",
+        "border": "#494363",
+        "text": "#b8acc9",
+        "warning": "#ffc179"
+      },
+      "tabs": {
+        "activeBackground": "#181626",
+        "activeBorder": "#62c7ba",
+        "background": "#25223a",
+        "idleBackground": "#25223a"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#302c50",
+        "blue": "#858fe0",
+        "brightBlack": "#998db1",
+        "brightBlue": "#adb8ff",
+        "brightCyan": "#9be6d7",
+        "brightGreen": "#b4e5b1",
+        "brightMagenta": "#edb8f3",
+        "brightRed": "#ffa5af",
+        "brightWhite": "#fff0e1",
+        "brightYellow": "#ffdcab",
+        "cyan": "#62c7ba",
+        "green": "#88cb9c",
+        "magenta": "#ca96db",
+        "red": "#ee7e99",
+        "white": "#e4d6e9",
+        "yellow": "#ffc179"
+      },
+      "background": "#1d192f",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#fff0e1",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#302c50",
+        "#858fe0",
+        "#ee7e99",
+        "#ffc179"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.1
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.7
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.1
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.6
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 10.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.8
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.4
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

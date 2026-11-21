@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+- **AI Help → New chat** starts a blank conversation (the AI forgets the
+  old one); the chosen terminal and options stay.
+- Library theme buttons now behave the same from any state. **Apply** (with
+  Terminal colors ticked) changes every pane, including panes that had a
+  theme of their own (after a bundle, Apply used to change only the app
+  colors). **Theme all** is now called **All terminals**: every pane, app
+  colors unchanged.
+- Fixed: the status bar and the left panel could keep a background color
+  picked for an older theme after a bundle or **All terminals**, so they
+  disagreed. Bundles now save those bar colors; older bundles that set an app
+  theme clear them.
+- Fixed: Settings → Themes named the shared theme ("Loaded: …") while
+  editing one pane, and **Rename theme…** renamed that shared theme. The
+  header now says **Pane N theme** or **Shared theme** and renames the one
+  being edited. The "Saved … to the shader list" note no longer lingers
+  after picking another shader or pane.
+- Fixed: **Invert text and backing colors** lost its colors when custom
+  backing colors were on (they are now set aside while Invert is on and come
+  back after), and with **Whole lines** every line used the plain text
+  color; each line now takes the color of its first character.
+- Fixed: Library **Apply**, **Theme all** and applying a bundle threw away
+  an unsaved edit of one pane; it is saved under the next numbered name,
+  as switching panes does.
+- Fixed: Library **Calm** did nothing unless Gradient or Effects was ticked
+  under Apply to, and **Apply** turned Calm off. Calm now always turns it
+  on and Apply leaves it alone. Apply, Calm and Theme all say what they
+  change.
+- Fixed: a bundle loaded later could show other fonts: panes without a font
+  of their own saved none and took whatever the shared font was by then.
+  Bundles now keep each pane's font, and loading one names any font that
+  is not installed (Recursive Mono Casual is used instead).
+- **Shell integration**: PowerShell, bash, zsh and fish tabs mark each
+  command's start, end and exit code (OSC 133). The agent `run` tool waits
+  for the real finish and returns `exitCode` and the command's output; new
+  `commands` route/tool/CLI command lists recent commands. A command that
+  finishes out of view marks its tab with ✓ or ✗ and the exit code, and long
+  ones show a message and flash the taskbar (Settings → Workspace).
+- **MCP `batch`** runs up to 20 tool calls in one call, stopping at the
+  first error or failed command.
+- **Look → Basic**: a new first stop that makes every pane plain black and
+  still (no shaders, Motion 0%), uses the bundled Recursive fonts across the
+  app and keeps text at 7:1 contrast. New built-in theme **Readable Black**.
+- The status bar's **✦ Shader** menu has the shader's own **Animate** and
+  **Speed** (the same setting as Settings → Themes → Shaders). Motion %
+  multiplies that speed, so a low Speed was why Motion seemed to do little.
+- Fixed: the shader window (File → New shader window) ran at a few frames a
+  second and ignored Motion. It now has its own clock at the FPS limit,
+  follows Motion, and keeps animating while the main window is minimized.
+- **Experimental**: Settings → Experimental → folder names in an `ls`/`dir`
+  listing can become buttons inside the terminal; click one to `cd` into it.
+- New built-in themes, shaders and bundles from the author's profile.
 - **Readable text presets**: Backing options → **White on black** / **Black
   on white** put a solid backing and a fixed text color in every pane, over
   any shader. **Theme colors** goes back. Backing colors also have **Black**

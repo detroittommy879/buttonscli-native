@@ -1,0 +1,194 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#0f1f3d",
+        "#1f5a6e",
+        "#9fd0d8",
+        "#e6ba99",
+        "#3c5a8f"
+      ],
+      "custom": {
+        "expression": "let hz = -0.03;\nlet below = max(hz - p.y, 0.015);\nlet depth = 1.0 / below;\nlet px = p.x * depth;\nlet fog = exp(-below * 2.5);\nvar swell = 0.0;\nvar crest_acc = 0.0;\nfor (var i = 0; i < 4; i++) {\n    let k = f32(i);\n    let spd = wave_speed * (0.4 + 0.2 * k);\n    let n = noise(vec2<f32>(px * (0.5 + 0.4 * k) - t * 0.2 * spd, depth * (1.2 + 0.7 * k) + t * 0.5 * spd));\n    swell += n * (0.5 - 0.08 * k);\n    crest_acc += (1.0 - abs(2.0 * n - 1.0)) * (0.3 + 0.1 * k);\n}\nlet crest = smoothstep(0.75 - 0.1 * wave_height, 0.95, crest_acc / 1.8);\nlet refl_x = p.x - 0.42 + (swell - 0.76) * 0.2 * wave_height;\nlet road = smoothstep(0.12, 0.0, abs(refl_x)) * (0.4 + 0.6 * fog);\nlet stripes = smoothstep(0.35, 0.65, 0.5 + 0.5 * sin(depth * 5.0 - t * 2.0 * wave_speed + swell * 3.0));\nlet glint = road * stripes;\nlet bp = vec2<f32>(px * 2.0, depth * 3.0 - t * 0.8 * wave_speed);\nlet bc = floor(bp);\nlet hb = hash(bc);\nlet bub = stroke(sd_circle(fract(bp) - 0.5, 0.05 + 0.1 * hb), 0.02) * step(0.92, hb);\nlet water = mix(c1 * 0.7, c2, clamp(swell, 0.0, 1.0)) * (0.5 + 0.5 * fog) + c3 * crest * (0.25 + 0.5 * fog) + c4 * glint * 0.8 + c3 * bub * fog * 0.6;\nlet stars_v = stars(p * 22.0, t);\nlet sky = mix(c5 * 0.45, c1 * 0.3, smoothstep(hz, 0.5, p.y));\nlet moon_d = sd_circle(p - vec2<f32>(0.42, 0.3), 0.05);\nlet moon = fill(moon_d) + halo(moon_d, 0.2) * 0.4;\nlet skyc = sky + c3 * stars_v * 0.8 + c4 * moon;\nlet foam = smoothstep(0.02, 0.0, abs(p.y - hz)) * (0.4 + 0.6 * crest_acc / 1.8) * c3;\nlet scene = mix(water + foam, skyc, smoothstep(hz - 0.004, hz + 0.004, p.y));\nreturn mix(bg, tonemap(scene), strength);",
+        "name": "Playful Swell",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_speed",
+            "value": 1.899999976158142
+          },
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "wave_height",
+            "value": 1.0
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.0,
+      "speed": 0.30000001192092896,
+      "strength": 0.1599999964237213,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 24.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 24,
+    "simpleNoiseIdleAmount": 50.0,
+    "simpleNoiseIdleDelaySeconds": 60.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 68.0,
+    "simpleNoiseMinBrightness": 32.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 50.0,
+    "staticBrightness": 42.0,
+    "staticDensity": 0.20000000298023224,
+    "staticEnabled": false,
+    "staticIntensity": 50.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-13T09:04:06.683Z",
+    "description": "Cozy autumn coding nights: espresso-brown canvas warmed by copper, pumpkin and gold, with cranberry and forest-green tones for comfortable long sessions.",
+    "id": "ai-glm-harvest-hearth-v10",
+    "name": "AI Glm - Harvest Hearth v10",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:ai-glm-harvest-hearth-v10",
+    "updatedAt": "2026-11-14T22:38:13.867Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#e3b341",
+        "background": "#0c0500",
+        "buttonBackground": "#362617",
+        "buttonHover": "#4a3420",
+        "buttonText": "#f5e9d8"
+      },
+      "settings": {
+        "background": "#251a10"
+      },
+      "shell": {
+        "accent": "#b35c22",
+        "accentHover": "#8f4517",
+        "background": "#1a120b",
+        "backgroundSecondary": "#251a10",
+        "border": "#8a613a",
+        "buttonBackground": "#362617",
+        "paneDivider": {
+          "color": "#b35c22",
+          "thickness": 2.0
+        },
+        "textDim": "#c9b295",
+        "textMain": "#f5e9d8"
+      },
+      "statusBar": {
+        "background": "#1b0e0e",
+        "border": "#8a613a",
+        "text": "#e8d5b5",
+        "warning": "#f2c14e"
+      },
+      "tabs": {
+        "activeBackground": "#1a120b",
+        "activeBorder": "#c97a35",
+        "background": "#251a10",
+        "idleBackground": "#2f2114"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#2a1c10",
+        "blue": "#85a3cc",
+        "brightBlack": "#8a7057",
+        "brightBlue": "#a9c3e0",
+        "brightCyan": "#9ed2c4",
+        "brightGreen": "#a8d183",
+        "brightMagenta": "#dfa8cd",
+        "brightRed": "#f28089",
+        "brightWhite": "#fff8ec",
+        "brightYellow": "#f6cf6b",
+        "cyan": "#6fb3a3",
+        "green": "#86b45e",
+        "magenta": "#c586b4",
+        "red": "#d9525f",
+        "white": "#ece2d3",
+        "yellow": "#e3b341"
+      },
+      "background": "#000000",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#f2e6cf",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.0,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.20000000298023224
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

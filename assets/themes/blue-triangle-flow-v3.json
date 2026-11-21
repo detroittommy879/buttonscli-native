@@ -1,0 +1,181 @@
+{
+  "effects": {
+    "masterDisabled": false,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff4fd8",
+        "#39ff88",
+        "#ffd23f",
+        "#2a1450",
+        "#3ad6ff"
+      ],
+      "custom": {
+        "expression": "let base = mix(bg, c4, smoothstep(-0.5, 0.5, p.y));\nlet g1 = p * 6.0 - vec2<f32>(0.0, t * 0.1);\nlet id1 = floor(g1);\nlet h1 = hash(id1);\nlet o1 = (hash2(id1 + vec2<f32>(4.0, 9.0)) - 0.5) * 0.3;\nlet q1 = fract(g1) - 0.5 - o1;\nlet d1 = length(q1);\nlet rr = 0.07 + 0.05 * h1;\nlet ring1 = 1.0 - smoothstep(0.0, 0.02, abs(d1 - rr));\nlet fill1 = 1.0 - smoothstep(rr - 0.01, rr, d1);\nlet far = c5 * (ring1 * 0.9 + fill1 * 0.2);\nlet g2 = p * 3.5 - vec2<f32>(t * 0.2, 0.0);\nlet id2 = floor(g2);\nlet h2 = hash(id2);\nlet bob = 0.1 * sin(t * 0.9 + h2 * 6.28);\nlet q2 = fract(g2) - 0.5 - vec2<f32>(0.0, bob);\nlet d2 = abs(q2.x) + abs(q2.y) - (0.13 + 0.05 * h2);\nlet fill2 = 1.0 - smoothstep(0.0, 0.02, d2);\nlet mid = mix(c3, c1, step(0.6, h2)) * fill2;\nlet g3 = p * 9.0 + vec2<f32>(t * 0.35, t * 0.2);\nlet id3 = floor(g3);\nlet h3 = hash(id3);\nlet o3 = (hash2(id3 + vec2<f32>(2.0, 5.0)) - 0.5) * 0.3;\nlet q3 = fract(g3) - 0.5 - o3;\nlet d3 = length(q3);\nlet tw = 0.5 + 0.5 * sin(t * 4.0 + h3 * 6.28);\nlet spark = (1.0 - smoothstep(0.0, 0.03, d3 - 0.03)) * tw * step(0.5, h3);\nlet near = mix(c2, c3, h3) * spark;\nlet color = base + far + mid + near;\nreturn mix(bg, tonemap(color * 1.2), strength);",
+        "name": "Pop Parade",
+        "variables": [],
+        "y_up": true
+      },
+      "preset": "silk",
+      "scale": 1.7999999523162842,
+      "speed": 1.899999976158142,
+      "strength": 0.5,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 4.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 42.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 100.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 38.0,
+    "staticAmplitude": 0.0,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.019999999552965164,
+    "staticEnabled": false,
+    "staticIntensity": 100.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-14T22:29:48.095Z",
+    "description": "Bundled legacy ButtonsCLI theme",
+    "id": "blue-triangle-flow-v3",
+    "name": "Blue Triangle Flow v3",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:blue-triangle-flow-v3",
+    "updatedAt": "2026-11-15T02:34:05.022Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#ffb02e",
+        "background": "#09090e",
+        "buttonBackground": "#14141e",
+        "buttonHover": "#1e1e2d",
+        "buttonText": "#e0e0f0"
+      },
+      "settings": {
+        "background": "#0b0b11"
+      },
+      "shell": {
+        "accent": "#ff2a6d",
+        "accentHover": "#ff5c8d",
+        "background": "#050508",
+        "backgroundSecondary": "#0a0a10",
+        "border": "#211a36",
+        "buttonBackground": "#0c0c12",
+        "paneDivider": {
+          "color": "#ff2a6d",
+          "thickness": 2.0
+        },
+        "textDim": "#f9f9fb",
+        "textMain": "#e0e0f0"
+      },
+      "statusBar": {
+        "background": "#0a0a10",
+        "border": "#1a1a28",
+        "text": "#c4c4d4",
+        "warning": "#a0a03a"
+      },
+      "tabs": {
+        "activeBackground": "#050508",
+        "activeBorder": "#05d9e8",
+        "background": "#07070b",
+        "idleBackground": "#0c0c12"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#1e1e1e",
+        "blue": "#ff00ff",
+        "brightBlack": "#444444",
+        "brightBlue": "#ff80ff",
+        "brightCyan": "#ffff44",
+        "brightGreen": "#ff4444",
+        "brightMagenta": "#44ff44",
+        "brightRed": "#80ffff",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#4444ff",
+        "cyan": "#ffff00",
+        "green": "#ff0000",
+        "magenta": "#00ff00",
+        "red": "#00ffff",
+        "white": "#888888",
+        "yellow": "#0000ff"
+      },
+      "background": "#060a09",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "saxmono Bundled",
+      "fontSize": 13.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#ffffff",
+      "gradientAngle": 135.0,
+      "gradientAnimation": false,
+      "gradientColors": [],
+      "gradientRadialPosition": "center",
+      "gradientType": "linear",
+      "letterSpacing": 0.20000000298023224,
+      "useGradient": false
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Recursive Sans Csl St Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Commit Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.0
+      },
+      "statusBar": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 16.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "tabs": {
+        "fontFamily": "Go Noto Current Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "terminal": {
+        "fontFamily": "saxmono Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.20000000298023224
+      }
+    }
+  },
+  "version": 1
+}

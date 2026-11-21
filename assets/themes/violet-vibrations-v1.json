@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff4fd8",
+        "#36e6f0",
+        "#7a5cff",
+        "#0b1f3a",
+        "#ffd1f5"
+      ],
+      "custom": {
+        "expression": "let fp = p * smoke_scale;\nlet warp = vec2<f32>(fbm(fp + vec2<f32>(t * 0.03, 0.0)), fbm(fp + vec2<f32>(4.1, 1.7) - vec2<f32>(0.0, t * 0.025)));\nlet smoke = fbm(fp + 1.8 * warp + vec2<f32>(0.0, t * 0.04));\nlet drift = clamp(0.5 + 0.5 * (p.y * 1.4 + 0.6 * warp.x - 0.3), 0.0, 1.0);\nlet hue = mix(c1, c2, drift);\nlet ink = mix(c4 * 0.8, hue, smoothstep(0.35, 0.75, smoke));\nlet ph1 = fract(t * 0.06 * drop_speed);\nlet ph2 = fract(t * 0.05 * drop_speed + 0.37);\nlet ph3 = fract(t * 0.07 * drop_speed + 0.71);\nlet r1 = stroke(sd_circle(p - vec2<f32>(-0.32, 0.1), ph1 * 0.8), 0.004 + 0.01 * (1.0 - ph1)) * (1.0 - ph1);\nlet r2 = stroke(sd_circle(p - vec2<f32>(0.4, -0.12), ph2 * 0.9), 0.004 + 0.01 * (1.0 - ph2)) * (1.0 - ph2);\nlet r3 = stroke(sd_circle(p - vec2<f32>(0.05, 0.2), ph3 * 0.7), 0.004 + 0.01 * (1.0 - ph3)) * (1.0 - ph3);\nlet rings = (r1 + r2 + r3) * mix(c5, c2, 0.4);\nlet color = tonemap(ink * 1.1 + rings * 1.2);\nreturn mix(bg, color, strength);",
+        "name": "Vaporwave Ink Bloom",
+        "variables": [
+          {
+            "max": 2.0,
+            "min": 0.20000000298023224,
+            "name": "drop_speed",
+            "value": 1.0
+          },
+          {
+            "max": 2.5,
+            "min": 0.800000011920929,
+            "name": "smoke_scale",
+            "value": 1.600000023841858
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 1.899999976158142,
+      "speed": 0.8999999761581421,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-17T00:55:09.213Z",
+    "description": "Dark blue-violet terminal with thin resonant rings and sharp cyan highlights",
+    "id": "violet-vibrations-v1",
+    "name": "Violet Vibrations v1",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:violet-vibrations-v1",
+    "updatedAt": "2026-11-17T00:55:09.213Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#3df5ff",
+        "background": "#140f26",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#140f26"
+      },
+      "shell": {
+        "accent": "#7a4dff",
+        "accentHover": "#3df5ff",
+        "background": "#0a0816",
+        "backgroundSecondary": "#140f26",
+        "border": "#2e2262",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#7a4dff",
+          "thickness": 2.0
+        },
+        "textDim": "#a9a0cc",
+        "textMain": "#eeeaff"
+      },
+      "statusBar": {
+        "background": "#140f26",
+        "border": "#2e2262",
+        "text": "#a9a0cc",
+        "warning": "#ffd66b"
+      },
+      "tabs": {
+        "activeBackground": "#0a0816",
+        "activeBorder": "#7a4dff",
+        "background": "#140f26",
+        "idleBackground": "#140f26"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#05060b",
+        "blue": "#4d8bff",
+        "brightBlack": "#4a4470",
+        "brightBlue": "#7aa8ff",
+        "brightCyan": "#86faff",
+        "brightGreen": "#9dffd0",
+        "brightMagenta": "#d0a8ff",
+        "brightRed": "#ff7a9c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff0a8",
+        "cyan": "#3df5ff",
+        "green": "#4dffb0",
+        "magenta": "#b07aff",
+        "red": "#ff4d7a",
+        "white": "#e6e2ff",
+        "yellow": "#ffd66b"
+      },
+      "background": "#05060b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "JetBrains Mono Bundled",
+      "fontSize": 14.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e6e2ff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0d0a24",
+        "#3a1f8f",
+        "#5b3dff",
+        "#2a6bff"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Serious Shanns Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Recursive Sans Lnr St Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.20000000298023224
+      },
+      "statusBar": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 11.0,
+        "fontWeight": 300,
+        "letterSpacing": 1.0
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.30000001192092896
+      },
+      "terminal": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

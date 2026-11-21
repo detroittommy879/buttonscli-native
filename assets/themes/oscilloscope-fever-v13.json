@@ -1,0 +1,199 @@
+{
+  "effects": {
+    "masterDisabled": true,
+    "rowBandingColor": "#00ff44",
+    "rowBandingEnabled": false,
+    "rowBandingOpacity": 6.0,
+    "scanlinesEnabled": false,
+    "scanlinesPeriod": 4.0,
+    "scanlinesStrength": 0.0,
+    "shaderBackground": {
+      "animated": true,
+      "colors": [
+        "#ff5fa2",
+        "#5ee6ff",
+        "#ffe15a",
+        "#1a0f2e",
+        "#e8f7ff"
+      ],
+      "custom": {
+        "expression": "let frame = floor(t * 30.0);\nlet grain = hash(floor(p * vec2<f32>(260.0, 140.0)) + vec2<f32>(frame * 13.0, 0.0));\nlet row = hash(vec2<f32>(floor(p.y * 140.0), frame * 3.0));\nlet s = grain * 0.7 + row * 0.3;\nlet roll = fract(p.y * 0.6 + t * roll_speed);\nlet bar = smoothstep(0.75, 1.0, roll) * 0.35;\nlet base = mix(c4 + vec3<f32>(0.05, 0.04, 0.08), c5, s * 0.75 + bar);\nlet q = p - vec2<f32>(0.1 * sin(t * 0.13), 0.02 * sin(t * 0.3));\nlet head = stroke(sd_circle(q, 0.2), 0.015);\nlet eyes = fill(sd_circle(q - vec2<f32>(-0.07, 0.06), 0.022)) + fill(sd_circle(q - vec2<f32>(0.07, 0.06), 0.022));\nlet smile = stroke(abs(length(q - vec2<f32>(0.0, 0.04)) - 0.1), 0.014) * (1.0 - smoothstep(0.03, 0.05, q.y));\nlet face = clamp(head + eyes + smile, 0.0, 1.0);\nlet presence = smoothstep(0.5, 0.85, cloud(vec2<f32>(t * 0.15, 2.0)));\nlet sig = face * presence * signal_level;\nlet sig_col = mix(c1, c3, fract(p.y * 2.0 + t * 0.1));\nlet scan = 0.85 + 0.15 * step(0.5, fract(p.y * 140.0));\nlet color = mix(base, sig_col, clamp(sig * 1.2, 0.0, 1.0)) * scan;\nreturn mix(bg, color, strength);",
+        "name": "Dead Air Smiley",
+        "variables": [
+          {
+            "max": 1.0,
+            "min": 0.20000000298023224,
+            "name": "signal_level",
+            "value": 0.6000000238418579
+          },
+          {
+            "max": 0.30000001192092896,
+            "min": 0.0,
+            "name": "roll_speed",
+            "value": 0.07999999821186066
+          }
+        ],
+        "y_up": true
+      },
+      "preset": "aurora",
+      "scale": 6.5,
+      "speed": 2.5,
+      "strength": 0.3499999940395355,
+      "theme_colors": false,
+      "version": 1
+    },
+    "simpleNoiseAmount": 8.0,
+    "simpleNoiseEnabled": false,
+    "simpleNoiseFps": 60,
+    "simpleNoiseIdleAmount": 33.0,
+    "simpleNoiseIdleDelaySeconds": 142.0,
+    "simpleNoiseIdleEnabled": false,
+    "simpleNoiseIdleRampSeconds": 6.0,
+    "simpleNoiseMaxBrightness": 52.0,
+    "simpleNoiseMinBrightness": 0.0,
+    "simpleNoiseResolution": 50.0,
+    "staticAmplitude": 54.000003814697266,
+    "staticBrightness": 100.0,
+    "staticDensity": 0.8600000143051147,
+    "staticEnabled": false,
+    "staticIntensity": 52.0,
+    "staticOpacity": 0.0
+  },
+  "metadata": {
+    "createdAt": "2026-11-11T22:43:37.186Z",
+    "description": "Hot magenta and cyan traces on a near-black violet ink, high-energy and high contrast.",
+    "id": "oscilloscope-fever-v13",
+    "name": "Oscilloscope Fever v13",
+    "nativeThemeVersion": 1,
+    "releasePickFrom": "personal:imported-default-da364bab3a22:oscilloscope-fever-v13",
+    "updatedAt": "2026-11-18T01:15:41.298Z"
+  },
+  "nativeAppearance": {
+    "shader_backgrounds_enabled": true
+  },
+  "theme": {
+    "app": {
+      "presetDock": {
+        "accent": "#00e5ff",
+        "background": "#120c1f",
+        "buttonBackground": "#4e2e59",
+        "buttonHover": "#653257",
+        "buttonText": "#f0f0f0"
+      },
+      "settings": {
+        "background": "#120c1f"
+      },
+      "shell": {
+        "accent": "#ff2e88",
+        "accentHover": "#00e5ff",
+        "background": "#07050d",
+        "backgroundSecondary": "#120c1f",
+        "border": "#3a1f57",
+        "buttonBackground": "#3a2a5a",
+        "paneDivider": {
+          "color": "#ff2e88",
+          "thickness": 2.0
+        },
+        "textDim": "#9a93b8",
+        "textMain": "#eef0ff"
+      },
+      "statusBar": {
+        "background": "#120c1f",
+        "border": "#3a1f57",
+        "text": "#9a93b8",
+        "warning": "#ffe14d"
+      },
+      "tabs": {
+        "activeBackground": "#07050d",
+        "activeBorder": "#ff2e88",
+        "background": "#120c1f",
+        "idleBackground": "#120c1f"
+      }
+    },
+    "mode": "dark",
+    "terminal": {
+      "ansiColors": {
+        "black": "#05060b",
+        "blue": "#3d7bff",
+        "brightBlack": "#4a3f66",
+        "brightBlue": "#7aa6ff",
+        "brightCyan": "#7af5ff",
+        "brightGreen": "#9dffb8",
+        "brightMagenta": "#ff6fb1",
+        "brightRed": "#ff7a9c",
+        "brightWhite": "#ffffff",
+        "brightYellow": "#fff08a",
+        "cyan": "#00e5ff",
+        "green": "#5cff8a",
+        "magenta": "#ff2e88",
+        "red": "#ff3b6b",
+        "white": "#e8ecff",
+        "yellow": "#ffe14d"
+      },
+      "background": "#05060b",
+      "drawBoldTextInBrightColors": true,
+      "fontFamily": "Fira Code Bundled",
+      "fontSize": 15.0,
+      "fontWeight": 400,
+      "fontWeightBold": 400,
+      "foreground": "#e8ecff",
+      "gradientAngle": 235.0,
+      "gradientAnimation": false,
+      "gradientColors": [
+        "#0a0418",
+        "#ff2e88",
+        "#00e5ff",
+        "#ffe14d"
+      ],
+      "gradientRadialPosition": "center",
+      "gradientType": "conic",
+      "letterSpacing": 0.0,
+      "useGradient": true
+    },
+    "typography": {
+      "assistant": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "presetDock": {
+        "fontFamily": "Monoisome Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      },
+      "settings": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.2
+      },
+      "shell": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 14.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.2
+      },
+      "statusBar": {
+        "fontFamily": "JetBrains Mono Bundled",
+        "fontSize": 12.0,
+        "fontWeight": 300,
+        "letterSpacing": 0.5
+      },
+      "tabs": {
+        "fontFamily": "Roboto Bundled",
+        "fontSize": 13.0,
+        "fontWeight": 500,
+        "letterSpacing": 0.5
+      },
+      "terminal": {
+        "fontFamily": "Fira Code Bundled",
+        "fontSize": 15.0,
+        "fontWeight": 400,
+        "letterSpacing": 0.0
+      }
+    }
+  },
+  "version": 1
+}

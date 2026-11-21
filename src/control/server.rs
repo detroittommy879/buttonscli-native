@@ -79,6 +79,47 @@ struct TabSummary {
     output_sequence: u64,
     ready: bool,
     exited: bool,
+    /// The shell sends OSC 133 marks (prompt, command start/finish).
+    shell_integration: bool,
+    /// A command is running (between its start and finish marks).
+    command_running: bool,
+    /// Finished commands so far; grows by one per finished command.
+    commands_finished: u64,
+    last_command: Option<CommandSummary>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandSummary {
+    id: u64,
+    command: Option<String>,
+    exit_code: Option<i32>,
+    started_at_ms: u64,
+    finished_at_ms: Option<u64>,
+    duration_ms: Option<u64>,
+}
+
+impl CommandSummary {
+    fn from(record: &crate::session::marks::CommandRecord) -> Self {
+        Self {
+            id: record.id,
+            command: record.command.clone(),
+            exit_code: record.exit_code,
+            started_at_ms: record.started_at_ms,
+            finished_at_ms: record.finished_at_ms,
+            duration_ms: record.duration_ms(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandsResponse {
+    tab: TabSummary,
+    /// Oldest first; at most the last 64 commands.
+    commands: Vec<CommandSummary>,
+    /// Output of the last finished command, while it is still captured.
+    last_output: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -89,7 +130,7 @@ struct DiscoveryFile {
     updated_at_ms: u64,
     instance_id: String,
     schema_version: u32,
-    capabilities: [&'static str; 11],
+    capabilities: [&'static str; 13],
 }
 
 #[derive(Deserialize)]
@@ -190,6 +231,9 @@ struct RunRequest {
     wait_for_text: Option<String>,
     #[serde(default)]
     ignore_case: bool,
+    /// "auto" (default): wait for the command-finished mark when the shell
+    /// sends them, else for quiet output. "quiet": always quiet output.
+    wait_for: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -224,6 +268,10 @@ struct RunResponse {
     stable: bool,
     completion_reason: String,
     matched_text: Option<String>,
+    /// From shell integration: the command's exit code and own output.
+    exit_code: Option<i32>,
+    command: Option<CommandSummary>,
+    command_output: Option<String>,
 }
 
 pub(crate) struct ControlServer {
@@ -274,6 +322,7 @@ impl ControlServer {
             .route("/v1/tabs/{selector}/send", axum::routing::post(send_tab))
             .route("/v1/tabs/{selector}/key", axum::routing::post(send_key))
             .route("/v1/tabs/{selector}/run", axum::routing::post(run_command))
+            .route("/v1/tabs/{selector}/commands", get(tab_commands))
             .route(
                 "/v1/tabs/{selector}/rename",
                 axum::routing::post(rename_tab),
@@ -355,6 +404,8 @@ impl ControlServer {
                 "layout",
                 "presets",
                 "preset-run",
+                "commands",
+                "run-exit-code",
             ],
         };
         if let Err(error) = write_discovery_file(&info_path, &descriptor) {
@@ -1015,8 +1066,23 @@ async fn run_command(
         .chars
         .unwrap_or(DEFAULT_RUN_CHARS)
         .clamp(1, MAX_READ_CHARS);
+    let wait_quiet = match request.wait_for.as_deref() {
+        None | Some("auto") => false,
+        Some("quiet") => true,
+        Some(_) => {
+            return Err(api_error(
+                StatusCode::BAD_REQUEST,
+                "waitFor must be auto or quiet",
+            ))
+        }
+    };
     let snapshot = read_snapshot(&state)?;
-    let target_id = resolve_session(&snapshot, &selector)?.id;
+    let target = resolve_session(&snapshot, &selector)?;
+    let target_id = target.id;
+    // Shell integration: wait for the next command-finished mark instead of
+    // guessing from quiet output (a silent build is not a finished one).
+    let marks = !wait_quiet && target.output_capture.commands().active;
+    let finished_before = target.output_capture.finished_commands();
     execute_delivery(&state, target_id, prepared).await?;
     let started = std::time::Instant::now();
     let deadline = started + Duration::from_millis(max_wait_ms);
@@ -1025,12 +1091,22 @@ async fn run_command(
     let completion_reason;
     let mut matched_text = None;
     let mut timed_out = false;
+    let mut finished = None;
     let text;
     loop {
         let snapshot = read_snapshot(&state)?;
         let session = find_session(&snapshot, target_id)?;
         let output = session.output_capture.snapshot();
         let current_text = session.output_capture.read_chars(chars, false);
+        if marks && session.output_capture.finished_commands() > finished_before {
+            let log = session.output_capture.commands();
+            if let Some(record) = log.last_finished().cloned() {
+                finished = Some(record);
+                completion_reason = "command-finished".into();
+                text = current_text;
+                break;
+            }
+        }
         let signature = format!("{}:{current_text}", output.output_sequence);
         let now = std::time::Instant::now();
         if signature != previous_signature {
@@ -1052,7 +1128,7 @@ async fn run_command(
                 break;
             }
         }
-        if now.duration_since(stable_since) >= Duration::from_millis(quiet_ms) {
+        if !marks && now.duration_since(stable_since) >= Duration::from_millis(quiet_ms) {
             completion_reason = "quiet".into();
             text = current_text;
             break;
@@ -1068,6 +1144,9 @@ async fn run_command(
     let elapsed_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
     let snapshot = read_snapshot(&state)?;
     let session = find_session(&snapshot, target_id)?;
+    let command_output = finished
+        .as_ref()
+        .and_then(|record| session.output_capture.command_output(record, chars));
     Ok(Json(RunResponse {
         ok: true,
         tab: tab_summary(session, snapshot.active_id),
@@ -1081,6 +1160,33 @@ async fn run_command(
         stable: !timed_out,
         completion_reason,
         matched_text,
+        exit_code: finished.as_ref().and_then(|record| record.exit_code),
+        command: finished.as_ref().map(CommandSummary::from),
+        command_output,
+    }))
+}
+
+async fn tab_commands(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+    AxumPath(selector): AxumPath<String>,
+    Query(query): Query<ReadQuery>,
+) -> Result<Json<CommandsResponse>, (StatusCode, Json<serde_json::Value>)> {
+    authorize(&headers, &state)?;
+    let snapshot = read_snapshot(&state)?;
+    let session = resolve_session(&snapshot, &selector)?;
+    let log = session.output_capture.commands();
+    let chars = query
+        .chars
+        .unwrap_or(DEFAULT_READ_CHARS)
+        .min(MAX_READ_CHARS);
+    let last_output = log
+        .last_finished()
+        .and_then(|record| session.output_capture.command_output(record, chars));
+    Ok(Json(CommandsResponse {
+        tab: tab_summary(session, snapshot.active_id),
+        commands: log.commands.iter().map(CommandSummary::from).collect(),
+        last_output,
     }))
 }
 
@@ -1160,6 +1266,7 @@ fn tab_summary(
     active_id: Option<u64>,
 ) -> TabSummary {
     let output = session.output_capture.snapshot();
+    let log = session.output_capture.commands();
     TabSummary {
         tab_id: format!("tab-{}", session.id),
         pty_id: session.id,
@@ -1175,6 +1282,10 @@ fn tab_summary(
         output_sequence: output.output_sequence,
         ready: session.ready,
         exited: session.exited,
+        shell_integration: log.active,
+        command_running: log.running().is_some(),
+        commands_finished: log.finished,
+        last_command: log.commands.back().map(CommandSummary::from),
     }
 }
 

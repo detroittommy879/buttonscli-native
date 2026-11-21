@@ -13,9 +13,9 @@ A fast terminal app for people who'd rather use a mouse: click buttons instead o
 
 </div>
 
-![Three stacked terminals with animated shader backgrounds and a command dock, next to Settings showing four AI-generated shader versions](docs/images/main.png)
+![Three stacked terminals with shader backgrounds and readable text backing, a command dock with folder buttons, and clickable folder names in an ls listing (hovering home shows cd "home")](docs/images/main-2026-11-20.png)
 
-*Some shaders in this picture are saved with a higher Strength than the default (0.35), so their motion shows. Strength fades a shader toward the background color, which keeps text readable; lower it any time.*
+*Each pane has its own theme and shader; text backing keeps the text readable over them. Folder names in an `ls` listing can become buttons that `cd` into them (Settings → Experimental).*
 
 ## AI features and other things to save time
 
@@ -67,7 +67,7 @@ install from. The AI and agent features still count as previews. See
 | **Arrange your workspace** | Wrapping tabs, COL / ROW / GRID layouts, up to ten visible panes, draggable dividers, and per-tab auto-tile inclusion. Extra tabs keep their sessions running. Save a set of open terminals as a named tab group and reopen it later. |
 | **Put commands on buttons** | Separate command and SSH docks with editable presets. Choose whether a button types the command or also sends Enter. Docks resize, collapse, and auto-hide. |
 | **Use the terminal normally** | Scrollback and scrollbars, selection, copy/paste, hyperlinks, regex search, select-all, clear-screen, and live PTY resizing. |
-| **Make every pane recognizable** | Each pane and its tab share their own color, and the tab that gets your typing is filled in. 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, Theme all, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
+| **Make every pane recognizable** | Each pane and its tab share their own color, and the tab that gets your typing is filled in. 555 bundled legacy theme choices plus native themes, per-terminal themes/fonts, All terminals, favorites, and random-theme controls. Browse Library / Edit / Generate tabs; edit, import, and export personal theme JSON. |
 | **Tune the look** | Offline bundled/system fonts, local TTF/OTF import, separate typography controls, gradients, scanlines and noise effects. 34 built-in GPU shader backgrounds (including VHS and CRT static), your own WGSL shader code with sliders, or AI-written shaders. Calm effects pauses motion; window opacity works on Windows. |
 | **Keep settings separate** | Preferences live under `~/.buttonscli-native/`. Import from the original app into a separate native profile and switch profiles from the status bar. Re-importing keeps your saved themes and favorites. Provider keys transfer only when selected explicitly. |
 | **Launch a workspace** | Start multiple tabs with a chosen shell/directory and optional commands for specific tabs. Startup options are available without AI or agent-control access. |

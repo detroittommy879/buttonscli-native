@@ -101,6 +101,20 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   new zoom after: use the gather zoom (`ui_scale.rs`), or Auto UI size loops.
 - Panes draw the shader instead of the gradient; the theme editor's
   "Shader background" switch stashes it in `effects.shaderBackgroundOff`.
+- **Look state (themes, shaders, fonts, backing, Calm, chrome colors):
+  read `docs/dev/LOOK-STATE.md` before changing any of it.** It lists where
+  each fact lives, how a pane's look is resolved, and what every button
+  changes. Rules in short:
+  - "Use this theme" goes through `apply_look(id, LookTarget)`
+    (`src/app/apply_look.rs`: WholeApp {scopes, calm}, AllTerminals, Pane);
+    `apply_theme`/`set_theme_all`/`set_theme_for_tab` are wrappers. Never
+    write `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from a
+    new button. Bundles and Shuffle still have their own paths.
+  - Anything that replaces a pane's theme calls `settle_pane_draft` first.
+  - Only the Calm button turns Calm on; Apply leaves it alone.
+  - Labels name the edit target (`edit_target_theme`), not the shared theme.
+  - Add a row to `every_button_from_every_state_gives_one_consistent_result`
+    for any new button or starting state, and update the doc's tables.
 
 ## Pane and input rules
 
@@ -143,8 +157,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   stamped from egui's font atlas into a mask, a chamfer distance map (capped
   at 0.9 MP, rebuilt only when the text on screen changes), colored through
   `ring_stops` and drawn as one texture.
-  Inversion backs runs with their foreground (whole rows use default foreground),
-  uses background for ink, and preserves explicit TUI/selection/search colors.
+  Inversion backs runs with their foreground (whole rows use the color of
+  the row's first visible character), uses background for ink, ignores custom
+  backing palettes while on, and preserves explicit TUI/selection/search colors.
   Web backing lives in `shader-playground/text-backing.js`; layout switches must
   preserve `backing-*` classes. Deploy the JS module along with app.js.
 - Terminal content has a 4 pt horizontal/2 pt vertical inset; pane borders and hover
@@ -259,7 +274,22 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   folded, so side effects (taking a worker result) must not live only there.
 - Left-panel folder buttons (`src/app/dock_nav.rs`, Settings → Experimental)
   read the screen via `TerminalBackend::screen_rows`, never the disk. Test
-  with a long listing: the `ls` line scrolls off screen.
+  with a long listing: the `ls` line scrolls off screen. In-terminal folder
+  buttons (`src/app/folder_chips.rs`, `DockNavigation::in_terminal`) reuse
+  that parser; spans are cached per pane by output sequence/scroll/size.
+- Shell integration (OSC 133/633): vte ignores these, so
+  `session::marks::MarkScanner` finds them in `OutputCapture`'s raw observer
+  and keeps a `CommandLog` (exit codes, absolute output positions). Scripts:
+  `assets/shell-integration/`, injected by `src/shell_integration.rs` only
+  for shells started without their own args (PowerShell inline via
+  `-EncodedCommand`; bash `--rcfile`; zsh `ZDOTDIR`; fish
+  `--init-command`). `BackendSettings::env` carries extra env. ConPTY passes
+  the marks through: `powershell_integration_reports_exit_codes` (ignored
+  probe) checks it. A D mark without a C mark is not a command (empty Enter).
+  Alerts/badges: `src/app/command_alerts.rs`.
+- The shader window is a deferred viewport (own clock via `advance_clock`,
+  state in an `Arc<Mutex>` in ctx data): an immediate viewport only redraws
+  when the main window does, which ran it at a few FPS.
 - OSC 52 copy arrives as `PtyEvent::ClipboardStore` in
   `process_terminal_events` (`program_clipboard`); reads stay denied.
 - Python edit scripts: pass `encoding='utf-8'` (the default here is cp1252).
