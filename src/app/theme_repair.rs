@@ -99,8 +99,9 @@ impl ButtonsApp {
     /// Saves the corrected file (backup first) and reloads personal themes.
     fn save_theme_repair(&mut self, repair: &ThemeRepair, text: &str) -> Result<(), String> {
         let store = self.native_store.as_ref().ok_or("No profile is open.")?;
-        let mut bytes = text.as_bytes().to_vec();
-        bytes.push(b'\n');
+        let mut document: Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
+        crate::theme_files::set_file_identity(&mut document, &repair.file_name);
+        let bytes = crate::theme_files::encoded_theme(&mut document)?;
         store
             .replace_theme_file_if_unchanged(&repair.file_name, &bytes, repair.original_hash)
             .map_err(|error| match error {
@@ -368,6 +369,11 @@ mod tests {
             .all()
             .iter()
             .any(|theme| theme.id.ends_with(":broken")));
+        let saved: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            saved["metadata"]["id"], "broken",
+            "metadata.id names its file"
+        );
         let backups = app
             .native_store
             .as_ref()

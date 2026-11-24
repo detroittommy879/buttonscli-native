@@ -12203,13 +12203,11 @@ impl ButtonsApp {
         document["metadata"]["name"] = json!(name);
         let file_name =
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
-        document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
         document["metadata"]["createdAt"] = Value::Null;
         document["metadata"]["updatedAt"] = Value::Null;
         let profile = store.profile_name().to_owned();
-        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
-            crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, false)
-        });
+        let result =
+            crate::theme_files::save_theme_document(store, &file_name, &name, &mut document);
         match result {
             Ok(file) => {
                 self.clear_theme_preview();
@@ -12782,13 +12780,14 @@ impl ButtonsApp {
                 json!(self.preferences.shader_backgrounds_enabled);
         }
         let expected = replace.then_some(self.theme_editor.file_digest()).flatten();
-        let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
-            if replace {
+        let result = if replace {
+            crate::theme_files::set_file_identity(&mut document, &file_name);
+            crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
                 crate::theme_files::replace_theme_file(store, &file_name, &bytes, expected)
-            } else {
-                crate::theme_files::save_theme_file(store, &file_name, &name, &bytes, false)
-            }
-        });
+            })
+        } else {
+            crate::theme_files::save_theme_document(store, &file_name, &name, &mut document)
+        };
         match result {
             Ok(saved_file_name) => {
                 let digest = store.theme_file_digest(&saved_file_name).ok();

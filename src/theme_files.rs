@@ -105,24 +105,43 @@ pub(crate) fn import_theme_file(
         .to_owned();
     let themes_dir = store.profile_dir().join("themes");
     let file_name = unique_file_name(&themes_dir, &name);
-    let bytes = encoded_theme(&mut document)?;
-    let saved_file_name = save_theme_file(store, &file_name, &name, &bytes, false)?;
+    let saved_file_name = save_theme_document(store, &file_name, &name, &mut document)?;
     Ok((saved_file_name, document, report))
 }
 
-pub(crate) fn save_theme_file(
+/// Sets a theme document's `metadata.id` to its file's stem. The file name is
+/// the one owner of a personal theme's identity (`personal:<profile>:<stem>`);
+/// a copy that kept its source's id said it was the source.
+pub(crate) fn set_file_identity(document: &mut Value, file_name: &str) {
+    let Some(object) = document.as_object_mut() else {
+        return;
+    };
+    let metadata = object.entry("metadata").or_insert_with(|| json!({}));
+    if let Some(metadata) = metadata.as_object_mut() {
+        metadata.insert(
+            "id".into(),
+            Value::String(file_name.trim_end_matches(".json").to_owned()),
+        );
+    }
+}
+
+/// Saves `document` as a new theme file, under the next free name if
+/// `requested_file_name` is taken meanwhile. Its `metadata.id` always
+/// matches the file it ends up in. Returns the file name used.
+pub(crate) fn save_theme_document(
     store: &NativeStore,
     requested_file_name: &str,
     theme_name: &str,
-    bytes: &[u8],
-    replace: bool,
+    document: &mut Value,
 ) -> Result<String, String> {
     let directory = store.profile_dir().join("themes");
     let mut file_name = requested_file_name.to_owned();
     for _ in 0..32 {
-        match store.write_theme_file(&file_name, bytes, replace) {
+        set_file_identity(document, &file_name);
+        let bytes = encoded_theme(document)?;
+        match store.write_theme_file(&file_name, &bytes, false) {
             Ok(()) => return Ok(file_name),
-            Err(StoreError::ThemeCollision) if !replace => {
+            Err(StoreError::ThemeCollision) => {
                 file_name = unique_file_name(&directory, theme_name);
             }
             Err(error) => return Err(error.to_string()),
@@ -776,17 +795,21 @@ mod tests {
         store
             .write_theme_file("night.json", occupied.as_bytes(), false)
             .unwrap();
-        let saved =
-            save_theme_file(&store, "night.json", "Night", b"{\"version\":1}", false).unwrap();
+        let mut document = crate::theme_generation::tests::base_document();
+        document["metadata"]["id"] = json!("aurora");
+        let saved = save_theme_document(&store, "night.json", "Night", &mut document).unwrap();
         assert_eq!(saved, "night-2.json");
         assert_eq!(
             fs::read(store.profile_dir().join("themes/night.json")).unwrap(),
             occupied.as_bytes()
         );
-        assert_eq!(
-            fs::read(store.profile_dir().join("themes/night-2.json")).unwrap(),
-            b"{\"version\":1}"
-        );
+        let written: Value = serde_json::from_slice(
+            &fs::read(store.profile_dir().join("themes/night-2.json")).unwrap(),
+        )
+        .unwrap();
+        // The copy names its own file, not its source or the taken name.
+        assert_eq!(written["metadata"]["id"], "night-2");
+        assert_eq!(document["metadata"]["id"], "night-2");
         fs::remove_dir_all(store.native_root().parent().unwrap()).unwrap();
     }
 }
