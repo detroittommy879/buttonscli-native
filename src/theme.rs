@@ -351,7 +351,20 @@ impl ThemeCatalog {
                 }
                 let document: Value =
                     serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+                // A newer file is refused here and never rewritten (the
+                // store will not save over it either).
+                let (document, changes) = crate::look_format::upgrade_theme_document(document)
+                    .map_err(|error| error.to_string())?;
                 validate_personal_document(&document)?;
+                // Usable with something ignored: say so in the log only;
+                // it must never block startup.
+                let report = crate::look_format::validate_theme_document(&document);
+                if !report.warnings.is_empty() {
+                    tracing::warn!("personal theme {file_name}: {}", report.summary(5));
+                }
+                if !changes.is_empty() {
+                    tracing::info!("personal theme {file_name}: {}", changes.join("; "));
+                }
                 let mut theme = parse_legacy_value(stem, &document, ThemeSource::Personal)
                     .map_err(|error| error.to_string())?;
                 theme.id = identity.clone();
@@ -418,21 +431,18 @@ impl ThemeCatalog {
     }
 }
 
+/// The checks a saved theme document must pass (`look_format`): a format
+/// this app reads, a metadata id and name, and `theme`/`effects` objects.
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
-    let valid_metadata = |key: &str| {
-        document["metadata"][key]
-            .as_str()
-            .is_some_and(|value| !value.trim().is_empty())
-    };
-    if document["version"] != 1
-        || !valid_metadata("id")
-        || !valid_metadata("name")
-        || !document["theme"].is_object()
-        || !document["effects"].is_object()
-    {
-        return Err("not a version 1 saved theme document".into());
+    let errors = crate::look_format::theme_document_errors(document);
+    if errors.is_empty() {
+        return Ok(());
     }
-    Ok(())
+    Err(errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; "))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1311,6 +1321,10 @@ fn ansi_color(ansi: &Value, named: &str, indexed: &str, fallback: &str) -> Strin
 
 pub(crate) fn parse_color(value: &str) -> Option<Color32> {
     let hex = value.strip_prefix('#')?;
+    // Byte slicing below would panic inside a multi-byte character.
+    if !hex.is_ascii() {
+        return None;
+    }
     match hex.len() {
         3 => Some(Color32::from_rgb(
             u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?,

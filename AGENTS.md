@@ -259,6 +259,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 ## Themes and profiles
 
 - Theme/shader/bundle authoring: `docs/dev/AUTHORING-THEME-BUNDLES.md`.
+  File versions and checks for outside theme/bundle files:
+  `src/look_format.rs` ("File versions" in `docs/dev/LOOK-STATE.md`).
+  Deserialize a bundle only after `look_format::upgrade_bundle`.
   Pane Focus assets regenerate with `python scripts/generate-pane-focus-library.py`.
   Bundles queue at most eight looks (no cycling); applying one preserves the
   global shader-enable/Calm/font settings. Include static gradient fallbacks.

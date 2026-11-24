@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Value};
 
 use crate::fonts::FontZone;
+use crate::look_format::{self, FormatReport};
 use crate::storage::store::{NativeStore, StoreError};
 use crate::theme::{to_hex, validate_personal_document, GradientGeometry, ThemeDefinition};
 
@@ -59,12 +60,21 @@ pub(crate) fn read_theme_file(path: &Path) -> Result<Value, String> {
         return Err("theme file exceeds 2 MiB".into());
     }
     let document: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    // Older formats are brought up to date; newer ones are refused.
+    let (document, _) =
+        look_format::upgrade_theme_document(document).map_err(|error| error.to_string())?;
     validate_personal_document(&document)?;
     Ok(document)
 }
 
 pub(crate) fn encoded_theme(document: &mut Value) -> Result<Vec<u8>, String> {
     validate_personal_document(document)?;
+    // Files always say their format, even when the source left it out.
+    if let Some(object) = document.as_object_mut() {
+        if object.get("version").is_none_or(Value::is_null) {
+            object.insert("version".into(), look_format::THEME_FORMAT_VERSION.into());
+        }
+    }
     update_metadata_times(document);
     let bytes = serde_json::to_vec_pretty(document).map_err(|error| error.to_string())?;
     if bytes.len() as u64 > MAX_THEME_BYTES {
@@ -73,11 +83,22 @@ pub(crate) fn encoded_theme(document: &mut Value) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
+/// Imports a theme file and also returns what the check found: errors
+/// refuse the import, warnings (things the app ignores) are logged and
+/// returned so the caller can show them.
 pub(crate) fn import_theme_file(
     store: &NativeStore,
     source: &Path,
-) -> Result<(String, Value), String> {
+) -> Result<(String, Value, FormatReport), String> {
     let mut document = read_theme_file(source)?;
+    let report = look_format::validate_theme_document(&document);
+    if !report.warnings.is_empty() {
+        tracing::warn!(
+            "imported theme {}: {}",
+            source.display(),
+            report.summary(10)
+        );
+    }
     let name = document["metadata"]["name"]
         .as_str()
         .ok_or_else(|| "theme name is missing".to_owned())?
@@ -86,7 +107,7 @@ pub(crate) fn import_theme_file(
     let file_name = unique_file_name(&themes_dir, &name);
     let bytes = encoded_theme(&mut document)?;
     let saved_file_name = save_theme_file(store, &file_name, &name, &bytes, false)?;
-    Ok((saved_file_name, document))
+    Ok((saved_file_name, document, report))
 }
 
 pub(crate) fn save_theme_file(
@@ -463,7 +484,7 @@ mod tests {
         for (index, text) in examples.iter().enumerate() {
             let path = base.join(format!("example-{index}.json"));
             std::fs::write(&path, text).unwrap();
-            let (file, document) = import_theme_file(&store, &path).unwrap();
+            let (file, document, _) = import_theme_file(&store, &path).unwrap();
             let parsed = ThemeDefinition::editor_document(&document).unwrap();
             assert_eq!(document["version"], 1);
             assert_eq!(parsed.native_version, Some(1));
@@ -594,8 +615,8 @@ mod tests {
         document["futureRoot"] = json!({"preserve": true});
         fs::write(&source, serde_json::to_vec(&document).unwrap()).unwrap();
 
-        let (first, first_doc) = import_theme_file(&store, &source).unwrap();
-        let (second, _) = import_theme_file(&store, &source).unwrap();
+        let (first, first_doc, _) = import_theme_file(&store, &source).unwrap();
+        let (second, _, _) = import_theme_file(&store, &source).unwrap();
         assert_eq!(first, "night-sky.json");
         assert_eq!(second, "night-sky-2.json");
         assert_eq!(first_doc["futureRoot"]["preserve"], true);
@@ -617,6 +638,64 @@ mod tests {
         assert!(export_theme_file(&export, &mut export_doc)
             .unwrap_err()
             .contains("already exists"));
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn imports_check_the_format_and_report_what_is_ignored() {
+        let (native, original) = roots("format");
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(native.clone()),
+            original,
+        )
+        .unwrap();
+        let source = native.parent().unwrap().join("source.json");
+        let theme = crate::theme::ThemeCatalog::load().get("basic2").clone();
+        let mut document = document_from_theme(&theme, "Checked");
+
+        // A newer format is refused with the reason, and nothing is saved.
+        let mut newer = document.clone();
+        newer["version"] = json!(2);
+        fs::write(&source, serde_json::to_vec(&newer).unwrap()).unwrap();
+        let error = import_theme_file(&store, &source).unwrap_err();
+        assert!(
+            error.contains("made by a newer ButtonsCLI (theme format 2"),
+            "{error}"
+        );
+        assert!(!store
+            .profile_dir()
+            .join("themes")
+            .join("checked.json")
+            .exists());
+
+        // No version: read as format 1 and saved with the version written.
+        document.as_object_mut().unwrap().remove("version");
+        document["theme"]["terminal"]["background"] = json!("#12345");
+        fs::write(&source, serde_json::to_vec(&document).unwrap()).unwrap();
+        let (file, imported, report) = import_theme_file(&store, &source).unwrap();
+        assert_eq!(imported["version"], 1);
+        let saved = read_theme_file(&store.profile_dir().join("themes").join(&file)).unwrap();
+        assert_eq!(saved["version"], 1);
+        assert!(report.errors.is_empty());
+        let warnings: Vec<String> = report.warnings.iter().map(ToString::to_string).collect();
+        assert!(warnings.contains(
+            &"theme.terminal.background: \"#12345\" is not a #rrggbb color; the default color is used"
+                .to_owned()
+        ));
+
+        // A newer personal file is skipped with the reason; startup goes on.
+        fs::write(
+            store.profile_dir().join("themes").join("future.json"),
+            serde_json::to_vec(&newer).unwrap(),
+        )
+        .unwrap();
+        let mut catalog = crate::theme::ThemeCatalog::load();
+        let skipped = catalog.load_personal(store.profile_name(), &store.profile_dir());
+        assert_eq!(skipped.len(), 1, "{skipped:?}");
+        assert!(skipped[0].starts_with("future.json: this theme was made by a newer ButtonsCLI"));
+        assert!(catalog
+            .personal_document("personal:default:checked")
+            .is_some());
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

@@ -111,6 +111,12 @@ against the library. Update both copies when changing a pattern.
 
 ## Validation
 
+Theme files keep `"version": 1`; bundles may carry `"format_version"`
+(absent means 1). `look_format::validate_theme_document` and
+`validate_bundle` list what the app will refuse or ignore, with the JSON
+path of each; `shipped_themes_and_bundles_are_current_and_load_unchanged`
+runs them over everything in `assets/`.
+
 ```text
 cargo test --locked --lib built_in_library_parses_and_every_shader_compiles
 cargo test --locked --lib pane_focus_bundles_assign_all_eight_looks_across_new_tabs_and_restart

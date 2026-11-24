@@ -12699,7 +12699,7 @@ impl ButtonsApp {
         let source = std::path::PathBuf::from(self.theme_editor_import_path.trim());
         let result = crate::theme_files::import_theme_file(store, &source);
         match result {
-            Ok((file_name, document)) => {
+            Ok((file_name, document, report)) => {
                 self.keep_edited_draft();
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
@@ -12710,10 +12710,18 @@ impl ButtonsApp {
                 self.theme_editor_file_exists = true;
                 self.refresh_theme_file_digest();
                 self.theme_editor_confirm_delete = false;
-                self.theme_editor_status = Some(crate::i18n::literal(
-                    &self.locale,
-                    "Theme imported to the active native profile.",
-                ));
+                self.theme_editor_status = Some(if report.warnings.is_empty() {
+                    crate::i18n::literal(
+                        &self.locale,
+                        "Theme imported to the active native profile.",
+                    )
+                } else {
+                    crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Theme imported to the active native profile. Ignored: {reasons}",
+                        &[("reasons", &report.summary(3))],
+                    )
+                });
             }
             Err(error) => {
                 self.theme_editor_status = Some(crate::i18n::formatted_literal(
@@ -20284,7 +20292,7 @@ mod tests {
         let themes: Vec<_> = paths
             .iter()
             .map(|path| {
-                let (imported, _) = crate::theme_files::import_theme_file(&store, path).unwrap();
+                let (imported, _, _) = crate::theme_files::import_theme_file(&store, path).unwrap();
                 let stem = std::path::Path::new(&imported)
                     .file_stem()
                     .unwrap()
