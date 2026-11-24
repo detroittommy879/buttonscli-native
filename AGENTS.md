@@ -94,6 +94,8 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
 | Undo, history, logs | `look_history.rs` (`record_look_change`, `undo_look_change`) | a second history |
 | Check or upgrade a file | `look_format` (versions, validators), `file_repair` (AI fix) | ad hoc JSON checks |
 | Keep a copy before overwriting | `storage::backups` (store does it) | delete without a copy |
+| Save, update or fork a saved shader | `save_shader_to_list`, `fork_shader` (keyed by `CustomShader::id`; `same_as` / `same_code`) | match saved shaders by name |
+| Write a theme file | `theme_files::save_theme_document` (sets `metadata.id` from the file name) | encode bytes and write them yourself |
 
 ## Big picture
 
