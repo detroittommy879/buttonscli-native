@@ -221,7 +221,7 @@ impl ButtonsApp {
             .cloned()?;
         // Keeps a pane's edit as its own theme file before it is replaced;
         // the editor then follows the new looks instead of the old draft.
-        self.settle_pane_draft(None);
+        self.settle_pane_draft();
         self.discard_theme_editor_session();
         let app_theme_before = self.preferences.app_theme_id.clone();
         let mut skipped = 0;

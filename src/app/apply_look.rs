@@ -30,7 +30,7 @@ impl ButtonsApp {
         }
         match target {
             LookTarget::WholeApp { scopes, calm } => {
-                self.settle_pane_draft(None);
+                self.settle_pane_draft();
                 let theme = self.themes.get(theme_id).clone();
                 if scopes.terminal {
                     self.theme_overrides.clear();
@@ -47,7 +47,7 @@ impl ButtonsApp {
                 self.appearance_baseline = Some(self.appearance_fingerprint());
             }
             LookTarget::AllTerminals => {
-                self.settle_pane_draft(None);
+                self.settle_pane_draft();
                 self.preferences.theme_id = theme_id.to_owned();
                 self.preferences.terminal_theme_id = theme_id.to_owned();
                 self.preferences.gradient_theme_id = theme_id.to_owned();
@@ -62,7 +62,7 @@ impl ButtonsApp {
                 }
             }
             LookTarget::Pane(index) => {
-                self.settle_pane_draft(self.tabs.get(index).map(|tab| tab.id));
+                self.settle_pane_draft();
                 let Some(tab) = self.tabs.get(index) else {
                     return;
                 };
@@ -78,6 +78,16 @@ impl ButtonsApp {
 
     pub(super) fn set_theme_all(&mut self, theme_id: &str) {
         self.apply_look(theme_id, LookTarget::AllTerminals);
+    }
+
+    /// "Use global theme": the pane drops its own theme and shows the shared
+    /// one. Its edit, if it is being edited, is saved first.
+    pub(super) fn use_shared_look(&mut self, index: usize) {
+        let Some(id) = self.tabs.get(index).map(|tab| tab.id) else {
+            return;
+        };
+        self.settle_pane_draft();
+        self.theme_overrides.remove(&id);
     }
 }
 
@@ -253,6 +263,49 @@ mod tests {
                 let _ = others;
                 let _ = std::fs::remove_dir_all(base);
             }
+        }
+    }
+
+    /// The edited pane itself: Use global, closing it (and reopening it) and
+    /// a new theme for it all keep the edit as a numbered theme. They used to
+    /// drop the edit or leave a `preview:` theme behind.
+    #[test]
+    fn the_edited_pane_keeps_its_edit_when_it_changes_or_closes() {
+        for action in ["use global", "close and reopen", "this terminal"] {
+            let (mut app, base, _) = app_in(Start::MidPaneEdit, &action.replace(' ', "-"));
+            let ctx = egui::Context::default();
+            let before = personal_count(&app);
+            let pane = app.tabs[1].id;
+            match action {
+                "use global" => app.use_shared_look(1),
+                "close and reopen" => app.close_tab(1),
+                _ => app.set_theme_for_tab(1, "aurora"),
+            }
+            assert_eq!(personal_count(&app), before + 1, "{action}: edit saved");
+            assert!(app.theme_editor_preview_snapshot.is_none(), "{action}");
+            assert!(
+                app.theme_editor_document.is_none(),
+                "{action}: session ended"
+            );
+            assert!(
+                !app.theme_overrides
+                    .values()
+                    .any(|id| id.starts_with("preview:")),
+                "{action}"
+            );
+            match action {
+                "use global" => assert!(!app.theme_overrides.contains_key(&pane), "{action}"),
+                "close and reopen" => {
+                    let saved = app.recently_closed.last().unwrap().theme_override.clone();
+                    let saved = saved.expect("the closed tab remembers the saved edit");
+                    assert!(saved.starts_with("personal:"), "{action}: {saved}");
+                    app.reopen_closed_tab(ctx.clone());
+                    let reopened = app.tabs.last().unwrap().id;
+                    assert_eq!(app.theme_overrides.get(&reopened), Some(&saved), "{action}");
+                }
+                _ => assert_eq!(app.theme_for_tab(1), "aurora", "{action}"),
+            }
+            let _ = std::fs::remove_dir_all(base);
         }
     }
 

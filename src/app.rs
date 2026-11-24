@@ -2488,9 +2488,7 @@ impl ButtonsApp {
                     self.set_theme_for_tab(index, &theme);
                 }
             }
-            PaneAction::UseGlobal => {
-                self.theme_overrides.remove(&id);
-            }
+            PaneAction::UseGlobal => self.use_shared_look(index),
             PaneAction::ToggleFavorite(theme) => {
                 if local_feature_available(crate::features::catalog::FeatureKey::ThemeFavorites)
                     && self
@@ -3202,6 +3200,11 @@ impl ButtonsApp {
         if index >= self.tabs.len() {
             return;
         }
+        // Closing the pane being edited keeps its edit, and the closed tab
+        // remembers the saved theme, never a `preview:` one.
+        if self.theme_editor_pane == Some(self.tabs[index].id) {
+            self.settle_pane_draft();
+        }
         self.save_terminal_history(Some(index));
         let mut tab = self.tabs.remove(index);
         self.tab_launch_commands.remove(&tab.id);
@@ -3259,7 +3262,9 @@ impl ButtonsApp {
             self.pane_fonts.insert(tab.id, font);
         }
         if let (Some(theme_id), Some(tab)) = (closed.theme_override, self.tabs.last()) {
-            if self.themes.all().iter().any(|theme| theme.id == theme_id) {
+            if !theme_id.starts_with("preview:")
+                && self.themes.all().iter().any(|theme| theme.id == theme_id)
+            {
                 self.theme_overrides.insert(tab.id, theme_id);
             }
         }
@@ -9005,6 +9010,10 @@ impl ButtonsApp {
                 self.random_theme_all();
             }
             if use_global {
+                #[cfg(not(target_arch = "wasm32"))]
+                self.use_shared_look(self.focused);
+                // The web demo has no editor sessions to settle.
+                #[cfg(target_arch = "wasm32")]
                 if let Some(tab) = self.tabs.get(self.focused) {
                     self.theme_overrides.remove(&tab.id);
                 }
@@ -12364,6 +12373,9 @@ impl ButtonsApp {
                 self.preferences.theme_apply = crate::settings::ThemeApplyScopes::default();
                 self.apply_theme_sources(self.themes.get(&id).clone(), self.preferences.calm_mode);
                 self.preferences.theme_apply = scopes;
+                // The draft's edits are in the copy just saved: the editor
+                // must not save them again under another number.
+                self.theme_editor_original_document = self.theme_editor_document.clone();
                 self.load_personal_theme_draft(&id);
                 self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.appearance_save_status = Some(format!("Saved {name}"));
@@ -12486,6 +12498,7 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
+        self.keep_edited_draft();
         self.restore_personal_theme_preview();
         let Some(document) = self.themes.personal_document(id).cloned() else {
             self.theme_editor_status = Some(crate::i18n::literal(
@@ -12510,6 +12523,10 @@ impl ButtonsApp {
     /// Ends the editor's ownership of a draft: restores any preview and forgets the file.
     #[cfg(not(target_arch = "wasm32"))]
     fn discard_theme_editor_session(&mut self) {
+        // Callers save first; anything still unsaved here gets a debug copy.
+        if self.theme_draft_edited() {
+            self.back_up_unsaved_draft();
+        }
         self.restore_personal_theme_preview();
         self.text_editor = None;
         self.theme_editor_source_id = None;
@@ -12756,6 +12773,7 @@ impl ButtonsApp {
         let result = crate::theme_files::import_theme_file(store, &source);
         match result {
             Ok((file_name, document)) => {
+                self.keep_edited_draft();
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
                 self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
@@ -13057,6 +13075,10 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn cancel_personal_theme_draft(&mut self) {
+        // Cancel throws the edit away on purpose; a debug copy is kept.
+        if self.theme_draft_edited() {
+            self.back_up_unsaved_draft();
+        }
         self.restore_personal_theme_preview();
         self.reload_personal_themes();
         if self.theme_editor_file_exists {
@@ -14057,20 +14079,61 @@ impl ButtonsApp {
         self.adopt_live_fonts_into_draft();
     }
 
-    /// Ends a pane-look edit before another pane's theme changes. A pane draft
-    /// is kept (saved under the next numbered name), as switching panes does;
-    /// restoring the preview instead put the edited pane back on an older look.
-    /// A new theme for the edited pane itself replaces the edit instead.
+    /// Ends a pane-look edit before any pane's theme changes or the pane
+    /// closes. An edited draft is always kept (saved under the next numbered
+    /// name), even when the edited pane itself gets a new theme: restoring the
+    /// preview instead threw the edit away. If saving fails, the draft goes to
+    /// the debug backups and the notice says where.
     #[cfg(not(target_arch = "wasm32"))]
-    fn settle_pane_draft(&mut self, changing: Option<u64>) {
-        if self.theme_editor_pane.is_none() || self.theme_editor_pane == changing {
+    fn settle_pane_draft(&mut self) {
+        if self.theme_editor_pane.is_none() {
             self.restore_personal_theme_preview();
             return;
         }
         if let Err(error) = self.autosave_theme_draft() {
-            self.notice = Some(format!("Could not save the pane's edit: {error}"));
+            let kept = self.back_up_unsaved_draft();
+            self.notice = Some(match kept {
+                Some(path) => format!(
+                    "Could not save the pane's edit: {error}. A copy is in {}",
+                    path.display()
+                ),
+                None => format!("Could not save the pane's edit: {error}"),
+            });
         }
         self.discard_theme_editor_session();
+    }
+
+    /// Saves an edited draft (next numbered name) before something replaces
+    /// it in the editor. On failure the draft goes to the debug backups and
+    /// the notice says so.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn keep_edited_draft(&mut self) {
+        if let Err(error) = self.autosave_theme_draft() {
+            let kept = self.back_up_unsaved_draft();
+            self.notice = Some(match kept {
+                Some(path) => format!(
+                    "Could not save the edit first: {error}. A copy is in {}",
+                    path.display()
+                ),
+                None => format!("Could not save the edit first: {error}"),
+            });
+        }
+    }
+
+    /// Writes the editor draft to the debug backups, for drafts that are
+    /// about to be dropped unsaved.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn back_up_unsaved_draft(&self) -> Option<std::path::PathBuf> {
+        let store = self.native_store.as_ref()?;
+        let document = self.theme_editor_document.as_ref()?;
+        let text = serde_json::to_string_pretty(document).ok()?;
+        crate::storage::backups::backup_bytes(
+            store.root_dir(),
+            store.profile_name(),
+            "unsaved-theme-draft.json",
+            text.as_bytes(),
+            crate::storage::backups::BackupReason::Questionable,
+        )
     }
 
     /// "Use on the whole app": the look being edited goes to the app colors
@@ -14207,6 +14270,7 @@ impl ButtonsApp {
     /// Starts an unsaved copy of a built-in theme that one pane uses.
     #[cfg(not(target_arch = "wasm32"))]
     fn start_pane_theme_copy(&mut self, id: &str) {
+        self.keep_edited_draft();
         self.restore_personal_theme_preview();
         let Some(store) = self.native_store.as_ref() else {
             return;
@@ -18995,11 +19059,12 @@ impl eframe::App for ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn on_exit(&mut self) {
-        // Quitting with Settings open keeps the edited look, like Keep and close.
-        if self.show_settings {
-            if let Err(error) = self.autosave_theme_draft() {
-                log::warn!("theme changes were not saved on exit: {error}");
-            }
+        // Quitting keeps the edited look, like Keep and close. A draft can
+        // outlive Settings (status-bar shader edits), so this does not depend
+        // on Settings being open.
+        if let Err(error) = self.autosave_theme_draft() {
+            log::warn!("theme changes were not saved on exit: {error}");
+            self.back_up_unsaved_draft();
         }
         self.restore_personal_theme_preview();
         self.persist_native_preferences();
