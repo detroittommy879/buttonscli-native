@@ -32,10 +32,9 @@ pub(crate) enum LookSource {
     /// Shuffle's timer or its "Shuffle now".
     Shuffle,
     /// The agent control API (client name).
-    #[allow(dead_code)] // The look API (plan step I1) constructs it.
     Api(String),
     /// A plugin (its ID).
-    #[allow(dead_code)] // The look API (plan step I1) constructs it.
+    #[allow(dead_code)] // Plugins will construct it.
     Plugin(String),
 }
 

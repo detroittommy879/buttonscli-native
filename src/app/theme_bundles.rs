@@ -138,6 +138,7 @@ impl ButtonsApp {
             }
         }
         ThemeBundle {
+            format_version: Default::default(),
             name: name.trim().to_owned(),
             theme_id: self.preferences.theme_id.clone(),
             app_theme_id: self.preferences.app_theme_id.clone(),
@@ -163,6 +164,12 @@ impl ButtonsApp {
     /// An empty name becomes the first free "Bundle N". Unsaved editor edits
     /// are saved first, so the bundle holds what is on screen.
     pub(super) fn save_theme_bundle(&mut self, name: &str) -> Result<String, String> {
+        // Bundles native.json keeps for a newer ButtonsCLI: never replaced.
+        let held = self
+            .native_store
+            .as_ref()
+            .and_then(|store| store.held_bundles().ok())
+            .unwrap_or_default();
         let mut name = name.trim().to_owned();
         if name.is_empty() {
             name = (1..)
@@ -175,8 +182,15 @@ impl ButtonsApp {
                         .iter()
                         .chain(crate::library::bundles())
                         .any(|bundle| &bundle.name == candidate)
+                        && !held.iter().any(|bundle| &bundle.name == candidate)
                 })
                 .unwrap();
+        }
+        if let Some(bundle) = held.iter().find(|bundle| bundle.name == name) {
+            return Err(format!(
+                "A bundle named \"{name}\" is kept unchanged because {}. Save under another name.",
+                bundle.reason
+            ));
         }
         self.autosave_theme_draft()?;
         self.clear_theme_preview();

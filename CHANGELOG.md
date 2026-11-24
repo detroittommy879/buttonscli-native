@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- Agents can read and change the look through the control API
+  (`/v1/look`, `/v1/look/themes`, `/v1/look/apply`, `/v1/look/undo`),
+  `buttonsclictl look*` and the MCP `look_*` tools. Nothing changes until
+  you agree: a **Look change request** window names the agent and the
+  theme, with a checkbox for each part (app colors, terminal colors,
+  gradient, shader and effects, fonts). **Try it** shows it first (then
+  **Keep** or **Put back**); you can also decline or block that agent until
+  restart. Agents never change Calm or the shader switch.
+- **Look → Undo look change** takes back the newest look change: themes,
+  pane themes and fonts, bar colors, bundles, Shuffle and Look presets.
+  Every look change is recorded with what made it (logged as
+  `buttonscli::looks`); Settings → Debug shows why each pane looks the way
+  it does and can copy it all as JSON.
+- Bundles, Shuffle and Look presets now change the look the same way as the
+  Library buttons, so an unsaved theme edit is kept (saved under the next
+  numbered name) whatever replaces it, and closing a pane that is being
+  edited saves the edit.
+- Bundles save the shared font too, and put it back when applied.
+- Theme files that do not load get **Fix with AI** in Settings → Themes:
+  your theme model corrects the file, and you see the changes before
+  saving. The old file is kept as a backup.
+- Before `native.json` or a theme file is replaced or deleted, a copy goes
+  to `~/.buttonscli-native/debug/backups/` (the newest 2000 copies are
+  kept). Loading no longer cuts long bundle, shader or pane lists.
+- Theme files and theme bundles now have a format version, and outside
+  files are checked when they come in. A theme or bundle made by a newer
+  ButtonsCLI is refused with that reason instead of being half-read, and
+  is never overwritten: newer bundles stay in `native.json` unchanged.
+  Importing a theme says what in it was ignored (for example a color that
+  is not `#rrggbb`); personal themes and bundles log it. A broken bundle no
+  longer stops `native.json` from loading.
+- Fixed: a theme color such as `#éa` crashed the color reader.
 - Fixed: the theme editor's live preview could leave its temporary theme
   behind in a closed tab, a saved bundle or the saved pane looks, and some
   actions during a preview put the pane back on its old look. A preview now

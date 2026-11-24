@@ -82,6 +82,19 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
     `## Unreleased`. Failed approaches and validation go in
     `.private/dev-notes/logs/`.
 
+## Where to do a thing (looks)
+
+| To… | Use | Never |
+| --- | --- | --- |
+| Change a theme, bundle, Shuffle step, preset | `change_look` or its wrappers (`apply_look`, `apply_theme`, `set_theme_all`, `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`) | write `theme_id`, `*_theme_id`, `theme_overrides`, `pane_fonts` |
+| Give a pane a saved look (slot, new tab, group) | `put_pane_look` | insert into `theme_overrides` |
+| Read how a pane looks, and why | `resolve_pane_look`, `resolve_pane_font`, `explain_pane_look` | recompute Calm/strength yourself |
+| Add a look button | a `LookAction` + the table test | a new private path |
+| Let an agent or plugin change the look | `look_api.rs` (`LookRequest`, the request window) | call `change_look` from a request without asking |
+| Undo, history, logs | `look_history.rs` (`record_look_change`, `undo_look_change`) | a second history |
+| Check or upgrade a file | `look_format` (versions, validators), `file_repair` (AI fix) | ad hoc JSON checks |
+| Keep a copy before overwriting | `storage::backups` (store does it) | delete without a copy |
+
 ## Big picture
 
 ButtonsCLI Native: a Rust terminal workspace (egui/eframe 0.31 + wgpu) with tiled
@@ -267,6 +280,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 ## Themes and profiles
 
 - Theme/shader/bundle authoring: `docs/dev/AUTHORING-THEME-BUNDLES.md`.
+  File versions and checks for outside theme/bundle files:
+  `src/look_format.rs` ("File versions" in `docs/dev/LOOK-STATE.md`).
+  Deserialize a bundle only after `look_format::upgrade_bundle`.
   Pane Focus assets regenerate with `python scripts/generate-pane-focus-library.py`.
   Bundles queue at most eight looks (no cycling); applying one preserves the
   global shader-enable/Calm/font settings. Include static gradient fallbacks.

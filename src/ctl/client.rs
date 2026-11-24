@@ -157,8 +157,12 @@ fn is_live(connection: &Connection) -> bool {
 }
 
 /// Default deadline for a request: 10 s, plus the server's own limits for
-/// paced delivery (30 s) and `run` waits (up to 60 s).
+/// paced delivery (30 s) and `run` waits (up to 60 s). A look apply waits
+/// for the user's answer (up to 3 minutes).
 pub fn request_timeout(path: &str, body: Option<&Value>) -> Duration {
+    if path == "/v1/look/apply" {
+        return Duration::from_secs(190);
+    }
     let field = |key: &str| body.and_then(|body| body.get(key));
     let delivery = if field("delivery").and_then(Value::as_str) == Some("slow-typed") {
         30_000

@@ -369,6 +369,9 @@ pub struct ButtonsApp {
     themes: ThemeCatalog,
     #[cfg(not(target_arch = "wasm32"))]
     theme_load_warnings: Vec<String>,
+    /// "Fix with AI" for a theme file that did not load (`theme_repair.rs`).
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_repair: Option<theme_repair::ThemeRepair>,
     font_catalog: fonts::FontCatalog,
     theme_search: String,
     /// The theme editor: target, status and the open draft
@@ -688,6 +691,9 @@ pub struct ButtonsApp {
     session_dispatcher: Dispatcher,
     #[cfg(not(target_arch = "wasm32"))]
     session_inbox: Inbox,
+    /// Look requests from the control API and their prompt (`look_api.rs`).
+    #[cfg(not(target_arch = "wasm32"))]
+    look_api: look_api::LookApi,
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1452,6 +1458,8 @@ impl ButtonsApp {
             themes: ThemeCatalog::load(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_load_warnings: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_repair: None,
             font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1747,6 +1755,8 @@ impl ButtonsApp {
             session_dispatcher,
             #[cfg(not(target_arch = "wasm32"))]
             session_inbox,
+            #[cfg(not(target_arch = "wasm32"))]
+            look_api: look_api::LookApi::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -6694,6 +6704,7 @@ impl ButtonsApp {
             &native_root,
             Arc::clone(&self.control_snapshot),
             self.session_dispatcher.clone(),
+            self.look_api.dispatcher.clone(),
             context.clone(),
         ) {
             Ok(server) => self.control_server = Some(server),
@@ -9058,8 +9069,26 @@ impl ButtonsApp {
                 .id_salt("{theme_load_warnings} theme files could not be loaded")
                 .default_open(true)
                 .show(ui, |ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let mut repair = None;
                     for warning in &self.theme_load_warnings {
                         ui.spaced_colored_label(colors.warning, warning);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if self.theme_repair_offered(warning)
+                            && ui
+                                .small_button(crate::i18n::literal(&self.locale, "Fix with AI"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Send this file and its problems to your theme model, then review the corrected file before saving.",
+                                ))
+                                .clicked()
+                        {
+                            repair = theme_repair::warning_file(warning).map(str::to_owned);
+                        }
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if let Some(file_name) = repair {
+                        self.start_theme_repair(ui.ctx(), &file_name);
                     }
                 });
             }
@@ -12560,7 +12589,7 @@ impl ButtonsApp {
         let source = std::path::PathBuf::from(self.theme_editor.import_path.trim());
         let result = crate::theme_files::import_theme_file(store, &source);
         match result {
-            Ok((file_name, document)) => {
+            Ok((file_name, document, report)) => {
                 self.keep_edited_draft();
                 self.clear_theme_preview();
                 self.reload_personal_themes();
@@ -12571,10 +12600,18 @@ impl ButtonsApp {
                     true,
                 ));
                 self.refresh_theme_file_digest();
-                self.theme_editor.status = Some(crate::i18n::literal(
-                    &self.locale,
-                    "Theme imported to the active native profile.",
-                ));
+                self.theme_editor.status = Some(if report.warnings.is_empty() {
+                    crate::i18n::literal(
+                        &self.locale,
+                        "Theme imported to the active native profile.",
+                    )
+                } else {
+                    crate::i18n::formatted_literal(
+                        &self.locale,
+                        "Theme imported to the active native profile. Ignored: {reasons}",
+                        &[("reasons", &report.summary(3))],
+                    )
+                });
             }
             Err(error) => {
                 self.theme_editor.status = Some(crate::i18n::formatted_literal(
@@ -18589,6 +18626,8 @@ mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod look_actions;
 #[cfg(not(target_arch = "wasm32"))]
+mod look_api;
+#[cfg(not(target_arch = "wasm32"))]
 mod look_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
@@ -18615,6 +18654,8 @@ mod test_text;
 mod text_backing;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
+#[cfg(not(target_arch = "wasm32"))]
+mod theme_repair;
 #[cfg(not(target_arch = "wasm32"))]
 mod tmux;
 #[cfg(not(target_arch = "wasm32"))]
@@ -18708,6 +18749,12 @@ impl eframe::App for ButtonsApp {
         self.apply_pending_pane_looks();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_look_requests(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.look_request_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.theme_repair_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.maintain_terminal_history(ctx);
         self.shortcuts(ctx);
@@ -20075,7 +20122,7 @@ mod tests {
         let themes: Vec<_> = paths
             .iter()
             .map(|path| {
-                let (imported, _) = crate::theme_files::import_theme_file(&store, path).unwrap();
+                let (imported, _, _) = crate::theme_files::import_theme_file(&store, path).unwrap();
                 let stem = std::path::Path::new(&imported)
                     .file_stem()
                     .unwrap()

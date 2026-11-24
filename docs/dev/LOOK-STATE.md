@@ -151,6 +151,41 @@ New "use this theme" controls call `change_look` (or a wrapper:
 `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`), add a
 `LookAction`, and update this table.
 
+## Outside callers (control API, MCP, plugins)
+
+Agents and (later) plugins change the look only through the look API:
+`src/session/looks.rs` (request types, bounded queue), the routes in
+`src/control/server.rs` (`/v1/look`, `/v1/look/themes`, `/v1/look/apply`,
+`/v1/look/undo`), and `src/app/look_api.rs` on the app thread. Rules:
+
+- Reads (`look_report`, the theme list) answer at once.
+- An apply never changes anything by itself: it opens the **Look change
+  request** window (client name, theme or bundle, where, one checkbox per
+  part, all ticked unless the caller turned some off). The user can **Try
+  it** (then **Keep** or **Put back**), **Apply**, **Decline** or block the
+  client until restart. One request at a time; unanswered after 175 s it
+  closes as declined.
+- The change goes through `change_look` with `LookSource::Api(client)` and
+  `calm: false`. Outside callers have no presets, so Calm and the live
+  switches never change.
+- `look/undo` undoes only when the newest change came from the API.
+- `buttonsclictl look*` and the MCP `look_*` tools are thin clients of
+  these routes (`src/ctl/`).
+
+A plugin API should reuse `LookRequest` and the same window, with
+`LookSource::Plugin(id)`.
+
+## Broken and outdated files
+
+`look_format` (see File versions) says what is wrong with a file. A personal
+theme that does not load is listed under Settings → Themes with **Fix with
+AI** (`src/file_repair.rs`, `src/app/theme_repair.rs`): the theme model gets
+the file and the findings, the answer is checked like the loader checks
+(one correction round), and the user sees the diff before **Save fixed
+file**, which replaces the file only if it is unchanged on disk, after a
+backup copy. Files from a newer ButtonsCLI are never changed. Not covered
+yet: bundles held back in `native.json`.
+
 ## The theme editor
 
 State: `theme_editor` (`src/app/editor_session.rs`). `ThemeEditor` holds
@@ -207,6 +242,46 @@ are kept for when it is off), and Whole lines use each line's first
 character's color. Renderer: `vendor/egui_term/src/view.rs` and
 `text_backing.rs`; settings UI: `src/app/text_backing.rs`.
 
+## File versions
+
+Theme documents and bundles can come from outside the app (imports,
+plugins, other ButtonsCLI versions), so both carry a format version.
+`src/look_format.rs` owns it (wasm-safe, no file access).
+
+- **Where the version lives.** Themes: the top-level `version` (already in
+  every theme file). Bundles: `format_version` (`ThemeBundle::format_version`,
+  a `BundleFormat`); format 1 is not written, so files stay as older builds
+  wrote them. A missing version means 1. Current: `THEME_FORMAT_VERSION`,
+  `BUNDLE_FORMAT_VERSION` (both 1).
+- **Checks.** `validate_theme_document` / `validate_bundle(value, known_theme)`
+  return a `FormatReport`: errors (cannot be used) and warnings (usable,
+  something ignored or clamped), each with a JSON pointer and a reason a
+  user or model can act on. Warnings follow what the loader really does
+  (`shader_warnings_match_what_the_theme_loader_drops` keeps them honest).
+  `validate_personal_document` is the error half (`theme_document_errors`).
+- **Where they run.** Theme import (`theme_files::import_theme_file`:
+  newer/invalid refused, warnings returned and shown after "Theme imported"),
+  every theme read through `read_theme_file`, personal theme loading
+  (`ThemeCatalog::load_personal`: refused files are listed as before,
+  warnings go to the log only), and native.json loading
+  (`storage::store::parse_document`: bundles are upgraded, warnings logged).
+- **Newer files are never rewritten.** A newer theme file is refused on load
+  and `write_theme_file(replace)` / `replace_theme_file_if_unchanged` return
+  `StoreError::NewerTheme`. A newer or unreadable bundle is held back by
+  `look_format::split_bundles` (it is not in `Preferences`), and
+  `NativeStore::save` re-reads the file and puts it back at its place
+  (`restore_bundles`), together with fields of known bundles this version
+  does not know (matched by name). `save_theme_bundle` refuses a held name.
+  When something is put back, native.json is written through
+  `serde_json::Value`, so its keys come out sorted.
+- **Adding a version.** Raise the constant, add a `Step { from, run }` to
+  `THEME_STEPS` or `BUNDLE_STEPS` (`run` edits the JSON object and returns
+  what it changed; the chain sets the version), extend the validator and
+  `BUNDLE_FIELDS`, and keep the `ThemeBundle` serde default in step.
+  `real_chains_have_a_step_for_every_older_version` fails on a gap. Bundles
+  must be deserialized only after `upgrade_bundle` (a missing
+  `format_version` deserializes as the current one).
+
 ## Tests to extend
 
 - `look_actions::tests::every_look_action_from_every_state_is_consistent`:
@@ -227,6 +302,13 @@ character's color. Renderer: `vendor/egui_term/src/view.rs` and
   across frames; use it for editor bugs.
 - `egui_term` `render_parity_tests`: headless rendering checks for text
   backing and Invert.
+- `look_api::tests`: the request window's answers (Try/Put back restores
+  the look exactly, Calm kept, unticked parts kept, decline/block change
+  nothing, API undo refuses app changes, pane target).
+- `file_repair::tests`: checker, one correction round, diff.
+- `look_format::tests`: every validator reason, the upgrade chain (with a
+  fake two-step chain), held bundles; `storage::store::tests::newer_*` and
+  `old_bundles_load_and_save_unchanged`.
 
 ## Debug copies
 
@@ -242,3 +324,5 @@ Nothing reads them automatically; they are for comparing later.
 1. Text backing is still resolved in the renderer (`backing_palette`), not
    in `resolve_pane_look`.
 2. Shaders with stable IDs and a "Fork shader" action.
+3. The look API has no plugin transport yet (`LookSource::Plugin` is
+   unused); Fix with AI does not cover held bundles.
