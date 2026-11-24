@@ -1004,6 +1004,114 @@ mod tests {
         let _ = std::fs::remove_dir_all(base);
     }
 
+    /// Personal themes whose terminal background is `color`.
+    fn saved_with(app: &ButtonsApp, color: Color32) -> Vec<String> {
+        app.themes
+            .all()
+            .iter()
+            .filter(|theme| {
+                theme.id.starts_with("personal:")
+                    && crate::theme::parse_color(&theme.terminal_colors.background) == Some(color)
+            })
+            .map(|theme| theme.id.clone())
+            .collect()
+    }
+
+    /// The whole life of an edit through the real editor UI: edit pane 2,
+    /// switch to pane 1 and edit it, apply a bundle, switch back to pane 2
+    /// and edit it again, close pane 2. Every edit ends up in a saved theme,
+    /// and a preview's ID never reaches pane themes, native.json, bundles,
+    /// closed tabs or the look history. (Previews used to be written into
+    /// `theme_overrides` and the preferences, and leaked into all of those.)
+    #[test]
+    fn an_edit_survives_switching_panes_a_bundle_and_closing_the_pane() {
+        let (ctx, mut app, base) = test_app(3, "edit-life");
+        app.preferences.theme_editor_live_preview = true;
+        let (first, second) = (app.tabs[0].id, app.tabs[1].id);
+        let mut frames = Frames {
+            ctx: ctx.clone(),
+            time: 0.0,
+        };
+        let black = Some(Color32::BLACK);
+        let white = Some(Color32::WHITE);
+
+        // 1. Edit pane 2: it previews the draft; nothing is stored.
+        app.theme_editor.pane_mode = true;
+        app.activate_tab(1);
+        frames.settle(&mut app);
+        assert_eq!(app.theme_editor.pane, Some(second));
+        let own_before = app.theme_overrides.get(&second).cloned();
+        frames.brightness(&mut app, "quick-adjust-terminal", false);
+        assert_eq!(background_of(&app, second), black, "pane 2 previews");
+        assert!(app.resolve_pane_look(second).previewing);
+        assert!(!app.resolve_pane_look(first).previewing);
+        assert_eq!(
+            app.theme_overrides.get(&second),
+            own_before.as_ref(),
+            "a preview never writes the pane's theme"
+        );
+        app.assert_no_preview_stored("pane 2 previewing");
+
+        // 2. Click into pane 1: pane 2's edit is saved as its own theme.
+        app.activate_tab(0);
+        frames.settle(&mut app);
+        assert_eq!(app.theme_editor.pane, Some(first));
+        let pane2_saved = app.theme_overrides[&second].clone();
+        assert!(pane2_saved.starts_with("personal:"), "{pane2_saved}");
+        assert_eq!(background_of(&app, second), black, "pane 2 kept");
+        assert!(!app.resolve_pane_look(second).previewing);
+        frames.brightness(&mut app, "quick-adjust-terminal", true);
+        assert_eq!(background_of(&app, first), white, "pane 1 previews");
+        assert_eq!(background_of(&app, second), black);
+        app.assert_no_preview_stored("pane 1 previewing");
+
+        // 3. A bundle replaces every pane's look: pane 1's open edit is
+        // saved first, and the editor lets go of it.
+        app.apply_theme_bundle(&ctx, &pane_focus_bundle()).unwrap();
+        assert_eq!(saved_with(&app, Color32::WHITE).len(), 1, "pane 1's edit");
+        assert!(!app.previewing_theme_draft());
+        assert!(app.theme_editor.draft().is_none() || !app.theme_draft_edited());
+        assert_ne!(background_of(&app, first), white, "the bundle's look");
+        app.assert_no_preview_stored("after the bundle");
+
+        // 4. Back to pane 2 (now on the bundle's look) and edit it again.
+        app.activate_tab(1);
+        frames.settle(&mut app);
+        assert_eq!(app.theme_editor.pane, Some(second));
+        let bundle_look = app.theme_overrides.get(&second).cloned();
+        frames.brightness(&mut app, "quick-adjust-terminal", false);
+        assert_eq!(background_of(&app, second), black);
+        assert_eq!(app.theme_overrides.get(&second), bundle_look.as_ref());
+        let blacks_before = saved_with(&app, Color32::BLACK).len();
+
+        // 5. Close the edited pane: the edit is saved and the closed tab
+        // remembers it; reopening shows it.
+        app.close_tab(1);
+        assert!(!app.previewing_theme_draft());
+        assert!(app.theme_editor.draft().is_none(), "session ended");
+        assert_eq!(saved_with(&app, Color32::BLACK).len(), blacks_before + 1);
+        let closed = app.recently_closed.last().unwrap().theme_override.clone();
+        let closed = closed.expect("the closed tab remembers the saved edit");
+        assert!(
+            saved_with(&app, Color32::BLACK).contains(&closed),
+            "{closed}"
+        );
+        app.assert_no_preview_stored("after closing the edited pane");
+        app.reopen_closed_tab(ctx.clone());
+        let reopened = app.tabs.last().unwrap().id;
+        assert_eq!(
+            background_of(&app, reopened),
+            black,
+            "reopened with its edit"
+        );
+
+        // Nothing was lost: both of pane 2's edits and pane 1's are files.
+        assert!(saved_with(&app, Color32::BLACK).contains(&pane2_saved));
+        assert_eq!(saved_with(&app, Color32::WHITE).len(), 1);
+        app.assert_no_preview_stored("end");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
     #[test]
     fn translucent_colors_keep_their_alpha() {
         let color = Color32::from_rgba_unmultiplied(200, 80, 40, 128);
