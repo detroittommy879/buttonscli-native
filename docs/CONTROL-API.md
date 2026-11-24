@@ -92,6 +92,10 @@ Node is needed only for the legacy helpers, not for the desktop app or
 `rename-tab`, `open-layout`, `read`, `wait-for-text`, `wait-for-quiet`, `send`,
 `run`, `key`, `presets`, and `preset-run`.
 
+Only `buttonsclictl` has the look commands: `look`, `look-themes`,
+`look-apply` and `look-undo` (MCP tools `look_get`, `look_themes`,
+`look_apply`, `look_undo`). See Look requests below.
+
 ## Optional MCP server
 
 The copied `mcpServers` JSON example starts `buttonsclictl mcp` (or the

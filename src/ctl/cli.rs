@@ -25,6 +25,11 @@ Usage:
   buttonsclictl key <key> [--tab <selector>] [--json]
   buttonsclictl presets [--json]
   buttonsclictl preset-run --label <label> [--tab <selector>] [--json]
+  buttonsclictl look [--json]            (current look, each pane's theme and why)
+  buttonsclictl look-themes [--json]     (theme IDs and bundle names to apply)
+  buttonsclictl look-apply (--theme <id> | --bundle <name>) [--target app|terminals|pane] [--tab <selector>] [--skip app,terminal,gradient,effects,fonts] [--client <name>] [--json]
+                                         (asks the user first; waits up to 3 minutes)
+  buttonsclictl look-undo [--client <name>] [--json]   (only undoes API look changes)
   buttonsclictl mcp                      (stdio MCP server for AI agents)
 
 Selectors:
@@ -65,6 +70,14 @@ pub(crate) enum Command {
     Status,
     Tabs,
     Presets,
+    Look,
+    LookThemes,
+    LookApply {
+        body: Value,
+    },
+    LookUndo {
+        client: Option<String>,
+    },
     Commands {
         tab: String,
         chars: Option<f64>,
@@ -390,6 +403,40 @@ pub(crate) fn parse(args: &[String]) -> Result<(Command, bool), String> {
             t.done()?;
             Command::PresetRun { tab, label }
         }
+        "look" | "look-themes" => {
+            t.done()?;
+            if name == "look" {
+                Command::Look
+            } else {
+                Command::LookThemes
+            }
+        }
+        "look-apply" => {
+            let theme = t.option("--theme")?;
+            let bundle = t.option("--bundle")?;
+            let target = t.option("--target")?;
+            let tab = t.option("--tab")?;
+            let skip = t.option("--skip")?;
+            let client = t.option("--client")?;
+            t.done()?;
+            if theme.is_some() == bundle.is_some() {
+                return Err("look-apply requires exactly one of --theme or --bundle.".into());
+            }
+            let body = look_apply_body(
+                theme,
+                bundle,
+                target,
+                tab,
+                skip.as_deref().unwrap_or_default(),
+                client.unwrap_or_else(|| "buttonsclictl".into()),
+            )?;
+            Command::LookApply { body }
+        }
+        "look-undo" => {
+            let client = t.option("--client")?;
+            t.done()?;
+            Command::LookUndo { client }
+        }
         other => {
             return Err(format!(
                 "Unknown command '{other}'. Use --help to see available commands."
@@ -397,6 +444,45 @@ pub(crate) fn parse(args: &[String]) -> Result<(Command, bool), String> {
         }
     };
     Ok((command, json))
+}
+
+/// The `POST /v1/look/apply` body. `skip` lists parts to leave alone
+/// (comma-separated: app, terminal, gradient, effects, fonts).
+pub(crate) fn look_apply_body(
+    theme: Option<String>,
+    bundle: Option<String>,
+    target: Option<String>,
+    tab: Option<String>,
+    skip: &str,
+    client: String,
+) -> Result<Value, String> {
+    const PARTS: [&str; 5] = ["app", "terminal", "gradient", "effects", "fonts"];
+    let mut parts = serde_json::Map::new();
+    for part in skip
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
+        if !PARTS.contains(&part) {
+            return Err(format!(
+                "Unknown part '{part}'; use app, terminal, gradient, effects or fonts."
+            ));
+        }
+        parts.insert(part.to_owned(), Value::Bool(false));
+    }
+    if let Some(target) = &target {
+        if !["app", "terminals", "pane"].contains(&target.as_str()) {
+            return Err("--target must be app, terminals or pane.".into());
+        }
+    }
+    Ok(object(vec![
+        ("theme", theme.map(Value::from)),
+        ("bundle", bundle.map(Value::from)),
+        ("target", target.map(Value::from)),
+        ("tab", tab.map(Value::from)),
+        ("parts", Some(Value::Object(parts))),
+        ("client", Some(Value::from(client))),
+    ]))
 }
 
 /// Builds a JSON object, leaving out `None` fields like `JSON.stringify` does.
@@ -747,6 +833,14 @@ pub(crate) fn execute(
         Command::Status => connection.call("GET", "/v1/status", None)?,
         Command::Tabs => connection.call("GET", "/v1/tabs", None)?,
         Command::Presets => connection.call("GET", "/v1/presets", None)?,
+        Command::Look => connection.call("GET", "/v1/look", None)?,
+        Command::LookThemes => connection.call("GET", "/v1/look/themes", None)?,
+        Command::LookApply { body } => connection.call("POST", "/v1/look/apply", Some(body))?,
+        Command::LookUndo { client } => connection.call(
+            "POST",
+            "/v1/look/undo",
+            Some(&json!({ "client": client.clone().unwrap_or_else(|| "buttonsclictl".into()) })),
+        )?,
         Command::Commands { tab, chars } => {
             let mut path = format!("/v1/tabs/{}/commands", encode_component(tab));
             if let Some(chars) = chars {
@@ -896,6 +990,19 @@ pub(crate) fn execute(
         ),
         Command::Tabs => render_tabs(out, &payload["tabs"]),
         Command::Presets => render_presets(out, &payload["presets"]),
+        Command::Look | Command::LookThemes => serde_json::to_string_pretty(&payload)
+            .map_err(std::io::Error::other)
+            .and_then(|text| writeln!(out, "{text}")),
+        Command::LookApply { .. } => writeln!(
+            out,
+            "Applied: {}",
+            payload["change"].as_str().unwrap_or_default()
+        ),
+        Command::LookUndo { .. } => writeln!(
+            out,
+            "Undone: {}",
+            payload["undone"].as_str().unwrap_or_default()
+        ),
         Command::Commands { .. } => render_commands(out, &payload),
         Command::CreateTab { .. } | Command::RenameTab { .. } => render_action(out, &payload),
         Command::OpenLayout { .. } => {

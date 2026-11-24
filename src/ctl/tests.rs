@@ -302,3 +302,46 @@ fn mcp_batch_runs_steps_in_order_and_stops_at_a_failed_command() {
         "only the batch with stopOnError false sends the last step"
     );
 }
+
+#[test]
+fn look_commands_send_the_look_routes() {
+    let (port, seen) = fake_api();
+    let connection = connection(port);
+    cli(&connection, &["look"]).unwrap();
+    cli(
+        &connection,
+        &[
+            "look-apply",
+            "--theme",
+            "aurora",
+            "--target",
+            "pane",
+            "--tab",
+            "2",
+            "--skip",
+            "fonts,app",
+            "--client",
+            "tester",
+        ],
+    )
+    .unwrap();
+    cli(&connection, &["look-undo"]).unwrap();
+    assert!(
+        cli(&connection, &["look-apply"]).is_err(),
+        "theme or bundle"
+    );
+    assert!(cli(&connection, &["look-apply", "--theme", "a", "--skip", "x"]).is_err());
+    let seen = seen.lock().unwrap();
+    let find = |path: &str| seen.iter().rev().find(|s| s.path == path).unwrap().clone();
+    assert_eq!(find("/v1/look").method, "GET");
+    let apply = find("/v1/look/apply");
+    assert_eq!(
+        apply.body,
+        json!({"theme": "aurora", "target": "pane", "tab": "2",
+            "parts": {"fonts": false, "app": false}, "client": "tester"})
+    );
+    assert_eq!(
+        find("/v1/look/undo").body,
+        json!({"client": "buttonsclictl"})
+    );
+}

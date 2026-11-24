@@ -1,5 +1,5 @@
 //! `buttonsclictl mcp`: a stdio MCP server (newline-delimited JSON-RPC 2.0)
-//! with the same 16 tools as `scripts/buttonscli-mcp.mjs`, plus tool
+//! with the 16 tools of `scripts/buttonscli-mcp.mjs` and four look tools, plus tool
 //! annotations so clients can tell reads from terminal input.
 
 use std::io::{BufRead, Read, Write};
@@ -33,6 +33,15 @@ Available tools:
 - presets
 - preset_run
 - batch
+- look_get
+- look_themes
+- look_apply
+- look_undo
+
+Looks: look_apply asks the user first (a window with one checkbox per part:
+app colors, terminal colors, gradient, shader and effects, fonts) and waits up
+to 3 minutes for Apply, Try it then Keep, or Decline. It never changes Calm or
+the shader switch. look_undo only takes back a change made through the API.
 
 Shell integration: when the shell sends OSC 133 marks (on by default for
 PowerShell, bash, zsh and fish tabs ButtonsCLI starts), run waits for the
@@ -270,6 +279,47 @@ pub fn tools() -> Vec<Value> {
                 "additionalProperties": false,
             }),
         ),
+        tool("look_get", "Current Look", "The current look: shared theme IDs, each pane's theme and font with the reason, and the look history.", Kind::Read, empty()),
+        tool("look_themes", "Look Themes", "Theme IDs and names, and bundle names, that look_apply accepts.", Kind::Read, empty()),
+        tool(
+            "look_apply",
+            "Apply Look",
+            "Ask the user to apply a theme (or bundle) to the whole app, every terminal, or one tab. The user sees a prompt with each part ticked and can untick parts, try it first, or decline; waits up to 3 minutes.",
+            Kind::Layout,
+            json!({
+                "type": "object",
+                "properties": {
+                    "theme": { "type": "string", "description": "A theme ID from look_themes." },
+                    "bundle": { "type": "string", "description": "A bundle name (instead of theme)." },
+                    "target": { "type": "string", "enum": ["app", "terminals", "pane"] },
+                    "tab": { "type": "string", "description": "For target pane: a tab selector (default active)." },
+                    "parts": {
+                        "type": "object",
+                        "properties": {
+                            "app": { "type": "boolean" },
+                            "terminal": { "type": "boolean" },
+                            "gradient": { "type": "boolean" },
+                            "effects": { "type": "boolean" },
+                            "fonts": { "type": "boolean" },
+                        },
+                        "additionalProperties": false,
+                    },
+                    "client": { "type": "string", "description": "Your name, shown to the user." },
+                },
+                "additionalProperties": false,
+            }),
+        ),
+        tool(
+            "look_undo",
+            "Undo Look",
+            "Undo the newest look change if it was made through the API.",
+            Kind::Layout,
+            json!({
+                "type": "object",
+                "properties": { "client": { "type": "string" } },
+                "additionalProperties": false,
+            }),
+        ),
         tool(
             "batch",
             "Batch",
@@ -432,6 +482,36 @@ fn run_tool(name: &str, args: &Args, c: &Connection) -> Result<Value, String> {
         "status" => c.call("GET", "/v1/status", None),
         "tabs" => c.call("GET", "/v1/tabs", None),
         "presets" => c.call("GET", "/v1/presets", None),
+        "look_get" => c.call("GET", "/v1/look", None),
+        "look_themes" => c.call("GET", "/v1/look/themes", None),
+        "look_apply" => c.call(
+            "POST",
+            "/v1/look/apply",
+            Some(&object(vec![
+                ("theme", args.string("theme").map(Value::from)),
+                ("bundle", args.string("bundle").map(Value::from)),
+                ("target", args.string("target").map(Value::from)),
+                ("tab", args.string("tab").map(Value::from)),
+                (
+                    "parts",
+                    args.0
+                        .get("parts")
+                        .filter(|parts| parts.is_object())
+                        .cloned(),
+                ),
+                (
+                    "client",
+                    Some(Value::from(
+                        args.string("client").unwrap_or_else(|| "MCP agent".into()),
+                    )),
+                ),
+            ])),
+        ),
+        "look_undo" => c.call(
+            "POST",
+            "/v1/look/undo",
+            Some(&json!({ "client": args.string("client").unwrap_or_else(|| "MCP agent".into()) })),
+        ),
         "create_tab" => c.call(
             "POST",
             "/v1/tabs",
@@ -771,7 +851,7 @@ mod tests {
             crate::BUILD_VERSION
         );
         let tools = by_id(2)["result"]["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 16);
+        assert_eq!(tools.len(), 20);
         let annotation = |name: &str, key: &str| {
             tools.iter().find(|t| t["name"] == name).unwrap()["annotations"][key].clone()
         };
