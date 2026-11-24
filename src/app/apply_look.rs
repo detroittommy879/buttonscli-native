@@ -111,7 +111,7 @@ impl ButtonsApp {
         // Use global only takes pane themes away: a preview of the shared
         // theme stays on screen (it is what those panes now show), while a
         // pane edit is saved as for any other change.
-        if !matches!(change, LookChange::UseShared { .. }) || self.theme_editor_pane.is_some() {
+        if !matches!(change, LookChange::UseShared { .. }) || self.theme_editor.pane.is_some() {
             self.settle_pane_draft();
         }
         // After settling: undo goes back to what was on screen, including a
@@ -397,9 +397,9 @@ mod tests {
             Start::MidPaneEdit => {
                 let pane = app.tabs[1].id;
                 app.retarget_theme_editor(Some(pane)).unwrap();
-                let mut document = app.theme_editor_document.clone().unwrap();
+                let mut document = app.theme_editor.draft().cloned().unwrap();
                 document["metadata"]["description"] = json!("edited, not saved");
-                app.theme_editor_document = Some(document);
+                app.theme_editor.set_draft(document);
                 app.preview_personal_theme_draft();
             }
         }
@@ -531,7 +531,7 @@ mod tests {
             assert_eq!(personal_count(&app), before + 1, "{action}: edit saved");
             assert!(app.theme_editor_preview_snapshot.is_none(), "{action}");
             assert!(
-                app.theme_editor_document.is_none(),
+                app.theme_editor.draft().is_none(),
                 "{action}: session ended"
             );
             assert!(

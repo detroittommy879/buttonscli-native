@@ -141,14 +141,14 @@ mod tests {
             Start::MidPaneEdit | Start::MidSharedEdit => {
                 let pane = matches!(start, Start::MidPaneEdit).then(|| app.tabs[1].id);
                 app.retarget_theme_editor(pane).unwrap();
-                let mut document = app.theme_editor_document.clone().unwrap();
+                let mut document = app.theme_editor.draft().cloned().unwrap();
                 document["metadata"]["description"] = json!("edited, not saved");
                 set_theme_document_value(
                     &mut document,
                     "/theme/terminal/background",
                     json!("#0a0b0c"),
                 );
-                app.theme_editor_document = Some(document);
+                app.theme_editor.set_draft(document);
                 app.preview_personal_theme_draft();
             }
         }
@@ -351,7 +351,7 @@ mod tests {
                     }
                     LookAction::UseOnWholeApp => {
                         assert!(app.theme_overrides.is_empty(), "{case_name}");
-                        assert!(!app.theme_editor_pane_mode && app.theme_editor_pane.is_none());
+                        assert!(!app.theme_editor.pane_mode && app.theme_editor.pane.is_none());
                     }
                     LookAction::RandomPane => {}
                     LookAction::RandomAll => {

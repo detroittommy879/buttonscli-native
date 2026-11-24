@@ -220,7 +220,7 @@ impl ButtonsApp {
         if self.theme_editor_preview_snapshot.is_some() {
             lines.push("The theme editor is previewing an unsaved edit.".into());
         }
-        if self.theme_editor_pane == Some(id) {
+        if self.theme_editor.pane == Some(id) {
             lines.push("The theme editor is editing this pane.".into());
         }
         lines

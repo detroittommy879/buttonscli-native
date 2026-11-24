@@ -562,9 +562,9 @@ mod tests {
         app.native_store = Some(store);
         // One personal theme, saved the normal way.
         app.sync_theme_editor_to_current();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["metadata"]["name"] = json!("Night Picks");
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.name_draft_as_next_version();
         app.save_personal_theme_draft();
         let personal = app

@@ -630,10 +630,10 @@ mod tests {
             });
         }
         app.sync_theme_editor_to_current();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut draft, "/theme/app/shell/background", json!("#123456"));
         set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#654321"));
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
         (app, base)
     }
@@ -660,7 +660,7 @@ mod tests {
             let other_theme = app.theme_overrides.get(&other).cloned();
             app.use_look_everywhere();
             assert!(app.theme_overrides.is_empty());
-            assert!(!app.theme_editor_pane_mode && app.theme_editor_pane.is_none());
+            assert!(!app.theme_editor.pane_mode && app.theme_editor.pane.is_none());
             if pane_edit {
                 // The pane's edit was saved as a new theme; the theme the other
                 // pane used is untouched.

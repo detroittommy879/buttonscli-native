@@ -610,9 +610,9 @@ mod tests {
         // A personal theme saved and applied with font A.
         app.retarget_theme_editor(None).unwrap();
         let old = with_fonts(&app, "Fira Code Bundled", "Commit Mono Bundled");
-        let mut document = app.theme_editor_document.clone().unwrap();
+        let mut document = app.theme_editor.draft().cloned().unwrap();
         crate::theme_files::set_document_typography(&mut document, &old);
-        app.theme_editor_document = Some(document);
+        app.theme_editor.set_draft(document);
         app.save_personal_theme_draft();
         assert_eq!(
             app.preferences.typography, old,
@@ -706,10 +706,10 @@ mod tests {
     /// Edits the editor's draft with Quick adjust and previews it, as the
     /// sliders plus live preview do. Returns the background it wrote.
     fn adjust_and_preview(app: &mut ButtonsApp) -> Color32 {
-        let mut document = app.theme_editor_document.clone().expect("a draft");
+        let mut document = app.theme_editor.draft().cloned().expect("a draft");
         drag(&mut document, &TERMINAL_POINTERS, darker());
         let background = current_color(&document, &Value::Null, TERMINAL_POINTERS[0]).unwrap();
-        app.theme_editor_document = Some(document);
+        app.theme_editor.set_draft(document);
         app.preview_personal_theme_draft();
         background
     }
@@ -777,9 +777,9 @@ mod tests {
             .flat_map(|(_, fields)| fields.iter().map(|(_, pointer)| *pointer))
             .collect();
         let before = app.colors().canvas;
-        let mut document = app.theme_editor_document.clone().unwrap();
+        let mut document = app.theme_editor.draft().cloned().unwrap();
         drag(&mut document, &interface, darker());
-        app.theme_editor_document = Some(document);
+        app.theme_editor.set_draft(document);
         app.preview_personal_theme_draft();
         assert_ne!(
             app.colors().canvas,
@@ -803,7 +803,7 @@ mod tests {
 
         app.set_theme_all("aurora");
         assert!(app.theme_overrides.is_empty());
-        assert!(app.theme_editor_document.is_none(), "session ended");
+        assert!(app.theme_editor.draft().is_none(), "session ended");
         assert!(app.shader_ai.list_note.is_none(), "stale note cleared");
         let kept = app.themes.all().iter().any(|theme| {
             theme.id.starts_with("personal:")
@@ -830,18 +830,18 @@ mod tests {
             .clone();
         app.theme_overrides.insert(pane, id);
         app.retarget_theme_editor(Some(pane)).unwrap();
-        let mut document = app.theme_editor_document.clone().unwrap();
+        let mut document = app.theme_editor.draft().cloned().unwrap();
         let shader = document["effects"]["shaderBackground"].clone();
         assert!(set_document_shader(&mut document, false));
         assert!(!set_document_shader(&mut document, false), "already off");
-        app.theme_editor_document = Some(document.clone());
+        app.theme_editor.set_draft(document.clone());
         app.preview_personal_theme_draft();
         let shown = app.terminal_presentation_for(pane);
         assert!(shown.effects.shader_background.is_none(), "shader off");
         assert!(shown.effects.gradient.is_some(), "gradient shows instead");
         assert!(set_document_shader(&mut document, true));
         assert_eq!(document["effects"]["shaderBackground"], shader);
-        app.theme_editor_document = Some(document);
+        app.theme_editor.set_draft(document);
         app.preview_personal_theme_draft();
         assert!(app
             .terminal_presentation_for(pane)
@@ -956,10 +956,10 @@ mod tests {
                 );
             }
             // "Edit for: Pane 2" follows the focused pane.
-            app.theme_editor_pane_mode = true;
+            app.theme_editor.pane_mode = true;
             app.activate_tab(1);
             frames.settle(&mut app);
-            assert_eq!(app.theme_editor_pane, Some(second), "round {round}");
+            assert_eq!(app.theme_editor.pane, Some(second), "round {round}");
             let first_before = background_of(&app, first);
             frames.brightness(&mut app, "quick-adjust-terminal", round == 2);
             assert_eq!(
@@ -976,7 +976,7 @@ mod tests {
             // Click into pane 1: the editor follows, and the sliders work there too.
             app.activate_tab(0);
             frames.settle(&mut app);
-            assert_eq!(app.theme_editor_pane, Some(first), "round {round}");
+            assert_eq!(app.theme_editor.pane, Some(first), "round {round}");
             frames.brightness(&mut app, "quick-adjust-terminal", round == 2);
             assert_eq!(
                 background_of(&app, first),
@@ -991,9 +991,9 @@ mod tests {
         }
 
         // All panes: the interface group changes the app colors.
-        app.theme_editor_pane_mode = false;
+        app.theme_editor.pane_mode = false;
         frames.settle(&mut app);
-        assert_eq!(app.theme_editor_pane, None);
+        assert_eq!(app.theme_editor.pane, None);
         let canvas = app.colors().canvas;
         frames.brightness(&mut app, "quick-adjust-interface", false);
         assert_ne!(

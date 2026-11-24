@@ -371,29 +371,12 @@ pub struct ButtonsApp {
     theme_load_warnings: Vec<String>,
     font_catalog: fonts::FontCatalog,
     theme_search: String,
+    /// The theme editor: target, status and the open draft
+    /// (`editor_session.rs`).
     #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_document: Option<Value>,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_original_document: Option<Value>,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_file_name: Option<String>,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_file_exists: bool,
-    /// Digest of the file bytes this window last loaded or saved; guards overwrites.
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_file_digest: Option<[u8; 32]>,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_import_path: String,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_export_path: String,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_status: Option<String>,
+    theme_editor: editor_session::ThemeEditor,
     #[cfg(not(target_arch = "wasm32"))]
     theme_editor_preview_snapshot: Option<ThemePreviewSnapshot>,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_confirm_delete: bool,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_preview_due: Option<f64>,
     #[cfg(not(target_arch = "wasm32"))]
     theme_generation_prompt: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -424,14 +407,6 @@ pub struct ButtonsApp {
     window_opacity_error: Option<String>,
     settings_tab: SettingsTab,
     theme_settings_tab: ThemeSettingsTab,
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_source_id: Option<String>,
-    /// "Edit for: Pane N" mode: the editor follows the focused pane.
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_pane_mode: bool,
-    /// Terminal ID whose own theme the draft edits; `None` edits the shared theme.
-    #[cfg(not(target_arch = "wasm32"))]
-    theme_editor_pane: Option<u64>,
     settings_snapshot: Option<SettingsSnapshot>,
     #[cfg(not(target_arch = "wasm32"))]
     appearance_baseline: Option<Value>,
@@ -1535,27 +1510,9 @@ impl ButtonsApp {
             font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_document: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_original_document: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_file_name: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_file_exists: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_file_digest: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_import_path: String::new(),
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_export_path: String::new(),
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_status: None,
+            theme_editor: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_editor_preview_snapshot: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_confirm_delete: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_preview_due: None,
             #[cfg(not(target_arch = "wasm32"))]
             theme_generation_prompt: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -1584,12 +1541,6 @@ impl ButtonsApp {
             window_opacity_error: None,
             settings_tab: SettingsTab::Themes,
             theme_settings_tab: ThemeSettingsTab::Library,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_source_id: None,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_pane_mode: false,
-            #[cfg(not(target_arch = "wasm32"))]
-            theme_editor_pane: None,
             settings_snapshot: None,
             #[cfg(not(target_arch = "wasm32"))]
             appearance_baseline: None,
@@ -2502,7 +2453,7 @@ impl ButtonsApp {
                 if index != self.focused {
                     self.activate_tab(index);
                 }
-                self.theme_editor_pane_mode = true;
+                self.theme_editor.pane_mode = true;
                 self.settings_tab = SettingsTab::Themes;
                 self.theme_settings_tab = ThemeSettingsTab::Shaders;
                 self.show_settings = true;
@@ -3126,7 +3077,7 @@ impl ButtonsApp {
         }
         // Closing the pane being edited keeps its edit, and the closed tab
         // remembers the saved theme, never a `preview:` one.
-        if self.theme_editor_pane == Some(self.tabs[index].id) {
+        if self.theme_editor.pane == Some(self.tabs[index].id) {
             self.settle_pane_draft();
         }
         self.save_terminal_history(Some(index));
@@ -5842,9 +5793,7 @@ impl ButtonsApp {
             self.theme_overrides = snapshot.theme_overrides;
             self.pane_fonts = snapshot.pane_fonts;
             self.appearance_baseline = snapshot.appearance_baseline;
-            self.theme_editor_document = None;
-            self.theme_editor_original_document = None;
-            self.theme_editor_source_id = None;
+            self.theme_editor.session = None;
             self.appearance_save_status = None;
         }
     }
@@ -6042,8 +5991,8 @@ impl ButtonsApp {
         );
         if let Some(action) = close_action {
             #[cfg(not(target_arch = "wasm32"))]
-            {
-                self.theme_editor_preview_due = None;
+            if let Some(session) = &mut self.theme_editor.session {
+                session.preview_due = None;
             }
             // Keep saves what the editor shows (numbered if new); Revert drops it.
             #[cfg(not(target_arch = "wasm32"))]
@@ -6353,7 +6302,7 @@ impl ButtonsApp {
                 #[cfg(not(target_arch = "wasm32"))]
                 if matches!(self.settings_tab, SettingsTab::Themes | SettingsTab::Fonts) {
                     // Editing one pane: a copy is that pane's own new theme, never the shared one.
-                    let pane = self.theme_editor_pane.is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
+                    let pane = self.theme_editor.pane.is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
                     let dirty = if pane { self.theme_draft_edited() } else { self.appearance_is_dirty() };
                     let color = if dirty { Color32::from_rgb(100, 245, 175) } else { ui.visuals().weak_text_color() };
                     let response = ui.add_enabled(dirty && self.native_store.is_some(), egui::Button::new(RichText::new(crate::i18n::literal(&self.locale, "● Save copy")).color(color)));
@@ -8762,7 +8711,8 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn edit_target_theme(&self) -> (String, Option<usize>) {
         let Some(tab) = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .filter(|tab| self.tabs.iter().any(|t| t.id == *tab))
         else {
             return (self.preferences.theme_id.clone(), None);
@@ -9385,7 +9335,7 @@ impl ButtonsApp {
             );
             return;
         }
-        let Some(mut document) = self.theme_editor_document.clone() else {
+        let Some(mut document) = self.theme_editor.draft().cloned() else {
             ui.spaced_label(crate::i18n::literal(
                 &self.locale,
                 "Pick a theme in Library first; its shader is edited here.",
@@ -9417,7 +9367,7 @@ impl ButtonsApp {
                     ui.spaced_label(
                         RichText::new(crate::i18n::formatted_literal(
                             &self.locale,
-                            if self.theme_editor_file_exists {
+                            if self.theme_editor.file_exists() {
                                 "Editing: {draft}"
                             } else {
                                 "Editing: {draft} (new theme, not saved yet)"
@@ -10405,7 +10355,7 @@ impl ButtonsApp {
                 }
                 theme_note = theme_part_note(
                     &self.preferences.theme_apply,
-                    self.theme_editor_pane.is_some(),
+                    self.theme_editor.pane.is_some(),
                 );
             }
             self.shader_ai.message = Some(format!(
@@ -10433,7 +10383,7 @@ impl ButtonsApp {
             set_theme_document_value(&mut document, "/effects/shaderBackground", Value::Null);
         }
         if document != before {
-            self.theme_editor_document = Some(document.clone());
+            self.theme_editor.set_draft(document.clone());
             self.queue_theme_editor_preview(ui.ctx());
         }
 
@@ -10451,7 +10401,7 @@ impl ButtonsApp {
                 self.theme_apply_controls(ui);
                 // The draft's display name: the file name and id stay as they are,
                 // so renaming here never breaks a reference to the theme.
-                if let Some(document) = self.theme_editor_document.as_mut() {
+                if let Some(document) = self.theme_editor.draft_mut() {
                     let mut name = document["metadata"]["name"]
                         .as_str()
                         .unwrap_or_default()
@@ -10499,7 +10449,7 @@ impl ButtonsApp {
                         self.preview_personal_theme_draft();
                     }
                     if ui
-                        .spaced_button(if self.theme_editor_file_exists {
+                        .spaced_button(if self.theme_editor.file_exists() {
                             crate::i18n::literal(&self.locale, "Save theme")
                         } else {
                             crate::i18n::literal(&self.locale, "Save as new theme")
@@ -10523,7 +10473,7 @@ impl ButtonsApp {
                         self.open_raw_theme_editor();
                     }
                 });
-                if let Some(status) = &self.theme_editor_status {
+                if let Some(status) = &self.theme_editor.status {
                     ui.spaced_label(status);
                 }
             },
@@ -10836,7 +10786,7 @@ impl ButtonsApp {
                     "Generated with {provider} · {model}",
                     &[("provider", &provider_name), ("model", &model_id)],
                 ));
-                ui.spaced_label(if self.theme_editor_pane.is_some() {
+                ui.spaced_label(if self.theme_editor.pane.is_some() {
                     crate::i18n::literal(
                         &self.locale,
                         "Previewing on the pane picked under Edit for. Save it to keep it.",
@@ -10869,7 +10819,7 @@ impl ButtonsApp {
             if save {
                 self.save_personal_theme_draft();
                 self.theme_generation_candidate = None;
-                self.theme_generation_message = self.theme_editor_status.clone();
+                self.theme_generation_message = self.theme_editor.status.clone();
             } else if edit {
                 self.theme_generation_candidate = None;
                 self.theme_settings_tab = ThemeSettingsTab::Edit;
@@ -10942,8 +10892,8 @@ impl ButtonsApp {
             }
         }
         let selected_label = self
-            .theme_editor_file_name
-            .as_deref()
+            .theme_editor
+            .file_name()
             .map(|file_name| file_name.trim_end_matches(".json").to_owned())
             .unwrap_or_else(|| crate::i18n::literal(&locale, "Select a saved theme"));
         egui::ComboBox::from_id_salt("personal-theme-editor-select")
@@ -10952,7 +10902,7 @@ impl ButtonsApp {
                 for (id, name) in &personal_profiles {
                     if ui
                         .spaced_selectable_label(
-                            self.theme_editor_file_name.as_deref()
+                            self.theme_editor.file_name()
                                 == id
                                     .rsplit(':')
                                     .next()
@@ -10995,7 +10945,7 @@ impl ButtonsApp {
 
         if theme_path_action(
             ui,
-            &mut self.theme_editor_import_path,
+            &mut self.theme_editor.import_path,
             &crate::i18n::literal(&locale, "Path to a theme JSON file"),
             &crate::i18n::literal(&locale, "Import theme JSON"),
         ) {
@@ -11010,10 +10960,11 @@ impl ButtonsApp {
             return;
         }
         let pane_mode = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .is_some_and(|tab| self.tabs.iter().any(|t| t.id == tab));
-        let Some(mut document) = self.theme_editor_document.clone() else {
-            if let Some(status) = &self.theme_editor_status {
+        let Some(mut document) = self.theme_editor.draft().cloned() else {
+            if let Some(status) = &self.theme_editor.status {
                 ui.spaced_label(status);
             }
             return;
@@ -11507,7 +11458,7 @@ impl ButtonsApp {
         });
 
         let changed = document != before_edits;
-        self.theme_editor_document = Some(document);
+        self.theme_editor.set_draft(document);
         if changed {
             self.queue_theme_editor_preview(ui.ctx());
         }
@@ -11527,8 +11478,8 @@ impl ButtonsApp {
             if crate::ui_text::safe_button(ui, crate::i18n::literal(&locale, "Cancel")).clicked() {
                 self.cancel_personal_theme_draft();
             }
-            if self.theme_editor_file_exists {
-                if self.theme_editor_confirm_delete {
+            if self.theme_editor.file_exists() {
+                if self.theme_editor.confirm_delete() {
                     if ui
                         .spaced_button(crate::i18n::literal(&locale, "Confirm delete"))
                         .clicked()
@@ -11539,19 +11490,19 @@ impl ButtonsApp {
                     .spaced_button(crate::i18n::literal(&locale, "Delete theme"))
                     .clicked()
                 {
-                    self.theme_editor_confirm_delete = true;
+                    self.theme_editor.set_confirm_delete(true);
                 }
             }
         });
         if theme_path_action(
             ui,
-            &mut self.theme_editor_export_path,
+            &mut self.theme_editor.export_path,
             &crate::i18n::literal(&locale, "Export path (choose a new .json file)"),
             &crate::i18n::literal(&locale, "Export"),
         ) {
             self.export_personal_theme_draft();
         }
-        if let Some(status) = &self.theme_editor_status {
+        if let Some(status) = &self.theme_editor.status {
             ui.spaced_label(status);
         }
     }
@@ -11683,7 +11634,7 @@ impl ButtonsApp {
         let theme_inputs = (self.preferences.shader_lab.design_theme
             && !self.shader_ai.fix_only
             && theme_generation_available())
-        .then(|| self.theme_editor_document.clone())
+        .then(|| self.theme_editor.draft().cloned())
         .flatten()
         .map(|base| {
             let mut seed = crate::theme_generation::seed_palette(&base);
@@ -11939,8 +11890,8 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn open_raw_theme_editor(&mut self) {
         self.sync_theme_editor_to_current();
-        let Some(document) = &self.theme_editor_document else {
-            self.theme_editor_status = Some("Pick a theme in Library first.".into());
+        let Some(document) = self.theme_editor.draft() else {
+            self.theme_editor.status = Some("Pick a theme in Library first.".into());
             return;
         };
         self.text_editor = Some(TextEditorWindow {
@@ -11951,8 +11902,8 @@ impl ButtonsApp {
             text: serde_json::to_string_pretty(document).unwrap_or_default(),
             kind: TextEditorKind::ThemeJson,
             error: None,
-            draft_source: self.theme_editor_source_id.clone(),
-            draft_file: self.theme_editor_file_name.clone(),
+            draft_source: self.theme_editor.source_id().map(str::to_owned),
+            draft_file: self.theme_editor.file_name().map(str::to_owned),
         });
     }
 
@@ -12010,8 +11961,8 @@ impl ButtonsApp {
         if apply
             && !raw_editor_targets(
                 editor,
-                self.theme_editor_source_id.as_deref(),
-                self.theme_editor_file_name.as_deref(),
+                self.theme_editor.source_id(),
+                self.theme_editor.file_name(),
             )
         {
             editor.error = Some(
@@ -12029,9 +11980,9 @@ impl ButtonsApp {
             match parsed {
                 Ok(value) => {
                     editor.error = None;
-                    self.theme_editor_document = Some(value);
+                    self.theme_editor.set_draft(value);
                     self.queue_theme_editor_preview(ctx);
-                    self.theme_editor_status = Some(
+                    self.theme_editor.status = Some(
                         "Raw edits loaded into the draft. Preview, save or discard them as usual."
                             .into(),
                     );
@@ -12086,13 +12037,13 @@ impl ButtonsApp {
             .unwrap_or("Generated theme")
             .to_owned();
         let file_name = crate::theme_files::unique_file_name(&themes_directory, &name);
-        self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
-        self.theme_editor_document = Some(candidate.document.clone());
-        self.theme_editor_original_document = Some(candidate.document);
-        self.theme_editor_file_name = Some(file_name);
-        self.theme_editor_file_exists = false;
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = Some(crate::i18n::literal(
+        self.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(self.preferences.theme_id.clone()),
+            candidate.document,
+            Some(file_name),
+            false,
+        ));
+        self.theme_editor.status = Some(crate::i18n::literal(
             &self.locale,
             "Generated theme loaded as a new draft. Saving creates a new file and will not replace an existing theme.",
         ));
@@ -12151,10 +12102,9 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn appearance_copy_document(&self) -> Value {
         let mut document = self.shared_appearance_document();
-        if let (Some(original), Some(draft)) = (
-            &self.theme_editor_original_document,
-            &self.theme_editor_document,
-        ) {
+        if let (Some(original), Some(draft)) =
+            (self.theme_editor.original(), self.theme_editor.draft())
+        {
             // Only overlay edited fields: a stale draft must not replace newer font
             // or quick-color settings merely because it contains their old values.
             merge_theme_edits(&mut document, original, draft);
@@ -12285,7 +12235,7 @@ impl ButtonsApp {
         });
         match result {
             Ok(file) => {
-                self.theme_editor_preview_due = None;
+                self.theme_editor.set_preview_due(None);
                 self.theme_editor_preview_snapshot = None;
                 self.reload_personal_themes();
                 let id = format!("personal:{profile}:{}", file.trim_end_matches(".json"));
@@ -12296,7 +12246,7 @@ impl ButtonsApp {
                 self.apply_theme_sources_with(theme, &Default::default(), calm, true);
                 // The draft's edits are in the copy just saved: the editor
                 // must not save them again under another number.
-                self.theme_editor_original_document = self.theme_editor_document.clone();
+                self.theme_editor.mark_unedited();
                 self.load_personal_theme_draft(&id);
                 self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.appearance_save_status = Some(format!("Saved {name}"));
@@ -12322,8 +12272,8 @@ impl ButtonsApp {
         }
         document["metadata"]["name"] = json!(name);
         let file = format!("{}.json", id.rsplit(':').next().unwrap());
-        let expected = (self.theme_editor_file_name.as_deref() == Some(file.as_str()))
-            .then_some(self.theme_editor_file_digest)
+        let expected = (self.theme_editor.file_name() == Some(file.as_str()))
+            .then_some(self.theme_editor.file_digest())
             .flatten();
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
             crate::theme_files::replace_theme_file(store, &file, &bytes, expected)
@@ -12331,18 +12281,15 @@ impl ButtonsApp {
         match result {
             Ok(_) => {
                 if expected.is_some() {
-                    self.theme_editor_file_digest = store.theme_file_digest(&file).ok();
+                    self.theme_editor
+                        .set_file_digest(store.theme_file_digest(&file).ok());
                 }
                 // Rename only metadata, without discarding a pending editor draft.
-                if self.theme_editor_source_id.as_deref() == Some(&id) {
-                    for value in [
-                        &mut self.theme_editor_document,
-                        &mut self.theme_editor_original_document,
-                    ]
-                    .into_iter()
-                    .flatten()
-                    {
-                        value["metadata"]["name"] = json!(name);
+                if self.theme_editor.source_id() == Some(&id) {
+                    if let Some(session) = &mut self.theme_editor.session {
+                        for value in [&mut session.document, &mut session.original] {
+                            value["metadata"]["name"] = json!(name);
+                        }
                     }
                 }
                 self.appearance_save_status = Some(format!("Renamed to {name}"));
@@ -12367,30 +12314,24 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
-        let edited = self
-            .theme_editor_document
-            .as_ref()
-            .zip(self.theme_editor_original_document.as_ref())
-            .is_some_and(|(draft, original)| draft != original);
+        let edited = self.theme_editor.edited();
         let source_document = if !from_current
             && (self.theme_editor_preview_snapshot.is_some()
-                || (edited
-                    && self.theme_editor_source_id.as_deref() == Some(&self.preferences.theme_id)))
+                || (edited && self.theme_editor.source_id() == Some(&self.preferences.theme_id)))
         {
-            self.theme_editor_document.clone()
+            self.theme_editor.draft().cloned()
         } else {
             None
         };
         let current_document = self.shared_appearance_document();
         self.restore_personal_theme_preview();
         let Some(store) = self.native_store.as_ref() else {
-            self.theme_editor_status = Some(crate::i18n::literal(
+            self.theme_editor.status = Some(crate::i18n::literal(
                 &self.locale,
                 "Native profile storage is unavailable.",
             ));
             return;
         };
-        self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
         let name = format!("{} Copy", self.themes.get(&self.preferences.theme_id).name);
         let mut document = source_document.unwrap_or(current_document);
         document["metadata"]["name"] = Value::String(name.clone());
@@ -12403,12 +12344,13 @@ impl ButtonsApp {
         document["metadata"]["updatedAt"] = Value::Null;
         let directory = store.profile_dir().join("themes");
         let file_name = crate::theme_files::unique_file_name(&directory, &name);
-        self.theme_editor_document = Some(document.clone());
-        self.theme_editor_original_document = Some(document);
-        self.theme_editor_file_name = Some(file_name);
-        self.theme_editor_file_exists = false;
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = Some(crate::i18n::literal(
+        self.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(self.preferences.theme_id.clone()),
+            document,
+            Some(file_name),
+            false,
+        ));
+        self.theme_editor.status = Some(crate::i18n::literal(
             &self.locale,
             "Edit the copy, preview it, then save to keep it.",
         ));
@@ -12422,7 +12364,7 @@ impl ButtonsApp {
         self.keep_edited_draft();
         self.restore_personal_theme_preview();
         let Some(document) = self.themes.personal_document(id).cloned() else {
-            self.theme_editor_status = Some(crate::i18n::literal(
+            self.theme_editor.status = Some(crate::i18n::literal(
                 &self.locale,
                 "Saved theme document is unavailable.",
             ));
@@ -12431,14 +12373,14 @@ impl ButtonsApp {
         let Some(stem) = id.rsplit(':').next() else {
             return;
         };
-        self.theme_editor_source_id = Some(id.to_owned());
-        self.theme_editor_document = Some(document.clone());
-        self.theme_editor_original_document = Some(document);
-        self.theme_editor_file_name = Some(format!("{stem}.json"));
-        self.theme_editor_file_exists = true;
+        self.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(id.to_owned()),
+            document,
+            Some(format!("{stem}.json")),
+            true,
+        ));
         self.refresh_theme_file_digest();
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = None;
+        self.theme_editor.status = None;
     }
 
     /// Ends the editor's ownership of a draft: restores any preview and forgets the file.
@@ -12450,14 +12392,8 @@ impl ButtonsApp {
         }
         self.restore_personal_theme_preview();
         self.text_editor = None;
-        self.theme_editor_source_id = None;
-        self.theme_editor_document = None;
-        self.theme_editor_original_document = None;
-        self.theme_editor_file_name = None;
-        self.theme_editor_file_exists = false;
-        self.theme_editor_file_digest = None;
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = None;
+        self.theme_editor.session = None;
+        self.theme_editor.status = None;
         // Notes and names about the old target would describe another theme.
         self.shader_ai.list_note = None;
         self.theme_rename.clear();
@@ -12465,20 +12401,16 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn theme_draft_edited(&self) -> bool {
-        self.theme_editor_document
-            .as_ref()
-            .zip(self.theme_editor_original_document.as_ref())
-            .is_some_and(|(draft, original)| draft != original)
+        self.theme_editor.edited()
     }
 
     /// Points the draft at a new file with the next numbered name, so saving it
     /// leaves the theme it came from alone ("pur v10" → "pur v11").
     #[cfg(not(target_arch = "wasm32"))]
     fn name_draft_as_next_version(&mut self) {
-        let (Some(store), Some(document)) = (
-            self.native_store.as_ref(),
-            self.theme_editor_document.as_mut(),
-        ) else {
+        let (Some(store), Some(document)) =
+            (self.native_store.as_ref(), self.theme_editor.draft_mut())
+        else {
             return;
         };
         let current = document["metadata"]["name"]
@@ -12502,9 +12434,7 @@ impl ButtonsApp {
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
         document["metadata"]["name"] = json!(name);
         document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
-        self.theme_editor_file_name = Some(file_name);
-        self.theme_editor_file_exists = false;
-        self.theme_editor_file_digest = None;
+        self.theme_editor.set_new_file(file_name);
     }
 
     /// "Random ideas": the Shader model suggests one idea per version.
@@ -12602,9 +12532,7 @@ impl ButtonsApp {
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), name);
         document["metadata"]["name"] = json!(name);
         document["metadata"]["id"] = json!(file_name.trim_end_matches(".json"));
-        self.theme_editor_file_name = Some(file_name);
-        self.theme_editor_file_exists = false;
-        self.theme_editor_file_digest = None;
+        self.theme_editor.set_new_file(file_name);
     }
 
     /// Saves an edited editor draft without asking, so switching panes, closing
@@ -12616,17 +12544,18 @@ impl ButtonsApp {
         if !self.theme_draft_edited() || self.native_store.is_none() {
             return Ok(None);
         }
-        if !self.theme_editor_file_exists {
+        if !self.theme_editor.file_exists() {
             self.name_draft_as_next_version();
         }
         self.save_personal_theme_draft();
         if self.theme_draft_edited() {
             return Err(self
-                .theme_editor_status
+                .theme_editor
+                .status
                 .clone()
                 .unwrap_or_else(|| "Theme save failed.".into()));
         }
-        Ok(self.theme_editor_document.as_ref().map(|document| {
+        Ok(self.theme_editor.draft().map(|document| {
             document["metadata"]["name"]
                 .as_str()
                 .unwrap_or("theme")
@@ -12642,12 +12571,12 @@ impl ButtonsApp {
         self.appearance_save_status = Some(if self.theme_draft_edited() {
             format!(
                 "Save failed: {}",
-                self.theme_editor_status.clone().unwrap_or_default()
+                self.theme_editor.status.clone().unwrap_or_default()
             )
         } else {
             let name = self
-                .theme_editor_document
-                .as_ref()
+                .theme_editor
+                .draft()
                 .and_then(|document| document["metadata"]["name"].as_str().map(str::to_owned));
             format!("Saved {} for this pane", name.unwrap_or_default())
         });
@@ -12655,12 +12584,13 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn refresh_theme_file_digest(&mut self) {
-        self.theme_editor_file_digest = match (&self.native_store, &self.theme_editor_file_name) {
-            (Some(store), Some(file_name)) if self.theme_editor_file_exists => {
+        let digest = match (&self.native_store, self.theme_editor.file_name()) {
+            (Some(store), Some(file_name)) if self.theme_editor.file_exists() => {
                 store.theme_file_digest(file_name).ok()
             }
             _ => None,
         };
+        self.theme_editor.set_file_digest(digest);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -12684,33 +12614,33 @@ impl ButtonsApp {
             return;
         }
         let Some(store) = self.native_store.as_ref() else {
-            self.theme_editor_status = Some(crate::i18n::literal(
+            self.theme_editor.status = Some(crate::i18n::literal(
                 &self.locale,
                 "Native profile storage is unavailable.",
             ));
             return;
         };
-        let source = std::path::PathBuf::from(self.theme_editor_import_path.trim());
+        let source = std::path::PathBuf::from(self.theme_editor.import_path.trim());
         let result = crate::theme_files::import_theme_file(store, &source);
         match result {
             Ok((file_name, document)) => {
                 self.keep_edited_draft();
                 self.restore_personal_theme_preview();
                 self.reload_personal_themes();
-                self.theme_editor_source_id = Some(self.preferences.theme_id.clone());
-                self.theme_editor_document = Some(document.clone());
-                self.theme_editor_original_document = Some(document);
-                self.theme_editor_file_name = Some(file_name);
-                self.theme_editor_file_exists = true;
+                self.theme_editor.session = Some(editor_session::EditorSession::new(
+                    Some(self.preferences.theme_id.clone()),
+                    document,
+                    Some(file_name),
+                    true,
+                ));
                 self.refresh_theme_file_digest();
-                self.theme_editor_confirm_delete = false;
-                self.theme_editor_status = Some(crate::i18n::literal(
+                self.theme_editor.status = Some(crate::i18n::literal(
                     &self.locale,
                     "Theme imported to the active native profile.",
                 ));
             }
             Err(error) => {
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme import failed: {reason}",
                     &[("reason", &error)],
@@ -12721,17 +12651,18 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn queue_theme_editor_preview(&mut self, ctx: &egui::Context) {
-        if self.preferences.theme_editor_live_preview && self.theme_editor_document.is_some() {
-            self.theme_editor_preview_due = Some(ctx.input(|input| input.time) + 0.5);
+        if self.preferences.theme_editor_live_preview && self.theme_editor.draft().is_some() {
+            self.theme_editor
+                .set_preview_due(Some(ctx.input(|input| input.time) + 0.5));
             ctx.request_repaint_after(Duration::from_millis(500));
         }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn process_theme_editor_preview(&mut self, ctx: &egui::Context) {
-        if let Some(due) = self.theme_editor_preview_due {
+        if let Some(due) = self.theme_editor.preview_due() {
             if !self.preferences.theme_editor_live_preview {
-                self.theme_editor_preview_due = None;
+                self.theme_editor.set_preview_due(None);
                 return;
             }
             let (now, down) = ctx.input(|input| (input.time, input.pointer.any_down()));
@@ -12745,14 +12676,14 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn preview_personal_theme_draft(&mut self) {
-        self.theme_editor_preview_due = None;
+        self.theme_editor.set_preview_due(None);
         if !personal_theme_editor_available() {
             return;
         }
         let (Some(store), Some(document), Some(file_name)) = (
             self.native_store.as_ref(),
-            self.theme_editor_document.clone(),
-            self.theme_editor_file_name.clone(),
+            self.theme_editor.draft().cloned(),
+            self.theme_editor.file_name().map(str::to_owned),
         ) else {
             return;
         };
@@ -12769,7 +12700,8 @@ impl ButtonsApp {
                         pane: None,
                     });
                 if let Some(tab) = self
-                    .theme_editor_pane
+                    .theme_editor
+                    .pane
                     .filter(|tab| self.tabs.iter().any(|t| t.id == *tab))
                 {
                     // Only this pane changes; the shared theme stays as it was.
@@ -12779,7 +12711,7 @@ impl ButtonsApp {
                         }
                     }
                     self.theme_overrides.insert(tab, id);
-                    self.theme_editor_status = Some(
+                    self.theme_editor.status = Some(
                         "Previewing on this pane only. Save to keep it or discard to restore."
                             .into(),
                     );
@@ -12798,14 +12730,14 @@ impl ButtonsApp {
                     if let Some(snapshot) = &mut self.theme_editor_preview_snapshot {
                         snapshot.applied_preferences = self.preferences.clone();
                     }
-                    self.theme_editor_status = Some(crate::i18n::literal(
+                    self.theme_editor.status = Some(crate::i18n::literal(
                         &self.locale,
                         "Selected Apply sections are previewing. Save to keep them or cancel to restore. Individual tab themes are kept.",
                     ));
                 }
             }
             Err(error) => {
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme preview failed: {reason}",
                     &[("reason", &error)],
@@ -12829,7 +12761,7 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn restore_personal_theme_preview(&mut self) {
-        self.theme_editor_preview_due = None;
+        self.theme_editor.set_preview_due(None);
         if let Some(snapshot) = self.theme_editor_preview_snapshot.take() {
             restore_preview_preferences(&mut self.preferences, &snapshot);
             if let Some((tab, previous)) = snapshot.pane {
@@ -12846,13 +12778,13 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn save_personal_theme_draft(&mut self) {
-        self.theme_editor_preview_due = None;
+        self.theme_editor.set_preview_due(None);
         if !personal_theme_editor_available() {
             return;
         }
         let (Some(store), Some(mut document)) = (
             self.native_store.as_ref(),
-            self.theme_editor_document.clone(),
+            self.theme_editor.draft().cloned(),
         ) else {
             return;
         };
@@ -12860,9 +12792,13 @@ impl ButtonsApp {
             .as_str()
             .unwrap_or("Custom theme")
             .to_owned();
-        let mut file_name = self.theme_editor_file_name.clone().unwrap_or_else(|| {
-            crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name)
-        });
+        let mut file_name = self
+            .theme_editor
+            .file_name()
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name)
+            });
         let profile_name = store.profile_name().to_owned();
         let preview_id = format!(
             "preview:{profile_name}:{}",
@@ -12874,7 +12810,8 @@ impl ButtonsApp {
         );
         let scopes = &self.preferences.theme_apply;
         let pane = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
         let pane_only = pane.is_some();
         // Replacing a file in use elsewhere would change those panes too.
@@ -12896,8 +12833,8 @@ impl ButtonsApp {
                     .any(|id| id == &existing_id)
                     || bundle.panes.iter().any(|look| look.theme_id.as_ref() == Some(&existing_id))
             });
-        let replace = self.theme_editor_file_exists && !keep_existing;
-        if self.theme_editor_file_exists && keep_existing {
+        let replace = self.theme_editor.file_exists() && !keep_existing;
+        if self.theme_editor.file_exists() && keep_existing {
             // A new file next to the one in use gets its own numbered name.
             name = next_theme_version(
                 &name,
@@ -12913,7 +12850,7 @@ impl ButtonsApp {
             document["nativeAppearance"]["shader_backgrounds_enabled"] =
                 json!(self.preferences.shader_backgrounds_enabled);
         }
-        let expected = replace.then_some(self.theme_editor_file_digest).flatten();
+        let expected = replace.then_some(self.theme_editor.file_digest()).flatten();
         let result = crate::theme_files::encoded_theme(&mut document).and_then(|bytes| {
             if replace {
                 crate::theme_files::replace_theme_file(store, &file_name, &bytes, expected)
@@ -12923,7 +12860,7 @@ impl ButtonsApp {
         });
         match result {
             Ok(saved_file_name) => {
-                self.theme_editor_file_digest = store.theme_file_digest(&saved_file_name).ok();
+                let digest = store.theme_file_digest(&saved_file_name).ok();
                 let saved_id = format!(
                     "personal:{profile_name}:{}",
                     saved_file_name.trim_end_matches(".json")
@@ -12939,20 +12876,11 @@ impl ButtonsApp {
                         selected.clone_from(&saved_id);
                     }
                 }
-                self.theme_editor_file_name = Some(saved_file_name);
-                self.theme_editor_file_exists = true;
-                self.theme_editor_document = Some(document.clone());
-                self.theme_editor_original_document = Some(document);
+                self.theme_editor
+                    .mark_saved(saved_file_name, document, digest);
                 self.theme_editor_preview_snapshot = None;
-                self.theme_editor_confirm_delete = false;
                 self.reload_personal_themes();
-                let id = format!(
-                    "personal:{profile_name}:{}",
-                    self.theme_editor_file_name
-                        .as_deref()
-                        .unwrap()
-                        .trim_end_matches(".json")
-                );
+                let id = saved_id;
                 if let Some(tab) = pane {
                     self.theme_overrides.insert(tab, id.clone());
                 } else if let Some(index) =
@@ -12963,10 +12891,12 @@ impl ButtonsApp {
                         self.preferences.calm_mode,
                     );
                 }
-                self.theme_editor_source_id = Some(id);
+                if let Some(session) = &mut self.theme_editor.session {
+                    session.source_id = Some(id);
+                }
                 self.appearance_baseline = Some(self.appearance_fingerprint());
                 self.persist_native_preferences();
-                self.theme_editor_status = Some(if pane.is_some() {
+                self.theme_editor.status = Some(if pane.is_some() {
                     if keep_existing {
                         "Saved as a new variant and applied to this pane; other panes keep theirs."
                             .into()
@@ -12985,7 +12915,7 @@ impl ButtonsApp {
                 });
             }
             Err(error) => {
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme save failed: {reason}",
                     &[("reason", &error)],
@@ -13002,36 +12932,32 @@ impl ButtonsApp {
         }
         self.restore_personal_theme_preview();
         self.reload_personal_themes();
-        if self.theme_editor_file_exists {
-            let id = self
-                .theme_editor_file_name
-                .as_deref()
-                .and_then(|file_name| {
-                    self.native_store.as_ref().map(|store| {
-                        format!(
-                            "personal:{}:{}",
-                            store.profile_name(),
-                            file_name.trim_end_matches(".json")
-                        )
-                    })
-                });
+        if self.theme_editor.file_exists() {
+            let id = self.theme_editor.file_name().and_then(|file_name| {
+                self.native_store.as_ref().map(|store| {
+                    format!(
+                        "personal:{}:{}",
+                        store.profile_name(),
+                        file_name.trim_end_matches(".json")
+                    )
+                })
+            });
             if let Some(document) = id
                 .as_deref()
                 .and_then(|id| self.themes.personal_document(id))
                 .cloned()
             {
-                self.theme_editor_document = Some(document.clone());
-                self.theme_editor_original_document = Some(document);
+                if let Some(session) = &mut self.theme_editor.session {
+                    session.document = document.clone();
+                    session.original = document;
+                }
             }
         } else {
-            self.theme_editor_document = None;
-            self.theme_editor_original_document = None;
-            self.theme_editor_file_name = None;
-            self.theme_editor_file_exists = false;
+            self.theme_editor.session = None;
         }
         self.refresh_theme_file_digest();
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = Some(crate::i18n::literal(
+        self.theme_editor.set_confirm_delete(false);
+        self.theme_editor.status = Some(crate::i18n::literal(
             &self.locale,
             "Unsaved theme edits were canceled.",
         ));
@@ -13042,21 +12968,21 @@ impl ButtonsApp {
         if !personal_theme_editor_available() {
             return;
         }
-        let Some(mut document) = self.theme_editor_document.clone() else {
+        let Some(mut document) = self.theme_editor.draft().cloned() else {
             return;
         };
-        let destination = std::path::PathBuf::from(self.theme_editor_export_path.trim());
+        let destination = std::path::PathBuf::from(self.theme_editor.export_path.trim());
         match crate::theme_files::export_theme_file(&destination, &mut document) {
             Ok(path) => {
-                self.theme_editor_document = Some(document);
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.set_draft(document);
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme exported to {path}",
                     &[("path", &path.display().to_string())],
                 ));
             }
             Err(error) => {
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme export failed: {reason}",
                     &[("reason", &error)],
@@ -13073,11 +12999,11 @@ impl ButtonsApp {
         self.restore_personal_theme_preview();
         let (Some(store), Some(file_name)) = (
             self.native_store.as_ref(),
-            self.theme_editor_file_name.clone(),
+            self.theme_editor.file_name().map(str::to_owned),
         ) else {
             return;
         };
-        if !self.theme_editor_file_exists {
+        if !self.theme_editor.file_exists() {
             return;
         }
         let id = format!(
@@ -13100,20 +13026,16 @@ impl ButtonsApp {
                     }
                 }
                 self.theme_overrides.retain(|_, theme_id| theme_id != &id);
-                self.theme_editor_document = None;
-                self.theme_editor_original_document = None;
-                self.theme_editor_file_name = None;
-                self.theme_editor_file_exists = false;
-                self.theme_editor_confirm_delete = false;
+                self.theme_editor.session = None;
                 self.reload_personal_themes();
-                self.theme_editor_status = Some(crate::i18n::literal(
+                self.theme_editor.status = Some(crate::i18n::literal(
                     &self.locale,
                     "Personal theme deleted.",
                 ));
             }
             Err(error) => {
-                self.theme_editor_confirm_delete = false;
-                self.theme_editor_status = Some(crate::i18n::formatted_literal(
+                self.theme_editor.set_confirm_delete(false);
+                self.theme_editor.status = Some(crate::i18n::formatted_literal(
                     &self.locale,
                     "Theme delete failed: {reason}",
                     &[("reason", &error.to_string())],
@@ -13957,16 +13879,15 @@ impl ButtonsApp {
             return;
         }
         let pane_theme = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .and_then(|tab| self.theme_overrides.get(&tab))
             .cloned();
         let id = pane_theme
             .clone()
             .unwrap_or_else(|| self.preferences.theme_id.clone());
         // A discarded new draft clears its document but keeps the source; recreate it here.
-        if self.theme_editor_source_id.as_deref() == Some(&id)
-            && self.theme_editor_document.is_some()
-        {
+        if self.theme_editor.source_id() == Some(&id) && self.theme_editor.draft().is_some() {
             return;
         }
         if self.themes.personal_document(&id).is_some() {
@@ -13986,7 +13907,8 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn adopt_live_fonts_into_draft(&mut self) {
         let pane = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
         if pane.is_none() && !self.preferences.theme_apply.fonts {
             // Shared previews and saves leave fonts alone with Fonts unticked.
@@ -13994,13 +13916,10 @@ impl ButtonsApp {
         }
         let pane_font = pane.map(|tab| self.font_for_pane(tab));
         let typography = self.preferences.typography.clone();
-        for document in [
-            &mut self.theme_editor_document,
-            &mut self.theme_editor_original_document,
-        ]
-        .into_iter()
-        .flatten()
-        {
+        let Some(session) = &mut self.theme_editor.session else {
+            return;
+        };
+        for document in [&mut session.document, &mut session.original] {
             match &pane_font {
                 Some(font) => crate::theme_files::set_document_terminal_font(document, font),
                 None => crate::theme_files::set_document_typography(document, &typography),
@@ -14038,7 +13957,7 @@ impl ButtonsApp {
                 None => format!("Could not save the edit: {error}"),
             });
         }
-        if self.theme_editor_pane.is_none() {
+        if self.theme_editor.pane.is_none() {
             self.restore_personal_theme_preview();
             return;
         }
@@ -14067,7 +13986,7 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn back_up_unsaved_draft(&self) -> Option<std::path::PathBuf> {
         let store = self.native_store.as_ref()?;
-        let document = self.theme_editor_document.as_ref()?;
+        let document = self.theme_editor.draft()?;
         let text = serde_json::to_string_pretty(document).ok()?;
         crate::storage::backups::backup_bytes(
             store.root_dir(),
@@ -14086,11 +14005,12 @@ impl ButtonsApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn use_look_everywhere(&mut self) {
         let pane = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .filter(|tab| self.tabs.iter().any(|t| t.id == *tab));
         if let Some(tab) = pane {
             if let Err(error) = self.autosave_theme_draft() {
-                self.theme_editor_status =
+                self.theme_editor.status =
                     Some(format!("Could not save this pane's edit first: {error}"));
                 return;
             }
@@ -14115,7 +14035,7 @@ impl ButtonsApp {
             );
             // The editor follows the shared look now.
             if let Err(error) = self.retarget_theme_editor(None) {
-                self.theme_editor_status = Some(error);
+                self.theme_editor.status = Some(error);
             }
         } else {
             self.change_look(
@@ -14123,7 +14043,7 @@ impl ButtonsApp {
                 apply_look::LookSource::User("Use on the whole app"),
             );
         }
-        self.theme_editor_pane_mode = false;
+        self.theme_editor.pane_mode = false;
     }
 
     /// Says when editor results won't reach the whole app (one pane is being
@@ -14148,7 +14068,8 @@ impl ButtonsApp {
                 )
         };
         let editing = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .and_then(|tab| self.tabs.iter().position(|t| t.id == tab));
         let note = if let Some(index) = editing {
             format!(
@@ -14204,17 +14125,17 @@ impl ButtonsApp {
         if index != self.focused {
             self.activate_tab(index);
         }
-        if self.theme_editor_pane != Some(tab) {
+        if self.theme_editor.pane != Some(tab) {
             if let Err(error) = self.autosave_theme_draft() {
                 self.notice = Some(format!("Could not save the current edit first: {error}"));
                 return;
             }
             self.discard_theme_editor_session();
-            self.theme_editor_pane = Some(tab);
+            self.theme_editor.pane = Some(tab);
         }
-        self.theme_editor_pane_mode = true;
+        self.theme_editor.pane_mode = true;
         self.sync_theme_editor_to_current();
-        let Some(document) = self.theme_editor_document.as_mut() else {
+        let Some(document) = self.theme_editor.draft_mut() else {
             return;
         };
         edit(document);
@@ -14239,13 +14160,13 @@ impl ButtonsApp {
         );
         let file_name =
             crate::theme_files::unique_file_name(&store.profile_dir().join("themes"), &name);
-        self.theme_editor_source_id = Some(id.to_owned());
-        self.theme_editor_document = Some(document.clone());
-        self.theme_editor_original_document = Some(document);
-        self.theme_editor_file_name = Some(file_name);
-        self.theme_editor_file_exists = false;
-        self.theme_editor_confirm_delete = false;
-        self.theme_editor_status = None;
+        self.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(id.to_owned()),
+            document,
+            Some(file_name),
+            false,
+        ));
+        self.theme_editor.status = None;
     }
 
     /// "Edit for: All panes / Pane 1 / Pane 2 …". In pane mode the editor follows
@@ -14257,12 +14178,12 @@ impl ButtonsApp {
         } else {
             self.rendered_panes.clone()
         };
-        if displayed.len() < 2 && !self.theme_editor_pane_mode && self.theme_editor_pane.is_none() {
+        if displayed.len() < 2 && !self.theme_editor.pane_mode && self.theme_editor.pane.is_none() {
             return;
         }
         let colors = self.colors();
         let distinct = self.preferences.pane_colors_distinct;
-        let mut pane_mode = self.theme_editor_pane_mode;
+        let mut pane_mode = self.theme_editor.pane_mode;
         let mut focus = None;
         wrapping_row(ui, |ui| {
             ui.spaced_label(crate::i18n::literal(&self.locale, "Edit for:"));
@@ -14306,15 +14227,16 @@ impl ButtonsApp {
         if let Some(index) = focus {
             self.activate_tab(index);
         }
-        self.theme_editor_pane_mode = pane_mode;
+        self.theme_editor.pane_mode = pane_mode;
         let wanted = pane_mode
             .then(|| self.tabs.get(self.focused).map(|tab| tab.id))
             .flatten();
-        if wanted == self.theme_editor_pane {
+        if wanted == self.theme_editor.pane {
             return;
         }
         let current = self
-            .theme_editor_pane
+            .theme_editor
+            .pane
             .and_then(|tab| self.tabs.iter().position(|t| t.id == tab))
             .and_then(|index| displayed.iter().position(|slot| *slot == index))
             .map_or("All panes".to_owned(), |slot| format!("Pane {}", slot + 1));
@@ -14337,7 +14259,7 @@ impl ButtonsApp {
             }
         };
         if let Some(name) = saved {
-            self.theme_editor_status = Some(format!("{current}'s changes were saved as {name}."));
+            self.theme_editor.status = Some(format!("{current}'s changes were saved as {name}."));
         }
     }
 
@@ -14352,7 +14274,7 @@ impl ButtonsApp {
     ) -> Result<Option<String>, String> {
         let saved = self.autosave_theme_draft()?;
         self.discard_theme_editor_session();
-        self.theme_editor_pane = wanted;
+        self.theme_editor.pane = wanted;
         self.sync_theme_editor_to_current();
         Ok(saved)
     }
@@ -18772,6 +18694,8 @@ mod dock_arrange;
 mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
+mod editor_session;
+#[cfg(not(target_arch = "wasm32"))]
 mod feature_flags;
 #[cfg(not(target_arch = "wasm32"))]
 mod folder_chips;
@@ -19125,9 +19049,8 @@ mod tests {
             !app.appearance_is_dirty(),
             "creating a draft alone is not an appearance change"
         );
-        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
-            json!("#123456");
-        app.theme_editor_document.as_mut().unwrap()["futureExtension"] = json!({"keep": true});
+        app.theme_editor.draft_mut().unwrap()["theme"]["terminal"]["background"] = json!("#123456");
+        app.theme_editor.draft_mut().unwrap()["futureExtension"] = json!({"keep": true});
         app.preferences.typography.shell.size = 21.0;
         app.preferences.dock_background_override = Some("#234567".into());
         app.preferences.status_background_override = Some("#345678".into());
@@ -19242,8 +19165,8 @@ mod tests {
         app.restore_settings_snapshot(snapshot);
         assert!(!app.appearance_is_dirty());
         app.start_personal_theme_draft();
-        app.theme_editor_document.as_mut().unwrap()["version"] = json!(99999);
-        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
+        app.theme_editor.draft_mut().unwrap()["version"] = json!(99999);
+        app.theme_editor.draft_mut().unwrap()["theme"]["terminal"]["background"] =
             json!("invalid color");
         let before = app.preferences.clone();
         app.save_appearance_copy();
@@ -20558,7 +20481,7 @@ Start-Sleep -Seconds 300
                 app.theme_settings_tab = ThemeSettingsTab::Shaders;
                 app.ensure_appearance_baseline();
                 app.start_current_appearance_draft();
-                app.theme_editor_document.as_mut().unwrap()["effects"]["shaderBackground"] =
+                app.theme_editor.draft_mut().unwrap()["effects"]["shaderBackground"] =
                     json!(crate::theme::ShaderBackground {
                         custom: Some(Default::default()),
                         colors: Some(vec!["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
@@ -20609,7 +20532,7 @@ Start-Sleep -Seconds 300
                 let elapsed = self.started.elapsed().as_secs_f32();
                 if self.step == 0 && elapsed > 1.0 {
                     self.app.start_current_appearance_draft();
-                    self.app.theme_editor_document.as_mut().unwrap()["theme"]["app"]["shell"]
+                    self.app.theme_editor.draft_mut().unwrap()["theme"]["app"]["shell"]
                         ["background"] = json!("#132332");
                     self.app.preview_personal_theme_draft();
                     assert_eq!(self.app.theme_overrides, self.overrides);
@@ -20869,7 +20792,7 @@ Start-Sleep -Seconds 300
         app.preferences.calm_mode = true;
         let original = app.preferences.theme_id.clone();
         app.start_personal_theme_draft();
-        let mut document = app.theme_editor_document.clone().unwrap();
+        let mut document = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut document, "/theme/terminal/useGradient", json!(true));
         set_theme_document_value(
             &mut document,
@@ -20877,7 +20800,7 @@ Start-Sleep -Seconds 300
             json!(true),
         );
         set_theme_document_value(&mut document, "/effects/masterDisabled", json!(false));
-        app.theme_editor_document = Some(document.clone());
+        app.theme_editor.set_draft(document.clone());
         let ctx = egui::Context::default();
         let frame = |app: &mut ButtonsApp, time, events| {
             let _ = ctx.run(
@@ -20893,7 +20816,7 @@ Start-Sleep -Seconds 300
         };
         frame(&mut app, 0.0, vec![]);
         app.queue_theme_editor_preview(&ctx);
-        assert!(app.theme_editor_preview_due.is_none());
+        assert!(app.theme_editor.preview_due().is_none());
         app.preferences.theme_editor_live_preview = true;
         app.queue_theme_editor_preview(&ctx);
         frame(&mut app, 0.499, vec![]);
@@ -20925,7 +20848,7 @@ Start-Sleep -Seconds 300
         // Older theme files carry the FPS they were saved at; it must never
         // replace the user's own frame rate.
         document["nativeAppearance"]["animation_fps"] = json!(30);
-        app.theme_editor_document = Some(document.clone());
+        app.theme_editor.set_draft(document.clone());
         app.preferences.calm_mode = false;
         app.preferences.animation_fps = 90;
         app.preview_personal_theme_draft();
@@ -20947,7 +20870,7 @@ Start-Sleep -Seconds 300
         app.restore_personal_theme_preview();
         assert_eq!(app.preferences.theme_id, original);
         assert!(app.preferences.calm_mode);
-        assert_eq!(app.theme_editor_document, Some(document));
+        assert_eq!(app.theme_editor.draft(), Some(&document));
         assert!(app
             .native_store
             .as_ref()
@@ -23596,9 +23519,12 @@ Start-Sleep -Seconds 300
             colors: Some(vec!["#ff487b".into(), "#36dcff".into(), "#ffc857".into()]),
             ..Default::default()
         });
-        app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
-        app.theme_editor_document = Some(document.clone());
-        app.theme_editor_original_document = Some(document);
+        app.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(app.preferences.theme_id.clone()),
+            document,
+            None,
+            false,
+        ));
         app.preferences.shader_backgrounds_enabled = true;
         let ctx = egui::Context::default();
         fonts::install(&ctx, &app.font_catalog);
@@ -23664,9 +23590,12 @@ Start-Sleep -Seconds 300
             custom: Some(Default::default()),
             ..Default::default()
         });
-        app.theme_editor_source_id = Some(app.preferences.theme_id.clone());
-        app.theme_editor_document = Some(document.clone());
-        app.theme_editor_original_document = Some(document.clone());
+        app.theme_editor.session = Some(editor_session::EditorSession::new(
+            Some(app.preferences.theme_id.clone()),
+            document.clone(),
+            None,
+            false,
+        ));
         app.preferences.shader_backgrounds_enabled = true;
         // A result checked against the default `amount` slider, while the draft
         // has no custom code (so no sliders) yet.
@@ -24107,7 +24036,7 @@ Start-Sleep -Seconds 300
         let pane_fonts = app.pane_fonts.clone();
         let terminal_before = app.terminal_presentation_for(42).terminal_colors.background;
         app.start_personal_theme_draft();
-        let draft = app.theme_editor_document.as_mut().unwrap();
+        let draft = app.theme_editor.draft_mut().unwrap();
         assert_eq!(
             draft["theme"]["app"]["shell"]["background"],
             crate::theme::to_hex(app.themes.get("aurora").colors.canvas)
@@ -24196,8 +24125,7 @@ Start-Sleep -Seconds 300
         app.theme_overrides.insert(42, saved.clone());
         let original = app.terminal_presentation_for(42).terminal_colors.background;
         app.load_personal_theme_draft(&saved);
-        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
-            json!("#123456");
+        app.theme_editor.draft_mut().unwrap()["theme"]["terminal"]["background"] = json!("#123456");
         app.preferences.theme_apply.terminal = false;
         app.preview_personal_theme_draft();
         assert!(app.preferences.theme_id.starts_with("preview:"));
@@ -24220,8 +24148,7 @@ Start-Sleep -Seconds 300
             "cancel must not undo a tab reset during preview"
         );
         app.theme_overrides.insert(42, saved.clone());
-        app.theme_editor_document.as_mut().unwrap()["theme"]["terminal"]["background"] =
-            json!("#123456");
+        app.theme_editor.draft_mut().unwrap()["theme"]["terminal"]["background"] = json!("#123456");
         app.preferences.theme_apply.app = true;
         app.preview_personal_theme_draft();
         app.save_personal_theme_draft();
@@ -24270,8 +24197,8 @@ Start-Sleep -Seconds 300
         };
         app.preferences.pane_divider = original_divider.clone();
         app.start_personal_theme_draft();
-        let file_name = app.theme_editor_file_name.clone().unwrap();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let file_name = app.theme_editor.file_name().map(str::to_owned).unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["theme"]["app"]["shell"]["paneDivider"] = json!({"color":"#0088ff", "thickness":6.0});
         draft["nativeAppearance"]["pane_divider"] = json!(original_divider);
         set_theme_document_value(
@@ -24279,7 +24206,7 @@ Start-Sleep -Seconds 300
             "/theme/terminal/background",
             Value::String("#123456".into()),
         );
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
 
         let preview_id = format!("preview:default:{}", file_name.trim_end_matches(".json"));
@@ -24326,8 +24253,8 @@ Start-Sleep -Seconds 300
         let original_tab_count = app.tabs.len();
 
         app.start_personal_theme_draft();
-        let file_name = app.theme_editor_file_name.clone().unwrap();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let file_name = app.theme_editor.file_name().map(str::to_owned).unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["futureRoot"] = serde_json::json!({"keep": "on restart"});
         let mut shader = crate::theme::ShaderBackground {
             preset: "prism".into(),
@@ -24337,7 +24264,7 @@ Start-Sleep -Seconds 300
         };
         shader.custom.as_mut().unwrap().variables[0].value = 8.0;
         draft["effects"]["shaderBackground"] = json!(shader);
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.save_personal_theme_draft();
 
         assert!(profile_dir.join("themes").join(&file_name).is_file());
@@ -24379,7 +24306,7 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.start_personal_theme_draft();
-        let requested = app.theme_editor_file_name.clone().unwrap();
+        let requested = app.theme_editor.file_name().map(str::to_owned).unwrap();
         app.preview_personal_theme_draft();
         app.native_store
             .as_ref()
@@ -24389,7 +24316,7 @@ Start-Sleep -Seconds 300
 
         app.save_personal_theme_draft();
 
-        let saved = app.theme_editor_file_name.clone().unwrap();
+        let saved = app.theme_editor.file_name().map(str::to_owned).unwrap();
         assert_ne!(saved, requested);
         let expected_id = format!("personal:default:{}", saved.trim_end_matches(".json"));
         assert_eq!(app.preferences.theme_id, expected_id);
@@ -24425,15 +24352,15 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.start_personal_theme_draft();
-        app.theme_editor_document.as_mut().unwrap()["metadata"]["name"] = json!("Shared");
-        app.theme_editor_file_name = Some("shared.json".into());
+        app.theme_editor.draft_mut().unwrap()["metadata"]["name"] = json!("Shared");
+        app.theme_editor.session.as_mut().unwrap().file_name = Some("shared.json".into());
         app.save_personal_theme_draft();
-        assert_eq!(app.theme_editor_file_name.as_deref(), Some("shared.json"));
+        assert_eq!(app.theme_editor.file_name(), Some("shared.json"));
         app.reload_personal_themes();
         app.load_personal_theme_draft("personal:default:shared");
-        let mut document = app.theme_editor_document.clone().unwrap();
+        let mut document = app.theme_editor.draft().cloned().unwrap();
         document["metadata"]["name"] = json!("Edited");
-        app.theme_editor_document = Some(document);
+        app.theme_editor.set_draft(document);
         app.preview_personal_theme_draft();
         assert!(app.theme_editor_preview_snapshot.is_some());
 
@@ -24499,11 +24426,11 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.start_personal_theme_draft();
-        app.theme_editor_file_name = Some("saved-look.json".into());
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        app.theme_editor.session.as_mut().unwrap().file_name = Some("saved-look.json".into());
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["nativeAppearance"] =
             json!({"window_opacity": 0.4, "shader_backgrounds_enabled": false});
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.save_personal_theme_draft();
 
         app.preferences.window_opacity = 1.0;
@@ -24545,8 +24472,8 @@ Start-Sleep -Seconds 300
         app.start_personal_theme_draft();
         let preview_id = format!(
             "preview:default:{}",
-            app.theme_editor_file_name
-                .as_deref()
+            app.theme_editor
+                .file_name()
                 .unwrap()
                 .trim_end_matches(".json")
         );
@@ -24587,12 +24514,12 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.sync_theme_editor_to_current();
-        assert!(app.theme_editor_document.is_some());
+        assert!(app.theme_editor.draft().is_some());
 
         app.cancel_personal_theme_draft();
         app.sync_theme_editor_to_current();
 
-        assert!(app.theme_editor_document.is_some());
+        assert!(app.theme_editor.draft().is_some());
         fs::remove_dir_all(base).unwrap();
     }
 
@@ -24618,21 +24545,21 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.start_personal_theme_draft();
-        app.theme_editor_file_name = Some("ai-look.json".into());
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        app.theme_editor.session.as_mut().unwrap().file_name = Some("ai-look.json".into());
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["nativeAppearance"] = json!({"shader_backgrounds_enabled": false});
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.save_personal_theme_draft();
 
         // Open the saved theme and choose a generated shader, as the shader editor does.
         app.load_personal_theme_draft("personal:default:ai-look");
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         let shader = crate::theme::ShaderBackground {
             custom: Some(Default::default()),
             ..Default::default()
         };
         draft["effects"]["shaderBackground"] = json!(shader);
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preferences.shader_backgrounds_enabled = true;
         app.preferences.theme_apply.effects = true;
         app.save_personal_theme_draft();
@@ -24681,12 +24608,12 @@ Start-Sleep -Seconds 300
         app.theme_overrides.insert(second, "aurora".into());
         let shared = app.preferences.clone();
 
-        app.theme_editor_pane = Some(second);
+        app.theme_editor.pane = Some(second);
         app.sync_theme_editor_to_current();
-        assert_eq!(app.theme_editor_source_id.as_deref(), Some("aurora"));
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        assert_eq!(app.theme_editor.source_id(), Some("aurora"));
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
         assert!(app.theme_overrides[&second].starts_with("preview:"));
         assert!(!app.theme_overrides.contains_key(&first));
@@ -24696,9 +24623,9 @@ Start-Sleep -Seconds 300
         assert_eq!(app.theme_overrides[&second], "aurora");
         app.sync_theme_editor_to_current();
 
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
         app.save_personal_theme_draft();
         let saved = app.theme_overrides[&second].clone();
@@ -24837,10 +24764,10 @@ Start-Sleep -Seconds 300
         app.open_tab_with_profile(ctx.clone(), crate::assistant::virtual_terminal::PROFILE_ID);
         let pane = app.tabs[0].id;
         app.sync_theme_editor_to_current();
-        app.theme_editor_pane = Some(pane);
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        app.theme_editor.pane = Some(pane);
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["metadata"]["name"] = json!("Typed Name Check");
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         let saved = app.autosave_theme_draft().unwrap().unwrap();
         assert_eq!(saved, "Typed Name Check");
         std::fs::remove_dir_all(base).unwrap();
@@ -24873,9 +24800,9 @@ Start-Sleep -Seconds 300
         let shared_name = app.themes.get(&shared).name.clone();
         let edit = |app: &mut ButtonsApp, color: &str| {
             app.sync_theme_editor_to_current();
-            let mut draft = app.theme_editor_document.clone().unwrap();
+            let mut draft = app.theme_editor.draft().cloned().unwrap();
             set_theme_document_value(&mut draft, "/theme/terminal/background", json!(color));
-            app.theme_editor_document = Some(draft);
+            app.theme_editor.set_draft(draft);
             app.preview_personal_theme_draft();
         };
 
@@ -24885,7 +24812,7 @@ Start-Sleep -Seconds 300
             &shared_name,
             app.themes.all().iter().map(|theme| theme.name.as_str()),
         );
-        app.theme_editor_pane = Some(second);
+        app.theme_editor.pane = Some(second);
         edit(&mut app, "#123456");
         let saved = app.autosave_theme_draft().unwrap().unwrap();
         assert_eq!(saved, expected);
@@ -24894,7 +24821,7 @@ Start-Sleep -Seconds 300
         assert!(second_theme.starts_with("personal:"), "{second_theme}");
 
         // Save copy on pane 1 gives it its own theme; pane 2 and the shared theme stay.
-        app.theme_editor_pane = Some(first);
+        app.theme_editor.pane = Some(first);
         edit(&mut app, "#654321");
         app.save_pane_theme_copy();
         assert!(!app.theme_draft_edited());
@@ -24938,14 +24865,14 @@ Start-Sleep -Seconds 300
         assert_eq!(app.save_theme_bundle(" ").unwrap(), free.next().unwrap());
 
         // The "Edit for" row switches panes with unsaved edits instead of blocking.
-        app.theme_editor_pane_mode = true;
+        app.theme_editor.pane_mode = true;
         app.focused = 0;
         edit(&mut app, "#111111");
         app.focused = 1;
         let _ = ctx.run(egui::RawInput::default(), |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| app.theme_editor_target_row(ui));
         });
-        assert_eq!(app.theme_editor_pane, Some(second));
+        assert_eq!(app.theme_editor.pane, Some(second));
         assert!(!app.theme_draft_edited());
         assert_ne!(app.theme_overrides[&first], first_theme);
         assert_eq!(
@@ -24958,7 +24885,7 @@ Start-Sleep -Seconds 300
 
         // Pane menu and status bar controls edit only that pane, the same way.
         app.perform_pane_action(first, PaneAction::PaneBackground("#222222".into()), &ctx);
-        assert_eq!(app.theme_editor_pane, Some(first));
+        assert_eq!(app.theme_editor.pane, Some(first));
         assert_eq!(
             app.terminal_presentation_for(first)
                 .terminal_colors
@@ -25020,34 +24947,34 @@ Start-Sleep -Seconds 300
         let mut app = ButtonsApp::empty(Preferences::default());
         app.native_store = Some(store);
         app.sync_theme_editor_to_current();
-        let original_source = app.theme_editor_source_id.clone();
+        let original_source = app.theme_editor.source_id().map(str::to_owned);
         app.perform_global_theme_action(PaneAction::RandomTheme);
         let random = app.preferences.theme_id.clone();
         assert_ne!(original_source.as_deref(), Some(random.as_str()));
         app.sync_theme_editor_to_current();
-        assert_eq!(app.theme_editor_source_id.as_deref(), Some(random.as_str()));
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        assert_eq!(app.theme_editor.source_id(), Some(random.as_str()));
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#123456"));
         draft["futureRoot"] = json!({"preserve": "variant"});
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
         assert!(app.theme_editor_preview_snapshot.is_some());
         app.start_personal_theme_draft();
         assert_eq!(
-            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            app.theme_editor.draft().unwrap()["theme"]["terminal"]["background"],
             "#123456"
         );
         assert_eq!(
-            app.theme_editor_document.as_ref().unwrap()["futureRoot"]["preserve"],
+            app.theme_editor.draft().unwrap()["futureRoot"]["preserve"],
             "variant"
         );
         app.save_personal_theme_draft();
         let saved = app.preferences.theme_id.clone();
         assert!(saved.starts_with("personal:"));
-        assert_eq!(app.theme_editor_source_id.as_deref(), Some(saved.as_str()));
+        assert_eq!(app.theme_editor.source_id(), Some(saved.as_str()));
         app.sync_theme_editor_to_current();
         assert_eq!(
-            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            app.theme_editor.draft().unwrap()["theme"]["terminal"]["background"],
             "#123456"
         );
         app.perform_global_theme_action(PaneAction::Theme("basic2".into()));
@@ -25056,7 +24983,7 @@ Start-Sleep -Seconds 300
         app.preview_personal_theme_draft();
         app.start_personal_theme_draft();
         assert_eq!(
-            app.theme_editor_document.as_ref().unwrap()["theme"]["terminal"]["background"],
+            app.theme_editor.draft().unwrap()["theme"]["terminal"]["background"],
             "#123456"
         );
         app.perform_global_theme_action(PaneAction::Theme("aurora".into()));

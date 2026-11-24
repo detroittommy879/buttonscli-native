@@ -481,7 +481,7 @@ mod setup {
     /// Pane 1's own look in the Shaders tab, as the pane menu opens it.
     pub(super) fn shaders(app: &mut ButtonsApp, ctx: &egui::Context) {
         bundle_hero(app, ctx);
-        app.theme_editor_pane_mode = true;
+        app.theme_editor.pane_mode = true;
         settings(app, ThemeSettingsTab::Shaders);
     }
 }
