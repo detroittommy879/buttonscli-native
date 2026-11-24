@@ -262,16 +262,23 @@ impl ButtonsApp {
 
     /// Settings → Debug: "Why does this pane look like this?"
     pub(super) fn look_debug_section(&mut self, ui: &mut egui::Ui) {
+        let locale = self.locale.clone();
         ui.separator();
-        ui.spaced_strong("Why does this pane look like this?");
+        ui.spaced_strong(crate::i18n::literal(
+            &locale,
+            "Why does this pane look like this?",
+        ));
         for (index, tab) in self.tabs.iter().enumerate() {
             let look = self.resolve_pane_look(tab.id);
             ui.collapsing(
-                format!(
-                    "Tab {} · {} · {}",
-                    index + 1,
-                    tab.title,
-                    self.themes.get(look.theme_id()).name
+                crate::i18n::formatted_literal(
+                    &locale,
+                    "Tab {number} · {title} · {theme}",
+                    &[
+                        ("number", &(index + 1).to_string()),
+                        ("title", &tab.title),
+                        ("theme", &self.themes.get(look.theme_id()).name),
+                    ],
                 ),
                 |ui| {
                     for line in self.explain_pane_look(tab.id) {
@@ -286,18 +293,25 @@ impl ButtonsApp {
             .iter()
             .filter(|record| !record.undone)
             .count();
-        ui.spaced_label(format!(
-            "Look history: {} changes ({undoable} can be undone). Logged as buttonscli::looks.",
-            self.look_history.records.len()
+        ui.spaced_label(crate::i18n::formatted_literal(
+            &locale,
+            "Look history: {count} changes ({undoable} can be undone). Logged as buttonscli::looks.",
+            &[
+                ("count", &self.look_history.records.len().to_string()),
+                ("undoable", &undoable.to_string()),
+            ],
         ));
         if ui
-            .spaced_button("Copy look as JSON")
-            .on_hover_text("The shared look, every pane's resolved look with reasons, and the look history, for bug reports.")
+            .spaced_button(crate::i18n::literal(&locale, "Copy look as JSON"))
+            .on_hover_text(crate::i18n::literal(
+                &locale,
+                "The shared look, every pane's resolved look with reasons, and the look history, for bug reports.",
+            ))
             .clicked()
         {
             let text = serde_json::to_string_pretty(&self.look_report()).unwrap_or_default();
             ui.ctx().copy_text(text);
-            self.notice = Some("Copied the look as JSON.".into());
+            self.notice = Some(crate::i18n::literal(&locale, "Copied the look as JSON."));
         }
     }
 }

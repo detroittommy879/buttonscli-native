@@ -125,6 +125,37 @@ for normal desktop use.
 | `POST /v1/layout/open` | Create named tabs and arrange them horizontally, vertically, or in a grid |
 | `GET /v1/presets` | List command and SSH presets from the active native profile |
 | `POST /v1/presets/run` | Send a uniquely named preset to a selected tab |
+| `GET /v1/look` | The current look: shared theme IDs, each pane's resolved theme and font with the reason, and the look history |
+| `GET /v1/look/themes` | Theme IDs and names, and bundle names, that `look/apply` accepts |
+| `POST /v1/look/apply` | Ask the user to apply a theme or bundle (see Look requests); waits up to 3 minutes for the answer |
+| `POST /v1/look/undo` | Undo the newest look change, only if it came through this API |
+
+## Look requests
+
+`POST /v1/look/apply` never changes the look by itself. The app shows a
+**Look change request** window naming the client, the theme or bundle and
+where it goes, with one checkbox per part (app colors, terminal colors,
+background gradient, shader and effects, fonts). Every part starts ticked
+unless the request turned it off; the user can untick more. The user can
+**Try it** (then **Keep** or **Put back**), **Apply**, **Decline**, or block
+the client until the app restarts. One request waits at a time; a second one
+is refused while the window is open.
+
+```json
+{ "theme": "aurora", "target": "app", "parts": { "fonts": false }, "client": "My agent" }
+```
+
+- `theme` (an ID from `look/themes`) or `bundle` (a name), not both.
+- `target`: `app` (default), `terminals` (the app's own colors stay) or
+  `pane` with `tab` (a selector, default `active`). Bundles take no target.
+- `client`: the name the user sees (60 characters at most).
+
+The answer is `{"applied": true, "change": …, "parts": …, "triedFirst": …,
+"look": …}`, or a 409 error with the reason (declined, put back, blocked, not
+answered in time, unknown theme). Outside requests never turn Calm, the
+shader switch or the other live switches on or off. Every change is recorded
+in the look history with the client's name; the user can take it back with
+Look → Undo look change, and `look/undo` takes back only API changes.
 
 Selectors can be `active`, a numeric session ID, `tab-<id>`, or an exact
 case-insensitive title. Duplicate titles return an ambiguity error. Layouts can

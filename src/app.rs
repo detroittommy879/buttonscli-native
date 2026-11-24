@@ -715,6 +715,9 @@ pub struct ButtonsApp {
     session_dispatcher: Dispatcher,
     #[cfg(not(target_arch = "wasm32"))]
     session_inbox: Inbox,
+    /// Look requests from the control API and their prompt (`look_api.rs`).
+    #[cfg(not(target_arch = "wasm32"))]
+    look_api: look_api::LookApi,
     #[cfg(not(target_arch = "wasm32"))]
     theme_overrides: std::collections::BTreeMap<u64, String>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1853,6 +1856,8 @@ impl ButtonsApp {
             session_dispatcher,
             #[cfg(not(target_arch = "wasm32"))]
             session_inbox,
+            #[cfg(not(target_arch = "wasm32"))]
+            look_api: look_api::LookApi::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_overrides: std::collections::BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -6780,6 +6785,7 @@ impl ButtonsApp {
             &native_root,
             Arc::clone(&self.control_snapshot),
             self.session_dispatcher.clone(),
+            self.look_api.dispatcher.clone(),
             context.clone(),
         ) {
             Ok(server) => self.control_server = Some(server),
@@ -18785,6 +18791,8 @@ mod input_recovery_tests;
 #[cfg(not(target_arch = "wasm32"))]
 mod look_actions;
 #[cfg(not(target_arch = "wasm32"))]
+mod look_api;
+#[cfg(not(target_arch = "wasm32"))]
 mod look_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
@@ -18904,6 +18912,10 @@ impl eframe::App for ButtonsApp {
         self.apply_pending_pane_looks();
         #[cfg(not(target_arch = "wasm32"))]
         self.process_session_actions(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.process_look_requests(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.look_request_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.maintain_terminal_history(ctx);
         self.shortcuts(ctx);
