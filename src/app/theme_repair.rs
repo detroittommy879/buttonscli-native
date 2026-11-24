@@ -271,4 +271,144 @@ mod tests {
         assert_eq!(warning_file("could not list personal themes: x"), None);
         assert_eq!(warning_file("../x.json: y"), None);
     }
+
+    fn app_with_broken_theme() -> (ButtonsApp, std::path::PathBuf) {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-theme-repair-{}-{:x}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let themes = store.profile_dir().join("themes");
+        std::fs::create_dir_all(&themes).unwrap();
+        let path = themes.join("broken.json");
+        std::fs::write(&path, "{\"version\": 1, \"metadata\": ").unwrap();
+        let mut app = ButtonsApp::empty(Preferences::default());
+        app.native_store = Some(store);
+        app.reload_personal_themes();
+        (app, path)
+    }
+
+    fn ready(app: &ButtonsApp, path: &std::path::Path) -> ThemeRepair {
+        let original = std::fs::read_to_string(path).unwrap();
+        let fixed = crate::theme_generation::tests::base_document();
+        let text = serde_json::to_string_pretty(&fixed).unwrap();
+        let before = crate::file_repair::theme_problems(&original).unwrap();
+        let after = crate::file_repair::theme_problems(&text).unwrap();
+        assert!(after.blocking.is_empty());
+        let _ = app;
+        ThemeRepair {
+            file_name: "broken.json".into(),
+            original_hash: sha2::Sha256::digest(original.as_bytes()).into(),
+            state: RepairState::Ready {
+                diff: crate::file_repair::line_diff(&original, &text),
+                repair: Repair {
+                    text,
+                    before,
+                    after,
+                    provider_name: "Fixture".into(),
+                    model_id: "fixture-model".into(),
+                },
+            },
+            original,
+        }
+    }
+
+    /// Every text the frame drew.
+    fn drawn_text(output: &egui::FullOutput) -> String {
+        output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn the_window_shows_the_problem_and_the_diff_and_saves_with_a_backup() {
+        let (mut app, path) = app_with_broken_theme();
+        assert_eq!(app.theme_load_warnings.len(), 1);
+        assert!(app.theme_repair_offered(&app.theme_load_warnings[0].clone()));
+        app.theme_repair = Some(ready(&app, &path));
+        let ctx = egui::Context::default();
+        fonts::install(&ctx, &app.font_catalog);
+        let mut output = egui::FullOutput::default();
+        for _ in 0..3 {
+            output = ctx.run(egui::RawInput::default(), |ctx| {
+                app.theme_repair_window(ctx)
+            });
+        }
+        let text = drawn_text(&output);
+        assert!(text.contains("broken.json"), "{text}");
+        assert!(text.contains("What was wrong"), "{text}");
+        assert!(text.contains("not valid JSON"), "{text}");
+        assert!(text.contains("+ "), "the diff is drawn: {text}");
+        assert!(text.contains("Save fixed file"), "{text}");
+        assert!(
+            app.theme_repair.is_some(),
+            "the window stays until answered"
+        );
+
+        let repair = app.theme_repair.take().unwrap();
+        let RepairState::Ready { repair: fixed, .. } = &repair.state else {
+            unreachable!()
+        };
+        let fixed_text = fixed.text.clone();
+        app.save_theme_repair(&repair, &fixed_text).unwrap();
+        assert!(app.theme_load_warnings.is_empty(), "the file loads now");
+        assert!(app
+            .themes
+            .all()
+            .iter()
+            .any(|theme| theme.id.ends_with(":broken")));
+        let backups = app
+            .native_store
+            .as_ref()
+            .unwrap()
+            .root_dir()
+            .join("debug")
+            .join("backups");
+        let copies: Vec<_> = walk(&backups)
+            .into_iter()
+            .filter(|name| name.contains("replace") && name.contains("broken.json"))
+            .collect();
+        assert_eq!(copies.len(), 1, "one backup of the broken file");
+    }
+
+    #[test]
+    fn save_refuses_a_file_that_changed_meanwhile() {
+        let (mut app, path) = app_with_broken_theme();
+        let repair = ready(&app, &path);
+        std::fs::write(&path, "{\"version\": 1, \"metadata\": {").unwrap();
+        let RepairState::Ready { repair: fixed, .. } = &repair.state else {
+            unreachable!()
+        };
+        let text = fixed.text.clone();
+        let error = app.save_theme_repair(&repair, &text).unwrap_err();
+        assert!(error.contains("changed on disk"), "{error}");
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "{\"version\": 1, \"metadata\": {"
+        );
+    }
+
+    fn walk(dir: &std::path::Path) -> Vec<String> {
+        let mut names = Vec::new();
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                names.extend(walk(&path));
+            } else {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+        names
+    }
 }

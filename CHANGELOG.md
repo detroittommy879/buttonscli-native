@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed: ButtonsCLI could crash on its next log line when the program that
+  started it (a script or an agent) had exited and closed its output.
 - Agents can read and change the look through the control API
   (`/v1/look`, `/v1/look/themes`, `/v1/look/apply`, `/v1/look/undo`),
   `buttonsclictl look*` and the MCP `look_*` tools. Nothing changes until
