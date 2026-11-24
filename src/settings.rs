@@ -444,11 +444,13 @@ pub(crate) const MAX_UI_SCALE: f32 = 2.0;
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 /// Longest workspace message timeout offered in Settings.
 pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
-/// Caps keep native.json bounded. Saving past one is refused with a message
-/// (never by dropping the oldest), so a cap must sit far above real use.
+/// Caps on what the UI lets you add. Adding past one is refused with a
+/// message; loading never cuts a longer list (an outside or older file keeps
+/// everything). native.json's own size limit is the real bound.
 pub(crate) const MAX_SAVED_SHADERS: usize = 512;
 pub(crate) const MAX_THEME_BUNDLES: usize = 512;
-/// Most pane slots a theme bundle or the saved pane looks remember.
+/// Most pane slots a theme bundle or the saved pane looks apply. Extra slots
+/// in a file are kept but ignored.
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
 /// One pane slot's look. `None` uses the shared theme or font.
@@ -1119,12 +1121,9 @@ impl Preferences {
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
-        self.pane_looks.truncate(MAX_PANE_LOOKS);
-        self.theme_bundles.truncate(MAX_THEME_BUNDLES);
-        self.saved_shaders.truncate(MAX_SAVED_SHADERS);
-        for bundle in &mut self.theme_bundles {
-            bundle.panes.truncate(MAX_PANE_LOOKS);
-        }
+        // Lists are never cut here: native.json's size limit bounds them,
+        // the UI refuses to add past a cap, and pane slots past
+        // MAX_PANE_LOOKS are kept but not applied.
         self.simulation.persona = self.simulation.persona.chars().take(512).collect();
         self.simulation.prompt = self.simulation.prompt.chars().take(8192).collect();
         self.shortcuts.normalize();
@@ -1218,6 +1217,25 @@ impl Default for ThemeApplyScopes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn normalize_keeps_lists_longer_than_the_caps() {
+        let mut preferences = Preferences::default();
+        let bundle = ThemeBundle {
+            panes: vec![PaneLook::default(); MAX_PANE_LOOKS + 3],
+            ..Default::default()
+        };
+        preferences.theme_bundles = (0..MAX_THEME_BUNDLES + 5)
+            .map(|index| ThemeBundle {
+                name: format!("b{index}"),
+                ..bundle.clone()
+            })
+            .collect();
+        preferences.pane_looks = vec![PaneLook::default(); MAX_PANE_LOOKS + 2];
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.theme_bundles.len(), MAX_THEME_BUNDLES + 5);
+        assert_eq!(preferences.theme_bundles[0].panes.len(), MAX_PANE_LOOKS + 3);
+        assert_eq!(preferences.pane_looks.len(), MAX_PANE_LOOKS + 2);
+    }
 
     #[test]
     fn favorites_and_hover_preferences_survive_restart_and_normalize_old_data() {

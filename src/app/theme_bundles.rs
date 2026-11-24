@@ -195,8 +195,7 @@ impl ButtonsApp {
         let count = bundles.len();
         match bundles.iter_mut().find(|existing| existing.name == name) {
             Some(existing) => *existing = bundle,
-            // Loading truncates to the cap, so a bundle past it would vanish
-            // on the next start: refuse it now instead.
+            // The cap only limits what the UI adds; loading keeps every bundle.
             None if count >= crate::settings::MAX_THEME_BUNDLES => {
                 return Err(format!(
                     "You have {count} theme bundles, the most that can be saved. Delete one first."
