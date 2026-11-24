@@ -369,6 +369,9 @@ pub struct ButtonsApp {
     themes: ThemeCatalog,
     #[cfg(not(target_arch = "wasm32"))]
     theme_load_warnings: Vec<String>,
+    /// "Fix with AI" for a theme file that did not load (`theme_repair.rs`).
+    #[cfg(not(target_arch = "wasm32"))]
+    theme_repair: Option<theme_repair::ThemeRepair>,
     font_catalog: fonts::FontCatalog,
     theme_search: String,
     #[cfg(not(target_arch = "wasm32"))]
@@ -1535,6 +1538,8 @@ impl ButtonsApp {
             themes: ThemeCatalog::load(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_load_warnings: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            theme_repair: None,
             font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
@@ -9162,8 +9167,26 @@ impl ButtonsApp {
                 .id_salt("{theme_load_warnings} theme files could not be loaded")
                 .default_open(true)
                 .show(ui, |ui| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let mut repair = None;
                     for warning in &self.theme_load_warnings {
                         ui.spaced_colored_label(colors.warning, warning);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        if self.theme_repair_offered(warning)
+                            && ui
+                                .small_button(crate::i18n::literal(&self.locale, "Fix with AI"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Send this file and its problems to your theme model, then review the corrected file before saving.",
+                                ))
+                                .clicked()
+                        {
+                            repair = theme_repair::warning_file(warning).map(str::to_owned);
+                        }
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if let Some(file_name) = repair {
+                        self.start_theme_repair(ui.ctx(), &file_name);
                     }
                 });
             }
@@ -18828,6 +18851,8 @@ mod text_backing;
 #[cfg(not(target_arch = "wasm32"))]
 mod theme_bundles;
 #[cfg(not(target_arch = "wasm32"))]
+mod theme_repair;
+#[cfg(not(target_arch = "wasm32"))]
 mod tmux;
 #[cfg(not(target_arch = "wasm32"))]
 mod ui_scale;
@@ -18924,6 +18949,8 @@ impl eframe::App for ButtonsApp {
         self.process_look_requests(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.look_request_window(ctx);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.theme_repair_window(ctx);
         #[cfg(not(target_arch = "wasm32"))]
         self.maintain_terminal_history(ctx);
         self.shortcuts(ctx);

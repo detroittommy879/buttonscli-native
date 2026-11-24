@@ -433,6 +433,15 @@ impl ThemeCatalog {
 
 /// The checks a saved theme document must pass (`look_format`): a format
 /// this app reads, a metadata id and name, and `theme`/`effects` objects.
+/// Whether a checked personal theme document also parses as the loader
+/// parses it (`file_repair` uses it to say a fixed file will load).
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn check_personal_theme(document: &Value) -> Result<(), String> {
+    parse_legacy_value("check", document, ThemeSource::Personal)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
     let errors = crate::look_format::theme_document_errors(document);
     if errors.is_empty() {
