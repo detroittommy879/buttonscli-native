@@ -43,7 +43,14 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
 3. **Never lose an edit.** `change_look` calls `settle_pane_draft` first
    (it saves an edited draft, pane or shared, under the next numbered name). Change the editor target only with
    `retarget_theme_editor`. End a draft only with `settle_pane_draft` or
-   `discard_theme_editor_session`.
+   `discard_theme_editor_session`. Editor state is `theme_editor`
+   (`src/app/editor_session.rs`: target, status, `session:
+   Option<EditorSession>`). **Previews never write state**: the live preview
+   is `EditorSession::preview`, an overlay that `resolve_pane_look`,
+   `shared_source` (shared terminal/app theme), `colors` and
+   `pane_divider_style` draw on top. Never put a preview into
+   `preferences`, `theme_overrides` or the catalog; saving applies the
+   saved file via `change_look(LookChange::SaveEdit)`.
 4. **Calm and the live switches are the user's.** `LIVE_SWITCHES` (Calm,
    shaders on, advanced effects, focused pane only) never come from a theme's
    `nativeAppearance`. Only the user's own controls change them (the Calm
@@ -192,8 +199,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `chatgpt_plan` providers hide URL/format/key fields; that endpoint rejects
   non-streaming requests, so probes must stream. `ProviderSettings::normalize`
   must keep `chatgpt:native:v1:<hex>`; use `chatgpt::saved_key` in key loaders.
-- The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
-  preview/save touch only that pane's `theme_overrides`, never shared sources.
+- The theme/shader editor targets `theme_editor.pane` (a PTY ID) in pane mode:
+  the preview overlay shows only on that pane, and saving sets only that
+  pane's `theme_overrides`, never shared sources.
   Edits never block: `autosave_theme_draft` saves them under the next numbered
   name when switching panes, on Keep and close, and on quit. Never overwrite
   a theme file that another pane, the shared sources or a bundle uses.
@@ -271,8 +279,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   Tests must use owned temporary profiles, never the user's normal profile.
 - App, terminal, fonts, gradient and effects have independent source IDs. Preserve
   `theme_apply` scopes, per-PTY overrides, Calm mode and unsupported JSON fields.
-- Editor state uses `theme_editor_source_id`; restore pending previews before switching
-  sources. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
+- Editor state lives in `theme_editor.session` (`source_id`, draft, original,
+  file, preview); open a new one with `EditorSession::new`, after saving or
+  settling the old draft. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
   use ordinary page scrolling, with separate positions, not stacked resize panels.
 - Theme shader strings are inert metadata. Do not claim legacy GLSL effects execute.
 - Custom shader code gets `strength`, `bg` and c1–c5; `CustomShader::y_up` (default on)
@@ -322,8 +331,8 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   0.31 has no occlusion flag); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar
   shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
-  Changing another pane's theme must call `settle_pane_draft` (autosave), never a
-  bare `restore_personal_theme_preview`, or the edited pane reverts.
+  Changing another pane's theme must call `settle_pane_draft` (autosave):
+  `clear_theme_preview` only takes the overlay off and leaves the edit unsaved.
 - egui buttons paint `weak_bg_fill`: theme hover/active colors must set both
   `bg_fill` and `weak_bg_fill`, or hover stays egui's stock grey.
   `SIMPLE_NOISE_HIDDEN` hides and disables simple noise for now.

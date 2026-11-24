@@ -18,17 +18,21 @@ copies. Read this before changing any of it.
    `discard_theme_editor_session`. Do not set those fields anywhere else.
 3. **Never lose an edit.** Anything that replaces a pane's theme first calls
    `settle_pane_draft`, which saves an unsaved pane edit under the next
-   numbered name. A bare `restore_personal_theme_preview` throws the edit
-   away and puts the pane back on an older look.
-4. **Live switches are the user's, not the theme's.** Calm, shaders on/off,
+   numbered name. `clear_theme_preview` only takes the live preview off the
+   screen; the edit stays unsaved in the session.
+4. **Previews never write state.** The editor's live preview is an overlay
+   (`EditorSession::preview`) applied when resolving what to draw. It is
+   never put into `preferences`, `theme_overrides`, the theme catalog,
+   bundles, closed tabs or the look history.
+5. **Live switches are the user's, not the theme's.** Calm, shaders on/off,
    advanced effects and "focused pane only" (`LIVE_SWITCHES`) are never
    applied from a theme's `nativeAppearance`. Only the user's own controls
    change them: the Calm button, the Look presets and the switches. Apply
    leaves Calm alone.
-5. **`normalize` never drops user data.** Refuse when saving instead.
-6. **Labels name what the control acts on.** The Themes header shows the
+6. **`normalize` never drops user data.** Refuse when saving instead.
+7. **Labels name what the control acts on.** The Themes header shows the
    edit target (`edit_target_theme`), not the shared theme.
-7. **Tests drive real transitions across states**, not only pure helpers:
+8. **Tests drive real transitions across states**, not only pure helpers:
    fresh, after a bundle, in the middle of a pane edit (see Tests below).
 
 ## Where look state lives
@@ -58,12 +62,13 @@ for that.
 | `pending_pane_looks` | Bundle/restart looks waiting for terminals to open |
 | `preferences.{dock,status}_background_override` | Right-click colors for the left panel and status bar |
 | `preferences.text_backing` | Global text backing (a theme's own backing colors win per pane unless "Also in panes whose theme has its own") |
-| `theme_editor_*` (about 12 fields) | The editor session: draft, original, file, target pane, preview snapshot |
+| `theme_editor` (`editor_session.rs`) | The editor: target (`pane`, `pane_mode`), status line, and `session: Option<EditorSession>` (draft, original, file, timers, live `preview`) |
 | `shuffle.fade` | A cross-fade in progress (presentation only) |
-| `ThemeCatalog` | Loaded copy of every theme, including the `preview:` pseudo-theme of a live preview |
+| `ThemeCatalog` | Loaded copy of every built-in and saved theme (never a preview) |
 
-Saving: `persist_native_preferences` writes `preferences_to_save()`, which
-undoes an active preview and fills `pane_looks` from the panes on screen.
+Saving: `persist_native_preferences` writes `preferences_to_save()`: the
+preferences as they are (a preview is never in them) plus `pane_looks`
+from the panes on screen.
 At startup `restore_pane_looks` hands those looks back by slot.
 
 ## How a pane's look is resolved
@@ -75,13 +80,18 @@ resolve_pane_look(pty) -> PaneLook { origin, presentation, font, font_origin }
   origin: Own { theme_id }        theme_overrides[pty], if that theme exists
         | Shared { terminal, gradient, effects }   the Apply-to sources
   presentation: that theme (shared: shared_terminal_theme())
+        or the editor's preview of this pane (pane_preview), on top
         + apply_live_switches: Calm, classic effects off, Strength override
+  previewing: the presentation shows an unsaved editor draft
   font: resolve_pane_font(pty): pane_fonts[pty] → own theme's typography → shared
 terminal_presentation_for(pty) = presentation + the Shuffle fade (draw time only)
 theme_for_tab(i), font_for_pane(pty), settled_presentation_for(pty): the same answer
 explain_pane_look(pty): the reasons in plain English (Settings → Debug)
 look_report(): the shared look, every pane and the history as JSON
-app chrome: app_theme_colors() (app_theme_id + Shuffle fade) + bar overrides → colors()
+shared parts: shared_source(App | Terminal | Gradient | Effects): the Apply-to
+  source, or the editor's shared preview for the parts ticked in Apply to
+app chrome: app_theme_colors() (active_app_theme + Shuffle fade) + bar overrides → colors()
+  (a shared preview with App chrome ticked hides the bar and divider overrides)
 ```
 
 Read colors through `colors()` / `app_theme_colors()` and
@@ -107,7 +117,9 @@ Every look change goes through `change_look(LookChange, LookSource)` in
 
 `LookChange` is `Theme { theme_id, target }` (targets: `WholeApp { scopes,
 calm }`, `AllTerminals`, `Pane(index)`), `UseShared { index }` (`None` =
-every pane), `Bundle { name }`, `Shuffle { .. }` or `Preset { look }`.
+every pane), `Bundle { name }`, `Shuffle { .. }`, `Preset { look }` or
+`SaveEdit { theme_id, pane }` (the editor just saved its draft; the only
+change that does not settle the editor first, since it is the settling).
 `LookSource` is `User("<button>")`, `Shuffle`, `Api(client)` or
 `Plugin(id)`. A pane is given a saved look (bundle slot, new terminal, tab
 group, reopened tab) only through `put_pane_look`.
@@ -128,6 +140,7 @@ its `ALL` list); each names its entry function.
 | **Shuffle** step | `shuffle_now` → `Shuffle` | yes (not "Shaders only") | yes, or only the shader | cleared; per-pane picks if "Every pane" | kept on screen unless Shuffle changes fonts | cleared (not "Shaders only") | unchanged |
 | **Look preset** | `apply_look_preset` → `Preset` | Basic/Minimal: theme; Moderate/Showoff: bundle | same | same | Basic: basic fonts | same | Basic/Minimal on, Moderate/Showoff off |
 | **Undo look change** | `undo_look_change` | back | back | back | back | back | back |
+| Editor **Save** (and autosave) | `save_personal_theme_draft` → `SaveEdit` | shared edit: if App ticked | shared edit: Apply-to parts | pane edit: that pane gets the saved file | unchanged (drafts carry the fonts in use) | shared edit: cleared if App ticked | unchanged |
 
 Undo restores themes, pane themes and fonts, the shared font, bar colors,
 the window appearance fields and the preset switches. It does not restore
@@ -140,17 +153,42 @@ New "use this theme" controls call `change_look` (or a wrapper:
 
 ## The theme editor
 
-- Target: `theme_editor_pane` (a PTY ID) in pane mode, otherwise the shared
+State: `theme_editor` (`src/app/editor_session.rs`). `ThemeEditor` holds
+what outlives a draft (the target `pane`, `pane_mode`, the status line, the
+import/export path fields); `session: Option<EditorSession>` is the open
+draft (`document`, `original`, `source_id`, file name/exists/digest, delete
+confirm, `preview_due`, `preview`). A session is opened and dropped whole.
+
+- Target: `theme_editor.pane` (a PTY ID) in pane mode, otherwise the shared
   theme. Change it only with `retarget_theme_editor`, which autosaves.
-- Previews mutate state and restore it later: the shared path snapshots
-  Preferences (`theme_editor_preview_snapshot`); the pane path points
-  `theme_overrides[pty]` at a `preview:` theme. Anything reading a pane's
-  theme while a preview is open must look through the snapshot (see
-  `edit_target_theme`, `current_pane_looks`).
-- Fonts belong to Settings → Fonts and pane fonts: drafts adopt the fonts in
-  use (`adopt_live_fonts_into_draft`) so a color edit never changes a font.
-- Saving never overwrites a theme file that another pane, the shared sources
-  or a bundle uses: it makes the next numbered copy.
+- Drafts end through `settle_pane_draft` (saves an edited draft, then ends
+  a pane session; a shared one stays open) or
+  `discard_theme_editor_session`.
+- **Previews are an overlay.** `preview_personal_theme_draft` builds
+  `EditorSession::preview` (a `ThemeDefinition` from the draft, ID
+  `preview:<profile>:<stem>`, never stored). What is drawn consults it:
+
+  | Reader | Pane mode | Shared mode |
+  | --- | --- | --- |
+  | `resolve_pane_look` | that pane draws the preview (`previewing: true`) | panes on the shared look see it through `shared_terminal_theme` |
+  | `shared_source(part)` (`shared_terminal_theme`, `active_app_theme`) | no | the parts ticked in Apply to (read at draw time, so ticking a box updates at once) |
+  | `colors`, `pane_divider_style` | no | App chrome ticked: the bar and divider overrides are hidden, as Apply clears them |
+
+  Not previewed: fonts (drafts adopt the fonts in use,
+  `adopt_live_fonts_into_draft`, so a color edit never changes a font) and
+  the window settings in a theme's `nativeAppearance` (opacity, corner
+  radius, hover label, row banding); they apply on Save. Calm and the live
+  switches are never touched. `preferences`, `theme_overrides`, the
+  catalog, bundles, `pane_looks`, closed tabs and the look history never
+  see a preview, so nothing has to be restored. `clear_theme_preview`
+  takes it off (the draft stays open).
+- Saving (`save_personal_theme_draft`, also autosave) writes the file, ends
+  the preview, then applies the saved theme through
+  `change_look(LookChange::SaveEdit { theme_id, pane })`: the edited pane's
+  own theme, or the shared sources ticked in Apply to (other panes keep
+  their own themes). It is recorded in the look history.
+- Saving never overwrites a theme file that another pane, the shared
+  sources or a bundle uses: it makes the next numbered copy.
 
 ## Shaders and names
 
@@ -173,8 +211,12 @@ character's color. Renderer: `vendor/egui_term/src/view.rs` and
 
 - `look_actions::tests::every_look_action_from_every_state_is_consistent`:
   every `LookAction` × (fresh, after a bundle, mid pane edit, mid shared
-  edit). A new action must be added to the enum, `perform` and the effect
-  match, or the test does not compile.
+  edit, pane edit not previewed, after switching panes). A new action must
+  be added to the enum, `perform` and the effect match, or the test does
+  not compile.
+- `color_adjust::tests::an_edit_survives_switching_panes_a_bundle_and_closing_the_pane`:
+  the editor's real UI across panes, a bundle and a close; checks no edit is
+  lost and `assert_no_preview_stored` (no preview ID anywhere) at each step.
 - `apply_look::tests::the_edited_pane_keeps_its_edit_when_it_changes_or_closes`
 - `apply_look::tests::every_button_from_every_state_gives_one_consistent_result`
   (the first, smaller table; Library buttons only)
@@ -199,8 +241,4 @@ Nothing reads them automatically; they are for comparing later.
 
 1. Text backing is still resolved in the renderer (`backing_palette`), not
    in `resolve_pane_look`.
-2. The editor session as one `Option<EditorSession>`; previews as an overlay
-   applied when resolving instead of mutate-and-restore. Editor previews and
-   saves (`preview_personal_theme_draft`, `save_personal_theme_draft`) still
-   write `theme_overrides` and the shared sources directly.
-3. Shaders with stable IDs and a "Fork shader" action.
+2. Shaders with stable IDs and a "Fork shader" action.

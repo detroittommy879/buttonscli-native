@@ -15,7 +15,7 @@
 //! Live previews are an overlay: `EditorSession::preview` holds the theme
 //! built from the draft, and the readers that decide what is drawn
 //! (`resolve_pane_look`, `shared_terminal_theme`, `active_app_theme`,
-//! `colors`, `shown_pane_divider`) put it on top while it exists. A preview
+//! `colors`, `pane_divider_style`) put it on top while it exists. A preview
 //! never writes `preferences`, `theme_overrides` or the theme catalog, so
 //! there is nothing to restore and nothing a preview can leak into saved
 //! files, bundles, closed tabs or the look history. Ending a preview is
