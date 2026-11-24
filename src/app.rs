@@ -14101,26 +14101,28 @@ impl ButtonsApp {
         self.adopt_live_fonts_into_draft();
     }
 
-    /// Ends a pane-look edit before any pane's theme changes or the pane
-    /// closes. An edited draft is always kept (saved under the next numbered
-    /// name), even when the edited pane itself gets a new theme: restoring the
-    /// preview instead threw the edit away. If saving fails, the draft goes to
-    /// the debug backups and the notice says where.
+    /// Settles the editor before any look change or a pane closing. An
+    /// edited draft is always kept (saved under the next numbered name), for
+    /// one pane or the shared theme, even when the edited pane itself gets a
+    /// new theme: restoring the preview instead threw the edit away. If
+    /// saving fails, the draft goes to the debug backups and the notice says
+    /// where. A pane session then ends; a shared one stays open (its preview
+    /// is undone).
     #[cfg(not(target_arch = "wasm32"))]
     fn settle_pane_draft(&mut self) {
-        if self.theme_editor_pane.is_none() {
-            self.restore_personal_theme_preview();
-            return;
-        }
         if let Err(error) = self.autosave_theme_draft() {
             let kept = self.back_up_unsaved_draft();
             self.notice = Some(match kept {
                 Some(path) => format!(
-                    "Could not save the pane's edit: {error}. A copy is in {}",
+                    "Could not save the edit: {error}. A copy is in {}",
                     path.display()
                 ),
-                None => format!("Could not save the pane's edit: {error}"),
+                None => format!("Could not save the edit: {error}"),
             });
+        }
+        if self.theme_editor_pane.is_none() {
+            self.restore_personal_theme_preview();
+            return;
         }
         self.discard_theme_editor_session();
     }
@@ -18862,6 +18864,8 @@ mod idle_glow;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod look_actions;
 #[cfg(not(target_arch = "wasm32"))]
 mod look_history;
 #[cfg(not(target_arch = "wasm32"))]

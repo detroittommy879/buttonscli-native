@@ -108,13 +108,15 @@ impl ButtonsApp {
             _ => {}
         }
         let label = change.label();
-        let before = self.look_state();
         // Use global only takes pane themes away: a preview of the shared
         // theme stays on screen (it is what those panes now show), while a
         // pane edit is saved as for any other change.
         if !matches!(change, LookChange::UseShared { .. }) || self.theme_editor_pane.is_some() {
             self.settle_pane_draft();
         }
+        // After settling: undo goes back to what was on screen, including a
+        // pane edit just saved as its own theme.
+        let before = self.look_state();
         let summary = match change {
             LookChange::Theme { theme_id, target } => {
                 self.set_look(&theme_id, target);
