@@ -32,11 +32,16 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
    already exists (`preferences.*`, `theme_overrides`, `pane_fonts`, the theme
    file, the bundle). Derive the rest. Never store the same color or font in a
    second place.
-2. **Theme buttons go through `apply_look`** (`src/app/apply_look.rs`). A new
-   button never writes `theme_id`, `*_theme_id`, `theme_overrides`,
-   `pane_fonts` or the bar `*_background_override` fields directly.
-3. **Never lose an edit.** Anything that replaces a pane's theme calls
-   `settle_pane_draft` first. Change the editor target only with
+2. **Every look change goes through `change_look`** (`src/app/apply_look.rs`,
+   or a wrapper: `apply_look`, `apply_theme`, `set_theme_all`,
+   `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`). It settles
+   the editor, writes the fields, records the change with its source (look
+   history, undo, logs) and saves. New code never writes `theme_id`,
+   `*_theme_id`, `theme_overrides`, `pane_fonts` or the bar
+   `*_background_override` fields directly; a pane gets a saved look only via
+   `put_pane_look`. A new action is a new `look_actions::LookAction`.
+3. **Never lose an edit.** `change_look` calls `settle_pane_draft` first
+   (it saves an edited draft, pane or shared, under the next numbered name). Change the editor target only with
    `retarget_theme_editor`. End a draft only with `settle_pane_draft` or
    `discard_theme_editor_session`.
 4. **Calm and the live switches are the user's.** `LIVE_SWITCHES` (Calm,
@@ -52,8 +57,10 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
 7. **Label what the control acts on.** Show the edit target
    (`edit_target_theme`), not the shared theme name. Tooltips say exactly what
    the button changes.
-8. **Tests follow real transitions.** Add a row to
-   `every_button_from_every_state_gives_one_consistent_result` for each new
+8. **Tests follow real transitions.** Add the action to
+   `look_actions::LookAction` (the table test
+   `every_look_action_from_every_state_is_consistent` then requires its
+   effect) and any new starting state to `STARTS`, for each new
    button or starting state. Drive the editor across frames with
    `color_adjust::tests::Frames`. Update the tables in `docs/dev/LOOK-STATE.md`.
 9. **Visible text is translated.** Wrap user-visible strings the way the
@@ -152,17 +159,23 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   read `docs/dev/LOOK-STATE.md` before changing any of it.** It lists where
   each fact lives, how a pane's look is resolved, and what every button
   changes. Rules in short:
-  - "Use this theme" goes through `apply_look(id, LookTarget)`
-    (`src/app/apply_look.rs`: WholeApp {scopes, calm}, AllTerminals, Pane);
-    `apply_theme`/`set_theme_all`/`set_theme_for_tab` are wrappers. Never
-    write `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from a
-    new button. Bundles and Shuffle still have their own paths.
-  - Anything that replaces a pane's theme calls `settle_pane_draft` first.
+  - Every look change goes through `change_look(LookChange, LookSource)`
+    (`src/app/apply_look.rs`: Theme {WholeApp, AllTerminals, Pane},
+    UseShared, Bundle, Shuffle, Preset). Buttons, bundles, Shuffle and Look
+    presets all use it; the API and plugins will too. Never write
+    `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from new
+    code. `apply_theme_sources_with` takes the Apply-to scopes as an
+    argument: never swap `preferences.theme_apply` around a call.
+  - `change_look` settles the editor first; the look history
+    (`look_history.rs`) records it and Look → Undo look change reverts it.
   - Themes never change Calm; Apply leaves it alone. Calm, Look presets
     and the switches themselves are the user's controls for it.
   - Labels name the edit target (`edit_target_theme`), not the shared theme.
-  - Add a row to `every_button_from_every_state_gives_one_consistent_result`
-    for any new button or starting state, and update the doc's tables.
+  - Add any new action to `look_actions::LookAction` (the table test then
+    needs its effect) and update the doc's tables.
+  - Profile files are copied to `~/.buttonscli-native/debug/backups/` before
+    they are replaced (`src/storage/backups.rs`); loading never truncates
+    lists (`normalize` keeps everything; caps only limit what the UI adds).
 
 ## Pane and input rules
 

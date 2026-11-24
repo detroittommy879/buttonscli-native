@@ -11,7 +11,8 @@ copies. Read this before changing any of it.
 1. **One owner per fact; derive the rest.** If a value can be computed from
    state that already exists, compute it where it is used. A cache stores the
    key it was built from and checks it on use.
-2. **One transition per action.** Theme buttons go through `apply_look`.
+2. **One transition per action.** Every look change goes through
+   `change_look` (`apply_look` and the other wrappers call it).
    The editor target changes only through `retarget_theme_editor`; an editor
    draft ends only through `settle_pane_draft` or
    `discard_theme_editor_session`. Do not set those fields anywhere else.
@@ -89,24 +90,52 @@ the chrome jumps during a Shuffle fade.
 Panes are keyed by **PTY ID** at runtime. Bundles and `pane_looks` are keyed
 by **slot** (`slot_order`: displayed panes, then the other tabs).
 
-## Transitions: what each action changes
+## Transitions: one path, `change_look`
 
-All in `src/app/apply_look.rs` unless noted.
+Every look change goes through `change_look(LookChange, LookSource)` in
+`src/app/apply_look.rs`. It:
 
-| Action | Function | App chrome | Terminals | Pane own themes | Fonts | Bar colors | Calm | Pane edit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Library **Apply** | `apply_look(WholeApp{scopes = Apply to, calm: false})` | if App ticked | if Terminal ticked | cleared if Terminal ticked | if Fonts ticked (pane fonts cleared) | cleared if App ticked | unchanged | saved |
-| Library **Calm** | same, `calm: true` | same | same | same | same | same | **on** | saved |
-| Status-bar theme pick | `WholeApp{scopes: all}` | yes | yes | cleared | yes | cleared | unchanged | saved |
-| **All terminals** | `AllTerminals` | no | yes (terminal, gradient, effects) | cleared | if Fonts ticked; pane fonts cleared | unchanged | unchanged | saved |
-| **This terminal** | `Pane(index)` | no | that pane | set | that pane's font cleared | unchanged | unchanged | saved (if another pane) |
-| Apply a bundle | `apply_theme_bundle` (`theme_bundles.rs`) | bundle's | per slot | per slot | per slot | bundle's (older bundles with an app theme: cleared) | unchanged | saved, session ended |
-| Editor **Use on the whole app** | `use_look_everywhere` (`app.rs`) | yes | yes | cleared | | | unchanged | autosaved |
-| Shuffle | `shuffle.rs` | own scopes | | | | | | |
+1. checks the theme or bundle exists (else does nothing, returns `None`);
+2. settles the editor (`settle_pane_draft`: an edited draft, pane or shared,
+   is saved under the next numbered name; Use global from the shared editor
+   is the one case that keeps the shared draft open);
+3. snapshots the look (`look_state`), writes the fields through one of the
+   `set_*_look` steps, records the change with its source in the look
+   history (`look_history.rs`, also logged as `buttonscli::looks`) and
+   saves `native.json` once.
 
-Bundles and Shuffle still have their own paths. New "use this theme" buttons
-must call `apply_look` (or one of its wrappers `apply_theme`,
-`set_theme_all`, `set_theme_for_tab`), never write the fields directly.
+`LookChange` is `Theme { theme_id, target }` (targets: `WholeApp { scopes,
+calm }`, `AllTerminals`, `Pane(index)`), `UseShared { index }` (`None` =
+every pane), `Bundle { name }`, `Shuffle { .. }` or `Preset { look }`.
+`LookSource` is `User("<button>")`, `Shuffle`, `Api(client)` or
+`Plugin(id)`. A pane is given a saved look (bundle slot, new terminal, tab
+group, reopened tab) only through `put_pane_look`.
+
+The list of actions is `look_actions::LookAction` (one enum, generated with
+its `ALL` list); each names its entry function.
+
+| Action | Entry | App chrome | Terminals | Pane own themes | Fonts | Bar colors | Calm |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Library **Apply** | `apply_theme` → `WholeApp{Apply to}` | if App ticked | if Terminal ticked | cleared if Terminal ticked | if Fonts ticked (pane fonts cleared) | cleared if App ticked | unchanged |
+| Library **Calm** | same, `calm: true` | same | same | same | same | same | **on** |
+| Status-bar theme pick | `perform_global_theme_action` → `WholeApp{all}` | yes | yes | cleared | yes | cleared | unchanged |
+| **All terminals** | `set_theme_all` → `AllTerminals` | no | yes (terminal, gradient, effects) | cleared | shared if Fonts ticked; pane fonts cleared | unchanged | unchanged |
+| **This terminal**, Random (pane/all) | `set_theme_for_tab` → `Pane(i)` | no | that pane | set | that pane's font cleared | unchanged | unchanged |
+| **Use global theme** (pane menu, Library) | `use_shared_look` → `UseShared{Some(i)}` | no | that pane shows shared | removed | unchanged | unchanged | unchanged |
+| Editor **Use on the whole app** | `use_look_everywhere` | if App ticked | yes | cleared | if Fonts ticked | if App ticked | unchanged |
+| Apply a **bundle** | `apply_theme_bundle` → `Bundle` | bundle's | per slot | per slot | shared (if saved) + per slot | bundle's (older bundles with an app theme: cleared) | unchanged |
+| **Shuffle** step | `shuffle_now` → `Shuffle` | yes (not "Shaders only") | yes, or only the shader | cleared; per-pane picks if "Every pane" | kept on screen unless Shuffle changes fonts | cleared (not "Shaders only") | unchanged |
+| **Look preset** | `apply_look_preset` → `Preset` | Basic/Minimal: theme; Moderate/Showoff: bundle | same | same | Basic: basic fonts | same | Basic/Minimal on, Moderate/Showoff off |
+| **Undo look change** | `undo_look_change` | back | back | back | back | back | back |
+
+Undo restores themes, pane themes and fonts, the shared font, bar colors,
+the window appearance fields and the preset switches. It does not restore
+the pane layout or looks waiting for terminals not yet open.
+
+New "use this theme" controls call `change_look` (or a wrapper:
+`apply_look`, `apply_look_from`, `apply_theme`, `set_theme_all`,
+`set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`), add a
+`LookAction`, and update this table.
 
 ## The theme editor
 
@@ -141,15 +170,29 @@ character's color. Renderer: `vendor/egui_term/src/view.rs` and
 
 ## Tests to extend
 
-- `apply_look::tests::every_button_from_every_state_gives_one_consistent_result`:
-  every Library button × (fresh, after a bundle, mid pane edit). Add a row
-  for any new button or starting state.
+- `look_actions::tests::every_look_action_from_every_state_is_consistent`:
+  every `LookAction` × (fresh, after a bundle, mid pane edit, mid shared
+  edit). A new action must be added to the enum, `perform` and the effect
+  match, or the test does not compile.
+- `apply_look::tests::the_edited_pane_keeps_its_edit_when_it_changes_or_closes`
+- `apply_look::tests::every_button_from_every_state_gives_one_consistent_result`
+  (the first, smaller table; Library buttons only)
 - `apply_look::tests::bundles_bring_their_bar_colors_and_old_ones_clear_stale_colors`
 - `theme_bundles::tests::bundles_keep_the_font_on_screen_and_name_missing_fonts`
+- `storage::backups::tests`: debug copies of profile files.
 - `color_adjust::tests::Frames`: drives the real editor UI with mouse events
   across frames; use it for editor bugs.
 - `egui_term` `render_parity_tests`: headless rendering checks for text
   backing and Invert.
+
+## Debug copies
+
+Before `native.json` or a personal theme file is replaced or deleted, a copy
+goes to `~/.buttonscli-native/debug/backups/<profile>/`
+(`<UTC time>-<reason>-<file>`; reasons: `start`, `save` (at most every 5
+minutes), `replace`, `delete`, `check` (an unreadable file, or an editor
+draft that could not be saved)). The newest 2000 files / 256 MB are kept.
+Nothing reads them automatically; they are for comparing later.
 
 ## Known gaps (next steps)
 
@@ -157,6 +200,7 @@ character's color. Renderer: `vendor/egui_term/src/view.rs` and
    used by the renderer, menus, the editor header and the control API, plus
    a debug "Why does this pane look like this?" view.
 2. The editor session as one `Option<EditorSession>`; previews as an overlay
-   applied when resolving instead of mutate-and-restore.
-3. Bundles and Shuffle routed through `apply_look`.
-4. Shaders with stable IDs and a "Fork shader" action.
+   applied when resolving instead of mutate-and-restore. Editor previews and
+   saves (`preview_personal_theme_draft`, `save_personal_theme_draft`) still
+   write `theme_overrides` and the shared sources directly.
+3. Shaders with stable IDs and a "Fork shader" action.
