@@ -9500,13 +9500,26 @@ impl ButtonsApp {
                             }
                             ui.label(RichText::new(heading).small().weak());
                             for item in list {
-                                if ui
-                                    .selectable_label(
-                                        shader.custom.as_ref() == Some(&item.shader),
-                                        format!("{mark} {}", item.shader.name),
-                                    )
-                                    .clicked()
-                                {
+                                let response = ui.selectable_label(
+                                    shader
+                                        .custom
+                                        .as_ref()
+                                        .is_some_and(|custom| custom.same_as(&item.shader)),
+                                    format!("{mark} {}", item.shader.name),
+                                );
+                                let response = response.on_hover_ui(|ui| {
+                                    let users = self.themes_using_shader(&item.shader);
+                                    ui.label(if users.is_empty() {
+                                        crate::i18n::literal(&self.locale, "No saved theme uses it.")
+                                    } else {
+                                        crate::i18n::formatted_literal(
+                                            &self.locale,
+                                            "Used by: {themes}",
+                                            &[("themes", &users.join(", "))],
+                                        )
+                                    });
+                                });
+                                if response.clicked() {
                                     pick_saved = Some(item.clone());
                                 }
                             }
@@ -9539,7 +9552,7 @@ impl ButtonsApp {
                     saved
                         .iter()
                         .chain(built_in)
-                        .any(|item| &item.shader == custom)
+                        .any(|item| item.shader.same_code(custom))
                 };
                 if pick_blank || pick_code || pick_saved.is_some() {
                     // A note about the previous shader would name the wrong one.
@@ -9560,6 +9573,7 @@ impl ButtonsApp {
                 }
                 if pick_blank {
                     shader.custom = Some(crate::theme::CustomShader {
+                        id: String::new(),
                         name: String::new(),
                         expression: "return bg;".into(),
                         variables: Vec::new(),
@@ -9581,26 +9595,42 @@ impl ButtonsApp {
                                 .desired_width(200.0)
                                 .char_limit(60),
                         );
-                        let listed = self.preferences.saved_shaders.iter().position(|item| {
-                            !custom.name.is_empty() && item.shader.name == custom.name
-                        });
+                        let listed = saved_shader_index(&self.preferences.saved_shaders, custom);
                         let label = if listed.is_some() {
                             crate::i18n::key("Update in shader list")
                         } else {
                             crate::i18n::key("Save to shader list")
                         };
-                        let hover = crate::i18n::key("Keep this shader (and its own colors) under Pattern → Saved shaders, to use in any theme. The same name replaces the saved one.");
+                        let hover = crate::i18n::key("Keep this shader (and its own colors) under Pattern → Saved shaders, to use in any theme. Updating keeps it the same shader, even after a rename.");
                         if ui
                             .spaced_button(crate::i18n::literal(&self.locale, label))
                             .on_hover_text(crate::i18n::literal(&self.locale, hover))
                             .clicked()
                         {
-                            custom.name = self.save_shader_to_list(crate::theme::SavedShader {
+                            let saved = self.save_shader_to_list(crate::theme::SavedShader {
                                 shader: custom.clone(),
                                 colors: own_colors.clone(),
                             });
+                            custom.name = saved.name;
+                            custom.id = saved.id;
                             self.shader_ai.list_note =
                                 Some(format!("Saved \"{}\" to the shader list.", custom.name));
+                        }
+                        if listed.is_some()
+                            && ui
+                                .spaced_button(crate::i18n::literal(&self.locale, "Fork"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Save a separate copy under a new name. Changes to the copy leave the original and the themes using it alone.",
+                                ))
+                                .clicked()
+                        {
+                            let forked = self.fork_shader(custom, own_colors.clone());
+                            self.shader_ai.list_note = Some(format!(
+                                "Forked \"{}\" as \"{}\".",
+                                custom.name, forked.name
+                            ));
+                            *custom = forked;
                         }
                         if let Some(index) = listed {
                             if ui
@@ -9980,6 +10010,7 @@ impl ButtonsApp {
                             let fresh = self.shader_ai.fresh || !has_code;
                             let mut current = if fresh {
                                 crate::theme::CustomShader {
+                                    id: String::new(),
                                     name: String::new(),
                                     expression: String::new(),
                                     variables: Vec::new(),
@@ -10071,6 +10102,7 @@ impl ButtonsApp {
                         });
                         if write_all {
                             let current = crate::theme::CustomShader {
+                                id: String::new(),
                                 name: String::new(),
                                 expression: String::new(),
                                 variables: Vec::new(),
@@ -10348,6 +10380,7 @@ impl ButtonsApp {
                 shader.theme_colors = false;
             }
             shader.custom = Some(crate::theme::CustomShader {
+                id: String::new(),
                 name: candidate.name,
                 expression: candidate.code,
                 variables,
@@ -10553,7 +10586,7 @@ impl ButtonsApp {
                         let mut preview = shader.clone();
                         // Use the sliders the code was checked with: it may
                         // reference them, and the draft may have none yet.
-                        preview.custom = Some(crate::theme::CustomShader {
+                        preview.custom = Some(crate::theme::CustomShader { id: String::new(),
                             name: candidate.name.clone(),
                             expression: candidate.code.clone(),
                             variables: candidate.variables.clone(),
@@ -10619,13 +10652,14 @@ impl ButtonsApp {
                             {
                                 let name = self.save_shader_to_list(crate::theme::SavedShader {
                                     shader: crate::theme::CustomShader {
+                                        id: String::new(),
                                         name: candidate.name.clone(),
                                         expression: candidate.code.clone(),
                                         variables: candidate.variables.clone(),
                                         y_up: candidate.y_up,
                                     },
                                     colors: candidate.colors.clone(),
-                                });
+                                }).name;
                                 self.shader_ai.message =
                                     Some(format!("Saved \"{name}\" to the shader list."));
                             }
@@ -12445,33 +12479,105 @@ impl ButtonsApp {
         });
     }
 
-    /// Adds `shader` to the Pattern picker's saved list, replacing one with the
-    /// same name. An unnamed shader becomes "Shader N". Returns the name used.
+    /// Adds `shader` to the Pattern picker's saved list or updates it there.
+    /// The list is keyed by `CustomShader::id`: the same ID updates its entry
+    /// (also after a rename); code without an ID takes the ID of the entry
+    /// with its name (the old "same name replaces" rule) or a new one. Names
+    /// stay unique: another shader's name gets a number. An unnamed shader
+    /// becomes "Shader N". Returns the shader as saved (name and ID).
     #[cfg(not(target_arch = "wasm32"))]
-    fn save_shader_to_list(&mut self, mut shader: crate::theme::SavedShader) -> String {
+    fn save_shader_to_list(
+        &mut self,
+        mut shader: crate::theme::SavedShader,
+    ) -> crate::theme::CustomShader {
         shader.shader.name = shader.shader.name.trim().to_owned();
         let list = &mut self.preferences.saved_shaders;
+        if shader.shader.id.is_empty() {
+            shader.shader.id = list
+                .iter()
+                .find(|item| {
+                    !shader.shader.name.is_empty() && item.shader.name == shader.shader.name
+                })
+                .map_or_else(new_shader_id, |item| item.shader.id.clone());
+        }
+        let id = shader.shader.id.clone();
+        let taken = |name: &str| {
+            list.iter()
+                .any(|item| item.shader.name == name && item.shader.id != id)
+        };
         if shader.shader.name.is_empty() {
             shader.shader.name = (1..)
                 .map(|number| format!("Shader {number}"))
-                .find(|name| !list.iter().any(|item| &item.shader.name == name))
+                .find(|name| !taken(name))
+                .unwrap();
+        } else if taken(&shader.shader.name) {
+            let base = shader.shader.name.clone();
+            shader.shader.name = (2..)
+                .map(|number| format!("{base} {number}"))
+                .find(|name| !taken(name))
                 .unwrap();
         }
-        let name = shader.shader.name.clone();
+        let saved = shader.shader.clone();
         let count = list.len();
-        match list.iter_mut().find(|item| item.shader.name == name) {
+        match list.iter_mut().find(|item| item.shader.id == id) {
             Some(item) => *item = shader,
             // Full: refuse, never drop the oldest saved shader.
             None if count >= crate::settings::MAX_SAVED_SHADERS => {
                 self.notice = Some(format!(
-                    "{count} shaders are saved, the most there can be. Delete one to save {name}."
+                    "{count} shaders are saved, the most there can be. Delete one to save {}.",
+                    saved.name
                 ));
-                return name;
+                return saved;
             }
             None => list.insert(0, shader),
         }
         self.persist_native_preferences();
-        name
+        saved
+    }
+
+    /// A copy of `shader` with its own ID and the next free numbered name,
+    /// saved to the list. The original entry and the themes using it stay.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn fork_shader(
+        &mut self,
+        shader: &crate::theme::CustomShader,
+        colors: Option<Vec<String>>,
+    ) -> crate::theme::CustomShader {
+        let mut fork = shader.clone();
+        fork.id = new_shader_id();
+        // The original counts as v1, so the first fork is "Name v2".
+        let original = format!("{} v1", shader.name);
+        fork.name = next_theme_version(
+            &shader.name,
+            self.preferences
+                .saved_shaders
+                .iter()
+                .map(|item| item.shader.name.as_str())
+                .chain([original.as_str()]),
+        );
+        self.save_shader_to_list(crate::theme::SavedShader {
+            shader: fork,
+            colors,
+        })
+    }
+
+    /// Names of saved themes whose shader is `shader` (same ID, or the same
+    /// code for copies from before IDs).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn themes_using_shader(&self, shader: &crate::theme::CustomShader) -> Vec<String> {
+        self.themes
+            .all()
+            .iter()
+            .filter(|theme| {
+                theme
+                    .effects
+                    .shader_background
+                    .as_ref()
+                    .and_then(|background| background.custom.as_ref())
+                    .is_some_and(|custom| custom.same_as(shader))
+            })
+            .map(|theme| theme.name.clone())
+            .collect()
     }
 
     /// `name` if no saved theme uses it, else its next numbered version.
@@ -17479,8 +17585,9 @@ fn pane_shader_menu(
                     .show(ui, |ui| {
                         for (number, item) in choices.iter().enumerate() {
                             let mark = if number < saved_count { "★" } else { "◆" };
-                            let current = shader.and_then(|shader| shader.custom.as_ref())
-                                == Some(&item.shader);
+                            let current = shader
+                                .and_then(|shader| shader.custom.as_ref())
+                                .is_some_and(|custom| custom.same_as(&item.shader));
                             if ui
                                 .selectable_label(current, format!("{mark} {}", item.shader.name))
                                 .clicked()
@@ -18172,6 +18279,28 @@ fn paint_theme_sample(ui: &egui::Ui, rect: egui::Rect, document: &Value) {
         );
         at.x = shown.right();
     }
+}
+
+/// A new saved-shader ID.
+#[cfg(not(target_arch = "wasm32"))]
+fn new_shader_id() -> String {
+    format!("shader-{:016x}", fastrand::u64(..))
+}
+
+/// Where `shader` sits in the saved list: by ID, else (code without an ID)
+/// by name.
+#[cfg(not(target_arch = "wasm32"))]
+fn saved_shader_index(
+    list: &[crate::theme::SavedShader],
+    shader: &crate::theme::CustomShader,
+) -> Option<usize> {
+    if !shader.id.is_empty() {
+        if let Some(index) = list.iter().position(|item| item.shader.id == shader.id) {
+            return Some(index);
+        }
+    }
+    list.iter()
+        .position(|item| !shader.name.is_empty() && item.shader.name == shader.name)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -23633,13 +23762,19 @@ Start-Sleep -Seconds 300
             colors: None,
         };
         let shader = crate::theme::CustomShader::default();
-        assert_eq!(app.save_shader_to_list(saved(shader.clone())), "Shader 1");
-        assert_eq!(app.save_shader_to_list(saved(shader.clone())), "Shader 2");
+        assert_eq!(
+            app.save_shader_to_list(saved(shader.clone())).name,
+            "Shader 1"
+        );
+        assert_eq!(
+            app.save_shader_to_list(saved(shader.clone())).name,
+            "Shader 2"
+        );
         let named = crate::theme::CustomShader {
             name: " Lava ".into(),
             ..shader.clone()
         };
-        assert_eq!(app.save_shader_to_list(saved(named.clone())), "Lava");
+        assert_eq!(app.save_shader_to_list(saved(named.clone())).name, "Lava");
         let changed = crate::theme::CustomShader {
             expression: "c2".into(),
             ..named
@@ -23672,6 +23807,81 @@ Start-Sleep -Seconds 300
         let reloaded: Preferences =
             serde_json::from_value(serde_json::to_value(&app.preferences).unwrap()).unwrap();
         assert_eq!(reloaded.saved_shaders, app.preferences.saved_shaders);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn saved_shaders_keep_their_id_through_renames_and_forks() {
+        let mut app = ButtonsApp::empty(Preferences::default());
+        let saved = |shader: crate::theme::CustomShader| crate::theme::SavedShader {
+            shader,
+            colors: None,
+        };
+        let lava = crate::theme::CustomShader {
+            name: "Lava".into(),
+            ..Default::default()
+        };
+        let first = app.save_shader_to_list(saved(lava.clone()));
+        assert!(first.id.starts_with("shader-"));
+        // A theme's copy carries the ID; renaming and updating it keeps one entry.
+        let renamed = crate::theme::CustomShader {
+            name: "Magma".into(),
+            expression: "c3".into(),
+            ..first.clone()
+        };
+        let updated = app.save_shader_to_list(saved(renamed.clone()));
+        assert_eq!(updated.id, first.id);
+        assert_eq!(app.preferences.saved_shaders.len(), 1);
+        assert_eq!(app.preferences.saved_shaders[0].shader.name, "Magma");
+        assert!(renamed.same_as(&app.preferences.saved_shaders[0].shader));
+        // Fork: a second entry with its own ID and a new name; the original stays.
+        let fork = app.fork_shader(&updated, None);
+        assert_ne!(fork.id, first.id);
+        assert_eq!(fork.name, "Magma v2");
+        assert_eq!(app.preferences.saved_shaders.len(), 2);
+        assert!(!fork.same_as(&updated));
+        // Another shader may not take a saved name: it gets a number.
+        let other = crate::theme::CustomShader {
+            name: "Magma".into(),
+            id: "shader-other".into(),
+            ..Default::default()
+        };
+        assert_eq!(app.save_shader_to_list(saved(other)).name, "Magma 2");
+        // Code without an ID updates the entry with its name (the old rule).
+        let unnamed_copy = crate::theme::CustomShader {
+            id: String::new(),
+            ..updated.clone()
+        };
+        assert_eq!(app.save_shader_to_list(saved(unnamed_copy)).id, first.id);
+        assert_eq!(app.preferences.saved_shaders.len(), 3);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn old_saved_shaders_get_an_id_that_still_matches_theme_copies() {
+        let old = crate::theme::CustomShader {
+            name: "Tide".into(),
+            expression: "c1".into(),
+            ..Default::default()
+        };
+        let mut preferences = Preferences {
+            saved_shaders: vec![crate::theme::SavedShader {
+                shader: old.clone(),
+                colors: None,
+            }],
+            ..Preferences::default()
+        };
+        preferences.normalize_theme_sources();
+        let saved = &preferences.saved_shaders[0].shader;
+        assert_eq!(saved.id, old.code_id(), "the same ID on every load");
+        // A theme file from before IDs has the code without an ID.
+        assert!(old.same_as(saved));
+        // An edited copy is not "this exact code is saved".
+        let edited = crate::theme::CustomShader {
+            expression: "c2".into(),
+            ..saved.clone()
+        };
+        assert!(edited.same_as(saved) && !edited.same_code(saved));
     }
 
     #[test]

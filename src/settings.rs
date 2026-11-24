@@ -1044,6 +1044,13 @@ impl Preferences {
     }
 
     pub(crate) fn normalize_theme_sources(&mut self) {
+        // Saved shaders from before IDs get one from their name and code, so
+        // theme copies of them still match (`CustomShader::same_as`).
+        for saved in &mut self.saved_shaders {
+            if saved.shader.id.is_empty() {
+                saved.shader.id = saved.shader.code_id();
+            }
+        }
         for (dimension, minimum, default) in [(0, 720.0, 980.0), (1, 520.0, 760.0)] {
             let value = &mut self.settings_layout.size[dimension];
             *value = if value.is_finite() {

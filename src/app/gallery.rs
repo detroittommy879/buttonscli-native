@@ -399,6 +399,7 @@ mod tests {
             colors: Some(vec!["#112233".into(), "#445566".into()]),
             theme_colors: false,
             custom: Some(crate::theme::CustomShader {
+                id: String::new(),
                 name: "Waves".into(),
                 expression: "c1 * (0.5 + 0.5 * sin(p.x * 10.0 + t))".into(),
                 variables: vec![crate::theme::ShaderVariable {

@@ -618,6 +618,11 @@ impl Default for ShaderVariable {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct CustomShader {
+    /// Stable identity in the saved shader list: kept when the shader is
+    /// renamed or copied into a theme, new for a fork. Empty for code that
+    /// was never saved to the list (and for files from before IDs).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub id: String,
     /// What the AI (or the user) called it; shown in the Style picker.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -628,9 +633,42 @@ pub struct CustomShader {
     pub y_up: bool,
 }
 
+impl CustomShader {
+    /// The same saved shader: the same ID when both have one, else the same
+    /// name and code (copies from before IDs).
+    pub fn same_as(&self, other: &Self) -> bool {
+        if !self.id.is_empty() && !other.id.is_empty() {
+            return self.id == other.id;
+        }
+        self.same_code(other)
+    }
+
+    /// The same name and code, whatever the IDs say. Use this to ask "is
+    /// this exact code saved?": an edited copy keeps its ID.
+    pub fn same_code(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.expression == other.expression
+            && self.variables == other.variables
+            && self.y_up == other.y_up
+    }
+
+    /// An ID from the name and code, the same on every run: given to saved
+    /// shaders from before IDs, so their theme copies still match them.
+    pub fn code_id(&self) -> String {
+        // FNV-1a, 64 bit.
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in self.name.bytes().chain([0]).chain(self.expression.bytes()) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        format!("shader-{hash:016x}")
+    }
+}
+
 impl Default for CustomShader {
     fn default() -> Self {
         Self {
+            id: String::new(),
             name: String::new(),
             expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
             variables: vec![ShaderVariable::default()],

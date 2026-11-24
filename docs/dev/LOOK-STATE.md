@@ -227,12 +227,32 @@ confirm, `preview_due`, `preview`). A session is opened and dropped whole.
 
 ## Shaders and names
 
-A theme stores its shader **by value** (`effects.shaderBackground`, with the
-code's own `custom.name`). The saved shader list (`preferences.saved_shaders`)
-is a separate copy matched by name; picking a saved shader copies it into the
-theme. So a theme name ("TV27") and its shader's name ("Dead Air Smiley") are
-different things, and editing one copy does not change the others. Stable
-shader IDs are planned.
+A theme stores its shader **by value** (`effects.shaderBackground.custom`),
+so a theme file still works when exported alone. Each copy also carries the
+shader's stable ID (`custom.id`), which is the key of the saved shader list
+(`preferences.saved_shaders`):
+
+- Picking a saved shader copies it, ID included, into the theme.
+- **Update in shader list** updates the entry with that ID, also after a
+  rename. Code without an ID (written by AI, or from before IDs) takes the ID
+  of the saved entry with its name, else a new one.
+- **Fork** saves a copy with a new ID and the next name ("Name v2"); the
+  original and the themes using it are untouched.
+- Names in the list are unique: another shader saved under a taken name gets
+  a number.
+- The Pattern picker's hover lists the saved themes using each shader.
+- `CustomShader::same_as` is "the same saved shader" (same ID, else same name
+  and code); `same_code` is "this exact code" (used before replacing unsaved
+  code). Saved shaders from before IDs get `code_id()` on load, a hash of
+  name and code, so their older theme copies still match.
+
+A theme name ("TV27") and its shader's name ("Dead Air Smiley") are different
+things, and editing one copy does not change the others.
+
+A theme file's `metadata.id` is always its file name's stem
+(`theme_files::set_file_identity`, called by `save_theme_document` and the
+other writers): the file name is the one owner of a personal theme's
+identity (`personal:<profile>:<stem>`).
 
 ## Text backing and Invert
 
@@ -323,6 +343,5 @@ Nothing reads them automatically; they are for comparing later.
 
 1. Text backing is still resolved in the renderer (`backing_palette`), not
    in `resolve_pane_look`.
-2. Shaders with stable IDs and a "Fork shader" action.
-3. The look API has no plugin transport yet (`LookSource::Plugin` is
+2. The look API has no plugin transport yet (`LookSource::Plugin` is
    unused); Fix with AI does not cover held bundles.

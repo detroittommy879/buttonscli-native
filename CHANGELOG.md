@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Saved shaders keep their identity: renaming one and choosing **Update in
+  shader list** updates it instead of adding a second entry, and the new
+  **Fork** button saves a separate copy ("Name v2") that leaves the original
+  alone. Hovering a saved shader in the Pattern list shows which themes use
+  it. Names in the list stay unique.
+- Fixed: a copied or imported theme file kept the ID of the theme it came
+  from inside the file.
 - Fixed: ButtonsCLI could crash on its next log line when the program that
   started it (a script or an agent) had exited and closed its output.
 - Agents can read and change the look through the control API
