@@ -10,6 +10,7 @@ use sha2::{Digest, Sha256};
 use crate::assistant::provider::ProviderSettings;
 use crate::settings::Preferences;
 
+use super::backups::{backup_bytes, backup_file, BackupReason};
 use super::paths::{sanitize_profile_name, NativeDataRoot};
 
 const MAX_NATIVE_BYTES: u64 = 8 * 1024 * 1024;
@@ -267,11 +268,18 @@ impl NativeStore {
         }
         ensure_native_path(&self.root.0, &path)?;
         let bytes = read_limited(&path, MAX_NATIVE_BYTES)?;
+        let parsed = parse_document(&bytes);
+        let reason = if parsed.is_ok() {
+            BackupReason::Startup
+        } else {
+            BackupReason::Questionable
+        };
+        backup_bytes_once(&self.root.0, &self.profile, &path, &bytes, reason);
         let has_provider_settings = serde_json::from_slice::<serde_json::Value>(&bytes)
             .ok()
             .and_then(|value| value.get("preferences")?.get("provider_settings").cloned())
             .is_some();
-        let mut document = parse_document(&bytes)?;
+        let mut document = parsed?;
         if !has_provider_settings {
             let compatibility = self.profile_dir().join("legacy-compatible.json");
             if compatibility.is_file() {
@@ -351,6 +359,7 @@ impl NativeStore {
         )?;
         fs::create_dir_all(self.profile_dir())?;
         ensure_native_path(&self.root.0, &path)?;
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Routine);
         atomic_replace(&path, &encoded)?;
         Ok(revision)
     }
@@ -620,6 +629,7 @@ impl NativeStore {
             if !path.is_file() {
                 return Err(StoreError::InvalidDocument);
             }
+            backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
             atomic_replace(&path, bytes)
         } else {
             match write_new(&path, bytes) {
@@ -663,6 +673,7 @@ impl NativeStore {
         if current != expected {
             return Err(StoreError::ThemeChanged);
         }
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
         atomic_replace(&path, bytes)
     }
 
@@ -675,6 +686,7 @@ impl NativeStore {
         if !path.is_file() {
             return Err(StoreError::InvalidDocument);
         }
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Delete);
         fs::remove_file(path)?;
         Ok(())
     }
@@ -904,6 +916,16 @@ pub(crate) fn ensure_native_path(root: &Path, candidate: &Path) -> Result<(), St
         }
     }
     Ok(())
+}
+
+/// The startup copy of `native.json`: skipped when the newest copy already
+/// holds these bytes (`backup_file` compares them).
+fn backup_bytes_once(root: &Path, profile: &str, path: &Path, bytes: &[u8], reason: BackupReason) {
+    if reason == BackupReason::Questionable {
+        backup_bytes(root, profile, "native.json", bytes, reason);
+    } else {
+        backup_file(root, profile, path, reason);
+    }
 }
 
 pub(crate) fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {

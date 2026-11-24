@@ -1,4 +1,5 @@
 // Legacy parsing and projection feed the read-only import preview.
+pub(crate) mod backups;
 pub(crate) mod document;
 pub(crate) mod import;
 pub mod paths;
