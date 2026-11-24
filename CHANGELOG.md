@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Theme files and theme bundles now have a format version, and outside
+  files are checked when they come in. A theme or bundle made by a newer
+  ButtonsCLI is refused with that reason instead of being half-read, and
+  is never overwritten: newer bundles stay in `native.json` unchanged.
+  Importing a theme says what in it was ignored (for example a color that
+  is not `#rrggbb`); personal themes and bundles log it. A broken bundle no
+  longer stops `native.json` from loading.
+- Fixed: a theme color such as `#éa` crashed the color reader.
 - **AI Help → New chat** starts a blank conversation (the AI forgets the
   old one); the chosen terminal and options stay.
 - Library theme buttons now behave the same from any state. **Apply** (with

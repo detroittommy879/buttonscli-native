@@ -470,6 +470,10 @@ pub(crate) struct PaneLook {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub(crate) struct ThemeBundle {
+    /// File format (`look_format`); format 1 is not written. Deserialize a
+    /// bundle only after `look_format::upgrade_bundle`.
+    #[serde(skip_serializing_if = "crate::look_format::BundleFormat::is_first")]
+    pub(crate) format_version: crate::look_format::BundleFormat,
     pub(crate) name: String,
     pub(crate) theme_id: String,
     pub(crate) app_theme_id: String,
