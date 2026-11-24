@@ -21,8 +21,9 @@ copies. Read this before changing any of it.
    away and puts the pane back on an older look.
 4. **Live switches are the user's, not the theme's.** Calm, shaders on/off,
    advanced effects and "focused pane only" (`LIVE_SWITCHES`) are never
-   applied from a theme's `nativeAppearance`. Only the Calm button turns Calm
-   on; nothing applies it off except the user.
+   applied from a theme's `nativeAppearance`. Only the user's own controls
+   change them: the Calm button, the Look presets and the switches. Apply
+   leaves Calm alone.
 5. **`normalize` never drops user data.** Refuse when saving instead.
 6. **Labels name what the control acts on.** The Themes header shows the
    edit target (`edit_target_theme`), not the shared theme.

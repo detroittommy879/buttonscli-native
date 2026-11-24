@@ -1,5 +1,6 @@
 # Agent quick start
 
+- **Changing UI, looks, themes, shaders or bundles?** Read "Before you change UI, looks, themes, shaders or bundles" below first.
 - Keep replies and work logs short. Default new web surfaces to dark mode.
 - Check `git status --short --branch`, fetch origin, and inspect existing commits/PRs
   before editing. Preserve unrelated work. Make focused local commits.
@@ -20,6 +21,52 @@
 - This is the only instruction file: `CLAUDE.md` just imports it.
 - Commit subjects use Conventional Commits; release numbers are computed from them.
   See **Versions and commits** below.
+
+## Before you change UI, looks, themes, shaders or bundles
+
+This file is the one place every agent reads, so the rules live here. Notes
+under `.private/` are local only. Full detail (storage tables, the transition
+table, the editor): `docs/dev/LOOK-STATE.md`.
+
+1. **Find the one owner first.** Before adding a field, look for the fact that
+   already exists (`preferences.*`, `theme_overrides`, `pane_fonts`, the theme
+   file, the bundle). Derive the rest. Never store the same color or font in a
+   second place.
+2. **Theme buttons go through `apply_look`** (`src/app/apply_look.rs`). A new
+   button never writes `theme_id`, `*_theme_id`, `theme_overrides`,
+   `pane_fonts` or the bar `*_background_override` fields directly.
+3. **Never lose an edit.** Anything that replaces a pane's theme calls
+   `settle_pane_draft` first. Change the editor target only with
+   `retarget_theme_editor`. End a draft only with `settle_pane_draft` or
+   `discard_theme_editor_session`.
+4. **Calm and the live switches are the user's.** `LIVE_SWITCHES` (Calm,
+   shaders on, advanced effects, focused pane only) never come from a theme's
+   `nativeAppearance`. Only the user's own controls change them (the Calm
+   button, Look presets, the switches); Apply leaves Calm alone.
+5. **Key per-pane state by PTY ID.** Bundles and `pane_looks` are keyed by
+   slot, never by tab index.
+6. **Save compatibly.** New `Preferences` or theme/bundle fields are additive:
+   `#[serde(default)]`, skipped when empty. Old files must still load.
+   `normalize` never drops user data; refuse the save instead. A change that
+   stops old files loading is breaking (see Versions and commits).
+7. **Label what the control acts on.** Show the edit target
+   (`edit_target_theme`), not the shared theme name. Tooltips say exactly what
+   the button changes.
+8. **Tests follow real transitions.** Add a row to
+   `every_button_from_every_state_gives_one_consistent_result` for each new
+   button or starting state. Drive the editor across frames with
+   `color_adjust::tests::Frames`. Update the tables in `docs/dev/LOOK-STATE.md`.
+9. **Visible text is translated.** Wrap user-visible strings the way the
+   neighboring code does, and run `python scripts/test_audit_i18n.py` (see
+   Validation and traps).
+10. **Keep shared code wasm-safe.** `app`, `settings`, `theme`, `fonts`, `i18n`,
+    `features` and `shortcuts` also build for wasm: run the wasm clippy command.
+11. **Look at it.** For anything visual, run an isolated app (a scratch
+    `USERPROFILE`, never the user's profile), check it in a screenshot, and say
+    in the final message what you did not check.
+12. **Log it.** User-visible changes go in `CHANGELOG.md` under
+    `## Unreleased`. Failed approaches and validation go in
+    `.private/dev-notes/logs/`.
 
 ## Big picture
 
@@ -111,7 +158,8 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
     write `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from a
     new button. Bundles and Shuffle still have their own paths.
   - Anything that replaces a pane's theme calls `settle_pane_draft` first.
-  - Only the Calm button turns Calm on; Apply leaves it alone.
+  - Themes never change Calm; Apply leaves it alone. Calm, Look presets
+    and the switches themselves are the user's controls for it.
   - Labels name the edit target (`edit_target_theme`), not the shared theme.
   - Add a row to `every_button_from_every_state_gives_one_consistent_result`
     for any new button or starting state, and update the doc's tables.
