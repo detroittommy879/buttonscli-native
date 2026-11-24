@@ -5,6 +5,8 @@
 //!   the previous launch's is kept as `buttonscli.previous.log`.
 //! - `crash-<unix seconds>.txt`: version, OS, panic message, location and
 //!   backtrace. The newest [`KEEP_CRASH_REPORTS`] are kept.
+//! - Look changes (themes, bundles, Shuffle, API requests, undo) are logged
+//!   at info level under the `buttonscli::looks` target, with their source.
 //!
 //! Logs record app events only. Never log keys, tokens or terminal contents.
 
@@ -102,7 +104,8 @@ fn crash_report(info: &std::panic::PanicHookInfo<'_>) -> String {
          os: {} {}\n\
          thread: {}\n\
          location: {location}\n\
-         message: {}\n\n\
+         message: {}\n\
+         log: buttonscli.log in this folder (look changes: buttonscli::looks lines)\n\n\
          backtrace:\n{}\n",
         crate::BUILD_VERSION,
         std::env::consts::OS,
