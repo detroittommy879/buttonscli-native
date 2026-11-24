@@ -138,6 +138,41 @@ New "use this theme" controls call `change_look` (or a wrapper:
 `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`), add a
 `LookAction`, and update this table.
 
+## Outside callers (control API, MCP, plugins)
+
+Agents and (later) plugins change the look only through the look API:
+`src/session/looks.rs` (request types, bounded queue), the routes in
+`src/control/server.rs` (`/v1/look`, `/v1/look/themes`, `/v1/look/apply`,
+`/v1/look/undo`), and `src/app/look_api.rs` on the app thread. Rules:
+
+- Reads (`look_report`, the theme list) answer at once.
+- An apply never changes anything by itself: it opens the **Look change
+  request** window (client name, theme or bundle, where, one checkbox per
+  part, all ticked unless the caller turned some off). The user can **Try
+  it** (then **Keep** or **Put back**), **Apply**, **Decline** or block the
+  client until restart. One request at a time; unanswered after 175 s it
+  closes as declined.
+- The change goes through `change_look` with `LookSource::Api(client)` and
+  `calm: false`. Outside callers have no presets, so Calm and the live
+  switches never change.
+- `look/undo` undoes only when the newest change came from the API.
+- `buttonsclictl look*` and the MCP `look_*` tools are thin clients of
+  these routes (`src/ctl/`).
+
+A plugin API should reuse `LookRequest` and the same window, with
+`LookSource::Plugin(id)`.
+
+## Broken and outdated files
+
+`look_format` (see File versions) says what is wrong with a file. A personal
+theme that does not load is listed under Settings → Themes with **Fix with
+AI** (`src/file_repair.rs`, `src/app/theme_repair.rs`): the theme model gets
+the file and the findings, the answer is checked like the loader checks
+(one correction round), and the user sees the diff before **Save fixed
+file**, which replaces the file only if it is unchanged on disk, after a
+backup copy. Files from a newer ButtonsCLI are never changed. Not covered
+yet: bundles held back in `native.json`.
+
 ## The theme editor
 
 - Target: `theme_editor_pane` (a PTY ID) in pane mode, otherwise the shared
@@ -225,6 +260,10 @@ plugins, other ButtonsCLI versions), so both carry a format version.
   across frames; use it for editor bugs.
 - `egui_term` `render_parity_tests`: headless rendering checks for text
   backing and Invert.
+- `look_api::tests`: the request window's answers (Try/Put back restores
+  the look exactly, Calm kept, unticked parts kept, decline/block change
+  nothing, API undo refuses app changes, pane target).
+- `file_repair::tests`: checker, one correction round, diff.
 - `look_format::tests`: every validator reason, the upgrade chain (with a
   fake two-step chain), held bundles; `storage::store::tests::newer_*` and
   `old_bundles_load_and_save_unchanged`.
@@ -247,3 +286,5 @@ Nothing reads them automatically; they are for comparing later.
    saves (`preview_personal_theme_draft`, `save_personal_theme_draft`) still
    write `theme_overrides` and the shared sources directly.
 3. Shaders with stable IDs and a "Fork shader" action.
+4. The look API has no plugin transport yet (`LookSource::Plugin` is
+   unused); Fix with AI does not cover held bundles.
