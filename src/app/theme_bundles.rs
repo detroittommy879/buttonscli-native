@@ -39,7 +39,7 @@ impl ButtonsApp {
         order
     }
 
-    fn known_theme(&self, id: &str) -> bool {
+    pub(super) fn known_theme(&self, id: &str) -> bool {
         !id.starts_with("preview:") && self.themes.all().iter().any(|theme| theme.id == id)
     }
 
@@ -102,12 +102,7 @@ impl ButtonsApp {
             .collect();
         for (slot, id) in free.into_iter().zip(waiting) {
             let look = pending.looks[slot].clone();
-            if let Some(theme) = look.theme_id.filter(|theme| self.known_theme(theme)) {
-                self.theme_overrides.insert(id, theme);
-            }
-            if let Some(font) = look.font {
-                self.pane_fonts.insert(id, font);
-            }
+            self.put_pane_look(id, look.theme_id.as_deref(), look.font.as_ref(), false);
             pending.used_slots.insert(slot);
             pending.used_tabs.insert(id);
         }
@@ -166,6 +161,7 @@ impl ButtonsApp {
                 dock_background: self.preferences.dock_background_override.clone(),
                 status_background: self.preferences.status_background_override.clone(),
             }),
+            typography: Some(self.preferences.typography.clone()),
         }
     }
 
@@ -211,18 +207,19 @@ impl ButtonsApp {
     /// or a layout that does not fit are skipped, not errors. Returns a short
     /// summary, or `None` when there is no bundle with that name.
     pub(super) fn apply_theme_bundle(&mut self, ctx: &egui::Context, name: &str) -> Option<String> {
-        // The user's bundles win over a built-in one with the same name.
-        let bundle = self
-            .preferences
-            .theme_bundles
-            .iter()
-            .chain(crate::library::bundles())
-            .find(|bundle| bundle.name == name)
-            .cloned()?;
-        // Keeps a pane's edit as its own theme file before it is replaced;
-        // the editor then follows the new looks instead of the old draft.
-        self.settle_pane_draft();
-        self.discard_theme_editor_session();
+        self.change_look(
+            apply_look::LookChange::Bundle {
+                name: name.to_owned(),
+                ctx: ctx.clone(),
+            },
+            apply_look::LookSource::User("Apply bundle"),
+        )
+    }
+
+    /// Writes a bundle's looks. Only `change_look` calls it (it has already
+    /// settled the editor).
+    pub(super) fn set_bundle_looks(&mut self, ctx: &egui::Context, bundle: &ThemeBundle) -> String {
+        let name = &bundle.name;
         let app_theme_before = self.preferences.app_theme_id.clone();
         let mut skipped = 0;
         for (target, id) in [
@@ -267,6 +264,10 @@ impl ButtonsApp {
         if let Some(brightness) = bundle.row_banding_brightness {
             self.preferences.row_banding_brightness = brightness.min(64);
         }
+        // The shared font (UI and terminals); older bundles keep the current one.
+        if let Some(typography) = &bundle.typography {
+            self.preferences.typography = typography.clone();
+        }
         self.preferences.normalize_theme_sources();
         if self.tabs.len() > 1 {
             match parse_layout(&bundle.layout) {
@@ -290,30 +291,25 @@ impl ButtonsApp {
         for (slot, index) in order.into_iter().enumerate().take(MAX_PANE_LOOKS) {
             let id = self.tabs[index].id;
             let look = bundle.panes.get(slot).cloned().unwrap_or_default();
-            match look.theme_id {
-                Some(theme) if self.known_theme(&theme) => {
-                    self.theme_overrides.insert(id, theme);
-                }
-                Some(_) => {
-                    skipped += 1;
-                    self.theme_overrides.remove(&id);
-                }
-                None => {
-                    self.theme_overrides.remove(&id);
-                }
+            if !self.put_pane_look(id, look.theme_id.as_deref(), look.font.as_ref(), true) {
+                skipped += 1;
             }
-            match look.font {
-                Some(font) => self.pane_fonts.insert(id, font),
-                None => self.pane_fonts.remove(&id),
-            };
             pending.used_slots.insert(slot);
             pending.used_tabs.insert(id);
         }
         // A font that is not installed falls back to the default terminal
         // font; say so instead of changing the look silently.
         let mut missing_fonts: Vec<String> = Vec::new();
-        for font in bundle.panes.iter().filter_map(|look| look.font.as_ref()) {
-            let family = &font.zone.family;
+        let shared = bundle
+            .typography
+            .iter()
+            .map(|typography| &typography.shell.family);
+        let panes = bundle
+            .panes
+            .iter()
+            .filter_map(|look| look.font.as_ref())
+            .map(|font| &font.zone.family);
+        for family in shared.chain(panes) {
             if !self.font_catalog.is_available(family) && !missing_fonts.contains(family) {
                 missing_fonts.push(family.clone());
             }
@@ -340,10 +336,7 @@ impl ButtonsApp {
                 crate::fonts::DEFAULT_MONO_FONT.trim_end_matches(" Bundled"),
             ));
         }
-        // Save now (row banding, layout, pane looks): waiting for the periodic
-        // autosave lost the bundle's settings if the app was closed abruptly.
-        self.persist_native_preferences();
-        Some(summary)
+        summary
     }
 
     /// File menu: apply a saved bundle.

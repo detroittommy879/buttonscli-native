@@ -194,8 +194,9 @@ pub(super) fn fade_theme(
 
 /// What a Shuffle change applies: the whole theme, or only its shader
 /// (effects) when "Shaders only" is on, so the colors stay as they are.
-fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeApplyScopes {
-    if shuffle.shader_only {
+/// The Apply-to parts one Shuffle step changes.
+pub(super) fn shuffle_scopes(shader_only: bool, fonts: bool) -> crate::settings::ThemeApplyScopes {
+    if shader_only {
         crate::settings::ThemeApplyScopes {
             app: false,
             terminal: false,
@@ -205,7 +206,7 @@ fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeA
         }
     } else {
         crate::settings::ThemeApplyScopes {
-            fonts: shuffle.fonts,
+            fonts,
             ..Default::default()
         }
     }
@@ -288,45 +289,23 @@ impl ButtonsApp {
             .iter()
             .map(|tab| (tab.id, self.terminal_presentation_for(tab.id)))
             .collect();
-        let fonts: Vec<(u64, fonts::PaneFont)> = self
-            .tabs
-            .iter()
-            .map(|tab| (tab.id, self.font_for_pane(tab.id)))
-            .collect();
-        let typography = self.preferences.typography.clone();
-
-        // The whole-app path of the status bar's Random theme, with fonts
-        // only when asked: a font change resizes every terminal.
-        let theme = self.themes.get(&id).clone();
-        let scopes = std::mem::replace(&mut self.preferences.theme_apply, shuffle_scopes(&shuffle));
-        let calm = self.preferences.calm_mode;
-        if shuffle.shader_only {
-            // `set_theme_all` sets every source and clears pane themes, so
-            // only the effects source moves here; the shared theme stays.
-            let shared = self.preferences.theme_id.clone();
-            self.apply_theme_sources(theme, calm);
-            self.preferences.theme_id = shared;
+        // Per-pane picks first, so each pane avoids the app's new theme.
+        let pane_themes: Vec<(usize, String)> = if shuffle.every_pane && !shuffle.shader_only {
+            (0..self.tabs.len())
+                .filter_map(|index| Some((index, self.next_shuffle_theme(&id)?)))
+                .collect()
         } else {
-            self.set_theme_all(&id);
-            self.apply_theme_sources(theme, calm);
-        }
-        self.preferences.theme_apply = scopes;
-        // Shaders only keeps every pane's colors, so per-pane themes are skipped.
-        if shuffle.every_pane && !shuffle.shader_only {
-            for index in 0..self.tabs.len() {
-                if let Some(pick) = self.next_shuffle_theme(&id) {
-                    self.set_theme_for_tab(index, &pick);
-                }
-            }
-        }
-        if !shuffle.fonts {
-            self.preferences.typography = typography;
-            for (tab, font) in fonts {
-                if self.font_for_pane(tab) != font {
-                    self.pane_fonts.insert(tab, font);
-                }
-            }
-        }
+            Vec::new()
+        };
+        self.change_look(
+            apply_look::LookChange::Shuffle {
+                theme_id: id,
+                shader_only: shuffle.shader_only,
+                fonts: shuffle.fonts,
+                pane_themes,
+            },
+            apply_look::LookSource::Shuffle,
+        );
         self.shuffle.fade = (shuffle.fade_seconds > 0.0).then_some(LookFade {
             started: now,
             seconds: shuffle.fade_seconds,
@@ -512,11 +491,10 @@ mod tests {
 
     #[test]
     fn shader_only_shuffle_applies_just_the_effects() {
-        let mut shuffle = crate::settings::Shuffle::default();
-        let whole = shuffle_scopes(&shuffle);
+        let whole = shuffle_scopes(false, false);
         assert!(whole.app && whole.terminal && whole.gradient && whole.effects);
-        shuffle.shader_only = true;
-        let shader = shuffle_scopes(&shuffle);
+        assert!(!whole.fonts && shuffle_scopes(false, true).fonts);
+        let shader = shuffle_scopes(true, true);
         assert!(!shader.app && !shader.terminal && !shader.gradient && !shader.fonts);
         assert!(shader.effects);
     }

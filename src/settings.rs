@@ -447,10 +447,13 @@ pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
 /// Caps on what the UI lets you add. Adding past one is refused with a
 /// message; loading never cuts a longer list (an outside or older file keeps
 /// everything). native.json's own size limit is the real bound.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_SAVED_SHADERS: usize = 512;
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_THEME_BUNDLES: usize = 512;
 /// Most pane slots a theme bundle or the saved pane looks apply. Extra slots
 /// in a file are kept but ignored.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
 /// One pane slot's look. `None` uses the shared theme or font.
@@ -486,6 +489,10 @@ pub(crate) struct ThemeBundle {
     /// clears them, as Apply does, so the bars never keep a stale color.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) chrome: Option<BundleChrome>,
+    /// The shared fonts (UI and terminals). `None` (older bundles) keeps the
+    /// fonts in use.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) typography: Option<Typography>,
 }
 
 /// The app chrome colors a bundle carries besides its app theme.

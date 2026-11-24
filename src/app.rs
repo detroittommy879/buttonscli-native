@@ -557,6 +557,9 @@ pub struct ButtonsApp {
     /// Look → Shuffle: the timer, this round's themes and the fade.
     #[cfg(not(target_arch = "wasm32"))]
     shuffle: shuffle::ShuffleState,
+    /// Every look change with its source, for logs, the API and undo.
+    #[cfg(not(target_arch = "wasm32"))]
+    look_history: look_history::LookHistory,
     /// Idle glow: the panes that turned it on, each with the time it went on
     /// (ms). Not saved; a pane's quiet time counts from here or its last output.
     #[cfg(not(target_arch = "wasm32"))]
@@ -1705,6 +1708,8 @@ impl ButtonsApp {
             #[cfg(not(target_arch = "wasm32"))]
             shuffle: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
+            look_history: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
             idle_glow_panes: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             idle_glow_off: Default::default(),
@@ -2451,12 +2456,13 @@ impl ButtonsApp {
             // chrome settings come with it and old chrome overrides are cleared.
             // Every part (default scopes, all on), whatever Apply to says.
             let calm = self.preferences.calm_mode;
-            self.apply_look(
+            self.apply_look_from(
                 &id,
                 apply_look::LookTarget::WholeApp {
                     scopes: Default::default(),
                     calm,
                 },
+                apply_look::LookSource::User("Status bar theme"),
             );
         }
     }
@@ -3258,15 +3264,13 @@ impl ButtonsApp {
                 self.toggle_auto_tile(index);
             }
         }
-        if let (Some(font), Some(tab)) = (closed.font_override, self.tabs.last()) {
-            self.pane_fonts.insert(tab.id, font);
-        }
-        if let (Some(theme_id), Some(tab)) = (closed.theme_override, self.tabs.last()) {
-            if !theme_id.starts_with("preview:")
-                && self.themes.all().iter().any(|theme| theme.id == theme_id)
-            {
-                self.theme_overrides.insert(tab.id, theme_id);
-            }
+        if let Some(id) = self.tabs.last().map(|tab| tab.id) {
+            self.put_pane_look(
+                id,
+                closed.theme_override.as_deref(),
+                closed.font_override.as_ref(),
+                false,
+            );
         }
     }
 
@@ -12369,10 +12373,9 @@ impl ButtonsApp {
                 let id = format!("personal:{profile}:{}", file.trim_end_matches(".json"));
                 // This snapshot includes every shared section, independently of the
                 // Library's selective Apply controls. Keep per-PTY overrides intact.
-                let scopes = self.preferences.theme_apply.clone();
-                self.preferences.theme_apply = crate::settings::ThemeApplyScopes::default();
-                self.apply_theme_sources(self.themes.get(&id).clone(), self.preferences.calm_mode);
-                self.preferences.theme_apply = scopes;
+                let theme = self.themes.get(&id).clone();
+                let calm = self.preferences.calm_mode;
+                self.apply_theme_sources_with(theme, &Default::default(), calm, true);
                 // The draft's edits are in the copy just saved: the editor
                 // must not save them again under another number.
                 self.theme_editor_original_document = self.theme_editor_document.clone();
@@ -13215,25 +13218,44 @@ impl ButtonsApp {
         self.apply_theme_sources(theme, calm);
     }
 
+    /// The shared sources for the Apply-to parts the user ticked.
     fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
+        let scopes = self.preferences.theme_apply.clone();
+        self.apply_theme_sources_with(theme, &scopes, calm, true);
+    }
+
+    /// Points the shared sources ticked in `scopes` at `theme` and applies
+    /// its saved appearance for those parts. `move_shared` also makes it the
+    /// shared theme (Library highlight); Shuffle's shader-only step does not.
+    /// The scopes are an argument: callers used to swap
+    /// `preferences.theme_apply` around the call and put it back by hand.
+    fn apply_theme_sources_with(
+        &mut self,
+        theme: ThemeDefinition,
+        scopes: &crate::settings::ThemeApplyScopes,
+        calm: bool,
+        move_shared: bool,
+    ) {
         let id = theme.id.clone();
-        self.preferences.theme_id = id.clone();
-        if self.preferences.theme_apply.app {
+        if move_shared {
+            self.preferences.theme_id = id.clone();
+        }
+        if scopes.app {
             self.preferences.app_theme_id = id.clone();
             self.preferences.pane_divider = Default::default();
             self.preferences.dock_background_override = None;
             self.preferences.status_background_override = None;
         }
-        if self.preferences.theme_apply.terminal {
+        if scopes.terminal {
             self.preferences.terminal_theme_id = id.clone();
         }
-        if self.preferences.theme_apply.gradient {
+        if scopes.gradient {
             self.preferences.gradient_theme_id = id.clone();
         }
-        if self.preferences.theme_apply.effects {
-            self.preferences.effects_theme_id = id;
+        if scopes.effects {
+            self.preferences.effects_theme_id = id.clone();
         }
-        if self.preferences.theme_apply.fonts {
+        if scopes.fonts {
             if let Some(typography) = theme.typography {
                 self.preferences.typography = typography;
             }
@@ -13246,7 +13268,7 @@ impl ButtonsApp {
             self.preferences.calm_mode = true;
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(document) = self.themes.personal_document(&self.preferences.theme_id) {
+        if let Some(document) = self.themes.personal_document(&id) {
             let mut value = serde_json::to_value(&self.preferences).unwrap();
             for (key, scope) in NATIVE_APPEARANCE_FIELDS {
                 // Calm, shaders on/off and the effect switches are the
@@ -13256,9 +13278,9 @@ impl ButtonsApp {
                     continue;
                 }
                 let enabled = match *scope {
-                    "app" => self.preferences.theme_apply.app,
-                    "fonts" => self.preferences.theme_apply.fonts,
-                    _ => self.preferences.theme_apply.effects,
+                    "app" => scopes.app,
+                    "fonts" => scopes.fonts,
+                    _ => scopes.effects,
                 };
                 if enabled {
                     if let Some(saved) = document["nativeAppearance"].get(*key) {
@@ -13273,7 +13295,7 @@ impl ButtonsApp {
         }
         // The portable divider in the theme is authoritative. Old appearance
         // copies can contain a stale native override of the same fields.
-        if self.preferences.theme_apply.app {
+        if scopes.app {
             self.preferences.pane_divider = Default::default();
         }
     }
@@ -14152,24 +14174,36 @@ impl ButtonsApp {
                     Some(format!("Could not save this pane's edit first: {error}"));
                 return;
             }
-            self.discard_theme_editor_session();
             let id = self
                 .theme_overrides
                 .get(&tab)
                 .cloned()
                 .unwrap_or_else(|| self.preferences.theme_id.clone());
-            self.theme_editor_pane = None;
-            self.theme_editor_pane_mode = false;
-            let theme = self.themes.get(&id).clone();
-            self.set_theme_all(&id);
+            // Every terminal part, plus the app colors and fonts when ticked
+            // in Apply to (as Library Apply).
+            let scopes = crate::settings::ThemeApplyScopes {
+                terminal: true,
+                gradient: true,
+                effects: true,
+                ..self.preferences.theme_apply.clone()
+            };
             let calm = self.preferences.calm_mode;
-            self.apply_theme_sources(theme, calm);
+            self.apply_look_from(
+                &id,
+                apply_look::LookTarget::WholeApp { scopes, calm },
+                apply_look::LookSource::User("Use on the whole app"),
+            );
+            // The editor follows the shared look now.
+            if let Err(error) = self.retarget_theme_editor(None) {
+                self.theme_editor_status = Some(error);
+            }
         } else {
-            self.theme_editor_pane_mode = false;
-            self.theme_overrides.clear();
-            self.pending_pane_looks = None;
+            self.change_look(
+                apply_look::LookChange::UseShared { index: None },
+                apply_look::LookSource::User("Use on the whole app"),
+            );
         }
-        self.persist_native_preferences();
+        self.theme_editor_pane_mode = false;
     }
 
     /// Says when editor results won't reach the whole app (one pane is being
@@ -18828,6 +18862,8 @@ mod idle_glow;
 #[cfg(all(test, windows))]
 #[path = "input_recovery_tests.rs"]
 mod input_recovery_tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod look_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
 mod notices;
