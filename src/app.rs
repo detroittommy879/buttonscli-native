@@ -2065,71 +2065,12 @@ impl ButtonsApp {
         std::time::Duration::from_secs_f64((due - now).clamp(0.001, step))
     }
 
+    /// The shared look as drawn (panes without a theme of their own). Same
+    /// rules as `resolve_pane_look`.
     #[cfg(not(target_arch = "wasm32"))]
     fn terminal_presentation(&self) -> ThemeDefinition {
-        let mut theme = self.themes.get(&self.preferences.terminal_theme_id).clone();
-        let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
-        let effects = &self.themes.get(&self.preferences.effects_theme_id).effects;
-        theme.effects = TerminalEffects {
-            shader_background: effects.shader_background.clone().map(|mut shader| {
-                shader.animated &= !self.preferences.calm_mode;
-                shader
-            }),
-            gradient: gradient.gradient,
-            gradient_geometry: gradient.gradient_geometry,
-            gradient_animation: gradient.gradient_animation
-                && !effects.master_disabled
-                && !self.preferences.calm_mode,
-            master_disabled: effects.master_disabled,
-            static_opacity: if self.preferences.calm_mode {
-                0.0
-            } else {
-                effects.static_opacity
-            },
-            static_density: effects.static_density,
-            static_intensity: effects.static_intensity,
-            static_amplitude: effects.static_amplitude,
-            static_brightness: effects.static_brightness,
-            scanlines_strength: if self.preferences.calm_mode {
-                0.0
-            } else {
-                effects.scanlines_strength
-            },
-            scanlines_period: effects.scanlines_period,
-            row_banding_enabled: effects.row_banding_enabled,
-            row_banding_color: effects.row_banding_color,
-            row_banding_opacity: effects.row_banding_opacity,
-            simple_noise_enabled: effects.simple_noise_enabled && !self.preferences.calm_mode,
-            simple_noise_amount: if self.preferences.calm_mode {
-                0.0
-            } else {
-                effects.simple_noise_amount
-            },
-            simple_noise_resolution: effects.simple_noise_resolution,
-            simple_noise_fps: effects.simple_noise_fps,
-            simple_noise_min_brightness: effects.simple_noise_min_brightness,
-            simple_noise_max_brightness: effects.simple_noise_max_brightness,
-            simple_noise_idle_enabled: effects.simple_noise_idle_enabled,
-            simple_noise_idle_amount: effects.simple_noise_idle_amount,
-            simple_noise_idle_delay_seconds: effects.simple_noise_idle_delay_seconds,
-            simple_noise_idle_ramp_seconds: effects.simple_noise_idle_ramp_seconds,
-        };
-        if !self.preferences.classic_effects {
-            without_classic_effects(&mut theme.effects);
-        }
-        self.with_strength_override(theme)
-    }
-
-    /// Look → Override panes: every pane's shader at one Strength. Only what
-    /// is drawn changes; theme files and pane looks keep their own value.
-    #[cfg(not(target_arch = "wasm32"))]
-    fn with_strength_override(&self, mut theme: ThemeDefinition) -> ThemeDefinition {
-        if let (Some(strength), Some(shader)) = (
-            self.preferences.strength_override.active(),
-            &mut theme.effects.shader_background,
-        ) {
-            shader.strength = strength;
-        }
+        let mut theme = self.shared_terminal_theme();
+        self.apply_live_switches(&mut theme);
         theme
     }
 
@@ -2144,42 +2085,16 @@ impl ButtonsApp {
         }
     }
 
+    /// A pane's look without the Shuffle fade (`resolve_pane_look`).
     #[cfg(not(target_arch = "wasm32"))]
     fn settled_presentation_for(&self, session_id: u64) -> ThemeDefinition {
-        if let Some(id) = self.theme_overrides.get(&session_id) {
-            if let Some(theme) = self.themes.all().iter().find(|theme| &theme.id == id) {
-                let mut theme = theme.clone();
-                if self.preferences.calm_mode {
-                    if let Some(shader) = &mut theme.effects.shader_background {
-                        shader.animated = false;
-                    }
-                    theme.effects.gradient_animation = false;
-                    theme.effects.static_opacity = 0.0;
-                    theme.effects.scanlines_strength = 0.0;
-                    theme.effects.simple_noise_enabled = false;
-                }
-                if !self.preferences.classic_effects {
-                    without_classic_effects(&mut theme.effects);
-                }
-                return self.with_strength_override(theme);
-            }
-        }
-        self.terminal_presentation()
+        self.resolve_pane_look(session_id).presentation
     }
 
+    /// The font a pane draws with (`resolve_pane_font`).
     #[cfg(not(target_arch = "wasm32"))]
     fn font_for_pane(&self, id: u64) -> fonts::PaneFont {
-        if let Some(font) = self.pane_fonts.get(&id) {
-            return font.clone();
-        }
-        if let Some(typography) = self
-            .theme_overrides
-            .get(&id)
-            .and_then(|theme| self.themes.get(theme).typography.as_ref())
-        {
-            return fonts::PaneFont::from(typography);
-        }
-        fonts::PaneFont::from(&self.preferences.typography)
+        self.resolve_pane_font(id).0
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -2194,9 +2109,12 @@ impl ButtonsApp {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn theme_for_tab(&self, index: usize) -> &str {
+        // As `resolve_pane_look`: an own theme that no longer exists falls
+        // back to the shared terminal theme.
         self.tabs
             .get(index)
             .and_then(|tab| self.theme_overrides.get(&tab.id))
+            .filter(|id| self.themes.all().iter().any(|theme| &theme.id == *id))
             .map(String::as_str)
             .unwrap_or(&self.preferences.terminal_theme_id)
     }
@@ -18871,6 +18789,8 @@ mod look_history;
 #[cfg(not(target_arch = "wasm32"))]
 mod looks;
 mod notices;
+#[cfg(not(target_arch = "wasm32"))]
+mod pane_look;
 #[cfg(not(target_arch = "wasm32"))]
 mod power;
 #[cfg(not(target_arch = "wasm32"))]

@@ -291,8 +291,14 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
   Look → Override panes (`strength_override`) is presentation only:
-  `with_strength_override` in `terminal_presentation` and the override
-  branch of `settled_presentation_for`; never write it into themes.
+  `apply_live_switches` (`src/app/pane_look.rs`, with Calm and classic
+  effects) for every pane; never write it into themes.
+- A pane's look is decided only by `resolve_pane_look(pty)`
+  (`src/app/pane_look.rs`: origin, presentation, font and why);
+  `settled_presentation_for`, `font_for_pane` (`resolve_pane_font`),
+  `theme_for_tab` and `terminal_presentation` agree with it. Settings →
+  Debug shows "Why does this pane look like this?" and Copy look as JSON
+  (`look_report`).
   Status-bar shader edits (`edit_pane_look`) leave the editor in pane mode,
   so results skip the app colors; `look_target_hint`/`use_look_everywhere`
   is the way out. Shared panes use `terminal_presentation()` directly in

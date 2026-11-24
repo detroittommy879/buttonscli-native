@@ -255,6 +255,7 @@ impl ButtonsApp {
             .small()
             .color(self.colors().muted),
         );
+        self.look_debug_section(ui);
         // Keep the readout current without forcing full-rate frames.
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_millis(500));

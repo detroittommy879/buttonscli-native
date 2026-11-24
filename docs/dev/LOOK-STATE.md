@@ -68,18 +68,19 @@ At startup `restore_pane_looks` hands those looks back by slot.
 
 ## How a pane's look is resolved
 
+One function decides it: `resolve_pane_look(pty)` in `src/app/pane_look.rs`.
+
 ```text
-terminal_presentation_for(pty)            per frame, per pane
-  └─ settled_presentation_for(pty)
-       ├─ theme_overrides[pty] set → that theme
-       │     + Calm, classic_effects, Look strength override
-       └─ else terminal_presentation()    the shared look
-             terminal colors  ← terminal_theme_id
-             gradient         ← gradient_theme_id
-             shader/effects   ← effects_theme_id
-             + Calm, classic_effects, strength override
-  └─ Shuffle fade, if one is running
-font_for_pane(pty): pane_fonts[pty] → override theme's typography → shared typography
+resolve_pane_look(pty) -> PaneLook { origin, presentation, font, font_origin }
+  origin: Own { theme_id }        theme_overrides[pty], if that theme exists
+        | Shared { terminal, gradient, effects }   the Apply-to sources
+  presentation: that theme (shared: shared_terminal_theme())
+        + apply_live_switches: Calm, classic effects off, Strength override
+  font: resolve_pane_font(pty): pane_fonts[pty] → own theme's typography → shared
+terminal_presentation_for(pty) = presentation + the Shuffle fade (draw time only)
+theme_for_tab(i), font_for_pane(pty), settled_presentation_for(pty): the same answer
+explain_pane_look(pty): the reasons in plain English (Settings → Debug)
+look_report(): the shared look, every pane and the history as JSON
 app chrome: app_theme_colors() (app_theme_id + Shuffle fade) + bar overrides → colors()
 ```
 
@@ -196,9 +197,8 @@ Nothing reads them automatically; they are for comparing later.
 
 ## Known gaps (next steps)
 
-1. One `resolve_pane_look(pty) -> PaneLook { theme, font, backing, why }`
-   used by the renderer, menus, the editor header and the control API, plus
-   a debug "Why does this pane look like this?" view.
+1. Text backing is still resolved in the renderer (`backing_palette`), not
+   in `resolve_pane_look`.
 2. The editor session as one `Option<EditorSession>`; previews as an overlay
    applied when resolving instead of mutate-and-restore. Editor previews and
    saves (`preview_personal_theme_draft`, `save_personal_theme_draft`) still
