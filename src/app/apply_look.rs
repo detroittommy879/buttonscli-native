@@ -66,6 +66,12 @@ pub(super) enum LookChange {
         fonts: bool,
         pane_themes: Vec<(usize, String)>,
     },
+    /// The theme editor saved its draft as `theme_id` (a personal theme
+    /// just written): the edited pane (`pane`, a PTY ID) gets it as its own
+    /// theme, or, editing the shared theme, the shared sources ticked in
+    /// Apply to point at it. Other panes keep their own themes. This is the
+    /// saving step itself, so it does not settle the editor first.
+    SaveEdit { theme_id: String, pane: Option<u64> },
 }
 
 impl LookChange {
@@ -85,6 +91,11 @@ impl LookChange {
             Self::Bundle { name, .. } => format!("bundle {name}"),
             Self::Preset { look, .. } => format!("look preset {look:?}"),
             Self::Shuffle { theme_id, .. } => format!("shuffle {theme_id}"),
+            Self::SaveEdit {
+                theme_id,
+                pane: Some(_),
+            } => format!("saved pane edit {theme_id}"),
+            Self::SaveEdit { theme_id, .. } => format!("saved shared edit {theme_id}"),
         }
     }
 }
@@ -97,11 +108,16 @@ impl ButtonsApp {
     /// bundle, no such tab).
     pub(super) fn change_look(&mut self, change: LookChange, source: LookSource) -> Option<String> {
         match &change {
-            LookChange::Theme { theme_id, .. } | LookChange::Shuffle { theme_id, .. }
+            LookChange::Theme { theme_id, .. }
+            | LookChange::Shuffle { theme_id, .. }
+            | LookChange::SaveEdit { theme_id, .. }
                 if !self.known_theme(theme_id) =>
             {
                 return None;
             }
+            LookChange::SaveEdit {
+                pane: Some(pane), ..
+            } if !self.tabs.iter().any(|tab| tab.id == *pane) => return None,
             LookChange::UseShared { index: Some(index) } if *index >= self.tabs.len() => {
                 return None
             }
@@ -110,8 +126,14 @@ impl ButtonsApp {
         let label = change.label();
         // Use global only takes pane themes away: a preview of the shared
         // theme stays on screen (it is what those panes now show), while a
-        // pane edit is saved as for any other change.
-        if !matches!(change, LookChange::UseShared { .. }) || self.theme_editor.pane.is_some() {
+        // pane edit is saved as for any other change. Saving the editor's
+        // draft is itself the settling step.
+        let settles = match change {
+            LookChange::UseShared { .. } => self.theme_editor.pane.is_some(),
+            LookChange::SaveEdit { .. } => false,
+            _ => true,
+        };
+        if settles {
             self.settle_pane_draft();
         }
         // After settling: undo goes back to what was on screen, including a
@@ -157,6 +179,20 @@ impl ButtonsApp {
             }
             LookChange::Preset { look, ctx } => {
                 self.set_preset_look(&ctx, look);
+                Some(String::new())
+            }
+            LookChange::SaveEdit { theme_id, pane } => {
+                match pane {
+                    Some(pane) => {
+                        self.theme_overrides.insert(pane, theme_id);
+                    }
+                    None => {
+                        let theme = self.themes.get(&theme_id).clone();
+                        let scopes = self.preferences.theme_apply.clone();
+                        let calm = self.preferences.calm_mode;
+                        self.apply_theme_sources_with(theme, &scopes, calm, true);
+                    }
+                }
                 Some(String::new())
             }
         };
@@ -294,7 +330,7 @@ impl ButtonsApp {
     ) -> bool {
         let mut found = true;
         match theme_id {
-            Some(theme) if !theme.starts_with("preview:") && self.known_theme(theme) => {
+            Some(theme) if self.known_theme(theme) => {
                 self.theme_overrides.insert(id, theme.to_owned());
             }
             Some(_) => {
@@ -382,7 +418,7 @@ mod tests {
             .all()
             .iter()
             .map(|theme| theme.id.clone())
-            .filter(|id| id != "aurora" && !id.starts_with("preview:"))
+            .filter(|id| id != "aurora")
             .take(2)
             .collect();
         match start {
@@ -499,13 +535,8 @@ mod tests {
                 // the editor lets go of it.
                 if matches!(start, Start::MidPaneEdit) {
                     assert_eq!(personal_count(&app), personal_before + 1, "{case}");
-                    assert!(app.theme_editor_preview_snapshot.is_none(), "{case}");
-                    assert!(
-                        !app.theme_overrides
-                            .values()
-                            .any(|id| id.starts_with("preview:")),
-                        "{case}"
-                    );
+                    assert!(!app.previewing_theme_draft(), "{case}");
+                    app.assert_no_preview_stored(&case);
                 }
                 let _ = others;
                 let _ = std::fs::remove_dir_all(base);
@@ -515,7 +546,7 @@ mod tests {
 
     /// The edited pane itself: Use global, closing it (and reopening it) and
     /// a new theme for it all keep the edit as a numbered theme. They used to
-    /// drop the edit or leave a `preview:` theme behind.
+    /// drop the edit or leave the preview's theme behind.
     #[test]
     fn the_edited_pane_keeps_its_edit_when_it_changes_or_closes() {
         for action in ["use global", "close and reopen", "this terminal"] {
@@ -529,17 +560,12 @@ mod tests {
                 _ => app.set_theme_for_tab(1, "aurora"),
             }
             assert_eq!(personal_count(&app), before + 1, "{action}: edit saved");
-            assert!(app.theme_editor_preview_snapshot.is_none(), "{action}");
+            assert!(!app.previewing_theme_draft(), "{action}");
             assert!(
                 app.theme_editor.draft().is_none(),
                 "{action}: session ended"
             );
-            assert!(
-                !app.theme_overrides
-                    .values()
-                    .any(|id| id.starts_with("preview:")),
-                "{action}"
-            );
+            app.assert_no_preview_stored(action);
             match action {
                 "use global" => assert!(!app.theme_overrides.contains_key(&pane), "{action}"),
                 "close and reopen" => {

@@ -798,7 +798,7 @@ mod tests {
         app.retarget_theme_editor(Some(pane)).unwrap();
         let edited = adjust_and_preview(&mut app);
         let (target, _) = app.edit_target_theme();
-        assert!(!target.starts_with("preview:"), "{target}");
+        assert!(app.known_theme(&target), "{target}");
         app.shader_ai.list_note = Some("Saved \"old\" to the shader list.".into());
 
         app.set_theme_all("aurora");

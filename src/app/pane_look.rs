@@ -4,6 +4,7 @@
 //! view and the control API all read `resolve_pane_look`, so they cannot
 //! disagree. Only the Shuffle fade is added on top, at draw time.
 use super::*;
+use editor_session::SharedPart;
 
 /// Where a pane's colors come from.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -34,10 +35,14 @@ pub(crate) enum FontOrigin {
 /// A pane's resolved look: what is drawn, and why.
 #[derive(Clone, Debug)]
 pub(crate) struct PaneLook {
+    /// Where the pane's saved look comes from (a preview never changes it).
     pub(crate) origin: ThemeOrigin,
     /// The theme drawn, with Calm, classic effects and the Strength override
-    /// applied (not the Shuffle fade).
+    /// applied (not the Shuffle fade). While the editor previews a draft on
+    /// this pane (or on the shared look it shows), the draft.
     pub(crate) presentation: ThemeDefinition,
+    /// The presentation shows an unsaved editor draft.
+    pub(crate) previewing: bool,
     pub(crate) font: fonts::PaneFont,
     pub(crate) font_origin: FontOrigin,
 }
@@ -54,7 +59,8 @@ impl PaneLook {
 
 impl ButtonsApp {
     /// The one place a pane's look is decided. An own theme that no longer
-    /// exists falls back to the shared look.
+    /// exists falls back to the shared look. The editor's live preview is
+    /// put on top here (and in `shared_terminal_theme`), never stored.
     pub(super) fn resolve_pane_look(&self, id: u64) -> PaneLook {
         let own = self
             .theme_overrides
@@ -76,11 +82,24 @@ impl ButtonsApp {
                 self.shared_terminal_theme(),
             ),
         };
+        let mut previewing = matches!(origin, ThemeOrigin::Shared { .. })
+            && [
+                SharedPart::Terminal,
+                SharedPart::Gradient,
+                SharedPart::Effects,
+            ]
+            .into_iter()
+            .any(|part| self.previews_shared(part));
+        if let Some(preview) = self.pane_preview(id) {
+            presentation = preview.clone();
+            previewing = true;
+        }
         self.apply_live_switches(&mut presentation);
         let (font, font_origin) = self.resolve_pane_font(id);
         PaneLook {
             origin,
             presentation,
+            previewing,
             font,
             font_origin,
         }
@@ -108,14 +127,11 @@ impl ButtonsApp {
 
     /// The shared look's theme: terminal colors from the terminal source,
     /// gradient and shader/effects from theirs.
+    /// The editor's shared preview stands in for the parts it covers.
     pub(super) fn shared_terminal_theme(&self) -> ThemeDefinition {
-        let mut theme = self.themes.get(&self.preferences.terminal_theme_id).clone();
-        let gradient = &self.themes.get(&self.preferences.gradient_theme_id).effects;
-        let effects = self
-            .themes
-            .get(&self.preferences.effects_theme_id)
-            .effects
-            .clone();
+        let mut theme = self.shared_source(SharedPart::Terminal).clone();
+        let gradient = &self.shared_source(SharedPart::Gradient).effects;
+        let effects = self.shared_source(SharedPart::Effects).effects.clone();
         theme.effects = TerminalEffects {
             gradient: gradient.gradient,
             gradient_geometry: gradient.gradient_geometry,
@@ -217,8 +233,8 @@ impl ButtonsApp {
         if self.shuffle.fade.is_some() {
             lines.push("Shuffle is fading to a new theme.".into());
         }
-        if self.theme_editor_preview_snapshot.is_some() {
-            lines.push("The theme editor is previewing an unsaved edit.".into());
+        if look.previewing {
+            lines.push("It shows the theme editor's unsaved edit (a live preview).".into());
         }
         if self.theme_editor.pane == Some(id) {
             lines.push("The theme editor is editing this pane.".into());

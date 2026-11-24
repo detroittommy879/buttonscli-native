@@ -238,8 +238,7 @@ fn ease(t: f32) -> f32 {
 impl ButtonsApp {
     /// The themes Shuffle picks from.
     pub(super) fn shuffle_pool(&self) -> Vec<String> {
-        let usable = |theme: &&ThemeDefinition| !theme.id.starts_with("preview:");
-        let themes = self.themes.all().iter().filter(usable);
+        let themes = self.themes.all().iter();
         match self.preferences.shuffle.pool {
             ShufflePool::Favorites => self
                 .preferences
@@ -347,9 +346,7 @@ impl ButtonsApp {
         let next = *self.shuffle.next_at.get_or_insert(now + interval);
         // Never change the look under someone who is editing or choosing it
         // (a loaded draft can outlive Settings; only a live preview counts).
-        let busy = self.show_settings
-            || self.theme_editor_preview_snapshot.is_some()
-            || self.power.minimized;
+        let busy = self.show_settings || self.previewing_theme_draft() || self.power.minimized;
         if busy {
             self.shuffle.next_at = Some(next.max(now + RESUME_DELAY));
         } else if now >= next {

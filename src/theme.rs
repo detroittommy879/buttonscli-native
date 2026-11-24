@@ -384,21 +384,23 @@ impl ThemeCatalog {
         self.preview_document(identity, file_stem, document)
     }
 
+    /// The editor draft as a theme for its live preview. Not added to the
+    /// catalog: the preview lives in the editor session only. Its ID,
+    /// `preview:<profile>:<stem>`, is never stored anywhere.
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn preview_editor_document(
-        &mut self,
+    pub(crate) fn editor_preview(
         profile: &str,
         file_stem: &str,
         document: &Value,
-    ) -> Result<String, String> {
-        self.preview_document(
-            format!("preview:{profile}:{file_stem}"),
-            file_stem,
-            document,
-        )
+    ) -> Result<ThemeDefinition, String> {
+        validate_personal_document(document)?;
+        let mut theme = parse_legacy_value(file_stem, document, ThemeSource::Personal)
+            .map_err(|error| error.to_string())?;
+        theme.id = format!("preview:{profile}:{file_stem}");
+        Ok(theme)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(test, not(target_arch = "wasm32")))]
     fn preview_document(
         &mut self,
         identity: String,

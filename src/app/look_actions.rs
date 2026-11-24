@@ -7,7 +7,8 @@
 //! (`tab_groups::tests::saved_group_reopens_order_names_themes_layout_and_commands`),
 //! closing/reopening the edited pane
 //! (`apply_look::tests::the_edited_pane_keeps_its_edit_when_it_changes_or_closes`),
-//! editor previews and saves (`color_adjust::tests`).
+//! the editor driven through its real UI across panes, a bundle and a close
+//! (`color_adjust::tests::an_edit_survives_switching_panes_a_bundle_and_closing_the_pane`).
 
 macro_rules! look_actions {
     ($($(#[doc = $doc:expr])* $name:ident => $label:expr, $entry:expr;)*) => {
@@ -73,6 +74,9 @@ look_actions! {
     PresetShowoff => "Look: Showoff", "apply_look_preset(Showoff)";
     /// Look → Undo look change (after an Apply).
     Undo => "Look: Undo look change", "undo_look_change";
+    /// Theme editor → Save (also autosave on switching panes, Keep, quit):
+    /// the edited pane or the shared sources get the saved file.
+    EditorSave => "Editor: Save", "save_personal_theme_draft";
 }
 
 #[cfg(test)]
@@ -84,16 +88,44 @@ mod tests {
     enum Start {
         Fresh,
         AfterBundle,
+        /// Pane 2's draft edited and previewed.
         MidPaneEdit,
+        /// The shared draft edited and previewed.
         MidSharedEdit,
+        /// Pane 2's draft edited with live preview off (nothing on screen).
+        PaneEditNotPreviewed,
+        /// Pane 2 edited, then the editor moved to pane 1 (pane 2's edit
+        /// autosaved) and pane 1 edited and previewed.
+        AfterPaneSwitch,
     }
 
-    const STARTS: [Start; 4] = [
+    const STARTS: [Start; 6] = [
         Start::Fresh,
         Start::AfterBundle,
         Start::MidPaneEdit,
         Start::MidSharedEdit,
+        Start::PaneEditNotPreviewed,
+        Start::AfterPaneSwitch,
     ];
+
+    impl Start {
+        /// An edited draft is open when the action runs.
+        fn editing(self) -> bool {
+            !matches!(self, Start::Fresh | Start::AfterBundle)
+        }
+    }
+
+    /// Edits the open draft's terminal background (and description).
+    fn edit_draft(app: &mut ButtonsApp, background: &str) {
+        let mut document = app.theme_editor.draft().cloned().unwrap();
+        document["metadata"]["description"] = json!("edited, not saved");
+        set_theme_document_value(
+            &mut document,
+            "/theme/terminal/background",
+            json!(background),
+        );
+        app.theme_editor.set_draft(document);
+    }
 
     struct Case {
         app: ButtonsApp,
@@ -126,7 +158,7 @@ mod tests {
             .all()
             .iter()
             .map(|theme| theme.id.clone())
-            .filter(|id| id != "aurora" && !id.starts_with("preview:"))
+            .filter(|id| id != "aurora")
             .take(2)
             .collect();
         match start {
@@ -141,14 +173,19 @@ mod tests {
             Start::MidPaneEdit | Start::MidSharedEdit => {
                 let pane = matches!(start, Start::MidPaneEdit).then(|| app.tabs[1].id);
                 app.retarget_theme_editor(pane).unwrap();
-                let mut document = app.theme_editor.draft().cloned().unwrap();
-                document["metadata"]["description"] = json!("edited, not saved");
-                set_theme_document_value(
-                    &mut document,
-                    "/theme/terminal/background",
-                    json!("#0a0b0c"),
-                );
-                app.theme_editor.set_draft(document);
+                edit_draft(&mut app, "#0a0b0c");
+                app.preview_personal_theme_draft();
+            }
+            Start::PaneEditNotPreviewed => {
+                app.retarget_theme_editor(Some(app.tabs[1].id)).unwrap();
+                edit_draft(&mut app, "#0a0b0c");
+            }
+            Start::AfterPaneSwitch => {
+                app.retarget_theme_editor(Some(app.tabs[1].id)).unwrap();
+                edit_draft(&mut app, "#0a0b0c");
+                app.preview_personal_theme_draft();
+                app.retarget_theme_editor(Some(app.tabs[0].id)).unwrap();
+                edit_draft(&mut app, "#0c0b0a");
                 app.preview_personal_theme_draft();
             }
         }
@@ -231,13 +268,22 @@ mod tests {
                 app.apply_theme(aurora_index(app), false);
                 assert!(app.undo_look_change().is_some());
             }
+            LookAction::EditorSave => {
+                if app.theme_editor.draft().is_none() {
+                    app.retarget_theme_editor(None).unwrap();
+                }
+                if !app.theme_draft_edited() {
+                    edit_draft(app, "#0d0e0f");
+                }
+                app.save_personal_theme_draft();
+            }
         }
     }
 
     /// Every look action from every starting state ends in one consistent
     /// result: the action's own effect, a pane or shared edit saved (never
-    /// dropped), no `preview:` theme left on a pane, every pane on a theme
-    /// that exists, and one history entry naming the action's source.
+    /// dropped), no preview ID stored anywhere, every pane on a theme that
+    /// exists, and one history entry naming the action's source.
     #[test]
     fn every_look_action_from_every_state_is_consistent() {
         for &start_state in &STARTS {
@@ -259,6 +305,7 @@ mod tests {
                 };
                 let pane1_before = case.app.theme_for_tab(1).to_owned();
                 let history_before = case.app.look_history.records.len();
+                let edited_pane = case.app.theme_editor.pane;
 
                 perform(&mut case, action);
                 let app = &case.app;
@@ -266,30 +313,25 @@ mod tests {
                 // An edit in progress is saved as its own theme, never lost.
                 // Use global from the shared editor keeps the draft open and
                 // its preview on screen instead (it only drops pane themes).
-                if matches!(start_state, Start::MidPaneEdit | Start::MidSharedEdit) {
+                if start_state.editing() {
                     let still_editing = app.theme_draft_edited();
                     assert!(
                         personal_count(app) > personal_before || still_editing,
                         "{case_name}: the edit was saved or is still open"
                     );
                     assert!(
-                        still_editing || app.theme_editor_preview_snapshot.is_none(),
+                        still_editing || !app.previewing_theme_draft(),
                         "{case_name}: no preview left behind"
                     );
                 }
-                assert!(
-                    !app.theme_overrides
-                        .values()
-                        .any(|id| id.starts_with("preview:")),
-                    "{case_name}: no preview theme on a pane"
-                );
-                // Every pane on a real theme (the shared preview, while the
-                // shared editor stays open, is the one exception).
-                let previewing = app.theme_editor_preview_snapshot.is_some();
+                // A preview is an overlay: no preview ID in pane themes,
+                // preferences, slot looks, bundles, closed tabs or history.
+                app.assert_no_preview_stored(&case_name);
+                // Every pane on a real theme, previewing or not.
                 for index in 0..app.tabs.len() {
                     let theme = app.theme_for_tab(index);
                     assert!(
-                        app.known_theme(theme) || (previewing && theme.starts_with("preview:")),
+                        app.known_theme(theme),
                         "{case_name}: pane {index} on {theme}"
                     );
                 }
@@ -339,7 +381,9 @@ mod tests {
                     }
                     LookAction::ThisTerminal => {
                         assert_eq!(app.theme_for_tab(0), "aurora", "{case_name}");
-                        if !matches!(start_state, Start::MidPaneEdit | Start::MidSharedEdit) {
+                        // Pane 2 keeps its look (when it was being edited,
+                        // the edit was saved as its own theme instead).
+                        if !start_state.editing() {
                             assert_eq!(app.theme_for_tab(1), pane1_before, "{case_name}");
                         }
                     }
@@ -383,9 +427,29 @@ mod tests {
                         // Back to what was on screen before the Apply (after
                         // any edit was saved, which settling already did).
                         let after = app.look_state();
-                        if matches!(start_state, Start::Fresh | Start::AfterBundle) {
+                        if !start_state.editing() {
                             assert_eq!(after, state_before, "{case_name}");
                         }
+                    }
+                    LookAction::EditorSave => {
+                        // The target now uses the saved file, not a preview.
+                        assert!(!app.theme_draft_edited(), "{case_name}: saved");
+                        assert!(!app.previewing_theme_draft(), "{case_name}");
+                        match edited_pane {
+                            Some(pane) => {
+                                let own = app.theme_overrides.get(&pane).cloned();
+                                assert!(
+                                    own.as_deref().is_some_and(|id| id.starts_with("personal:")),
+                                    "{case_name}: {own:?}"
+                                );
+                            }
+                            None => assert!(
+                                app.preferences.theme_id.starts_with("personal:"),
+                                "{case_name}: {}",
+                                app.preferences.theme_id
+                            ),
+                        }
+                        assert!(personal_count(app) > personal_before, "{case_name}");
                     }
                 }
                 let _ = std::fs::remove_dir_all(&case.base);

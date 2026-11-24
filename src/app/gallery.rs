@@ -113,9 +113,7 @@ impl ButtonsApp {
             }
             GalleryKind::Themes => {
                 for theme in self.themes.all() {
-                    if theme.effects.shader_background.is_some()
-                        && !theme.id.starts_with("preview:")
-                    {
+                    if theme.effects.shader_background.is_some() {
                         entries.push((
                             format!("theme:{}", theme.id),
                             theme.name.clone(),

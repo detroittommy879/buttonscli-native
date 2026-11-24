@@ -290,7 +290,7 @@ impl ButtonsApp {
             .themes
             .all()
             .iter()
-            .filter(|theme| !theme.id.starts_with("personal:") && !theme.id.starts_with("preview:"))
+            .filter(|theme| !theme.id.starts_with("personal:"))
             .map(|theme| theme.id.as_str())
             .collect();
         let mut renamed: BTreeMap<String, String> = BTreeMap::new();

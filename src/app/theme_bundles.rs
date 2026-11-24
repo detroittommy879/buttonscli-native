@@ -39,29 +39,23 @@ impl ButtonsApp {
         order
     }
 
+    /// A theme in the catalog. An editor preview's `preview:` ID never is:
+    /// previews live in the editor session only.
     pub(super) fn known_theme(&self, id: &str) -> bool {
-        !id.starts_with("preview:") && self.themes.all().iter().any(|theme| theme.id == id)
+        self.themes.all().iter().any(|theme| theme.id == id)
     }
 
     /// The look each slot has now; slots without a terminal keep any look
     /// still waiting for one.
     pub(super) fn current_pane_looks(&self) -> Vec<PaneLook> {
-        let previewed = self
-            .theme_editor_preview_snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.pane.clone());
         let mut looks: Vec<PaneLook> = self
             .slot_order()
             .into_iter()
             .take(MAX_PANE_LOOKS)
             .map(|index| {
                 let id = self.tabs[index].id;
-                let theme_id = match &previewed {
-                    Some((tab, previous)) if *tab == id => previous.clone(),
-                    _ => self.theme_overrides.get(&id).cloned(),
-                };
                 PaneLook {
-                    theme_id: theme_id.filter(|theme| !theme.starts_with("preview:")),
+                    theme_id: self.theme_overrides.get(&id).cloned(),
                     font: self.pane_fonts.get(&id).cloned(),
                 }
             })
@@ -185,7 +179,7 @@ impl ButtonsApp {
                 .unwrap();
         }
         self.autosave_theme_draft()?;
-        self.restore_personal_theme_preview();
+        self.clear_theme_preview();
         let bundle = self.capture_theme_bundle(&name);
         let bundles = &mut self.preferences.theme_bundles;
         let count = bundles.len();
@@ -602,7 +596,6 @@ mod tests {
             .all()
             .iter()
             .map(|theme| theme.id.clone())
-            .filter(|id| !id.starts_with("preview:"))
             .take(count)
             .collect()
     }
