@@ -183,8 +183,16 @@ AI** (`src/file_repair.rs`, `src/app/theme_repair.rs`): the theme model gets
 the file and the findings, the answer is checked like the loader checks
 (one correction round), and the user sees the diff before **Save fixed
 file**, which replaces the file only if it is unchanged on disk, after a
-backup copy. Files from a newer ButtonsCLI are never changed. Not covered
-yet: bundles held back in `native.json`.
+backup copy. Files from a newer ButtonsCLI are never changed.
+
+Bundles `native.json` holds back are listed under Settings → Theme bundles
+("Not loaded", with the reason; `held_bundles` caches them per
+`native_revision`). An unreadable one gets the same **Fix with AI**
+(`FileKind::Bundle`, `file_repair::bundle_problems`). Saving goes through
+`NativeStore::replace_held_bundle`: under the write lock it refuses a
+different revision or a bundle that changed, backs up `native.json`,
+replaces that one list entry in place and checks the file still loads; the
+app then adds the bundle to its list at the same place.
 
 ## The theme editor
 
@@ -344,4 +352,4 @@ Nothing reads them automatically; they are for comparing later.
 1. Text backing is still resolved in the renderer (`backing_palette`), not
    in `resolve_pane_look`.
 2. The look API has no plugin transport yet (`LookSource::Plugin` is
-   unused); Fix with AI does not cover held bundles.
+   unused).

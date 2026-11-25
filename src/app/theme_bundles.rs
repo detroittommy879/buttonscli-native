@@ -541,6 +541,50 @@ impl ButtonsApp {
                 });
             });
         }
+        // Bundles native.json keeps but cannot load: say so, never hide them.
+        let held = self.held_bundles().to_vec();
+        let mut repair_held = None;
+        if !held.is_empty() {
+            ui.add_space(4.0);
+            ui.spaced_colored_label(
+                self.colors().warning,
+                crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Not loaded ({count}): kept unchanged in native.json",
+                    &[("count", &held.len().to_string())],
+                ),
+            );
+            for (index, bundle) in held.iter().enumerate() {
+                ui.push_id(("held-bundle", index), |ui| {
+                    wrapping_row(ui, |ui| {
+                        let name = if bundle.name.is_empty() {
+                            crate::i18n::literal(&self.locale, "(no name)")
+                        } else {
+                            bundle.name.clone()
+                        };
+                        ui.spaced_label(RichText::new(name).strong());
+                        ui.spaced_label(
+                            RichText::new(bundle.reason.as_str()).color(self.colors().muted),
+                        );
+                        if self.bundle_repair_offered(bundle)
+                            && ui
+                                .small_button(crate::i18n::literal(&self.locale, "Fix with AI"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Send this bundle and its problems to your theme model, then review the corrected bundle before saving.",
+                                ))
+                                .clicked()
+                        {
+                            repair_held = Some(bundle.clone());
+                        }
+                    });
+                });
+            }
+        }
+        if let Some(bundle) = repair_held {
+            let ctx = ui.ctx().clone();
+            self.start_bundle_repair(&ctx, &bundle);
+        }
         // Built-ins the user has no bundle of the same name for, folded away
         // so they don't push the theme list down.
         let built_in: Vec<&ThemeBundle> = crate::library::bundles()

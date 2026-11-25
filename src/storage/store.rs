@@ -655,6 +655,64 @@ impl NativeStore {
             .held)
     }
 
+    /// Replaces one held bundle in native.json with `fixed` (Fix with AI),
+    /// in place, under the write lock, after a backup copy. Refused when the
+    /// file's revision is not `expected_revision` or the held bundle is no
+    /// longer exactly `original`. Returns the new revision.
+    pub(crate) fn replace_held_bundle(
+        &self,
+        expected_revision: Option<u64>,
+        original: &serde_json::Value,
+        fixed: serde_json::Value,
+    ) -> Result<u64, StoreError> {
+        let _lock = self.acquire_root_lock()?;
+        let path = self.native_path();
+        ensure_native_path(&self.root.0, &path)?;
+        let bytes = read_limited(&path, MAX_NATIVE_BYTES)?;
+        let parsed = parse_document(&bytes)?;
+        if Some(parsed.document.revision) != expected_revision {
+            return Err(StoreError::StaleRevision);
+        }
+        let Some(held) = parsed
+            .bundles
+            .held
+            .iter()
+            .find(|held| &held.document == original)
+        else {
+            return Err(StoreError::SourceChanged);
+        };
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_| StoreError::InvalidDocument)?;
+        let revision = parsed
+            .document
+            .revision
+            .checked_add(1)
+            .ok_or(StoreError::StaleRevision)?;
+        let Some(serde_json::Value::Array(list)) = value
+            .get_mut("preferences")
+            .and_then(|preferences| preferences.get_mut("theme_bundles"))
+        else {
+            return Err(StoreError::InvalidDocument);
+        };
+        match list.get_mut(held.index) {
+            Some(slot) if slot == original => *slot = fixed,
+            _ => return Err(StoreError::SourceChanged),
+        }
+        value["revision"] = serde_json::json!(revision);
+        let encoded = serde_json::to_vec_pretty(&value).map_err(|_| StoreError::InvalidDocument)?;
+        if encoded.len() as u64 > MAX_NATIVE_BYTES {
+            return Err(StoreError::TooLarge);
+        }
+        // The new file must load, with the fixed bundle no longer held.
+        let check = parse_document(&encoded)?;
+        if check.bundles.held.len() + 1 != parsed.bundles.held.len() {
+            return Err(StoreError::InvalidDocument);
+        }
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
+        atomic_replace(&path, &encoded)?;
+        Ok(revision)
+    }
+
     pub(crate) fn native_root(&self) -> &Path {
         &self.root.0
     }

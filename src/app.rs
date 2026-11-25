@@ -372,6 +372,10 @@ pub struct ButtonsApp {
     /// "Fix with AI" for a theme file that did not load (`theme_repair.rs`).
     #[cfg(not(target_arch = "wasm32"))]
     theme_repair: Option<theme_repair::ThemeRepair>,
+    /// Bundles native.json holds back, read for this `native_revision`
+    /// (`theme_repair::held_bundles`).
+    #[cfg(not(target_arch = "wasm32"))]
+    held_bundles: Option<(Option<u64>, Vec<crate::look_format::HeldBundle>)>,
     font_catalog: fonts::FontCatalog,
     theme_search: String,
     /// The theme editor: target, status and the open draft
@@ -1460,6 +1464,8 @@ impl ButtonsApp {
             theme_load_warnings: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             theme_repair: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            held_bundles: None,
             font_catalog: fonts::FontCatalog::bundled(),
             theme_search: String::new(),
             #[cfg(not(target_arch = "wasm32"))]

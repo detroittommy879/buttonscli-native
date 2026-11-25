@@ -32,6 +32,8 @@
 - Theme files that do not load get **Fix with AI** in Settings → Themes:
   your theme model corrects the file, and you see the changes before
   saving. The old file is kept as a backup.
+- Theme bundles that cannot be loaded are now listed in Settings → Theme
+  bundles with the reason, and unreadable ones get **Fix with AI** too.
 - Before `native.json` or a theme file is replaced or deleted, a copy goes
   to `~/.buttonscli-native/debug/backups/` (the newest 2000 copies are
   kept). Loading no longer cuts long bundle, shader or pane lists.

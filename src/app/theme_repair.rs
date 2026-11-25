@@ -1,18 +1,38 @@
 //! "Fix with AI" for personal theme files that did not load (Settings →
-//! Themes, under "theme files could not be loaded"). The theme model returns
-//! a corrected file (`crate::file_repair`); the window shows what was wrong,
-//! a line diff and what is still ignored. Save replaces the file only if it
-//! did not change meanwhile, after a backup copy (`debug/backups`).
+//! Themes, under "theme files could not be loaded") and for theme bundles
+//! native.json holds back (Settings → Theme bundles, "Not loaded"). The
+//! theme model returns a corrected document (`crate::file_repair`); the
+//! window shows what was wrong, a line diff and what is still ignored. Save
+//! replaces the file or the bundle only if it did not change meanwhile,
+//! after a backup copy (`debug/backups`).
 
 use super::*;
-use crate::file_repair::{DiffLine, Repair};
+use crate::file_repair::{DiffLine, FileKind, Repair};
+use crate::look_format::HeldBundle;
 use sha2::Digest;
 
 pub(super) struct ThemeRepair {
+    /// The file name, or the bundle's name.
     file_name: String,
+    target: RepairTarget,
     original: String,
     original_hash: [u8; 32],
     state: RepairState,
+}
+
+enum RepairTarget {
+    ThemeFile,
+    /// A held bundle, exactly as native.json has it.
+    HeldBundle(Value),
+}
+
+impl RepairTarget {
+    fn kind(&self) -> FileKind {
+        match self {
+            Self::ThemeFile => FileKind::Theme,
+            Self::HeldBundle(_) => FileKind::Bundle,
+        }
+    }
 }
 
 enum RepairState {
@@ -42,6 +62,50 @@ impl ButtonsApp {
             && warning_file(warning).is_some()
     }
 
+    /// Bundles native.json holds back (newer or unreadable), read again only
+    /// when the saved revision changed.
+    pub(super) fn held_bundles(&mut self) -> &[HeldBundle] {
+        let revision = self.native_revision;
+        if self
+            .held_bundles
+            .as_ref()
+            .is_none_or(|(read_for, _)| *read_for != revision)
+        {
+            let held = self
+                .native_store
+                .as_ref()
+                .and_then(|store| store.held_bundles().ok())
+                .unwrap_or_default();
+            self.held_bundles = Some((revision, held));
+        }
+        &self.held_bundles.as_ref().unwrap().1
+    }
+
+    /// Whether "Fix with AI" is offered for a held bundle.
+    pub(super) fn bundle_repair_offered(&self, held: &HeldBundle) -> bool {
+        theme_generation_available()
+            && self.theme_repair.is_none()
+            && !held.reason.contains("newer ButtonsCLI")
+    }
+
+    /// Asks the theme model for a corrected version of a held bundle.
+    pub(super) fn start_bundle_repair(&mut self, ctx: &egui::Context, held: &HeldBundle) {
+        let original = serde_json::to_string_pretty(&held.document).unwrap_or_default();
+        let original_hash: [u8; 32] = sha2::Sha256::digest(original.as_bytes()).into();
+        let label = if held.name.is_empty() {
+            format!("bundle {}", held.index + 1)
+        } else {
+            held.name.clone()
+        };
+        self.start_repair(
+            ctx,
+            label,
+            RepairTarget::HeldBundle(held.document.clone()),
+            original,
+            original_hash,
+        );
+    }
+
     /// Reads the file and asks the theme model for a corrected version.
     pub(super) fn start_theme_repair(&mut self, ctx: &egui::Context, file_name: &str) {
         let Some(store) = self.native_store.as_ref() else {
@@ -57,7 +121,28 @@ impl ButtonsApp {
         };
         let original = String::from_utf8_lossy(&bytes).into_owned();
         let original_hash: [u8; 32] = sha2::Sha256::digest(&bytes).into();
+        self.start_repair(
+            ctx,
+            file_name.to_owned(),
+            RepairTarget::ThemeFile,
+            original,
+            original_hash,
+        );
+    }
+
+    fn start_repair(
+        &mut self,
+        ctx: &egui::Context,
+        file_name: String,
+        target: RepairTarget,
+        original: String,
+        original_hash: [u8; 32],
+    ) {
+        let Some(store) = self.native_store.as_ref() else {
+            return;
+        };
         let profile = store.profile_name().to_owned();
+        let kind = target.kind();
         let providers = self.preferences.provider_settings.chain(AiTask::Theme);
         let (sender, result) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
@@ -67,10 +152,11 @@ impl ButtonsApp {
             let session = Arc::clone(&self.credential_session);
             let worker_cancel = Arc::clone(&cancel);
             let text = original.clone();
-            let name = file_name.to_owned();
+            let name = file_name.clone();
             let context = ctx.clone();
             std::thread::spawn(move || {
-                let repair = crate::file_repair::repair_theme(
+                let repair = crate::file_repair::repair_file(
+                    kind,
                     &crate::assistant::transport::ReqwestTransport,
                     &providers,
                     &mut |provider| {
@@ -87,13 +173,72 @@ impl ButtonsApp {
             });
             RepairState::Working { result, cancel }
         };
-        tracing::info!(target: "buttonscli::looks", file = %file_name, "theme repair started");
+        tracing::info!(target: "buttonscli::looks", file = %file_name, ?kind, "repair started");
         self.theme_repair = Some(ThemeRepair {
-            file_name: file_name.to_owned(),
+            file_name,
+            target,
             original,
             original_hash,
             state,
         });
+    }
+
+    /// Saves the corrected file or bundle (backup first).
+    fn save_repair(&mut self, repair: &ThemeRepair, text: &str) -> Result<(), String> {
+        match &repair.target {
+            RepairTarget::ThemeFile => self.save_theme_repair(repair, text),
+            RepairTarget::HeldBundle(original) => self.save_bundle_repair(original, text),
+        }
+    }
+
+    /// Puts the corrected bundle in place of the held one in native.json
+    /// (backup first) and adds it to the bundle list at the same place.
+    fn save_bundle_repair(&mut self, original: &Value, text: &str) -> Result<(), String> {
+        let fixed: Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
+        let (upgraded, _) =
+            crate::look_format::upgrade_bundle(fixed.clone()).map_err(|error| error.to_string())?;
+        let bundle: crate::settings::ThemeBundle =
+            serde_json::from_value(upgraded).map_err(|error| error.to_string())?;
+        if self
+            .preferences
+            .theme_bundles
+            .iter()
+            .any(|existing| existing.name == bundle.name)
+        {
+            return Err(format!(
+                "A bundle named \"{}\" is already loaded. Rename or delete it first.",
+                bundle.name
+            ));
+        }
+        let store = self.native_store.as_ref().ok_or("No profile is open.")?;
+        let held = store.held_bundles().map_err(|error| error.to_string())?;
+        let at = held
+            .iter()
+            .find(|held| &held.document == original)
+            .map(|this| this.index - held.iter().filter(|other| other.index < this.index).count())
+            .ok_or("The bundle changed in native.json meanwhile; run Fix with AI again.")?;
+        // Unsaved setting changes go to disk first, so the revision matches.
+        self.persist_native_preferences();
+        let store = self.native_store.as_ref().ok_or("No profile is open.")?;
+        let revision = store
+            .replace_held_bundle(self.native_revision, original, fixed)
+            .map_err(|error| match error {
+                crate::storage::store::StoreError::SourceChanged => {
+                    "The bundle changed in native.json meanwhile; run Fix with AI again.".to_owned()
+                }
+                crate::storage::store::StoreError::StaleRevision => {
+                    "Settings were saved elsewhere meanwhile; reopen ButtonsCLI and try again."
+                        .to_owned()
+                }
+                other => other.to_string(),
+            })?;
+        tracing::info!(target: "buttonscli::looks", bundle = %bundle.name, "bundle repair saved");
+        self.native_revision = Some(revision);
+        self.held_bundles = None;
+        let bundles = &mut self.preferences.theme_bundles;
+        bundles.insert(at.min(bundles.len()), bundle);
+        self.persist_native_preferences();
+        Ok(())
     }
 
     /// Saves the corrected file (backup first) and reloads personal themes.
@@ -140,7 +285,13 @@ impl ButtonsApp {
         let mut open = true;
         let mut close = false;
         let mut save = None;
-        egui::Window::new(crate::i18n::literal(&locale, "Fix theme file with AI"))
+        let title = match repair.target {
+            RepairTarget::ThemeFile => crate::i18n::literal(&locale, "Fix theme file with AI"),
+            RepairTarget::HeldBundle(_) => {
+                crate::i18n::literal(&locale, "Fix theme bundle with AI")
+            }
+        };
+        egui::Window::new(title)
             .id(egui::Id::new("theme-repair"))
             .open(&mut open)
             .collapsible(false)
@@ -221,7 +372,7 @@ impl ButtonsApp {
                                 .spaced_button(crate::i18n::literal(&locale, "Save fixed file"))
                                 .on_hover_text(crate::i18n::literal(
                                     &locale,
-                                    "Replace the file; a copy of the old one goes to debug/backups.",
+                                    "Replace the file (or the bundle in native.json); a copy of the old file goes to debug/backups.",
                                 ))
                                 .clicked()
                             {
@@ -238,7 +389,7 @@ impl ButtonsApp {
                 }
             });
         if let Some(text) = save {
-            match self.save_theme_repair(&repair, &text) {
+            match self.save_repair(&repair, &text) {
                 Ok(()) => {
                     self.notice = Some(format!(
                         "Fixed {}; the old file was copied to debug/backups.",
@@ -304,6 +455,7 @@ mod tests {
         let _ = app;
         ThemeRepair {
             file_name: "broken.json".into(),
+            target: RepairTarget::ThemeFile,
             original_hash: sha2::Sha256::digest(original.as_bytes()).into(),
             state: RepairState::Ready {
                 diff: crate::file_repair::line_diff(&original, &text),
@@ -403,6 +555,78 @@ mod tests {
             std::fs::read_to_string(&path).unwrap(),
             "{\"version\": 1, \"metadata\": {"
         );
+    }
+
+    #[test]
+    fn a_held_bundle_is_listed_fixed_in_place_and_loaded() {
+        let base = std::env::temp_dir().join(format!(
+            "buttonscli-bundle-repair-{}-{:x}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        let store = NativeStore::open(
+            crate::storage::paths::NativeDataRoot(base.join("native")),
+            base.join("legacy"),
+        )
+        .unwrap();
+        let revision = store.save(None, &Preferences::default()).unwrap();
+        let path = store.profile_dir().join("native.json");
+        let mut file: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let broken = serde_json::json!({"name": "Broken", "visible_panes": "two"});
+        let future = serde_json::json!({"name": "Future", "format_version": 99});
+        file["preferences"]["theme_bundles"] = serde_json::json!([
+            future.clone(), {"name": "Mine"}, broken.clone()
+        ]);
+        std::fs::write(&path, serde_json::to_vec_pretty(&file).unwrap()).unwrap();
+        let loaded = store.load().unwrap().unwrap();
+        let mut app = ButtonsApp::empty(loaded.preferences);
+        app.native_store = Some(store);
+        app.native_revision = Some(revision);
+
+        let held = app.held_bundles().to_vec();
+        assert_eq!(held.len(), 2);
+        assert!(
+            !app.bundle_repair_offered(&held[0]),
+            "newer: never repaired"
+        );
+        let target = held.iter().find(|held| held.name == "Broken").unwrap();
+
+        let text = serde_json::json!({"name": "Broken", "visible_panes": 2}).to_string();
+        app.save_bundle_repair(&target.document, &text).unwrap();
+        let names: Vec<&str> = app
+            .preferences
+            .theme_bundles
+            .iter()
+            .map(|bundle| bundle.name.as_str())
+            .collect();
+        assert_eq!(names, ["Mine", "Broken"], "loaded at its place");
+        assert_eq!(app.held_bundles().len(), 1, "only the newer one is held");
+        let saved: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let on_disk: Vec<&str> = saved["preferences"]["theme_bundles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|bundle| bundle["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(on_disk, ["Future", "Mine", "Broken"]);
+        assert_eq!(saved["preferences"]["theme_bundles"][0], future);
+        // Again: the held bundle is gone, so it is refused.
+        let again = app.save_bundle_repair(&broken, &text).unwrap_err();
+        assert!(
+            again.contains("already loaded") || again.contains("changed"),
+            "{again}"
+        );
+        let backups = app
+            .native_store
+            .as_ref()
+            .unwrap()
+            .root_dir()
+            .join("debug")
+            .join("backups");
+        assert!(walk(&backups)
+            .iter()
+            .any(|name| name.contains("replace") && name.contains("native.json")));
+        std::fs::remove_dir_all(base).ok();
     }
 
     fn walk(dir: &std::path::Path) -> Vec<String> {
