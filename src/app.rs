@@ -13079,8 +13079,9 @@ impl ButtonsApp {
     }
 
     /// The shared sources for the Apply-to parts the user ticked. Native
-    /// code goes through `change_look`; the web demo and tests call this.
-    #[cfg(any(test, target_arch = "wasm32"))]
+    /// code goes through `change_look`; the web demo and the Windows probes
+    /// call this.
+    #[cfg(any(all(test, windows), target_arch = "wasm32"))]
     fn apply_theme_sources(&mut self, theme: ThemeDefinition, calm: bool) {
         let scopes = self.preferences.theme_apply.clone();
         self.apply_theme_sources_with(theme, &scopes, calm, true);
