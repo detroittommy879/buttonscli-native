@@ -25,11 +25,14 @@
 //! What a preview shows: the draft's colors, gradient, shader and effects,
 //! on the edited pane (pane mode) or on the shared look for the parts ticked
 //! in Apply to (App chrome also hides the bar color and divider overrides,
-//! as Apply does). Fonts are never previewed (drafts adopt the fonts in use,
-//! `adopt_live_fonts_into_draft`), and neither are the window settings kept
-//! in a theme's `nativeAppearance` (opacity, corner radius, hover label, row
-//! banding): those apply on Save. Calm and the other live switches are never
-//! touched.
+//! as Apply does). A shared preview also shows the window settings kept in
+//! the draft's `nativeAppearance` (window and dock opacity, corner radius,
+//! hover label, row banding) for the Apply-to parts ticked, through
+//! `shown_setting` at the places that draw them; the Settings controls keep
+//! showing the saved values. Pane previews leave them alone (they are not
+//! per pane). Fonts need no preview: drafts adopt the fonts in use
+//! (`adopt_live_fonts_into_draft`). Calm and the other live switches are
+//! never taken from a draft.
 use super::*;
 
 /// The theme editor. Native only.
@@ -280,6 +283,36 @@ impl ButtonsApp {
     pub(super) fn previewing_theme_draft(&self) -> bool {
         self.theme_editor.preview().is_some()
     }
+
+    /// A window setting (one of `NATIVE_APPEARANCE_FIELDS`) as drawn: while
+    /// a shared preview shows and the field's Apply-to part is ticked, the
+    /// draft's `nativeAppearance` value; else `saved`. Live switches always
+    /// give `saved`. Read-only: nothing is written.
+    pub(super) fn shown_setting<T: serde::de::DeserializeOwned>(&self, key: &str, saved: T) -> T {
+        if LIVE_SWITCHES.contains(&key) || self.shared_preview().is_none() {
+            return saved;
+        }
+        let Some((_, scope)) = NATIVE_APPEARANCE_FIELDS
+            .iter()
+            .find(|(field, _)| *field == key)
+        else {
+            return saved;
+        };
+        let scopes = &self.preferences.theme_apply;
+        let ticked = match *scope {
+            "app" => scopes.app,
+            "fonts" => scopes.fonts,
+            _ => scopes.effects,
+        };
+        if !ticked {
+            return saved;
+        }
+        self.theme_editor
+            .draft()
+            .and_then(|draft| draft["nativeAppearance"].get(key))
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+            .unwrap_or(saved)
+    }
 }
 
 #[cfg(test)]
@@ -306,5 +339,58 @@ impl ButtonsApp {
                 "{case}: a preview ID in {place}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shared_preview_shows_the_drafts_window_settings_without_storing_them() {
+        let mut preferences = Preferences::default();
+        preferences.normalize_theme_sources();
+        preferences.window_opacity = 1.0;
+        preferences.chrome_corner_radius = 4;
+        preferences.row_banding_brightness = 0;
+        let mut app = ButtonsApp::empty(preferences);
+        let draft = json!({"nativeAppearance": {
+            "window_opacity": 0.6,
+            "chrome_corner_radius": 12,
+            "row_banding_brightness": 9,
+            "calm_mode": true,
+        }});
+        let mut session = EditorSession::new(None, draft, None, false);
+        session.preview = Some(app.themes.all()[0].clone());
+        app.theme_editor.session = Some(session);
+        app.preferences.theme_apply.app = true;
+        app.preferences.theme_apply.effects = true;
+
+        let shown = |app: &ButtonsApp| {
+            (
+                app.shown_setting("window_opacity", app.preferences.window_opacity),
+                app.shown_setting("chrome_corner_radius", app.preferences.chrome_corner_radius),
+                app.shown_setting(
+                    "row_banding_brightness",
+                    app.preferences.row_banding_brightness,
+                ),
+                app.shown_setting("calm_mode", app.preferences.calm_mode),
+            )
+        };
+        assert_eq!(shown(&app), (0.6, 12, 9, false), "Calm is never previewed");
+        assert_eq!(app.preferences.window_opacity, 1.0, "nothing is written");
+        app.assert_no_preview_stored("shared preview");
+
+        // Effects unticked: row banding stays; App chrome still previews.
+        app.preferences.theme_apply.effects = false;
+        assert_eq!(shown(&app), (0.6, 12, 0, false));
+        // A pane preview leaves window settings alone.
+        app.theme_editor.pane = Some(7);
+        assert_eq!(shown(&app), (1.0, 4, 0, false));
+        // No preview: the saved values.
+        app.theme_editor.pane = None;
+        app.theme_editor.clear_preview();
+        app.preferences.theme_apply.effects = true;
+        assert_eq!(shown(&app), (1.0, 4, 0, false));
     }
 }

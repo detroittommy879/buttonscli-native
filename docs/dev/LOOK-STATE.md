@@ -219,12 +219,11 @@ confirm, `preview_due`, `preview`). A session is opened and dropped whole.
   | `resolve_pane_look` | that pane draws the preview (`previewing: true`) | panes on the shared look see it through `shared_terminal_theme` |
   | `shared_source(part)` (`shared_terminal_theme`, `active_app_theme`) | no | the parts ticked in Apply to (read at draw time, so ticking a box updates at once) |
   | `colors`, `pane_divider_style` | no | App chrome ticked: the bar and divider overrides are hidden, as Apply clears them |
+  | `shown_setting(key, saved)` (window/dock opacity, corner radius, hover label, row banding where they are drawn) | no | the draft's `nativeAppearance` value for the parts ticked; Settings controls keep the saved value |
 
   Not previewed: fonts (drafts adopt the fonts in use,
-  `adopt_live_fonts_into_draft`, so a color edit never changes a font) and
-  the window settings in a theme's `nativeAppearance` (opacity, corner
-  radius, hover label, row banding); they apply on Save. Calm and the live
-  switches are never touched. `preferences`, `theme_overrides`, the
+  `adopt_live_fonts_into_draft`, so a color edit never changes a font).
+  Calm and the live switches are never taken from a draft. `preferences`, `theme_overrides`, the
   catalog, bundles, `pane_looks`, closed tabs and the look history never
   see a preview, so nothing has to be restored. `clear_theme_preview`
   takes it off (the draft stays open).

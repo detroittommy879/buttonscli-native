@@ -1265,13 +1265,18 @@ impl ButtonsApp {
         if !window_transparency_available() || !crate::window_opacity::is_supported() {
             return;
         }
-        let requested = crate::window_opacity::clamp(self.preferences.window_opacity);
+        // A shared editor preview can show its own opacity (never saved).
+        let saved = self.preferences.window_opacity;
+        let shown = self.shown_setting("window_opacity", saved);
+        let requested = crate::window_opacity::clamp(shown);
         if self.window_opacity_last_applied == Some(requested) {
             return;
         }
         match crate::window_opacity::apply(frame, requested) {
             Ok(applied) => {
-                self.preferences.window_opacity = applied;
+                if shown == saved {
+                    self.preferences.window_opacity = applied;
+                }
                 self.window_opacity_last_applied = Some(applied);
                 self.window_opacity_error = None;
             }
@@ -1882,7 +1887,13 @@ impl ButtonsApp {
         let mut style = (*ctx.style()).clone();
         style.spacing.item_spacing = Vec2::new(7.0, 6.0);
         style.spacing.button_padding = Vec2::new(10.0, 5.0);
-        let chrome_radius = egui::CornerRadius::same(self.preferences.chrome_corner_radius.min(16));
+        let chrome_radius = egui::CornerRadius::same(
+            self.shown_setting(
+                "chrome_corner_radius",
+                self.preferences.chrome_corner_radius,
+            )
+            .min(16),
+        );
         style.visuals.window_corner_radius = chrome_radius;
         style.visuals.menu_corner_radius = chrome_radius;
         for widget in [
@@ -3556,9 +3567,17 @@ impl ButtonsApp {
             .filter_map(|id| self.themes.all().iter().find(|theme| &theme.id == id))
             .map(|theme| (theme.id.clone(), theme.name.clone()))
             .collect();
-        let hover_font = self
-            .font_catalog
-            .font_id(&self.preferences.pane_hover_label.font, false);
+        let row_brightness = self
+            .shown_setting(
+                "row_banding_brightness",
+                self.preferences.row_banding_brightness,
+            )
+            .min(64);
+        let hover_label = self.shown_setting(
+            "pane_hover_label",
+            self.preferences.pane_hover_label.clone(),
+        );
+        let hover_font = self.font_catalog.font_id(&hover_label.font, false);
         let mut visible = self.visible_panes.clone();
         visible.retain(|index| *index < self.tabs.len());
         if visible.is_empty() {
@@ -3653,7 +3672,7 @@ impl ButtonsApp {
             favorites: &favorites,
             auto_tile: &self.auto_tile,
             action: &mut pane_action,
-            hover_label: &self.preferences.pane_hover_label,
+            hover_label: &hover_label,
             hover_font: &hover_font,
             pane_indices: &visible,
             pane_rects: &mut self.pane_rects,
@@ -3666,7 +3685,7 @@ impl ButtonsApp {
             shader_backgrounds_enabled: self.preferences.shader_backgrounds_enabled,
             keyboard: &self.preferences.keyboard,
             scroll_lines: self.preferences.terminal_scroll_lines,
-            row_brightness: self.preferences.row_banding_brightness,
+            row_brightness,
             text_backing: self.preferences.text_backing.clone(),
             animation_fps,
             animation_delay,
@@ -5178,7 +5197,7 @@ impl ButtonsApp {
                     .fill(if auto_hide && !self.dock_auto_hide_state.is_open() {
                         crate::dock::with_opacity(
                             colors.dock_background,
-                            self.preferences.dock_opacity,
+                            self.shown_setting("dock_opacity", self.preferences.dock_opacity),
                         )
                     } else {
                         colors.dock_background
@@ -18742,6 +18761,14 @@ mod dock_nav;
 mod docs_capture;
 #[cfg(not(target_arch = "wasm32"))]
 mod editor_session;
+
+/// The web demo has no theme editor, so nothing is previewed.
+#[cfg(target_arch = "wasm32")]
+impl ButtonsApp {
+    fn shown_setting<T>(&self, _key: &str, saved: T) -> T {
+        saved
+    }
+}
 #[cfg(not(target_arch = "wasm32"))]
 mod feature_flags;
 #[cfg(not(target_arch = "wasm32"))]

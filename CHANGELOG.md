@@ -48,9 +48,9 @@
 - Fixed: the theme editor's live preview could leave its temporary theme
   behind in a closed tab, a saved bundle or the saved pane looks, and some
   actions during a preview put the pane back on its old look. A preview now
-  only changes what is drawn until you save. Fonts and window settings
-  stored in a theme (opacity, corner radius) are applied when you save, not
-  while previewing.
+  only changes what is drawn until you save, including a theme's window
+  settings (opacity, corner radius, row banding) when you edit the shared
+  theme.
 - **AI Help → New chat** starts a blank conversation (the AI forgets the
   old one); the chosen terminal and options stay.
 - Library theme buttons now behave the same from any state. **Apply** (with
