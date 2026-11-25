@@ -2,7 +2,9 @@
 //! (`terminal_presentation_for`), font sizing (`font_for_pane`), the pane
 //! menus (`theme_for_tab`), the debug "Why does this pane look like this?"
 //! view and the control API all read `resolve_pane_look`, so they cannot
-//! disagree. Only the Shuffle fade is added on top, at draw time.
+//! disagree. Only the Shuffle fade is added on top, at draw time. Text
+//! backing is decided by `resolve_text_backing`, which the renderer and
+//! `resolve_pane_look` both call.
 use super::*;
 use editor_session::SharedPart;
 
@@ -32,6 +34,74 @@ pub(crate) enum FontOrigin {
     Shared,
 }
 
+/// Where a pane's text backing colors come from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum BackingColorsFrom {
+    /// No custom colors: each run is backed with the pane background.
+    PaneBackground,
+    /// Invert: each run is backed with its own text color.
+    TextColor,
+    /// The pane's theme brings colors (`terminal.textBacking`).
+    Theme,
+    /// The colors set for all panes (Settings → Text backing).
+    AllPanes,
+}
+
+/// What is drawn behind a pane's text.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub(crate) enum BackingLook {
+    /// Off (or the experiment is switched off).
+    Off,
+    /// No backing, but glyphs are kept at the contrast target.
+    ContrastOnly,
+    Backing {
+        colors_from: BackingColorsFrom,
+        #[serde(skip)]
+        colors: Option<crate::theme::TextBackingColors>,
+    },
+}
+
+/// The one place a pane's text backing is decided, from the settings for
+/// all panes and the colors its theme brings (`theme.text_backing`).
+/// A theme's colors win unless "override theme colors" is on; Invert backs
+/// each run with its own text color, so no custom colors apply then.
+pub(crate) fn resolve_text_backing(
+    settings: &crate::settings::TextBacking,
+    theme_colors: Option<crate::theme::TextBackingColors>,
+) -> BackingLook {
+    if !settings.available {
+        return BackingLook::Off;
+    }
+    if !settings.enabled {
+        return if settings.auto_contrast {
+            BackingLook::ContrastOnly
+        } else {
+            BackingLook::Off
+        };
+    }
+    if settings.invert {
+        return BackingLook::Backing {
+            colors_from: BackingColorsFrom::TextColor,
+            colors: None,
+        };
+    }
+    let from_theme = theme_colors.is_some();
+    let custom = settings.custom_colors();
+    let colors = settings.colors_for(theme_colors);
+    let colors_from = match (&colors, from_theme, &custom) {
+        (None, ..) => BackingColorsFrom::PaneBackground,
+        (Some(_), true, Some(_)) if settings.override_theme_colors => BackingColorsFrom::AllPanes,
+        (Some(_), true, _) => BackingColorsFrom::Theme,
+        (Some(_), false, _) => BackingColorsFrom::AllPanes,
+    };
+    BackingLook::Backing {
+        colors_from,
+        colors,
+    }
+}
+
 /// A pane's resolved look: what is drawn, and why.
 #[derive(Clone, Debug)]
 pub(crate) struct PaneLook {
@@ -45,6 +115,7 @@ pub(crate) struct PaneLook {
     pub(crate) previewing: bool,
     pub(crate) font: fonts::PaneFont,
     pub(crate) font_origin: FontOrigin,
+    pub(crate) backing: BackingLook,
 }
 
 impl PaneLook {
@@ -96,12 +167,17 @@ impl ButtonsApp {
         }
         self.apply_live_switches(&mut presentation);
         let (font, font_origin) = self.resolve_pane_font(id);
+        let backing = resolve_text_backing(
+            &self.preferences.text_backing,
+            presentation.text_backing.clone(),
+        );
         PaneLook {
             origin,
             presentation,
             previewing,
             font,
             font_origin,
+            backing,
         }
     }
 
@@ -215,6 +291,24 @@ impl ButtonsApp {
                 look.font.zone.family, look.font.zone.size
             ),
         });
+        lines.push(match &look.backing {
+            BackingLook::Off => "No text backing.".into(),
+            BackingLook::ContrastOnly => {
+                "No text backing; text is kept readable (auto contrast).".into()
+            }
+            BackingLook::Backing { colors_from, .. } => match colors_from {
+                BackingColorsFrom::PaneBackground => {
+                    "Text backing in the pane background color.".into()
+                }
+                BackingColorsFrom::TextColor => {
+                    "Text backing inverted: each run is backed with its text color.".into()
+                }
+                BackingColorsFrom::Theme => "Text backing colors from its theme.".into(),
+                BackingColorsFrom::AllPanes => {
+                    "Text backing colors set for all panes (Settings → Text backing).".into()
+                }
+            },
+        });
         let prefs = &self.preferences;
         if prefs.calm_mode {
             lines.push("Calm is on: no motion, static or scanlines.".into());
@@ -265,6 +359,7 @@ impl ButtonsApp {
                         "size": look.font.zone.size,
                         "from": look.font_origin,
                     },
+                    "text_backing": look.backing,
                     "why": self.explain_pane_look(tab.id),
                 })
             })
@@ -335,6 +430,80 @@ impl ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_backing_is_decided_in_one_place() {
+        let theme_colors = crate::theme::TextBackingColors {
+            colors: vec![egui::Color32::RED],
+            style: crate::theme::TextBackingStyle::Vertical,
+            ring_width: 4.0,
+            rings: Default::default(),
+        };
+        let mut settings = crate::settings::TextBacking {
+            available: true,
+            enabled: true,
+            invert: false,
+            colors: Vec::new(),
+            override_theme_colors: false,
+            auto_contrast: false,
+            ..Default::default()
+        };
+        let from = |settings: &crate::settings::TextBacking, theme: bool| match resolve_text_backing(
+            settings,
+            theme.then(|| theme_colors.clone()),
+        ) {
+            BackingLook::Backing {
+                colors_from,
+                colors,
+            } => Some((colors_from, colors.map(|colors| colors.colors[0]))),
+            _ => None,
+        };
+        assert_eq!(
+            from(&settings, false),
+            Some((BackingColorsFrom::PaneBackground, None))
+        );
+        assert_eq!(
+            from(&settings, true),
+            Some((BackingColorsFrom::Theme, Some(egui::Color32::RED)))
+        );
+        settings.colors = vec!["#0000ff".into()];
+        let blue = egui::Color32::from_rgb(0, 0, 255);
+        assert_eq!(
+            from(&settings, true),
+            Some((BackingColorsFrom::Theme, Some(egui::Color32::RED))),
+            "a theme's colors win"
+        );
+        assert_eq!(
+            from(&settings, false),
+            Some((BackingColorsFrom::AllPanes, Some(blue)))
+        );
+        settings.override_theme_colors = true;
+        assert_eq!(
+            from(&settings, true),
+            Some((BackingColorsFrom::AllPanes, Some(blue))),
+            "unless all-pane colors override themes"
+        );
+        settings.invert = true;
+        assert_eq!(
+            from(&settings, true),
+            Some((BackingColorsFrom::TextColor, None))
+        );
+        settings.enabled = false;
+        assert!(matches!(
+            resolve_text_backing(&settings, None),
+            BackingLook::Off
+        ));
+        settings.auto_contrast = true;
+        assert!(matches!(
+            resolve_text_backing(&settings, None),
+            BackingLook::ContrastOnly
+        ));
+        settings.available = false;
+        assert!(matches!(
+            resolve_text_backing(&settings, None),
+            BackingLook::Off
+        ));
+    }
 
     fn app_with_two_panes() -> ButtonsApp {
         let mut preferences = Preferences::default();

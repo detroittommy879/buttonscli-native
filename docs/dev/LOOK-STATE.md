@@ -76,7 +76,7 @@ At startup `restore_pane_looks` hands those looks back by slot.
 One function decides it: `resolve_pane_look(pty)` in `src/app/pane_look.rs`.
 
 ```text
-resolve_pane_look(pty) -> PaneLook { origin, presentation, font, font_origin }
+resolve_pane_look(pty) -> PaneLook { origin, presentation, font, font_origin, backing }
   origin: Own { theme_id }        theme_overrides[pty], if that theme exists
         | Shared { terminal, gradient, effects }   the Apply-to sources
   presentation: that theme (shared: shared_terminal_theme())
@@ -84,6 +84,9 @@ resolve_pane_look(pty) -> PaneLook { origin, presentation, font, font_origin }
         + apply_live_switches: Calm, classic effects off, Strength override
   previewing: the presentation shows an unsaved editor draft
   font: resolve_pane_font(pty): pane_fonts[pty] → own theme's typography → shared
+  backing: resolve_text_backing(settings, presentation.text_backing): Off |
+        ContrastOnly | Backing { colors_from: PaneBackground | TextColor (Invert)
+        | Theme | AllPanes }; the renderer calls the same function
 terminal_presentation_for(pty) = presentation + the Shuffle fade (draw time only)
 theme_for_tab(i), font_for_pane(pty), settled_presentation_for(pty): the same answer
 explain_pane_look(pty): the reasons in plain English (Settings → Debug)
@@ -349,7 +352,5 @@ Nothing reads them automatically; they are for comparing later.
 
 ## Known gaps (next steps)
 
-1. Text backing is still resolved in the renderer (`backing_palette`), not
-   in `resolve_pane_look`.
-2. The look API has no plugin transport yet (`LookSource::Plugin` is
+1. The look API has no plugin transport yet (`LookSource::Plugin` is
    unused).

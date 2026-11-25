@@ -16423,8 +16423,12 @@ fn terminal_surface(
             None
         })
         .set_text_backing(
-            if interaction.text_backing.available && interaction.text_backing.enabled {
-                Some(egui_term::TextBacking {
+            // Which backing and whose colors: decided in `pane_look`.
+            match pane_look::resolve_text_backing(
+                &interaction.text_backing,
+                theme.text_backing.clone(),
+            ) {
+                pane_look::BackingLook::Backing { colors, .. } => Some(egui_term::TextBacking {
                     opacity: interaction.text_backing.opacity.min(100) as f32 / 100.0,
                     feather: (interaction.text_backing.feather as f32).min(egui_term::MAX_FEATHER),
                     whole_line: interaction.text_backing.whole_line,
@@ -16432,32 +16436,23 @@ fn terminal_surface(
                     text_color: interaction.text_backing.text_color(),
                     recolor_all: interaction.text_backing.recolor_all,
                     min_contrast: interaction.text_backing.contrast_target(),
-                    // A pane's theme colors win over the colors set for all panes.
-                    // Invert backs each run with its own text color, so custom
-                    // colors (kept for when Invert is off) would undo it.
-                    palette: interaction
-                        .text_backing
-                        .colors_for(theme.text_backing.clone())
-                        .filter(|_| !interaction.text_backing.invert)
-                        .and_then(|colors| {
-                            // Moving rings: repaint on the animation tick.
-                            if moving
-                                && colors.rings.flow != 0
-                                && colors.style == crate::theme::TextBackingStyle::Rings
-                            {
-                                ui.ctx().request_repaint_after(interaction.animation_delay);
-                            }
-                            backing_palette(&colors, time)
-                        }),
-                })
-            } else if interaction.text_backing.available && interaction.text_backing.auto_contrast {
+                    palette: colors.and_then(|colors| {
+                        // Moving rings: repaint on the animation tick.
+                        if moving
+                            && colors.rings.flow != 0
+                            && colors.style == crate::theme::TextBackingStyle::Rings
+                        {
+                            ui.ctx().request_repaint_after(interaction.animation_delay);
+                        }
+                        backing_palette(&colors, time)
+                    }),
+                }),
                 // Auto contrast works without backing too (against the pane background).
-                Some(egui_term::TextBacking {
+                pane_look::BackingLook::ContrastOnly => Some(egui_term::TextBacking {
                     min_contrast: interaction.text_backing.contrast_target(),
                     ..egui_term::TextBacking::default()
-                })
-            } else {
-                None
+                }),
+                pane_look::BackingLook::Off => None,
             },
         )
         .set_draw_bold_bright(draw_bold_bright)
