@@ -668,6 +668,24 @@ fn shot_list_matches_image_markers() {
     }
 }
 
+/// QA shots never land in the docs: their own names, never a docs image's.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[test]
+fn qa_shots_are_named_apart_from_docs_images() {
+    let markers = image_markers();
+    let mut seen = std::collections::BTreeSet::new();
+    for shot in QA_SHOTS {
+        assert!(shot.file.starts_with("qa-"), "{}", shot.file);
+        assert!(
+            !markers.contains(shot.file),
+            "{} is a docs image",
+            shot.file
+        );
+        assert!(seen.insert(shot.file), "{} is listed twice", shot.file);
+        assert!(!shot.parts.is_empty(), "{} has no parts", shot.file);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Writing images
 // ---------------------------------------------------------------------------
