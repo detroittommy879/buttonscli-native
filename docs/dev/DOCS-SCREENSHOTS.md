@@ -18,6 +18,7 @@ affected. Windows only for now (it needs a GPU or WARP for the shaders).
 | `-DryRun` | Writes to `target/docs-capture/preview/`, leaves the docs alone |
 | `-Locale de` | App in German, written to `docs/guide/images/de/` |
 | `-Force` | Rewrites files even when the picture did not change |
+| `-Qa` | Look-state checks (`QA_SHOTS`: editor previews, held bundles, Fork) to `target/docs-capture/qa/`; no markers needed |
 
 Full-window captures of every shot land in `target/docs-capture/` with
 `report.json` (status, size and percent changed per shot). Look there when a

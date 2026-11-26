@@ -546,7 +546,7 @@ impl ButtonsApp {
         let mut repair_held = None;
         if !held.is_empty() {
             ui.add_space(4.0);
-            ui.spaced_colored_label(
+            let heading = ui.spaced_colored_label(
                 self.colors().warning,
                 crate::i18n::formatted_literal(
                     &self.locale,
@@ -554,6 +554,7 @@ impl ButtonsApp {
                     &[("count", &held.len().to_string())],
                 ),
             );
+            docs_capture::anchor(ui, "held-bundles", heading.rect);
             for (index, bundle) in held.iter().enumerate() {
                 ui.push_id(("held-bundle", index), |ui| {
                     wrapping_row(ui, |ui| {

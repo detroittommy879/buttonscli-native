@@ -3624,11 +3624,7 @@ impl ButtonsApp {
             .iter()
             .filter_map(|index| self.tabs.get(*index).map(|tab| (*index, tab)))
             .filter(|(index, tab)| {
-                // Mid-fade every pane has its own look (from its old one).
-                self.theme_overrides.contains_key(&tab.id)
-                    || self.shuffle.fade.is_some()
-                    || self.idle_glow_on(tab.id)
-                    || (focused_effects_only && *index != focused)
+                self.pane_draws_own_look(tab.id) || (focused_effects_only && *index != focused)
             })
             .map(|(index, tab)| {
                 let mut theme = self.terminal_presentation_for(tab.id);
@@ -9641,21 +9637,22 @@ impl ButtonsApp {
                             self.shader_ai.list_note =
                                 Some(format!("Saved \"{}\" to the shader list.", custom.name));
                         }
-                        if listed.is_some()
-                            && ui
+                        if listed.is_some() {
+                            let fork = ui
                                 .spaced_button(crate::i18n::literal(&self.locale, "Fork"))
                                 .on_hover_text(crate::i18n::literal(
                                     &self.locale,
                                     "Save a separate copy under a new name. Changes to the copy leave the original and the themes using it alone.",
-                                ))
-                                .clicked()
-                        {
-                            let forked = self.fork_shader(custom, own_colors.clone());
-                            self.shader_ai.list_note = Some(format!(
-                                "Forked \"{}\" as \"{}\".",
-                                custom.name, forked.name
-                            ));
-                            *custom = forked;
+                                ));
+                            docs_capture::anchor(ui, "shader-fork", fork.rect);
+                            if fork.clicked() {
+                                let forked = self.fork_shader(custom, own_colors.clone());
+                                self.shader_ai.list_note = Some(format!(
+                                    "Forked \"{}\" as \"{}\".",
+                                    custom.name, forked.name
+                                ));
+                                *custom = forked;
+                            }
                         }
                         if let Some(index) = listed {
                             if ui

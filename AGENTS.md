@@ -484,6 +484,10 @@ cargo build --locked --release --bin buttonscli
   Idle return/latency: `native_keyboard_recovers_after_idle_window_switches`;
   adapter lock checks: `cargo test --locked -p egui_term --lib input_recovery_tests
   -- --include-ignored --test-threads=1` (uses owned Windows shells).
+- Visual look checks without touching the docs: `scripts/docs-capture.ps1 -Qa`
+  (`QA_SHOTS` in `docs_capture.rs`; PNGs in `target/docs-capture/qa/`). It
+  caught a pane-only editor preview that was never drawn. egui shows no
+  tooltips for the probe's synthetic pointer.
 - Docs screenshots: `scripts/docs-capture.ps1 [-Only a,b] [-DryRun]` runs the
   ignored `native_docs_capture` probe (`src/app/docs_capture.rs`, guide in
   `docs/dev/DOCS-SCREENSHOTS.md`). Crops use named anchors

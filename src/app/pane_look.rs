@@ -181,6 +181,18 @@ impl ButtonsApp {
         }
     }
 
+    /// Whether the pane loop draws this pane from `terminal_presentation_for`
+    /// instead of the one shared presentation: it has its own theme, the
+    /// editor previews a draft on it, Shuffle is fading (every pane fades
+    /// from its old look) or it glows idle. Missing the preview here once
+    /// left "Edit for: Pane N" previews invisible on shared panes.
+    pub(super) fn pane_draws_own_look(&self, id: u64) -> bool {
+        self.theme_overrides.contains_key(&id)
+            || self.pane_preview(id).is_some()
+            || self.shuffle.fade.is_some()
+            || self.idle_glow_on(id)
+    }
+
     /// A pane's font and where it comes from: its own, its own theme's, or
     /// the shared one. Cheap (no theme copy), for per-frame sizing.
     pub(super) fn resolve_pane_font(&self, id: u64) -> (fonts::PaneFont, FontOrigin) {
@@ -430,6 +442,23 @@ impl ButtonsApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_pane_preview_is_drawn_on_a_pane_without_its_own_theme() {
+        let mut app = app_with_two_panes();
+        let (edited, other) = (app.tabs[0].id, app.tabs[1].id);
+        assert!(
+            !app.pane_draws_own_look(edited),
+            "shared panes share one look"
+        );
+        let mut session = editor_session::EditorSession::new(None, json!({}), None, false);
+        session.preview = Some(app.themes.all()[0].clone());
+        app.theme_editor.session = Some(session);
+        app.theme_editor.pane = Some(edited);
+        assert!(app.resolve_pane_look(edited).previewing);
+        assert!(app.pane_draws_own_look(edited), "the preview must be drawn");
+        assert!(!app.pane_draws_own_look(other));
+    }
 
     #[test]
     fn text_backing_is_decided_in_one_place() {
