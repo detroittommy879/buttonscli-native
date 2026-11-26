@@ -1,16 +1,17 @@
-//! Look requests from outside the app (control API, MCP; later plugins),
-//! answered on the app thread. Reads are answered at once. Applying asks the
-//! user first, in a small window: which parts change (all ticked, each can
-//! be turned off), Try it (then Keep or Put back), Apply, Decline, or Block
+//! Look requests from outside the app (control API, MCP, plugins), answered
+//! on the app thread. Reads are answered at once. Applying asks the user
+//! first, in a small window: which parts change (all ticked, each can be
+//! turned off), Try it (then Keep or Put back), Apply, Decline, or Block
 //! that client until restart. The change goes through `change_look` with
-//! `LookSource::Api`; it never turns Calm or the other live switches on or
-//! off, and API undo only takes back a change the API made.
+//! `LookSource::Api` (agents) or `LookSource::Plugin` (plugins); it never
+//! turns Calm or the other live switches on or off. API undo only takes
+//! back a change an agent made, a plugin's undo only its own change.
 
 use super::apply_look::{LookChange, LookSource, LookTarget};
 use super::*;
 use crate::session::looks::{
-    self, LookApiTarget, LookApplyRequest, LookDispatcher, LookInbox, LookParts, LookReply,
-    LookRequest,
+    self, LookApiTarget, LookApplyRequest, LookCaller, LookDispatcher, LookInbox, LookParts,
+    LookReply, LookRequest,
 };
 use std::time::Instant;
 
@@ -24,8 +25,25 @@ pub(super) struct LookApi {
     pub(super) dispatcher: LookDispatcher,
     inbox: LookInbox,
     prompt: Option<LookPrompt>,
-    /// Clients the user blocked until the app restarts.
+    /// Callers the user blocked until the app restarts (`blocked_key`).
     blocked: std::collections::BTreeSet<String>,
+}
+
+/// What a change by this caller is recorded as.
+fn caller_source(caller: &LookCaller, client: &str) -> LookSource {
+    match caller {
+        LookCaller::Api => LookSource::Api(client.to_owned()),
+        LookCaller::Plugin { id } => LookSource::Plugin(id.clone()),
+    }
+}
+
+/// Block list key: an agent by its name, a plugin by its ID (so an agent
+/// naming itself after a plugin blocks only itself).
+fn blocked_key(caller: &LookCaller, client: &str) -> String {
+    match caller {
+        LookCaller::Api => format!("api:{client}"),
+        LookCaller::Plugin { id } => format!("plugin:{id}"),
+    }
 }
 
 impl LookApi {
@@ -70,13 +88,16 @@ impl ButtonsApp {
             match queued.request {
                 LookRequest::Report => reply.finish(Ok(self.look_report())),
                 LookRequest::Themes => reply.finish(Ok(self.look_catalog())),
-                LookRequest::Undo { client } => reply.finish(self.undo_api_look(&client)),
+                LookRequest::Undo { client, caller } => {
+                    reply.finish(self.undo_api_look(&client, &caller))
+                }
                 LookRequest::Apply(request) => match self.check_look_request(&request) {
                     Err(error) => reply.finish(Err(error)),
                     Ok(()) => {
                         tracing::info!(
                             target: "buttonscli::looks",
                             client = %request.client,
+                            caller = ?request.caller,
                             theme = ?request.theme,
                             bundle = ?request.bundle,
                             "look request waiting for the user"
@@ -148,7 +169,11 @@ impl ButtonsApp {
 
     /// Refuses a request the prompt could not carry out.
     fn check_look_request(&self, request: &LookApplyRequest) -> Result<(), String> {
-        if self.look_api.blocked.contains(&request.client) {
+        if self
+            .look_api
+            .blocked
+            .contains(&blocked_key(&request.caller, &request.client))
+        {
             return Err(format!(
                 "The user blocked look requests from \"{}\" until the app restarts.",
                 request.client
@@ -222,8 +247,9 @@ impl ButtonsApp {
         Some(LookChange::Theme { theme_id, target })
     }
 
-    /// Undoes the newest look change if the API made it.
-    fn undo_api_look(&mut self, client: &str) -> Result<Value, String> {
+    /// Undoes the newest look change if this caller may: an agent any
+    /// agent's change, a plugin only its own.
+    fn undo_api_look(&mut self, client: &str, caller: &LookCaller) -> Result<Value, String> {
         let newest = self
             .look_history
             .records
@@ -232,9 +258,14 @@ impl ButtonsApp {
             .find(|record| !record.undone);
         match newest {
             None => return Err("There is no look change to undo.".into()),
-            Some(record) if !matches!(record.source, LookSource::Api(_)) => {
+            Some(record)
+                if !match caller {
+                    LookCaller::Api => matches!(record.source, LookSource::Api(_)),
+                    LookCaller::Plugin { id } => record.source == LookSource::Plugin(id.clone()),
+                } =>
+            {
                 return Err(
-                    "The newest look change was made in the app; only the user can undo it (Look → Undo look change)."
+                    "The newest look change was not made by this caller; only the user can undo it (Look → Undo look change)."
                         .into(),
                 )
             }
@@ -253,6 +284,7 @@ impl ButtonsApp {
             return;
         };
         let client = prompt.request.client.clone();
+        let source = caller_source(&prompt.request.caller, &client);
         match answer {
             LookAnswer::Try | LookAnswer::Apply => {
                 if prompt.trying.is_some() {
@@ -261,8 +293,7 @@ impl ButtonsApp {
                 }
                 let change = self.look_request_change(ctx, &prompt.request, &prompt.parts);
                 let label = change.as_ref().map(LookChange::label);
-                let done = change
-                    .and_then(|change| self.change_look(change, LookSource::Api(client.clone())));
+                let done = change.and_then(|change| self.change_look(change, source.clone()));
                 match (done, label) {
                     (Some(_), Some(label)) if answer == LookAnswer::Try => {
                         prompt.trying = Some(label);
@@ -296,9 +327,7 @@ impl ButtonsApp {
                     .iter()
                     .rev()
                     .find(|record| !record.undone)
-                    .is_some_and(|record| {
-                        record.label == label && record.source == LookSource::Api(client.clone())
-                    });
+                    .is_some_and(|record| record.label == label && record.source == source);
                 if newest_is_ours {
                     self.undo_look_change();
                 } else {
@@ -320,7 +349,9 @@ impl ButtonsApp {
                 prompt.reply.finish(Err("The user declined.".into()));
             }
             LookAnswer::Block => {
-                self.look_api.blocked.insert(client.clone());
+                self.look_api
+                    .blocked
+                    .insert(blocked_key(&prompt.request.caller, &client));
                 tracing::info!(target: "buttonscli::looks", client = %client, "look requests blocked until restart");
                 prompt.reply.finish(Err(
                     "The user declined and blocked look requests from this client until the app restarts."
@@ -692,6 +723,7 @@ mod tests {
         assert!(answer(&pending).is_ok());
         let undo = || LookRequest::Undo {
             client: "Test agent".into(),
+            caller: LookCaller::Api,
         };
         assert!(answer(&submit(&mut app, &ctx, undo())).is_ok());
         assert_ne!(app.preferences.terminal_theme_id, theme);
@@ -706,6 +738,82 @@ mod tests {
         let refused = answer(&submit(&mut app, &ctx, undo())).unwrap_err();
         assert!(refused.contains("only the user"));
         assert_eq!(app.preferences.terminal_theme_id, theme);
+    }
+
+    #[test]
+    fn plugins_are_asked_recorded_blocked_and_undone_as_themselves() {
+        let (mut app, ctx) = app();
+        let theme = other_theme(&app);
+        let plugin = crate::session::looks::PluginLooks::new(
+            "dev.example.moods",
+            "Moods\u{7}",
+            app.look_api.dispatcher.clone(),
+        );
+        let run = |app: &mut ButtonsApp, pending: Result<LookPending, String>| {
+            let pending = pending.unwrap();
+            app.process_look_requests(&ctx);
+            pending
+        };
+        assert!(answer(&run(&mut app, plugin.report())).is_ok());
+        assert!(answer(&run(&mut app, plugin.themes())).is_ok());
+        let pending = run(
+            &mut app,
+            plugin.apply(LookApplyRequest {
+                theme: Some(theme.clone()),
+                // A plugin cannot pass itself off as an agent.
+                client: "Claude Code".into(),
+                ..Default::default()
+            }),
+        );
+        let prompt = app.look_api.prompt.as_ref().expect("the user is asked");
+        assert_eq!(prompt.request.client, "Moods (plugin)");
+        app.answer_look_prompt(&ctx, LookAnswer::Apply);
+        assert!(answer(&pending).is_ok());
+        assert_eq!(
+            app.look_history.records.back().unwrap().source,
+            LookSource::Plugin("dev.example.moods".into())
+        );
+
+        // An agent cannot undo a plugin's change; the plugin can.
+        let agent_undo = LookRequest::Undo {
+            client: "Test agent".into(),
+            caller: LookCaller::Api,
+        };
+        assert!(answer(&submit(&mut app, &ctx, agent_undo)).is_err());
+        let other = crate::session::looks::PluginLooks::new(
+            "dev.example.other",
+            "Other",
+            app.look_api.dispatcher.clone(),
+        );
+        assert!(
+            answer(&run(&mut app, other.undo())).is_err(),
+            "another plugin"
+        );
+        assert!(answer(&run(&mut app, plugin.undo())).is_ok());
+        assert_ne!(app.preferences.terminal_theme_id, theme);
+
+        // Blocking the plugin blocks it, not agents or other plugins.
+        let pending = run(
+            &mut app,
+            plugin.apply(LookApplyRequest {
+                theme: Some(theme.clone()),
+                ..Default::default()
+            }),
+        );
+        app.answer_look_prompt(&ctx, LookAnswer::Block);
+        assert!(answer(&pending).is_err());
+        let again = run(
+            &mut app,
+            plugin.apply(LookApplyRequest {
+                theme: Some(theme.clone()),
+                ..Default::default()
+            }),
+        );
+        assert!(answer(&again).unwrap_err().contains("blocked"));
+        let agent = submit(&mut app, &ctx, apply_request(&theme));
+        assert!(app.look_api.prompt.is_some(), "agents are still asked");
+        app.answer_look_prompt(&ctx, LookAnswer::Decline);
+        assert!(answer(&agent).is_err());
     }
 
     #[test]

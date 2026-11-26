@@ -156,7 +156,7 @@ New "use this theme" controls call `change_look` (or a wrapper:
 
 ## Outside callers (control API, MCP, plugins)
 
-Agents and (later) plugins change the look only through the look API:
+Agents and plugins change the look only through the look API:
 `src/session/looks.rs` (request types, bounded queue), the routes in
 `src/control/server.rs` (`/v1/look`, `/v1/look/themes`, `/v1/look/apply`,
 `/v1/look/undo`), and `src/app/look_api.rs` on the app thread. Rules:
@@ -174,9 +174,13 @@ Agents and (later) plugins change the look only through the look API:
 - `look/undo` undoes only when the newest change came from the API.
 - `buttonsclictl look*` and the MCP `look_*` tools are thin clients of
   these routes (`src/ctl/`).
-
-A plugin API should reuse `LookRequest` and the same window, with
-`LookSource::Plugin(id)`.
+- Plugins get a `PluginLooks` handle (`session/looks.rs`; the plugin
+  host makes one per plugin with `PluginLooks::new(id, name, dispatcher)`).
+  It uses the same queue and window. The handle sets `LookCaller::Plugin`
+  and the shown name ("<name> (plugin)"), so a plugin cannot pass itself
+  off as an agent or another plugin. Its changes are recorded as
+  `LookSource::Plugin(id)`; its undo takes back only its own newest change;
+  Block blocks that plugin ID only (agents are blocked by name).
 
 ## Broken and outdated files
 
@@ -351,5 +355,6 @@ Nothing reads them automatically; they are for comparing later.
 
 ## Known gaps (next steps)
 
-1. The look API has no plugin transport yet (`LookSource::Plugin` is
-   unused).
+1. No plugin host exists yet: nothing constructs `PluginLooks` outside
+   tests. When one is built, give each plugin its own handle and never the
+   `LookDispatcher` itself.

@@ -1,7 +1,9 @@
-//! Look requests from outside the app (control API, MCP, later plugins).
-//! The control server queues them; the app thread answers them in
+//! Look requests from outside the app: the control API and MCP (queued by
+//! the control server) and in-process plugins (through a `PluginLooks`
+//! handle). Both use the same bounded queue; the app thread answers them in
 //! `look_api.rs`, and every change still goes through `change_look`, with
-//! the user asked first.
+//! the user asked first. A plugin cannot pass itself off as an agent or
+//! another plugin: its handle fixes who it is.
 
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError};
 use std::time::Duration;
@@ -50,6 +52,16 @@ pub(crate) enum LookApiTarget {
     Pane,
 }
 
+/// Who sent a request. Set by the transport, never read from the body.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum LookCaller {
+    /// The control API or MCP; `client` names it.
+    #[default]
+    Api,
+    /// An in-process plugin with this ID.
+    Plugin { id: String },
+}
+
 /// `POST /v1/look/apply`.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -67,6 +79,8 @@ pub(crate) struct LookApplyRequest {
     pub parts: LookParts,
     /// Who is asking, shown to the user ("Claude Code", a plugin name).
     pub client: String,
+    #[serde(skip)]
+    pub caller: LookCaller,
 }
 
 pub(crate) enum LookRequest {
@@ -76,8 +90,9 @@ pub(crate) enum LookRequest {
     Themes,
     /// Apply a theme or bundle (the user is asked first).
     Apply(LookApplyRequest),
-    /// Undo the newest look change, if an outside caller made it.
-    Undo { client: String },
+    /// Undo the newest look change, if this caller made it (any agent for
+    /// the API; the same plugin for a plugin).
+    Undo { client: String, caller: LookCaller },
 }
 
 pub(crate) struct QueuedLook {
@@ -147,6 +162,65 @@ impl LookDispatcher {
                 TrySendError::Disconnected(_) => "The app is closing.".to_owned(),
             })?;
         Ok(LookPending { receiver })
+    }
+}
+
+/// What a plugin is given to read and change the look. Every apply asks the
+/// user (the same prompt agents get), is recorded as `LookSource::Plugin`
+/// with this ID, and can be blocked or undone for this plugin alone.
+#[derive(Clone)]
+pub(crate) struct PluginLooks {
+    id: String,
+    name: String,
+    dispatcher: LookDispatcher,
+}
+
+impl PluginLooks {
+    /// The plugin host makes one handle per loaded plugin.
+    #[cfg_attr(not(test), allow(dead_code))] // The plugin host is not built yet.
+    pub(crate) fn new(id: &str, name: &str, dispatcher: LookDispatcher) -> Self {
+        let name: String = name
+            .chars()
+            .filter(|character| !character.is_control())
+            .take(60)
+            .collect();
+        Self {
+            id: id.to_owned(),
+            name: format!("{} (plugin)", name.trim()),
+            dispatcher,
+        }
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn report(&self) -> Result<LookPending, String> {
+        self.dispatcher.submit(LookRequest::Report)
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn themes(&self) -> Result<LookPending, String> {
+        self.dispatcher.submit(LookRequest::Themes)
+    }
+
+    /// Asks the user to apply a theme or bundle; the answer arrives on the
+    /// returned handle (wait at most `ANSWER_TIMEOUT`).
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn apply(&self, mut request: LookApplyRequest) -> Result<LookPending, String> {
+        request.client = self.name.clone();
+        request.caller = LookCaller::Plugin {
+            id: self.id.clone(),
+        };
+        self.dispatcher.submit(LookRequest::Apply(request))
+    }
+
+    /// Undoes the newest look change if this plugin made it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn undo(&self) -> Result<LookPending, String> {
+        self.dispatcher.submit(LookRequest::Undo {
+            client: self.name.clone(),
+            caller: LookCaller::Plugin {
+                id: self.id.clone(),
+            },
+        })
     }
 }
 

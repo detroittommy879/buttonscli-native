@@ -33,8 +33,7 @@ pub(crate) enum LookSource {
     Shuffle,
     /// The agent control API (client name).
     Api(String),
-    /// A plugin (its ID).
-    #[allow(dead_code)] // Plugins will construct it.
+    /// A plugin (its ID), through `session::looks::PluginLooks`.
     Plugin(String),
 }
 

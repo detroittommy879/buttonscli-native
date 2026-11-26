@@ -1518,7 +1518,10 @@ async fn look_undo(
     let client = client_name(&request.client);
     submit_look(
         &state,
-        LookRequest::Undo { client },
+        LookRequest::Undo {
+            client,
+            caller: crate::session::looks::LookCaller::Api,
+        },
         Duration::from_secs(10),
     )
     .await

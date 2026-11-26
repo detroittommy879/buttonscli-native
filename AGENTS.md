@@ -90,7 +90,7 @@ table, the editor): `docs/dev/LOOK-STATE.md`.
 | Give a pane a saved look (slot, new tab, group) | `put_pane_look` | insert into `theme_overrides` |
 | Read how a pane looks, and why | `resolve_pane_look`, `resolve_pane_font`, `explain_pane_look` | recompute Calm/strength yourself |
 | Add a look button | a `LookAction` + the table test | a new private path |
-| Let an agent or plugin change the look | `look_api.rs` (`LookRequest`, the request window) | call `change_look` from a request without asking |
+| Let an agent or plugin change the look | `look_api.rs` (`LookRequest`, the request window); plugins get a `PluginLooks` handle | call `change_look` from a request without asking, or give a plugin the `LookDispatcher` |
 | Undo, history, logs | `look_history.rs` (`record_look_change`, `undo_look_change`) | a second history |
 | Check or upgrade a file | `look_format` (versions, validators), `file_repair` (AI fix) | ad hoc JSON checks |
 | Keep a copy before overwriting | `storage::backups` (store does it) | delete without a copy |
