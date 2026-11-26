@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::assistant::provider::ProviderSettings;
+use crate::look_format::{self, HeldBundle};
 use crate::settings::Preferences;
 
+use super::backups::{backup_bytes, backup_file, BackupReason};
 use super::paths::{sanitize_profile_name, NativeDataRoot};
 
 const MAX_NATIVE_BYTES: u64 = 8 * 1024 * 1024;
@@ -32,6 +34,8 @@ pub enum StoreError {
     InstallerCollision,
     SourceChanged,
     ThemeChanged,
+    /// The theme file on disk has this newer format: never overwrite it.
+    NewerTheme(u64),
     ProfileExists,
     ActiveProfile,
     Io(io::Error),
@@ -65,6 +69,12 @@ impl std::fmt::Display for StoreError {
             Self::ThemeChanged => write!(
                 f,
                 "this theme changed in another window; reload it before saving"
+            ),
+            Self::NewerTheme(version) => write!(
+                f,
+                "this theme file was made by a newer ButtonsCLI (theme format {version}; this \
+                 version reads up to {}), so it is not overwritten; save under a new name",
+                look_format::THEME_FORMAT_VERSION
             ),
             Self::ProfileExists => write!(f, "a profile with that name already exists"),
             Self::ActiveProfile => {
@@ -267,11 +277,43 @@ impl NativeStore {
         }
         ensure_native_path(&self.root.0, &path)?;
         let bytes = read_limited(&path, MAX_NATIVE_BYTES)?;
+        let parsed = parse_document(&bytes);
+        let reason = if parsed.is_ok() {
+            BackupReason::Startup
+        } else {
+            BackupReason::Questionable
+        };
+        backup_bytes_once(&self.root.0, &self.profile, &path, &bytes, reason);
         let has_provider_settings = serde_json::from_slice::<serde_json::Value>(&bytes)
             .ok()
             .and_then(|value| value.get("preferences")?.get("provider_settings").cloned())
             .is_some();
-        let mut document = parse_document(&bytes)?;
+        let ParsedNative {
+            mut document,
+            bundles,
+        } = parsed?;
+        for held in &bundles.held {
+            tracing::warn!(
+                "theme bundle {:?} is kept in native.json unchanged but not loaded: {}",
+                held.name,
+                held.reason
+            );
+        }
+        for upgraded in &bundles.upgraded {
+            tracing::info!("native.json: {upgraded}");
+        }
+        // Installed themes are not known yet; the rest is checked here.
+        for bundle in &bundles.kept {
+            let report = look_format::validate_bundle(bundle, |_| true);
+            if !report.warnings.is_empty() {
+                let name = bundle.get("name").and_then(|name| name.as_str());
+                tracing::warn!(
+                    "theme bundle {:?}: {}",
+                    name.unwrap_or_default(),
+                    report.summary(5)
+                );
+            }
+        }
         if !has_provider_settings {
             let compatibility = self.profile_dir().join("legacy-compatible.json");
             if compatibility.is_file() {
@@ -316,11 +358,12 @@ impl NativeStore {
         })?;
         let path = self.native_path();
         ensure_native_path(&self.root.0, &path)?;
-        let actual_revision = if path.exists() {
-            Some(parse_document(&read_limited(&path, MAX_NATIVE_BYTES)?)?.revision)
+        let existing = if path.exists() {
+            Some(parse_document(&read_limited(&path, MAX_NATIVE_BYTES)?)?)
         } else {
             None
         };
+        let actual_revision = existing.as_ref().map(|parsed| parsed.document.revision);
         if actual_revision != expected_revision {
             return Err(StoreError::StaleRevision);
         }
@@ -337,8 +380,8 @@ impl NativeStore {
             revision,
             preferences: safe_preferences,
         };
-        let encoded =
-            serde_json::to_vec_pretty(&document).map_err(|_| StoreError::InvalidDocument)?;
+        let kept = existing.map(|parsed| parsed.bundles).unwrap_or_default();
+        let encoded = encode_document(&document, &kept)?;
         if encoded.len() as u64 > MAX_NATIVE_BYTES {
             return Err(StoreError::TooLarge);
         }
@@ -351,6 +394,7 @@ impl NativeStore {
         )?;
         fs::create_dir_all(self.profile_dir())?;
         ensure_native_path(&self.root.0, &path)?;
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Routine);
         atomic_replace(&path, &encoded)?;
         Ok(revision)
     }
@@ -598,6 +642,77 @@ impl NativeStore {
         Ok(new)
     }
 
+    /// Bundles in native.json this app keeps but cannot use (made by a newer
+    /// ButtonsCLI, or unreadable). Read from disk on each call.
+    pub(crate) fn held_bundles(&self) -> Result<Vec<HeldBundle>, StoreError> {
+        let path = self.native_path();
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        ensure_native_path(&self.root.0, &path)?;
+        Ok(parse_document(&read_limited(&path, MAX_NATIVE_BYTES)?)?
+            .bundles
+            .held)
+    }
+
+    /// Replaces one held bundle in native.json with `fixed` (Fix with AI),
+    /// in place, under the write lock, after a backup copy. Refused when the
+    /// file's revision is not `expected_revision` or the held bundle is no
+    /// longer exactly `original`. Returns the new revision.
+    pub(crate) fn replace_held_bundle(
+        &self,
+        expected_revision: Option<u64>,
+        original: &serde_json::Value,
+        fixed: serde_json::Value,
+    ) -> Result<u64, StoreError> {
+        let _lock = self.acquire_root_lock()?;
+        let path = self.native_path();
+        ensure_native_path(&self.root.0, &path)?;
+        let bytes = read_limited(&path, MAX_NATIVE_BYTES)?;
+        let parsed = parse_document(&bytes)?;
+        if Some(parsed.document.revision) != expected_revision {
+            return Err(StoreError::StaleRevision);
+        }
+        let Some(held) = parsed
+            .bundles
+            .held
+            .iter()
+            .find(|held| &held.document == original)
+        else {
+            return Err(StoreError::SourceChanged);
+        };
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_| StoreError::InvalidDocument)?;
+        let revision = parsed
+            .document
+            .revision
+            .checked_add(1)
+            .ok_or(StoreError::StaleRevision)?;
+        let Some(serde_json::Value::Array(list)) = value
+            .get_mut("preferences")
+            .and_then(|preferences| preferences.get_mut("theme_bundles"))
+        else {
+            return Err(StoreError::InvalidDocument);
+        };
+        match list.get_mut(held.index) {
+            Some(slot) if slot == original => *slot = fixed,
+            _ => return Err(StoreError::SourceChanged),
+        }
+        value["revision"] = serde_json::json!(revision);
+        let encoded = serde_json::to_vec_pretty(&value).map_err(|_| StoreError::InvalidDocument)?;
+        if encoded.len() as u64 > MAX_NATIVE_BYTES {
+            return Err(StoreError::TooLarge);
+        }
+        // The new file must load, with the fixed bundle no longer held.
+        let check = parse_document(&encoded)?;
+        if check.bundles.held.len() + 1 != parsed.bundles.held.len() {
+            return Err(StoreError::InvalidDocument);
+        }
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
+        atomic_replace(&path, &encoded)?;
+        Ok(revision)
+    }
+
     pub(crate) fn native_root(&self) -> &Path {
         &self.root.0
     }
@@ -620,6 +735,8 @@ impl NativeStore {
             if !path.is_file() {
                 return Err(StoreError::InvalidDocument);
             }
+            refuse_newer_theme(&path)?;
+            backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
             atomic_replace(&path, bytes)
         } else {
             match write_new(&path, bytes) {
@@ -663,6 +780,8 @@ impl NativeStore {
         if current != expected {
             return Err(StoreError::ThemeChanged);
         }
+        refuse_newer_theme(&path)?;
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Replace);
         atomic_replace(&path, bytes)
     }
 
@@ -675,6 +794,7 @@ impl NativeStore {
         if !path.is_file() {
             return Err(StoreError::InvalidDocument);
         }
+        backup_file(&self.root.0, &self.profile, &path, BackupReason::Delete);
         fs::remove_file(path)?;
         Ok(())
     }
@@ -855,13 +975,68 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
     Ok(())
 }
 
-fn parse_document(bytes: &[u8]) -> Result<NativeDocument, StoreError> {
-    let document: NativeDocument =
+struct ParsedNative {
+    document: NativeDocument,
+    /// Bundles held back (newer or unreadable) and unknown bundle fields,
+    /// which a save writes back.
+    bundles: look_format::BundleSplit,
+}
+
+/// Reads native.json. Theme bundles go through `look_format` first: older
+/// formats are upgraded, and a bundle this app cannot use (newer format, or
+/// unreadable) is held back instead of failing the whole file.
+fn parse_document(bytes: &[u8]) -> Result<ParsedNative, StoreError> {
+    let mut value: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|_| StoreError::InvalidDocument)?;
+    let list = value
+        .get_mut("preferences")
+        .and_then(|preferences| preferences.get_mut("theme_bundles"));
+    let mut bundles = look_format::BundleSplit::default();
+    if let Some(list) = list {
+        if let serde_json::Value::Array(items) = list.take() {
+            bundles = look_format::split_bundles(items);
+            *list = serde_json::Value::Array(bundles.kept.clone());
+        }
+    }
+    let document: NativeDocument =
+        serde_json::from_value(value).map_err(|_| StoreError::InvalidDocument)?;
     if document.schema_version != SCHEMA_VERSION {
         return Err(StoreError::UnsupportedVersion);
     }
-    Ok(document)
+    Ok(ParsedNative { document, bundles })
+}
+
+/// The bytes to save. Bundles held back at load and fields of bundles this
+/// version does not know are written back as they were.
+fn encode_document(
+    document: &NativeDocument,
+    kept: &look_format::BundleSplit,
+) -> Result<Vec<u8>, StoreError> {
+    if kept.held.is_empty() && kept.extras.is_empty() {
+        return serde_json::to_vec_pretty(document).map_err(|_| StoreError::InvalidDocument);
+    }
+    let mut value = serde_json::to_value(document).map_err(|_| StoreError::InvalidDocument)?;
+    if let Some(serde_json::Value::Array(bundles)) = value
+        .get_mut("preferences")
+        .and_then(|preferences| preferences.get_mut("theme_bundles"))
+    {
+        look_format::restore_bundles(bundles, &kept.held, &kept.extras);
+    }
+    serde_json::to_vec_pretty(&value).map_err(|_| StoreError::InvalidDocument)
+}
+
+/// A theme file made by a newer app must not be overwritten by this one.
+fn refuse_newer_theme(path: &Path) -> Result<(), StoreError> {
+    let Ok(bytes) = fs::read(path) else {
+        return Ok(());
+    };
+    let Ok(document) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        return Ok(());
+    };
+    match look_format::THEME_CHAIN.check(&document) {
+        Err(look_format::FormatError::Newer { found, .. }) => Err(StoreError::NewerTheme(found)),
+        _ => Ok(()),
+    }
 }
 
 fn read_limited(path: &Path, limit: u64) -> Result<Vec<u8>, StoreError> {
@@ -904,6 +1079,16 @@ pub(crate) fn ensure_native_path(root: &Path, candidate: &Path) -> Result<(), St
         }
     }
     Ok(())
+}
+
+/// The startup copy of `native.json`: skipped when the newest copy already
+/// holds these bytes (`backup_file` compares them).
+fn backup_bytes_once(root: &Path, profile: &str, path: &Path, bytes: &[u8], reason: BackupReason) {
+    if reason == BackupReason::Questionable {
+        backup_bytes(root, profile, "native.json", bytes, reason);
+    } else {
+        backup_file(root, profile, path, reason);
+    }
 }
 
 pub(crate) fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
@@ -998,6 +1183,130 @@ mod tests {
         assert!(loaded.preferences.presets.is_empty());
         assert_eq!(first.save(Some(1), &preferences).unwrap(), 2);
         assert_eq!(second.load().unwrap().unwrap().revision, 2);
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    fn bundles_of(native: &Path) -> Vec<serde_json::Value> {
+        let path = native.join("profiles").join("default").join("native.json");
+        let value: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        value["preferences"]["theme_bundles"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+
+    #[test]
+    fn old_bundles_load_and_save_unchanged() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        let preferences = Preferences {
+            theme_bundles: vec![crate::settings::ThemeBundle {
+                name: "Old".into(),
+                theme_id: "basic2".into(),
+                panes: vec![Default::default()],
+                layout: "grid".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let first = store.save(None, &preferences).unwrap();
+        let written = bundles_of(&native);
+        // Format 1 is not written: older builds read the same file.
+        assert!(written[0].get("format_version").is_none());
+        let loaded = store.load().unwrap().unwrap();
+        assert_eq!(loaded.preferences.theme_bundles, preferences.theme_bundles);
+        store.save(Some(first), &loaded.preferences).unwrap();
+        assert_eq!(bundles_of(&native), written);
+        assert!(store.held_bundles().unwrap().is_empty());
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn newer_and_unreadable_bundles_stay_in_native_json() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        let first = store.save(None, &Preferences::default()).unwrap();
+        let path = native.join("profiles").join("default").join("native.json");
+        let mut file: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let future = serde_json::json!({
+            "format_version": 7, "name": "Future", "panes": {"new": "shape"}
+        });
+        let broken = serde_json::json!({"name": "Broken", "visible_panes": "two"});
+        let extra = serde_json::json!({"name": "Extra", "notes": {"by": "a newer app"}});
+        file["preferences"]["theme_bundles"] = serde_json::json!([
+            {"name": "Mine"}, future.clone(), extra.clone(), broken.clone()
+        ]);
+        fs::write(&path, serde_json::to_vec_pretty(&file).unwrap()).unwrap();
+
+        // The file still loads; only the bundles this app reads are in it.
+        let loaded = store.load().unwrap().unwrap();
+        let names: Vec<&str> = loaded
+            .preferences
+            .theme_bundles
+            .iter()
+            .map(|bundle| bundle.name.as_str())
+            .collect();
+        assert_eq!(names, ["Mine", "Extra"]);
+        let held = store.held_bundles().unwrap();
+        assert_eq!(held.len(), 2);
+        assert!(
+            held[0].reason.contains("made by a newer ButtonsCLI"),
+            "{}",
+            held[0].reason
+        );
+
+        // Saving (with a bundle removed and one added) writes them back.
+        let mut preferences = loaded.preferences;
+        preferences.theme_bundles.remove(0);
+        preferences
+            .theme_bundles
+            .push(crate::settings::ThemeBundle {
+                name: "New".into(),
+                ..Default::default()
+            });
+        store.save(Some(first), &preferences).unwrap();
+        let bundles = bundles_of(&native);
+        let names: Vec<&str> = bundles
+            .iter()
+            .map(|bundle| bundle["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["Extra", "Future", "New", "Broken"]);
+        assert_eq!(bundles[1], future);
+        assert_eq!(bundles[3], broken);
+        assert_eq!(bundles[0]["notes"], extra["notes"]);
+        fs::remove_dir_all(native.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn newer_theme_files_are_never_overwritten() {
+        let (native, original) = roots();
+        let store = NativeStore::open(NativeDataRoot(native.clone()), original).unwrap();
+        let newer = br#"{"version": 2, "metadata": {"id": "x", "name": "X"}}"#;
+        store.write_theme_file("future.json", newer, false).unwrap();
+        let replaced = store.write_theme_file("future.json", b"{}", true);
+        assert!(
+            matches!(replaced, Err(StoreError::NewerTheme(2))),
+            "{replaced:?}"
+        );
+        let digest = store.theme_file_digest("future.json").unwrap();
+        let replaced = store.replace_theme_file_if_unchanged("future.json", b"{}", digest);
+        let message = replaced.unwrap_err().to_string();
+        assert!(
+            message.contains("made by a newer ButtonsCLI (theme format 2"),
+            "{message}"
+        );
+        let path = native
+            .join("profiles")
+            .join("default")
+            .join("themes")
+            .join("future.json");
+        assert_eq!(fs::read(path).unwrap(), newer);
+        // Current files are still replaced.
+        store
+            .write_theme_file("now.json", br#"{"version": 1}"#, false)
+            .unwrap();
+        store.write_theme_file("now.json", b"{}", true).unwrap();
         fs::remove_dir_all(native.parent().unwrap()).unwrap();
     }
 

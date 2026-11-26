@@ -21,6 +21,9 @@ use zeroize::Zeroizing;
 
 use crate::layout::LayoutMode;
 use crate::session::actions::{Action, ActionError, Dispatcher, PresetInfo, Snapshot, Target};
+use crate::session::looks::{
+    LookApiTarget, LookApplyRequest, LookDispatcher, LookRequest, ANSWER_TIMEOUT,
+};
 
 const CONTROL_DIR: &str = "control";
 const HELPER_DIR: &str = "helpers";
@@ -41,6 +44,7 @@ struct ApiState {
     instance_id: String,
     snapshot: Arc<RwLock<Snapshot>>,
     dispatcher: Dispatcher,
+    looks: LookDispatcher,
     repaint: egui::Context,
     request_slots: Arc<tokio::sync::Semaphore>,
 }
@@ -288,6 +292,7 @@ impl ControlServer {
         native_root: &Path,
         snapshot: Arc<RwLock<Snapshot>>,
         dispatcher: Dispatcher,
+        looks: LookDispatcher,
         repaint: egui::Context,
     ) -> Result<Self, String> {
         let helper_path = install_cli_helper(native_root)?;
@@ -312,6 +317,7 @@ impl ControlServer {
             instance_id: instance_id.clone(),
             snapshot,
             dispatcher,
+            looks,
             repaint,
             request_slots: Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_REQUESTS)),
         });
@@ -330,6 +336,10 @@ impl ControlServer {
             .route("/v1/layout/open", axum::routing::post(open_layout))
             .route("/v1/presets", get(presets))
             .route("/v1/presets/run", axum::routing::post(run_preset))
+            .route("/v1/look", get(look_report))
+            .route("/v1/look/themes", get(look_themes))
+            .route("/v1/look/apply", axum::routing::post(look_apply))
+            .route("/v1/look/undo", axum::routing::post(look_undo))
             .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
             .layer(middleware::from_fn_with_state(
                 Arc::clone(&state),
@@ -1445,6 +1455,114 @@ async fn dispatch_action(
             )
         })?
         .map_err(map_action_error)
+}
+
+async fn look_report(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    authorize(&headers, &state)?;
+    submit_look(&state, LookRequest::Report, Duration::from_secs(10)).await
+}
+
+async fn look_themes(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    authorize(&headers, &state)?;
+    submit_look(&state, LookRequest::Themes, Duration::from_secs(10)).await
+}
+
+/// Applies a theme or bundle after the user agrees (a prompt in the app with
+/// the parts it will change). Never changes Calm or the other live switches.
+async fn look_apply(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+    Json(mut request): Json<LookApplyRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    authorize(&headers, &state)?;
+    match (&request.theme, &request.bundle) {
+        (Some(_), None) | (None, Some(_)) => {}
+        _ => {
+            return Err(api_error(
+                StatusCode::BAD_REQUEST,
+                "give exactly one of \"theme\" (an ID from GET /v1/look/themes) or \"bundle\" (a bundle name)",
+            ))
+        }
+    }
+    request.client = client_name(&request.client);
+    if request.target == LookApiTarget::Pane {
+        let snapshot = read_snapshot(&state)?;
+        let selector = request.tab.clone().unwrap_or_else(|| "active".into());
+        let id = snapshot
+            .resolve(&Target::Selector(selector))
+            .map_err(map_action_error)?;
+        request.pane_id = Some(id);
+    }
+    submit_look(&state, LookRequest::Apply(request), ANSWER_TIMEOUT).await
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct LookUndoRequest {
+    client: String,
+}
+
+/// Undoes the newest look change, only when an outside caller made it.
+async fn look_undo(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+    Json(request): Json<LookUndoRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    authorize(&headers, &state)?;
+    let client = client_name(&request.client);
+    submit_look(
+        &state,
+        LookRequest::Undo {
+            client,
+            caller: crate::session::looks::LookCaller::Api,
+        },
+        Duration::from_secs(10),
+    )
+    .await
+}
+
+/// The caller's name as shown to the user: trimmed, one line, at most 60
+/// characters; "An agent" when empty.
+fn client_name(name: &str) -> String {
+    let name: String = name
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(60)
+        .collect();
+    let name = name.trim();
+    if name.is_empty() {
+        "An agent".into()
+    } else {
+        name.to_owned()
+    }
+}
+
+async fn submit_look(
+    state: &ApiState,
+    request: LookRequest,
+    timeout: Duration,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let pending = state
+        .looks
+        .submit(request)
+        .map_err(|error| api_error(StatusCode::SERVICE_UNAVAILABLE, &error))?;
+    state.repaint.request_repaint();
+    tokio::task::spawn_blocking(move || pending.recv_timeout(timeout))
+        .await
+        .map_err(|_| {
+            api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "look request worker failed",
+            )
+        })?
+        .map(Json)
+        .map_err(|error| api_error(StatusCode::CONFLICT, &error))
 }
 
 async fn rollback_created_tabs(state: &ApiState, created_ids: &[u64]) {

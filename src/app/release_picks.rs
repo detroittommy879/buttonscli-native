@@ -290,7 +290,7 @@ impl ButtonsApp {
             .themes
             .all()
             .iter()
-            .filter(|theme| !theme.id.starts_with("personal:") && !theme.id.starts_with("preview:"))
+            .filter(|theme| !theme.id.starts_with("personal:"))
             .map(|theme| theme.id.as_str())
             .collect();
         let mut renamed: BTreeMap<String, String> = BTreeMap::new();
@@ -562,9 +562,9 @@ mod tests {
         app.native_store = Some(store);
         // One personal theme, saved the normal way.
         app.sync_theme_editor_to_current();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         draft["metadata"]["name"] = json!("Night Picks");
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.name_draft_as_next_version();
         app.save_personal_theme_draft();
         let personal = app

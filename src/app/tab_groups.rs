@@ -105,14 +105,7 @@ impl ButtonsApp {
             if saved.custom_title {
                 self.tabs[index].rename(saved.title.clone());
             }
-            if let Some(theme_id) = &saved.theme_id {
-                if self.themes.all().iter().any(|theme| &theme.id == theme_id) {
-                    self.theme_overrides.insert(id, theme_id.clone());
-                }
-            }
-            if let Some(font) = &saved.font {
-                self.pane_fonts.insert(id, font.clone());
-            }
+            self.put_pane_look(id, saved.theme_id.as_deref(), saved.font.as_ref(), false);
             if !saved.auto_tile {
                 self.auto_tile.set_included(id, false);
             }

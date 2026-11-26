@@ -351,7 +351,20 @@ impl ThemeCatalog {
                 }
                 let document: Value =
                     serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+                // A newer file is refused here and never rewritten (the
+                // store will not save over it either).
+                let (document, changes) = crate::look_format::upgrade_theme_document(document)
+                    .map_err(|error| error.to_string())?;
                 validate_personal_document(&document)?;
+                // Usable with something ignored: say so in the log only;
+                // it must never block startup.
+                let report = crate::look_format::validate_theme_document(&document);
+                if !report.warnings.is_empty() {
+                    tracing::warn!("personal theme {file_name}: {}", report.summary(5));
+                }
+                if !changes.is_empty() {
+                    tracing::info!("personal theme {file_name}: {}", changes.join("; "));
+                }
                 let mut theme = parse_legacy_value(stem, &document, ThemeSource::Personal)
                     .map_err(|error| error.to_string())?;
                 theme.id = identity.clone();
@@ -384,21 +397,23 @@ impl ThemeCatalog {
         self.preview_document(identity, file_stem, document)
     }
 
+    /// The editor draft as a theme for its live preview. Not added to the
+    /// catalog: the preview lives in the editor session only. Its ID,
+    /// `preview:<profile>:<stem>`, is never stored anywhere.
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn preview_editor_document(
-        &mut self,
+    pub(crate) fn editor_preview(
         profile: &str,
         file_stem: &str,
         document: &Value,
-    ) -> Result<String, String> {
-        self.preview_document(
-            format!("preview:{profile}:{file_stem}"),
-            file_stem,
-            document,
-        )
+    ) -> Result<ThemeDefinition, String> {
+        validate_personal_document(document)?;
+        let mut theme = parse_legacy_value(file_stem, document, ThemeSource::Personal)
+            .map_err(|error| error.to_string())?;
+        theme.id = format!("preview:{profile}:{file_stem}");
+        Ok(theme)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(test, not(target_arch = "wasm32")))]
     fn preview_document(
         &mut self,
         identity: String,
@@ -418,21 +433,27 @@ impl ThemeCatalog {
     }
 }
 
+/// The checks a saved theme document must pass (`look_format`): a format
+/// this app reads, a metadata id and name, and `theme`/`effects` objects.
+/// Whether a checked personal theme document also parses as the loader
+/// parses it (`file_repair` uses it to say a fixed file will load).
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn check_personal_theme(document: &Value) -> Result<(), String> {
+    parse_legacy_value("check", document, ThemeSource::Personal)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 pub(crate) fn validate_personal_document(document: &Value) -> Result<(), String> {
-    let valid_metadata = |key: &str| {
-        document["metadata"][key]
-            .as_str()
-            .is_some_and(|value| !value.trim().is_empty())
-    };
-    if document["version"] != 1
-        || !valid_metadata("id")
-        || !valid_metadata("name")
-        || !document["theme"].is_object()
-        || !document["effects"].is_object()
-    {
-        return Err("not a version 1 saved theme document".into());
+    let errors = crate::look_format::theme_document_errors(document);
+    if errors.is_empty() {
+        return Ok(());
     }
-    Ok(())
+    Err(errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; "))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -597,6 +618,11 @@ impl Default for ShaderVariable {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct CustomShader {
+    /// Stable identity in the saved shader list: kept when the shader is
+    /// renamed or copied into a theme, new for a fork. Empty for code that
+    /// was never saved to the list (and for files from before IDs).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub id: String,
     /// What the AI (or the user) called it; shown in the Style picker.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub name: String,
@@ -607,9 +633,42 @@ pub struct CustomShader {
     pub y_up: bool,
 }
 
+impl CustomShader {
+    /// The same saved shader: the same ID when both have one, else the same
+    /// name and code (copies from before IDs).
+    pub fn same_as(&self, other: &Self) -> bool {
+        if !self.id.is_empty() && !other.id.is_empty() {
+            return self.id == other.id;
+        }
+        self.same_code(other)
+    }
+
+    /// The same name and code, whatever the IDs say. Use this to ask "is
+    /// this exact code saved?": an edited copy keeps its ID.
+    pub fn same_code(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.expression == other.expression
+            && self.variables == other.variables
+            && self.y_up == other.y_up
+    }
+
+    /// An ID from the name and code, the same on every run: given to saved
+    /// shaders from before IDs, so their theme copies still match them.
+    pub fn code_id(&self) -> String {
+        // FNV-1a, 64 bit.
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in self.name.bytes().chain([0]).chain(self.expression.bytes()) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        format!("shader-{hash:016x}")
+    }
+}
+
 impl Default for CustomShader {
     fn default() -> Self {
         Self {
+            id: String::new(),
             name: String::new(),
             expression: "mix(c1, c2, 0.5 + 0.5 * sin(p.x * amount + t))".into(),
             variables: vec![ShaderVariable::default()],
@@ -1311,6 +1370,10 @@ fn ansi_color(ansi: &Value, named: &str, indexed: &str, fallback: &str) -> Strin
 
 pub(crate) fn parse_color(value: &str) -> Option<Color32> {
     let hex = value.strip_prefix('#')?;
+    // Byte slicing below would panic inside a multi-byte character.
+    if !hex.is_ascii() {
+        return None;
+    }
     match hex.len() {
         3 => Some(Color32::from_rgb(
             u8::from_str_radix(&hex[0..1].repeat(2), 16).ok()?,

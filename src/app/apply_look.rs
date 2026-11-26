@@ -1,7 +1,9 @@
-// One transition for "use this theme": Library Apply/Calm, All terminals,
-// This terminal and the status bar's whole-look pick all go through
-// `apply_look`, so they settle the editor and touch state the same way.
-// Plan and the old per-button table: .private/dev-notes/LOOK-STATE-PLAN-2026-11-20.md
+// The one transition for look changes. Every button, menu, bundle, Shuffle
+// step, Look preset and (later) API or plugin request that changes which
+// theme, font or chrome colors are used goes through `change_look`, so they
+// all settle the editor, write the same fields and are recorded the same way.
+// Map of what each action changes: docs/dev/LOOK-STATE.md. Every action is
+// listed in `look_actions::ACTIONS` and tested from every starting state.
 use super::*;
 
 /// Where a theme goes.
@@ -21,16 +23,191 @@ pub(super) enum LookTarget {
     Pane(usize),
 }
 
-impl ButtonsApp {
-    /// Applies `theme_id` to `target`. A pane being edited keeps its edit as
-    /// its own theme file (`settle_pane_draft`) before anything changes.
-    pub(super) fn apply_look(&mut self, theme_id: &str, target: LookTarget) {
-        if !self.themes.all().iter().any(|theme| theme.id == theme_id) {
-            return;
+/// Who asked for a look change. Kept with each change in the look history.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind", content = "name", rename_all = "snake_case")]
+pub(crate) enum LookSource {
+    /// A button or menu in the app; the name says which.
+    User(&'static str),
+    /// Shuffle's timer or its "Shuffle now".
+    Shuffle,
+    /// The agent control API (client name).
+    Api(String),
+    /// A plugin (its ID), through `session::looks::PluginLooks`.
+    Plugin(String),
+}
+
+/// One look change.
+#[derive(Clone, Debug)]
+pub(super) enum LookChange {
+    /// Use a theme somewhere.
+    Theme {
+        theme_id: String,
+        target: LookTarget,
+    },
+    /// A pane drops its own theme and shows the shared one ("Use global");
+    /// `None`: every pane does, and looks waiting for new terminals go.
+    UseShared { index: Option<usize> },
+    /// A theme bundle by name (the user's win over a built-in one).
+    Bundle { name: String, ctx: egui::Context },
+    /// A Look preset: its switches (panel, shaders, Calm, motion…) and its
+    /// theme or bundle, as one change.
+    Preset {
+        look: looks::LookPreset,
+        ctx: egui::Context,
+    },
+    /// One Shuffle step: `theme_id` for the app (or only its shader), and
+    /// `pane_themes` for panes that get their own pick.
+    Shuffle {
+        theme_id: String,
+        shader_only: bool,
+        fonts: bool,
+        pane_themes: Vec<(usize, String)>,
+    },
+    /// The theme editor saved its draft as `theme_id` (a personal theme
+    /// just written): the edited pane (`pane`, a PTY ID) gets it as its own
+    /// theme, or, editing the shared theme, the shared sources ticked in
+    /// Apply to point at it. Other panes keep their own themes. This is the
+    /// saving step itself, so it does not settle the editor first.
+    SaveEdit { theme_id: String, pane: Option<u64> },
+}
+
+impl LookChange {
+    /// A short English label for logs and the look history.
+    pub(super) fn label(&self) -> String {
+        match self {
+            Self::Theme { theme_id, target } => match target {
+                LookTarget::WholeApp { calm: true, .. } => format!("calm look {theme_id}"),
+                LookTarget::WholeApp { .. } => format!("whole app {theme_id}"),
+                LookTarget::AllTerminals => format!("all terminals {theme_id}"),
+                LookTarget::Pane(index) => format!("pane {} {theme_id}", index + 1),
+            },
+            Self::UseShared { index: Some(index) } => {
+                format!("pane {} uses the shared theme", index + 1)
+            }
+            Self::UseShared { index: None } => "every pane uses the shared theme".into(),
+            Self::Bundle { name, .. } => format!("bundle {name}"),
+            Self::Preset { look, .. } => format!("look preset {look:?}"),
+            Self::Shuffle { theme_id, .. } => format!("shuffle {theme_id}"),
+            Self::SaveEdit {
+                theme_id,
+                pane: Some(_),
+            } => format!("saved pane edit {theme_id}"),
+            Self::SaveEdit { theme_id, .. } => format!("saved shared edit {theme_id}"),
         }
+    }
+}
+
+impl ButtonsApp {
+    /// The one way to change the look. A pane being edited keeps its edit as
+    /// its own theme file (`settle_pane_draft`) before anything changes; the
+    /// change is recorded with its source. Returns a summary (empty except
+    /// for bundles), or `None` when nothing could be done (unknown theme or
+    /// bundle, no such tab).
+    pub(super) fn change_look(&mut self, change: LookChange, source: LookSource) -> Option<String> {
+        match &change {
+            LookChange::Theme { theme_id, .. }
+            | LookChange::Shuffle { theme_id, .. }
+            | LookChange::SaveEdit { theme_id, .. }
+                if !self.known_theme(theme_id) =>
+            {
+                return None;
+            }
+            LookChange::SaveEdit {
+                pane: Some(pane), ..
+            } if !self.tabs.iter().any(|tab| tab.id == *pane) => return None,
+            LookChange::UseShared { index: Some(index) } if *index >= self.tabs.len() => {
+                return None
+            }
+            _ => {}
+        }
+        let label = change.label();
+        // Use global only takes pane themes away: a preview of the shared
+        // theme stays on screen (it is what those panes now show), while a
+        // pane edit is saved as for any other change. Saving the editor's
+        // draft is itself the settling step.
+        let settles = match change {
+            LookChange::UseShared { .. } => self.theme_editor.pane.is_some(),
+            LookChange::SaveEdit { .. } => false,
+            _ => true,
+        };
+        if settles {
+            self.settle_pane_draft();
+        }
+        // After settling: undo goes back to what was on screen, including a
+        // pane edit just saved as its own theme.
+        let before = self.look_state();
+        let summary = match change {
+            LookChange::Theme { theme_id, target } => {
+                self.set_look(&theme_id, target);
+                Some(String::new())
+            }
+            LookChange::UseShared { index: Some(index) } => {
+                let id = self.tabs[index].id;
+                self.theme_overrides.remove(&id);
+                Some(String::new())
+            }
+            LookChange::UseShared { index: None } => {
+                self.theme_overrides.clear();
+                self.pending_pane_looks = None;
+                Some(String::new())
+            }
+            LookChange::Bundle { name, ctx } => {
+                let bundle = self
+                    .preferences
+                    .theme_bundles
+                    .iter()
+                    .chain(crate::library::bundles())
+                    .find(|bundle| bundle.name == name)
+                    .cloned();
+                bundle.map(|bundle| {
+                    // The editor follows the new looks instead of the old draft.
+                    self.discard_theme_editor_session();
+                    self.set_bundle_looks(&ctx, &bundle)
+                })
+            }
+            LookChange::Shuffle {
+                theme_id,
+                shader_only,
+                fonts,
+                pane_themes,
+            } => {
+                self.set_shuffle_look(&theme_id, shader_only, fonts, pane_themes);
+                Some(String::new())
+            }
+            LookChange::Preset { look, ctx } => {
+                self.set_preset_look(&ctx, look);
+                Some(String::new())
+            }
+            LookChange::SaveEdit { theme_id, pane } => {
+                match pane {
+                    Some(pane) => {
+                        self.theme_overrides.insert(pane, theme_id);
+                    }
+                    None => {
+                        let theme = self.themes.get(&theme_id).clone();
+                        let scopes = self.preferences.theme_apply.clone();
+                        let calm = self.preferences.calm_mode;
+                        self.apply_theme_sources_with(theme, &scopes, calm, true);
+                    }
+                }
+                Some(String::new())
+            }
+        };
+        if summary.is_some() {
+            self.record_look_change(source, label, before);
+            // Saved now: waiting for the periodic autosave lost a bundle's
+            // settings when the app was closed abruptly.
+            self.persist_native_preferences();
+        }
+        summary
+    }
+
+    /// Writes the fields for one theme target. Only `change_look` and the
+    /// `set_*_look` steps it runs call it; everything else calls `change_look`.
+    pub(super) fn set_look(&mut self, theme_id: &str, target: LookTarget) {
         match target {
             LookTarget::WholeApp { scopes, calm } => {
-                self.settle_pane_draft(None);
                 let theme = self.themes.get(theme_id).clone();
                 if scopes.terminal {
                     self.theme_overrides.clear();
@@ -39,15 +216,12 @@ impl ButtonsApp {
                 if scopes.fonts {
                     self.pane_fonts.clear();
                 }
-                let saved = std::mem::replace(&mut self.preferences.theme_apply, scopes);
-                self.apply_theme_sources(theme, calm);
-                self.preferences.theme_apply = saved;
+                self.apply_theme_sources_with(theme, &scopes, calm, true);
                 self.discard_theme_editor_session();
                 self.appearance_save_status = None;
                 self.appearance_baseline = Some(self.appearance_fingerprint());
             }
             LookTarget::AllTerminals => {
-                self.settle_pane_draft(None);
                 self.preferences.theme_id = theme_id.to_owned();
                 self.preferences.terminal_theme_id = theme_id.to_owned();
                 self.preferences.gradient_theme_id = theme_id.to_owned();
@@ -62,7 +236,6 @@ impl ButtonsApp {
                 }
             }
             LookTarget::Pane(index) => {
-                self.settle_pane_draft(self.tabs.get(index).map(|tab| tab.id));
                 let Some(tab) = self.tabs.get(index) else {
                     return;
                 };
@@ -72,12 +245,130 @@ impl ButtonsApp {
         }
     }
 
+    /// One Shuffle step. Fonts stay as they are on screen unless Shuffle
+    /// changes fonts: a font change resizes every terminal.
+    fn set_shuffle_look(
+        &mut self,
+        theme_id: &str,
+        shader_only: bool,
+        fonts: bool,
+        pane_themes: Vec<(usize, String)>,
+    ) {
+        let theme = self.themes.get(theme_id).clone();
+        let on_screen: Vec<(u64, fonts::PaneFont)> = self
+            .tabs
+            .iter()
+            .map(|tab| (tab.id, self.font_for_pane(tab.id)))
+            .collect();
+        let typography = self.preferences.typography.clone();
+        let calm = self.preferences.calm_mode;
+        let scopes = shuffle::shuffle_scopes(shader_only, fonts);
+        if shader_only {
+            // Only the effects source moves: every pane keeps its colors and
+            // the shared theme (Library highlight) stays.
+            self.apply_theme_sources_with(theme, &scopes, calm, false);
+        } else {
+            self.set_look(theme_id, LookTarget::WholeApp { scopes, calm });
+            for (index, pick) in pane_themes {
+                if self.known_theme(&pick) {
+                    self.set_look(&pick, LookTarget::Pane(index));
+                }
+            }
+        }
+        if !fonts {
+            self.preferences.typography = typography;
+            for (tab, font) in on_screen {
+                if self.font_for_pane(tab) != font {
+                    self.pane_fonts.insert(tab, font);
+                }
+            }
+        }
+    }
+
+    /// Applies `theme_id` to `target` (see `change_look`), as a user action
+    /// named after the Library button.
+    pub(super) fn apply_look(&mut self, theme_id: &str, target: LookTarget) {
+        let name = match &target {
+            LookTarget::WholeApp { calm: true, .. } => "Calm",
+            LookTarget::WholeApp { .. } => "Apply",
+            LookTarget::AllTerminals => "All terminals",
+            LookTarget::Pane(_) => "This terminal",
+        };
+        self.apply_look_from(theme_id, target, LookSource::User(name));
+    }
+
+    /// `apply_look` with its source named.
+    pub(super) fn apply_look_from(
+        &mut self,
+        theme_id: &str,
+        target: LookTarget,
+        source: LookSource,
+    ) {
+        self.change_look(
+            LookChange::Theme {
+                theme_id: theme_id.to_owned(),
+                target,
+            },
+            source,
+        );
+    }
+
+    /// Gives one terminal a saved look: a theme (if it still exists) and a
+    /// font. `replace`: a missing part removes the pane's own one (bundles);
+    /// otherwise it is left alone (new terminals, tab groups, reopening a
+    /// closed tab). Returns false when the saved theme no longer exists.
+    /// Not a look change by itself: callers are `change_look` steps or
+    /// terminals that just opened.
+    pub(super) fn put_pane_look(
+        &mut self,
+        id: u64,
+        theme_id: Option<&str>,
+        font: Option<&fonts::PaneFont>,
+        replace: bool,
+    ) -> bool {
+        let mut found = true;
+        match theme_id {
+            Some(theme) if self.known_theme(theme) => {
+                self.theme_overrides.insert(id, theme.to_owned());
+            }
+            Some(_) => {
+                found = false;
+                if replace {
+                    self.theme_overrides.remove(&id);
+                }
+            }
+            None if replace => {
+                self.theme_overrides.remove(&id);
+            }
+            None => {}
+        }
+        match font {
+            Some(font) => {
+                self.pane_fonts.insert(id, font.clone());
+            }
+            None if replace => {
+                self.pane_fonts.remove(&id);
+            }
+            None => {}
+        }
+        found
+    }
+
     pub(super) fn set_theme_for_tab(&mut self, index: usize, theme_id: &str) {
         self.apply_look(theme_id, LookTarget::Pane(index));
     }
 
     pub(super) fn set_theme_all(&mut self, theme_id: &str) {
         self.apply_look(theme_id, LookTarget::AllTerminals);
+    }
+
+    /// "Use global theme": the pane drops its own theme and shows the shared
+    /// one. Its edit, if it is being edited, is saved first.
+    pub(super) fn use_shared_look(&mut self, index: usize) {
+        self.change_look(
+            LookChange::UseShared { index: Some(index) },
+            LookSource::User("Use global theme"),
+        );
     }
 }
 
@@ -125,7 +416,7 @@ mod tests {
             .all()
             .iter()
             .map(|theme| theme.id.clone())
-            .filter(|id| id != "aurora" && !id.starts_with("preview:"))
+            .filter(|id| id != "aurora")
             .take(2)
             .collect();
         match start {
@@ -140,9 +431,9 @@ mod tests {
             Start::MidPaneEdit => {
                 let pane = app.tabs[1].id;
                 app.retarget_theme_editor(Some(pane)).unwrap();
-                let mut document = app.theme_editor_document.clone().unwrap();
+                let mut document = app.theme_editor.draft().cloned().unwrap();
                 document["metadata"]["description"] = json!("edited, not saved");
-                app.theme_editor_document = Some(document);
+                app.theme_editor.set_draft(document);
                 app.preview_personal_theme_draft();
             }
         }
@@ -242,17 +533,50 @@ mod tests {
                 // the editor lets go of it.
                 if matches!(start, Start::MidPaneEdit) {
                     assert_eq!(personal_count(&app), personal_before + 1, "{case}");
-                    assert!(app.theme_editor_preview_snapshot.is_none(), "{case}");
-                    assert!(
-                        !app.theme_overrides
-                            .values()
-                            .any(|id| id.starts_with("preview:")),
-                        "{case}"
-                    );
+                    assert!(!app.previewing_theme_draft(), "{case}");
+                    app.assert_no_preview_stored(&case);
                 }
                 let _ = others;
                 let _ = std::fs::remove_dir_all(base);
             }
+        }
+    }
+
+    /// The edited pane itself: Use global, closing it (and reopening it) and
+    /// a new theme for it all keep the edit as a numbered theme. They used to
+    /// drop the edit or leave the preview's theme behind.
+    #[test]
+    fn the_edited_pane_keeps_its_edit_when_it_changes_or_closes() {
+        for action in ["use global", "close and reopen", "this terminal"] {
+            let (mut app, base, _) = app_in(Start::MidPaneEdit, &action.replace(' ', "-"));
+            let ctx = egui::Context::default();
+            let before = personal_count(&app);
+            let pane = app.tabs[1].id;
+            match action {
+                "use global" => app.use_shared_look(1),
+                "close and reopen" => app.close_tab(1),
+                _ => app.set_theme_for_tab(1, "aurora"),
+            }
+            assert_eq!(personal_count(&app), before + 1, "{action}: edit saved");
+            assert!(!app.previewing_theme_draft(), "{action}");
+            assert!(
+                app.theme_editor.draft().is_none(),
+                "{action}: session ended"
+            );
+            app.assert_no_preview_stored(action);
+            match action {
+                "use global" => assert!(!app.theme_overrides.contains_key(&pane), "{action}"),
+                "close and reopen" => {
+                    let saved = app.recently_closed.last().unwrap().theme_override.clone();
+                    let saved = saved.expect("the closed tab remembers the saved edit");
+                    assert!(saved.starts_with("personal:"), "{action}: {saved}");
+                    app.reopen_closed_tab(ctx.clone());
+                    let reopened = app.tabs.last().unwrap().id;
+                    assert_eq!(app.theme_overrides.get(&reopened), Some(&saved), "{action}");
+                }
+                _ => assert_eq!(app.theme_for_tab(1), "aurora", "{action}"),
+            }
+            let _ = std::fs::remove_dir_all(base);
         }
     }
 

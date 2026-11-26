@@ -444,11 +444,16 @@ pub(crate) const MAX_UI_SCALE: f32 = 2.0;
 pub(crate) const MAX_ANIMATION_FPS: u32 = 240;
 /// Longest workspace message timeout offered in Settings.
 pub(crate) const MAX_NOTICE_SECONDS: u32 = 600;
-/// Caps keep native.json bounded. Saving past one is refused with a message
-/// (never by dropping the oldest), so a cap must sit far above real use.
+/// Caps on what the UI lets you add. Adding past one is refused with a
+/// message; loading never cuts a longer list (an outside or older file keeps
+/// everything). native.json's own size limit is the real bound.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_SAVED_SHADERS: usize = 512;
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_THEME_BUNDLES: usize = 512;
-/// Most pane slots a theme bundle or the saved pane looks remember.
+/// Most pane slots a theme bundle or the saved pane looks apply. Extra slots
+/// in a file are kept but ignored.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) const MAX_PANE_LOOKS: usize = 8;
 
 /// One pane slot's look. `None` uses the shared theme or font.
@@ -465,6 +470,10 @@ pub(crate) struct PaneLook {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub(crate) struct ThemeBundle {
+    /// File format (`look_format`); format 1 is not written. Deserialize a
+    /// bundle only after `look_format::upgrade_bundle`.
+    #[serde(skip_serializing_if = "crate::look_format::BundleFormat::is_first")]
+    pub(crate) format_version: crate::look_format::BundleFormat,
     pub(crate) name: String,
     pub(crate) theme_id: String,
     pub(crate) app_theme_id: String,
@@ -484,6 +493,10 @@ pub(crate) struct ThemeBundle {
     /// clears them, as Apply does, so the bars never keep a stale color.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) chrome: Option<BundleChrome>,
+    /// The shared fonts (UI and terminals). `None` (older bundles) keeps the
+    /// fonts in use.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) typography: Option<Typography>,
 }
 
 /// The app chrome colors a bundle carries besides its app theme.
@@ -1031,6 +1044,13 @@ impl Preferences {
     }
 
     pub(crate) fn normalize_theme_sources(&mut self) {
+        // Saved shaders from before IDs get one from their name and code, so
+        // theme copies of them still match (`CustomShader::same_as`).
+        for saved in &mut self.saved_shaders {
+            if saved.shader.id.is_empty() {
+                saved.shader.id = saved.shader.code_id();
+            }
+        }
         for (dimension, minimum, default) in [(0, 720.0, 980.0), (1, 520.0, 760.0)] {
             let value = &mut self.settings_layout.size[dimension];
             *value = if value.is_finite() {
@@ -1119,12 +1139,9 @@ impl Preferences {
         self.dock_peek_radius = self.dock_peek_radius.min(24);
         self.quick_secrets_auto_lock_minutes = self.quick_secrets_auto_lock_minutes.min(120);
         self.provider_settings.normalize(&mut Vec::new());
-        self.pane_looks.truncate(MAX_PANE_LOOKS);
-        self.theme_bundles.truncate(MAX_THEME_BUNDLES);
-        self.saved_shaders.truncate(MAX_SAVED_SHADERS);
-        for bundle in &mut self.theme_bundles {
-            bundle.panes.truncate(MAX_PANE_LOOKS);
-        }
+        // Lists are never cut here: native.json's size limit bounds them,
+        // the UI refuses to add past a cap, and pane slots past
+        // MAX_PANE_LOOKS are kept but not applied.
         self.simulation.persona = self.simulation.persona.chars().take(512).collect();
         self.simulation.prompt = self.simulation.prompt.chars().take(8192).collect();
         self.shortcuts.normalize();
@@ -1218,6 +1235,25 @@ impl Default for ThemeApplyScopes {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn normalize_keeps_lists_longer_than_the_caps() {
+        let mut preferences = Preferences::default();
+        let bundle = ThemeBundle {
+            panes: vec![PaneLook::default(); MAX_PANE_LOOKS + 3],
+            ..Default::default()
+        };
+        preferences.theme_bundles = (0..MAX_THEME_BUNDLES + 5)
+            .map(|index| ThemeBundle {
+                name: format!("b{index}"),
+                ..bundle.clone()
+            })
+            .collect();
+        preferences.pane_looks = vec![PaneLook::default(); MAX_PANE_LOOKS + 2];
+        preferences.normalize_theme_sources();
+        assert_eq!(preferences.theme_bundles.len(), MAX_THEME_BUNDLES + 5);
+        assert_eq!(preferences.theme_bundles[0].panes.len(), MAX_PANE_LOOKS + 3);
+        assert_eq!(preferences.pane_looks.len(), MAX_PANE_LOOKS + 2);
+    }
 
     #[test]
     fn favorites_and_hover_preferences_survive_restart_and_normalize_old_data() {

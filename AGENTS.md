@@ -1,5 +1,6 @@
 # Agent quick start
 
+- **Changing UI, looks, themes, shaders or bundles?** Read "Before you change UI, looks, themes, shaders or bundles" below first.
 - Keep replies and work logs short. Default new web surfaces to dark mode.
 - Check `git status --short --branch`, fetch origin, and inspect existing commits/PRs
   before editing. Preserve unrelated work. Make focused local commits.
@@ -20,6 +21,81 @@
 - This is the only instruction file: `CLAUDE.md` just imports it.
 - Commit subjects use Conventional Commits; release numbers are computed from them.
   See **Versions and commits** below.
+
+## Before you change UI, looks, themes, shaders or bundles
+
+This file is the one place every agent reads, so the rules live here. Notes
+under `.private/` are local only. Full detail (storage tables, the transition
+table, the editor): `docs/dev/LOOK-STATE.md`.
+
+1. **Find the one owner first.** Before adding a field, look for the fact that
+   already exists (`preferences.*`, `theme_overrides`, `pane_fonts`, the theme
+   file, the bundle). Derive the rest. Never store the same color or font in a
+   second place.
+2. **Every look change goes through `change_look`** (`src/app/apply_look.rs`,
+   or a wrapper: `apply_look`, `apply_theme`, `set_theme_all`,
+   `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`). It settles
+   the editor, writes the fields, records the change with its source (look
+   history, undo, logs) and saves. New code never writes `theme_id`,
+   `*_theme_id`, `theme_overrides`, `pane_fonts` or the bar
+   `*_background_override` fields directly; a pane gets a saved look only via
+   `put_pane_look`. A new action is a new `look_actions::LookAction`.
+3. **Never lose an edit.** `change_look` calls `settle_pane_draft` first
+   (it saves an edited draft, pane or shared, under the next numbered name). Change the editor target only with
+   `retarget_theme_editor`. End a draft only with `settle_pane_draft` or
+   `discard_theme_editor_session`. Editor state is `theme_editor`
+   (`src/app/editor_session.rs`: target, status, `session:
+   Option<EditorSession>`). **Previews never write state**: the live preview
+   is `EditorSession::preview`, an overlay that `resolve_pane_look`,
+   `shared_source` (shared terminal/app theme), `colors` and
+   `pane_divider_style` draw on top. Never put a preview into
+   `preferences`, `theme_overrides` or the catalog; saving applies the
+   saved file via `change_look(LookChange::SaveEdit)`.
+4. **Calm and the live switches are the user's.** `LIVE_SWITCHES` (Calm,
+   shaders on, advanced effects, focused pane only) never come from a theme's
+   `nativeAppearance`. Only the user's own controls change them (the Calm
+   button, Look presets, the switches); Apply leaves Calm alone.
+5. **Key per-pane state by PTY ID.** Bundles and `pane_looks` are keyed by
+   slot, never by tab index.
+6. **Save compatibly.** New `Preferences` or theme/bundle fields are additive:
+   `#[serde(default)]`, skipped when empty. Old files must still load.
+   `normalize` never drops user data; refuse the save instead. A change that
+   stops old files loading is breaking (see Versions and commits).
+7. **Label what the control acts on.** Show the edit target
+   (`edit_target_theme`), not the shared theme name. Tooltips say exactly what
+   the button changes.
+8. **Tests follow real transitions.** Add the action to
+   `look_actions::LookAction` (the table test
+   `every_look_action_from_every_state_is_consistent` then requires its
+   effect) and any new starting state to `STARTS`, for each new
+   button or starting state. Drive the editor across frames with
+   `color_adjust::tests::Frames`. Update the tables in `docs/dev/LOOK-STATE.md`.
+9. **Visible text is translated.** Wrap user-visible strings the way the
+   neighboring code does, and run `python scripts/test_audit_i18n.py` (see
+   Validation and traps).
+10. **Keep shared code wasm-safe.** `app`, `settings`, `theme`, `fonts`, `i18n`,
+    `features` and `shortcuts` also build for wasm: run the wasm clippy command.
+11. **Look at it.** For anything visual, run an isolated app (a scratch
+    `USERPROFILE`, never the user's profile), check it in a screenshot, and say
+    in the final message what you did not check.
+12. **Log it.** User-visible changes go in `CHANGELOG.md` under
+    `## Unreleased`. Failed approaches and validation go in
+    `.private/dev-notes/logs/`.
+
+## Where to do a thing (looks)
+
+| To… | Use | Never |
+| --- | --- | --- |
+| Change a theme, bundle, Shuffle step, preset | `change_look` or its wrappers (`apply_look`, `apply_theme`, `set_theme_all`, `set_theme_for_tab`, `use_shared_look`, `apply_theme_bundle`) | write `theme_id`, `*_theme_id`, `theme_overrides`, `pane_fonts` |
+| Give a pane a saved look (slot, new tab, group) | `put_pane_look` | insert into `theme_overrides` |
+| Read how a pane looks, and why | `resolve_pane_look`, `resolve_pane_font`, `explain_pane_look` | recompute Calm/strength yourself |
+| Add a look button | a `LookAction` + the table test | a new private path |
+| Let an agent or plugin change the look | `look_api.rs` (`LookRequest`, the request window); plugins get a `PluginLooks` handle | call `change_look` from a request without asking, or give a plugin the `LookDispatcher` |
+| Undo, history, logs | `look_history.rs` (`record_look_change`, `undo_look_change`) | a second history |
+| Check or upgrade a file | `look_format` (versions, validators), `file_repair` (AI fix) | ad hoc JSON checks |
+| Keep a copy before overwriting | `storage::backups` (store does it) | delete without a copy |
+| Save, update or fork a saved shader | `save_shader_to_list`, `fork_shader` (keyed by `CustomShader::id`; `same_as` / `same_code`) | match saved shaders by name |
+| Write a theme file | `theme_files::save_theme_document` (sets `metadata.id` from the file name) | encode bytes and write them yourself |
 
 ## Big picture
 
@@ -105,16 +181,23 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   read `docs/dev/LOOK-STATE.md` before changing any of it.** It lists where
   each fact lives, how a pane's look is resolved, and what every button
   changes. Rules in short:
-  - "Use this theme" goes through `apply_look(id, LookTarget)`
-    (`src/app/apply_look.rs`: WholeApp {scopes, calm}, AllTerminals, Pane);
-    `apply_theme`/`set_theme_all`/`set_theme_for_tab` are wrappers. Never
-    write `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from a
-    new button. Bundles and Shuffle still have their own paths.
-  - Anything that replaces a pane's theme calls `settle_pane_draft` first.
-  - Only the Calm button turns Calm on; Apply leaves it alone.
+  - Every look change goes through `change_look(LookChange, LookSource)`
+    (`src/app/apply_look.rs`: Theme {WholeApp, AllTerminals, Pane},
+    UseShared, Bundle, Shuffle, Preset). Buttons, bundles, Shuffle and Look
+    presets all use it; the API and plugins will too. Never write
+    `theme_id`, `*_theme_id`, `theme_overrides` or `pane_fonts` from new
+    code. `apply_theme_sources_with` takes the Apply-to scopes as an
+    argument: never swap `preferences.theme_apply` around a call.
+  - `change_look` settles the editor first; the look history
+    (`look_history.rs`) records it and Look → Undo look change reverts it.
+  - Themes never change Calm; Apply leaves it alone. Calm, Look presets
+    and the switches themselves are the user's controls for it.
   - Labels name the edit target (`edit_target_theme`), not the shared theme.
-  - Add a row to `every_button_from_every_state_gives_one_consistent_result`
-    for any new button or starting state, and update the doc's tables.
+  - Add any new action to `look_actions::LookAction` (the table test then
+    needs its effect) and update the doc's tables.
+  - Profile files are copied to `~/.buttonscli-native/debug/backups/` before
+    they are replaced (`src/storage/backups.rs`); loading never truncates
+    lists (`normalize` keeps everything; caps only limit what the UI adds).
 
 ## Pane and input rules
 
@@ -131,8 +214,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   `chatgpt_plan` providers hide URL/format/key fields; that endpoint rejects
   non-streaming requests, so probes must stream. `ProviderSettings::normalize`
   must keep `chatgpt:native:v1:<hex>`; use `chatgpt::saved_key` in key loaders.
-- The theme/shader editor targets `theme_editor_pane` (a PTY ID) in pane mode:
-  preview/save touch only that pane's `theme_overrides`, never shared sources.
+- The theme/shader editor targets `theme_editor.pane` (a PTY ID) in pane mode:
+  the preview overlay shows only on that pane, and saving sets only that
+  pane's `theme_overrides`, never shared sources.
   Edits never block: `autosave_theme_draft` saves them under the next numbered
   name when switching panes, on Keep and close, and on quit. Never overwrite
   a theme file that another pane, the shared sources or a bundle uses.
@@ -198,6 +282,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
 ## Themes and profiles
 
 - Theme/shader/bundle authoring: `docs/dev/AUTHORING-THEME-BUNDLES.md`.
+  File versions and checks for outside theme/bundle files:
+  `src/look_format.rs` ("File versions" in `docs/dev/LOOK-STATE.md`).
+  Deserialize a bundle only after `look_format::upgrade_bundle`.
   Pane Focus assets regenerate with `python scripts/generate-pane-focus-library.py`.
   Bundles queue at most eight looks (no cycling); applying one preserves the
   global shader-enable/Calm/font settings. Include static gradient fallbacks.
@@ -210,8 +297,9 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   Tests must use owned temporary profiles, never the user's normal profile.
 - App, terminal, fonts, gradient and effects have independent source IDs. Preserve
   `theme_apply` scopes, per-PTY overrides, Calm mode and unsupported JSON fields.
-- Editor state uses `theme_editor_source_id`; restore pending previews before switching
-  sources. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
+- Editor state lives in `theme_editor.session` (`source_id`, draft, original,
+  file, preview); open a new one with `EditorSession::new`, after saving or
+  settling the old draft. **New variant** creates a draft; saving creates a file. Library/Edit/Generate
   use ordinary page scrolling, with separate positions, not stacked resize panels.
 - Theme shader strings are inert metadata. Do not claim legacy GLSL effects execute.
 - Custom shader code gets `strength`, `bg` and c1–c5; `CustomShader::y_up` (default on)
@@ -230,8 +318,14 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   summed per frame so speed changes never jump); speed 0 holds the frame and
   stops repaint requests. Look presets and status-bar Motion/Look: `src/app/looks.rs`.
   Look → Override panes (`strength_override`) is presentation only:
-  `with_strength_override` in `terminal_presentation` and the override
-  branch of `settled_presentation_for`; never write it into themes.
+  `apply_live_switches` (`src/app/pane_look.rs`, with Calm and classic
+  effects) for every pane; never write it into themes.
+- A pane's look is decided only by `resolve_pane_look(pty)`
+  (`src/app/pane_look.rs`: origin, presentation, font and why);
+  `settled_presentation_for`, `font_for_pane` (`resolve_pane_font`),
+  `theme_for_tab` and `terminal_presentation` agree with it. Settings →
+  Debug shows "Why does this pane look like this?" and Copy look as JSON
+  (`look_report`).
   Status-bar shader edits (`edit_pane_look`) leave the editor in pane mode,
   so results skip the app colors; `look_target_hint`/`use_look_everywhere`
   is the way out. Shared panes use `terminal_presentation()` directly in
@@ -255,8 +349,8 @@ Semantic Versioning (`MAJOR.MINOR.PATCH`); details in `docs/dev/RELEASING.md`.
   0.31 has no occlusion flag); output repaints are capped via
   `egui_term::set_output_repaint_interval`. Menu/status-bar
   shader controls use `edit_pane_look` (the "Edit for: Pane N" draft).
-  Changing another pane's theme must call `settle_pane_draft` (autosave), never a
-  bare `restore_personal_theme_preview`, or the edited pane reverts.
+  Changing another pane's theme must call `settle_pane_draft` (autosave):
+  `clear_theme_preview` only takes the overlay off and leaves the edit unsaved.
 - egui buttons paint `weak_bg_fill`: theme hover/active colors must set both
   `bg_fill` and `weak_bg_fill`, or hover stays egui's stock grey.
   `SIMPLE_NOISE_HIDDEN` hides and disables simple noise for now.
@@ -390,6 +484,10 @@ cargo build --locked --release --bin buttonscli
   Idle return/latency: `native_keyboard_recovers_after_idle_window_switches`;
   adapter lock checks: `cargo test --locked -p egui_term --lib input_recovery_tests
   -- --include-ignored --test-threads=1` (uses owned Windows shells).
+- Visual look checks without touching the docs: `scripts/docs-capture.ps1 -Qa`
+  (`QA_SHOTS` in `docs_capture.rs`; PNGs in `target/docs-capture/qa/`). It
+  caught a pane-only editor preview that was never drawn. egui shows no
+  tooltips for the probe's synthetic pointer.
 - Docs screenshots: `scripts/docs-capture.ps1 [-Only a,b] [-DryRun]` runs the
   ignored `native_docs_capture` probe (`src/app/docs_capture.rs`, guide in
   `docs/dev/DOCS-SCREENSHOTS.md`). Crops use named anchors

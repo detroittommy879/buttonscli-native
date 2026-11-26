@@ -5,6 +5,8 @@
 //!   the previous launch's is kept as `buttonscli.previous.log`.
 //! - `crash-<unix seconds>.txt`: version, OS, panic message, location and
 //!   backtrace. The newest [`KEEP_CRASH_REPORTS`] are kept.
+//! - Look changes (themes, bundles, Shuffle, API requests, undo) are logged
+//!   at info level under the `buttonscli::looks` target, with their source.
 //!
 //! Logs record app events only. Never log keys, tokens or terminal contents.
 
@@ -29,16 +31,22 @@ pub fn init() {
             .unwrap_or_else(|_| "warn,buttonscli=info".into())
     };
     let file = logs_dir().and_then(|dir| open_log(&dir).ok());
+    // A failed write must never reach `eprintln!`: when the app was started
+    // with a stderr pipe that has since closed (a script or agent that
+    // exited), `eprintln!` panics and the next log line crashed the app.
+    // The file still gets every line; stderr is best effort.
     match file {
         Some(file) => tracing_subscriber::fmt()
             .with_env_filter(filter())
             .with_ansi(false)
             .compact()
+            .log_internal_errors(false)
             .with_writer(std::io::stderr.and(Mutex::new(file)))
             .init(),
         None => tracing_subscriber::fmt()
             .with_env_filter(filter())
             .compact()
+            .log_internal_errors(false)
             .init(),
     }
     if let Some(dir) = logs_dir() {
@@ -102,7 +110,8 @@ fn crash_report(info: &std::panic::PanicHookInfo<'_>) -> String {
          os: {} {}\n\
          thread: {}\n\
          location: {location}\n\
-         message: {}\n\n\
+         message: {}\n\
+         log: buttonscli.log in this folder (look changes: buttonscli::looks lines)\n\n\
          backtrace:\n{}\n",
         crate::BUILD_VERSION,
         std::env::consts::OS,

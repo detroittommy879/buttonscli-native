@@ -552,7 +552,7 @@ fn set_string(document: &mut Value, pointer: &str, value: &Value) -> Result<(), 
     Ok(())
 }
 
-fn extract_json_object(raw: &str) -> Option<&str> {
+pub(crate) fn extract_json_object(raw: &str) -> Option<&str> {
     let mut start = None;
     let mut depth = 0_usize;
     let mut in_string = false;

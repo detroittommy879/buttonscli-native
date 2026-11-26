@@ -194,8 +194,9 @@ pub(super) fn fade_theme(
 
 /// What a Shuffle change applies: the whole theme, or only its shader
 /// (effects) when "Shaders only" is on, so the colors stay as they are.
-fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeApplyScopes {
-    if shuffle.shader_only {
+/// The Apply-to parts one Shuffle step changes.
+pub(super) fn shuffle_scopes(shader_only: bool, fonts: bool) -> crate::settings::ThemeApplyScopes {
+    if shader_only {
         crate::settings::ThemeApplyScopes {
             app: false,
             terminal: false,
@@ -205,7 +206,7 @@ fn shuffle_scopes(shuffle: &crate::settings::Shuffle) -> crate::settings::ThemeA
         }
     } else {
         crate::settings::ThemeApplyScopes {
-            fonts: shuffle.fonts,
+            fonts,
             ..Default::default()
         }
     }
@@ -237,8 +238,7 @@ fn ease(t: f32) -> f32 {
 impl ButtonsApp {
     /// The themes Shuffle picks from.
     pub(super) fn shuffle_pool(&self) -> Vec<String> {
-        let usable = |theme: &&ThemeDefinition| !theme.id.starts_with("preview:");
-        let themes = self.themes.all().iter().filter(usable);
+        let themes = self.themes.all().iter();
         match self.preferences.shuffle.pool {
             ShufflePool::Favorites => self
                 .preferences
@@ -288,45 +288,23 @@ impl ButtonsApp {
             .iter()
             .map(|tab| (tab.id, self.terminal_presentation_for(tab.id)))
             .collect();
-        let fonts: Vec<(u64, fonts::PaneFont)> = self
-            .tabs
-            .iter()
-            .map(|tab| (tab.id, self.font_for_pane(tab.id)))
-            .collect();
-        let typography = self.preferences.typography.clone();
-
-        // The whole-app path of the status bar's Random theme, with fonts
-        // only when asked: a font change resizes every terminal.
-        let theme = self.themes.get(&id).clone();
-        let scopes = std::mem::replace(&mut self.preferences.theme_apply, shuffle_scopes(&shuffle));
-        let calm = self.preferences.calm_mode;
-        if shuffle.shader_only {
-            // `set_theme_all` sets every source and clears pane themes, so
-            // only the effects source moves here; the shared theme stays.
-            let shared = self.preferences.theme_id.clone();
-            self.apply_theme_sources(theme, calm);
-            self.preferences.theme_id = shared;
+        // Per-pane picks first, so each pane avoids the app's new theme.
+        let pane_themes: Vec<(usize, String)> = if shuffle.every_pane && !shuffle.shader_only {
+            (0..self.tabs.len())
+                .filter_map(|index| Some((index, self.next_shuffle_theme(&id)?)))
+                .collect()
         } else {
-            self.set_theme_all(&id);
-            self.apply_theme_sources(theme, calm);
-        }
-        self.preferences.theme_apply = scopes;
-        // Shaders only keeps every pane's colors, so per-pane themes are skipped.
-        if shuffle.every_pane && !shuffle.shader_only {
-            for index in 0..self.tabs.len() {
-                if let Some(pick) = self.next_shuffle_theme(&id) {
-                    self.set_theme_for_tab(index, &pick);
-                }
-            }
-        }
-        if !shuffle.fonts {
-            self.preferences.typography = typography;
-            for (tab, font) in fonts {
-                if self.font_for_pane(tab) != font {
-                    self.pane_fonts.insert(tab, font);
-                }
-            }
-        }
+            Vec::new()
+        };
+        self.change_look(
+            apply_look::LookChange::Shuffle {
+                theme_id: id,
+                shader_only: shuffle.shader_only,
+                fonts: shuffle.fonts,
+                pane_themes,
+            },
+            apply_look::LookSource::Shuffle,
+        );
         self.shuffle.fade = (shuffle.fade_seconds > 0.0).then_some(LookFade {
             started: now,
             seconds: shuffle.fade_seconds,
@@ -368,9 +346,7 @@ impl ButtonsApp {
         let next = *self.shuffle.next_at.get_or_insert(now + interval);
         // Never change the look under someone who is editing or choosing it
         // (a loaded draft can outlive Settings; only a live preview counts).
-        let busy = self.show_settings
-            || self.theme_editor_preview_snapshot.is_some()
-            || self.power.minimized;
+        let busy = self.show_settings || self.previewing_theme_draft() || self.power.minimized;
         if busy {
             self.shuffle.next_at = Some(next.max(now + RESUME_DELAY));
         } else if now >= next {
@@ -512,11 +488,10 @@ mod tests {
 
     #[test]
     fn shader_only_shuffle_applies_just_the_effects() {
-        let mut shuffle = crate::settings::Shuffle::default();
-        let whole = shuffle_scopes(&shuffle);
+        let whole = shuffle_scopes(false, false);
         assert!(whole.app && whole.terminal && whole.gradient && whole.effects);
-        shuffle.shader_only = true;
-        let shader = shuffle_scopes(&shuffle);
+        assert!(!whole.fonts && shuffle_scopes(false, true).fonts);
+        let shader = shuffle_scopes(true, true);
         assert!(!shader.app && !shader.terminal && !shader.gradient && !shader.fonts);
         assert!(shader.effects);
     }
@@ -652,10 +627,10 @@ mod tests {
             });
         }
         app.sync_theme_editor_to_current();
-        let mut draft = app.theme_editor_document.clone().unwrap();
+        let mut draft = app.theme_editor.draft().cloned().unwrap();
         set_theme_document_value(&mut draft, "/theme/app/shell/background", json!("#123456"));
         set_theme_document_value(&mut draft, "/theme/terminal/background", json!("#654321"));
-        app.theme_editor_document = Some(draft);
+        app.theme_editor.set_draft(draft);
         app.preview_personal_theme_draft();
         (app, base)
     }
@@ -682,7 +657,7 @@ mod tests {
             let other_theme = app.theme_overrides.get(&other).cloned();
             app.use_look_everywhere();
             assert!(app.theme_overrides.is_empty());
-            assert!(!app.theme_editor_pane_mode && app.theme_editor_pane.is_none());
+            assert!(!app.theme_editor.pane_mode && app.theme_editor.pane.is_none());
             if pane_edit {
                 // The pane's edit was saved as a new theme; the theme the other
                 // pane used is untouched.

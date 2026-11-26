@@ -17,6 +17,8 @@ See docs/dev/DOCS-SCREENSHOTS.md.
 ./scripts/docs-capture.ps1 -DryRun     # writes to target/docs-capture/preview
 .EXAMPLE
 ./scripts/docs-capture.ps1 -Locale de  # writes to docs/guide/images/de
+.EXAMPLE
+./scripts/docs-capture.ps1 -Qa         # look-state checks to target/docs-capture/qa
 #>
 [CmdletBinding()]
 param(
@@ -29,7 +31,9 @@ param(
     # Preview: write to target/docs-capture/preview, leave the docs alone.
     [switch]$DryRun,
     # Rewrite files even when the picture did not change.
-    [switch]$Force
+    [switch]$Force,
+    # Look-state checks (QA_SHOTS) instead of docs pictures.
+    [switch]$Qa
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,6 +66,7 @@ try {
         BUTTONSCLI_DOCS_CAPTURE_ONLY = ($Only -join ',')
         BUTTONSCLI_DOCS_CAPTURE_OUT = $Out
         BUTTONSCLI_DOCS_CAPTURE_FORCE = $(if ($Force) { '1' } else { $null })
+        BUTTONSCLI_DOCS_CAPTURE_QA = $(if ($Qa) { '1' } else { $null })
     }
     foreach ($name in $environment.Keys) {
         $saved[$name] = [Environment]::GetEnvironmentVariable($name)
@@ -99,7 +104,7 @@ try {
         Write-Host ("Summary: " + ($counts -join ', '))
         Write-Host "Full-window captures for checking crops: $work"
     }
-    if (-not $Out) {
+    if (-not $Out -and -not $Qa) {
         Write-Host ''
         git status --short -- docs/guide/images
     }

@@ -39,29 +39,23 @@ impl ButtonsApp {
         order
     }
 
-    fn known_theme(&self, id: &str) -> bool {
-        !id.starts_with("preview:") && self.themes.all().iter().any(|theme| theme.id == id)
+    /// A theme in the catalog. An editor preview's `preview:` ID never is:
+    /// previews live in the editor session only.
+    pub(super) fn known_theme(&self, id: &str) -> bool {
+        self.themes.all().iter().any(|theme| theme.id == id)
     }
 
     /// The look each slot has now; slots without a terminal keep any look
     /// still waiting for one.
     pub(super) fn current_pane_looks(&self) -> Vec<PaneLook> {
-        let previewed = self
-            .theme_editor_preview_snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.pane.clone());
         let mut looks: Vec<PaneLook> = self
             .slot_order()
             .into_iter()
             .take(MAX_PANE_LOOKS)
             .map(|index| {
                 let id = self.tabs[index].id;
-                let theme_id = match &previewed {
-                    Some((tab, previous)) if *tab == id => previous.clone(),
-                    _ => self.theme_overrides.get(&id).cloned(),
-                };
                 PaneLook {
-                    theme_id: theme_id.filter(|theme| !theme.starts_with("preview:")),
+                    theme_id: self.theme_overrides.get(&id).cloned(),
                     font: self.pane_fonts.get(&id).cloned(),
                 }
             })
@@ -102,12 +96,7 @@ impl ButtonsApp {
             .collect();
         for (slot, id) in free.into_iter().zip(waiting) {
             let look = pending.looks[slot].clone();
-            if let Some(theme) = look.theme_id.filter(|theme| self.known_theme(theme)) {
-                self.theme_overrides.insert(id, theme);
-            }
-            if let Some(font) = look.font {
-                self.pane_fonts.insert(id, font);
-            }
+            self.put_pane_look(id, look.theme_id.as_deref(), look.font.as_ref(), false);
             pending.used_slots.insert(slot);
             pending.used_tabs.insert(id);
         }
@@ -149,6 +138,7 @@ impl ButtonsApp {
             }
         }
         ThemeBundle {
+            format_version: Default::default(),
             name: name.trim().to_owned(),
             theme_id: self.preferences.theme_id.clone(),
             app_theme_id: self.preferences.app_theme_id.clone(),
@@ -166,6 +156,7 @@ impl ButtonsApp {
                 dock_background: self.preferences.dock_background_override.clone(),
                 status_background: self.preferences.status_background_override.clone(),
             }),
+            typography: Some(self.preferences.typography.clone()),
         }
     }
 
@@ -173,6 +164,12 @@ impl ButtonsApp {
     /// An empty name becomes the first free "Bundle N". Unsaved editor edits
     /// are saved first, so the bundle holds what is on screen.
     pub(super) fn save_theme_bundle(&mut self, name: &str) -> Result<String, String> {
+        // Bundles native.json keeps for a newer ButtonsCLI: never replaced.
+        let held = self
+            .native_store
+            .as_ref()
+            .and_then(|store| store.held_bundles().ok())
+            .unwrap_or_default();
         let mut name = name.trim().to_owned();
         if name.is_empty() {
             name = (1..)
@@ -185,18 +182,24 @@ impl ButtonsApp {
                         .iter()
                         .chain(crate::library::bundles())
                         .any(|bundle| &bundle.name == candidate)
+                        && !held.iter().any(|bundle| &bundle.name == candidate)
                 })
                 .unwrap();
         }
+        if let Some(bundle) = held.iter().find(|bundle| bundle.name == name) {
+            return Err(format!(
+                "A bundle named \"{name}\" is kept unchanged because {}. Save under another name.",
+                bundle.reason
+            ));
+        }
         self.autosave_theme_draft()?;
-        self.restore_personal_theme_preview();
+        self.clear_theme_preview();
         let bundle = self.capture_theme_bundle(&name);
         let bundles = &mut self.preferences.theme_bundles;
         let count = bundles.len();
         match bundles.iter_mut().find(|existing| existing.name == name) {
             Some(existing) => *existing = bundle,
-            // Loading truncates to the cap, so a bundle past it would vanish
-            // on the next start: refuse it now instead.
+            // The cap only limits what the UI adds; loading keeps every bundle.
             None if count >= crate::settings::MAX_THEME_BUNDLES => {
                 return Err(format!(
                     "You have {count} theme bundles, the most that can be saved. Delete one first."
@@ -212,18 +215,19 @@ impl ButtonsApp {
     /// or a layout that does not fit are skipped, not errors. Returns a short
     /// summary, or `None` when there is no bundle with that name.
     pub(super) fn apply_theme_bundle(&mut self, ctx: &egui::Context, name: &str) -> Option<String> {
-        // The user's bundles win over a built-in one with the same name.
-        let bundle = self
-            .preferences
-            .theme_bundles
-            .iter()
-            .chain(crate::library::bundles())
-            .find(|bundle| bundle.name == name)
-            .cloned()?;
-        // Keeps a pane's edit as its own theme file before it is replaced;
-        // the editor then follows the new looks instead of the old draft.
-        self.settle_pane_draft(None);
-        self.discard_theme_editor_session();
+        self.change_look(
+            apply_look::LookChange::Bundle {
+                name: name.to_owned(),
+                ctx: ctx.clone(),
+            },
+            apply_look::LookSource::User("Apply bundle"),
+        )
+    }
+
+    /// Writes a bundle's looks. Only `change_look` calls it (it has already
+    /// settled the editor).
+    pub(super) fn set_bundle_looks(&mut self, ctx: &egui::Context, bundle: &ThemeBundle) -> String {
+        let name = &bundle.name;
         let app_theme_before = self.preferences.app_theme_id.clone();
         let mut skipped = 0;
         for (target, id) in [
@@ -268,6 +272,10 @@ impl ButtonsApp {
         if let Some(brightness) = bundle.row_banding_brightness {
             self.preferences.row_banding_brightness = brightness.min(64);
         }
+        // The shared font (UI and terminals); older bundles keep the current one.
+        if let Some(typography) = &bundle.typography {
+            self.preferences.typography = typography.clone();
+        }
         self.preferences.normalize_theme_sources();
         if self.tabs.len() > 1 {
             match parse_layout(&bundle.layout) {
@@ -291,30 +299,25 @@ impl ButtonsApp {
         for (slot, index) in order.into_iter().enumerate().take(MAX_PANE_LOOKS) {
             let id = self.tabs[index].id;
             let look = bundle.panes.get(slot).cloned().unwrap_or_default();
-            match look.theme_id {
-                Some(theme) if self.known_theme(&theme) => {
-                    self.theme_overrides.insert(id, theme);
-                }
-                Some(_) => {
-                    skipped += 1;
-                    self.theme_overrides.remove(&id);
-                }
-                None => {
-                    self.theme_overrides.remove(&id);
-                }
+            if !self.put_pane_look(id, look.theme_id.as_deref(), look.font.as_ref(), true) {
+                skipped += 1;
             }
-            match look.font {
-                Some(font) => self.pane_fonts.insert(id, font),
-                None => self.pane_fonts.remove(&id),
-            };
             pending.used_slots.insert(slot);
             pending.used_tabs.insert(id);
         }
         // A font that is not installed falls back to the default terminal
         // font; say so instead of changing the look silently.
         let mut missing_fonts: Vec<String> = Vec::new();
-        for font in bundle.panes.iter().filter_map(|look| look.font.as_ref()) {
-            let family = &font.zone.family;
+        let shared = bundle
+            .typography
+            .iter()
+            .map(|typography| &typography.shell.family);
+        let panes = bundle
+            .panes
+            .iter()
+            .filter_map(|look| look.font.as_ref())
+            .map(|font| &font.zone.family);
+        for family in shared.chain(panes) {
             if !self.font_catalog.is_available(family) && !missing_fonts.contains(family) {
                 missing_fonts.push(family.clone());
             }
@@ -341,10 +344,7 @@ impl ButtonsApp {
                 crate::fonts::DEFAULT_MONO_FONT.trim_end_matches(" Bundled"),
             ));
         }
-        // Save now (row banding, layout, pane looks): waiting for the periodic
-        // autosave lost the bundle's settings if the app was closed abruptly.
-        self.persist_native_preferences();
-        Some(summary)
+        summary
     }
 
     /// File menu: apply a saved bundle.
@@ -541,6 +541,51 @@ impl ButtonsApp {
                 });
             });
         }
+        // Bundles native.json keeps but cannot load: say so, never hide them.
+        let held = self.held_bundles().to_vec();
+        let mut repair_held = None;
+        if !held.is_empty() {
+            ui.add_space(4.0);
+            let heading = ui.spaced_colored_label(
+                self.colors().warning,
+                crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Not loaded ({count}): kept unchanged in native.json",
+                    &[("count", &held.len().to_string())],
+                ),
+            );
+            docs_capture::anchor(ui, "held-bundles", heading.rect);
+            for (index, bundle) in held.iter().enumerate() {
+                ui.push_id(("held-bundle", index), |ui| {
+                    wrapping_row(ui, |ui| {
+                        let name = if bundle.name.is_empty() {
+                            crate::i18n::literal(&self.locale, "(no name)")
+                        } else {
+                            bundle.name.clone()
+                        };
+                        ui.spaced_label(RichText::new(name).strong());
+                        ui.spaced_label(
+                            RichText::new(bundle.reason.as_str()).color(self.colors().muted),
+                        );
+                        if self.bundle_repair_offered(bundle)
+                            && ui
+                                .small_button(crate::i18n::literal(&self.locale, "Fix with AI"))
+                                .on_hover_text(crate::i18n::literal(
+                                    &self.locale,
+                                    "Send this bundle and its problems to your theme model, then review the corrected bundle before saving.",
+                                ))
+                                .clicked()
+                        {
+                            repair_held = Some(bundle.clone());
+                        }
+                    });
+                });
+            }
+        }
+        if let Some(bundle) = repair_held {
+            let ctx = ui.ctx().clone();
+            self.start_bundle_repair(&ctx, &bundle);
+        }
         // Built-ins the user has no bundle of the same name for, folded away
         // so they don't push the theme list down.
         let built_in: Vec<&ThemeBundle> = crate::library::bundles()
@@ -610,7 +655,6 @@ mod tests {
             .all()
             .iter()
             .map(|theme| theme.id.clone())
-            .filter(|id| !id.starts_with("preview:"))
             .take(count)
             .collect()
     }

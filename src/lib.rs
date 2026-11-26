@@ -40,11 +40,14 @@ mod dock;
 pub mod features;
 #[cfg(not(target_arch = "wasm32"))]
 mod feedback;
+#[cfg(not(target_arch = "wasm32"))]
+mod file_repair;
 pub mod fonts;
 pub mod i18n;
 #[cfg(not(target_arch = "wasm32"))]
 mod layout;
 mod library;
+mod look_format;
 pub mod plugins;
 #[cfg(not(target_arch = "wasm32"))]
 mod scrollbar;

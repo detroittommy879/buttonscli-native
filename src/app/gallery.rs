@@ -113,9 +113,7 @@ impl ButtonsApp {
             }
             GalleryKind::Themes => {
                 for theme in self.themes.all() {
-                    if theme.effects.shader_background.is_some()
-                        && !theme.id.starts_with("preview:")
-                    {
+                    if theme.effects.shader_background.is_some() {
                         entries.push((
                             format!("theme:{}", theme.id),
                             theme.name.clone(),
@@ -401,6 +399,7 @@ mod tests {
             colors: Some(vec!["#112233".into(), "#445566".into()]),
             theme_colors: false,
             custom: Some(crate::theme::CustomShader {
+                id: String::new(),
                 name: "Waves".into(),
                 expression: "c1 * (0.5 + 0.5 * sin(p.x * 10.0 + t))".into(),
                 variables: vec![crate::theme::ShaderVariable {

@@ -157,8 +157,20 @@ fn use_basic_fonts(typography: &mut crate::fonts::Typography) {
 }
 
 impl ButtonsApp {
-    /// Applies a whole-app look: panel, shaders, motion and themes.
+    /// Applies a whole-app look: panel, shaders, motion and themes, as one
+    /// look change.
     pub(super) fn apply_look_preset(&mut self, ctx: &egui::Context, look: LookPreset) {
+        self.change_look(
+            apply_look::LookChange::Preset {
+                look,
+                ctx: ctx.clone(),
+            },
+            apply_look::LookSource::User("Look preset"),
+        );
+    }
+
+    /// Writes a preset's switches and looks. Only `change_look` calls it.
+    pub(super) fn set_preset_look(&mut self, ctx: &egui::Context, look: LookPreset) {
         let prefs = &mut self.preferences;
         match look {
             LookPreset::Basic => {
@@ -176,7 +188,7 @@ impl ButtonsApp {
                 prefs.text_backing.override_theme_colors = false;
                 prefs.text_backing.auto_contrast = true;
                 prefs.text_backing.min_contrast = BASIC_MIN_CONTRAST;
-                self.perform_global_theme_action(PaneAction::Theme(BASIC_THEME.into()));
+                self.set_preset_theme(BASIC_THEME);
                 // After the theme, which may bring its own typography.
                 use_basic_fonts(&mut self.preferences.typography);
                 self.pane_fonts.clear();
@@ -187,7 +199,7 @@ impl ButtonsApp {
                 prefs.shader_backgrounds_enabled = false;
                 prefs.pane_colors_distinct = false;
                 prefs.calm_mode = true;
-                self.perform_global_theme_action(PaneAction::Theme(MINIMAL_THEME.into()));
+                self.set_preset_theme(MINIMAL_THEME);
             }
             LookPreset::Moderate => {
                 prefs.show_sidebar = true;
@@ -195,7 +207,7 @@ impl ButtonsApp {
                 prefs.pane_colors_distinct = true;
                 prefs.calm_mode = false;
                 prefs.motion_speed = MODERATE_MOTION;
-                self.apply_theme_bundle(ctx, MODERATE_BUNDLE);
+                self.set_preset_bundle(ctx, MODERATE_BUNDLE);
             }
             LookPreset::Showoff => {
                 prefs.show_sidebar = true;
@@ -203,10 +215,37 @@ impl ButtonsApp {
                 prefs.pane_colors_distinct = true;
                 prefs.calm_mode = false;
                 prefs.motion_speed = 1.0;
-                self.apply_theme_bundle(ctx, SHOWOFF_BUNDLE);
+                self.set_preset_bundle(ctx, SHOWOFF_BUNDLE);
             }
         }
-        self.persist_native_preferences();
+    }
+
+    /// The whole theme (every part), as the status bar's theme pick does.
+    fn set_preset_theme(&mut self, id: &str) {
+        if self.known_theme(id) {
+            let calm = self.preferences.calm_mode;
+            self.set_look(
+                id,
+                apply_look::LookTarget::WholeApp {
+                    scopes: Default::default(),
+                    calm,
+                },
+            );
+        }
+    }
+
+    fn set_preset_bundle(&mut self, ctx: &egui::Context, name: &str) {
+        let bundle = self
+            .preferences
+            .theme_bundles
+            .iter()
+            .chain(crate::library::bundles())
+            .find(|bundle| bundle.name == name)
+            .cloned();
+        if let Some(bundle) = bundle {
+            self.discard_theme_editor_session();
+            self.set_bundle_looks(ctx, &bundle);
+        }
     }
 
     /// The look currently on screen, when it still matches a preset's switches.
@@ -225,6 +264,39 @@ impl ButtonsApp {
             })
         } else {
             None
+        }
+    }
+
+    /// Look → Undo look change: puts back the look from before the newest
+    /// change (any button, bundle, Shuffle step or outside request).
+    fn undo_look_row(&mut self, ui: &mut egui::Ui) {
+        let last = self
+            .look_history
+            .records
+            .iter()
+            .rev()
+            .find(|record| !record.undone)
+            .map(|record| record.label.clone());
+        let button = ui.add_enabled(
+            last.is_some(),
+            crate::ui_text::button(ui, crate::i18n::literal(&self.locale, "Undo look change")),
+        );
+        let hint = match &last {
+            Some(label) => crate::i18n::formatted_literal(
+                &self.locale,
+                "Puts back the look from before the last change ({change}). Themes, pane themes and fonts, bar colors and window appearance; not the layout.",
+                &[("change", label)],
+            ),
+            None => crate::i18n::literal(&self.locale, "No look change to undo yet.").to_string(),
+        };
+        if button.on_hover_text(hint).clicked() {
+            if let Some(label) = self.undo_look_change() {
+                self.notice = Some(crate::i18n::formatted_literal(
+                    &self.locale,
+                    "Undid: {change}",
+                    &[("change", &label)],
+                ));
+            }
         }
     }
 
@@ -292,6 +364,7 @@ impl ButtonsApp {
                     chosen = Some(look);
                 }
                 ui.spaced_small(crate::i18n::literal(&self.locale, look.description()));
+                self.undo_look_row(ui);
                 ui.separator();
                 changed |= ui
                     .spaced_checkbox(&mut self.preferences.calm_mode, calm_label)

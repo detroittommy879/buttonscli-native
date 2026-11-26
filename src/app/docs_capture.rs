@@ -156,6 +156,48 @@ const LAYOUT: Part = Part {
     ..WINDOW
 };
 
+/// Look-state checks, not docs pictures: `BUTTONSCLI_DOCS_CAPTURE_QA=1`
+/// (`scripts/docs-capture.ps1 -Qa`) runs these instead of `SHOTS` and
+/// writes to `target/docs-capture/qa/`. No image markers needed.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+pub(super) const QA_SHOTS: &[Shot] = &[
+    Shot {
+        file: "qa-shared-preview.png",
+        parts: &[Part {
+            setup: setup::qa_editor,
+            then: Some(setup::qa_shared_preview),
+            ..WINDOW
+        }],
+    },
+    Shot {
+        file: "qa-pane-preview.png",
+        parts: &[Part {
+            setup: setup::qa_editor,
+            then: Some(setup::qa_pane_preview),
+            ..WINDOW
+        }],
+    },
+    Shot {
+        file: "qa-held-bundles.png",
+        parts: &[Part {
+            setup: setup::qa_held_bundles,
+            scroll_to: Some("held-bundles"),
+            ..SETTINGS
+        }],
+    },
+    Shot {
+        file: "qa-fork.png",
+        parts: &[Part {
+            setup: setup::two,
+            then: Some(setup::qa_shaders_listed),
+            scroll_to: Some("shader-fork"),
+            ..SETTINGS
+        }],
+    },
+    // Not here: the saved shader's "Used by" tooltip. egui did not show
+    // tooltips for the probe's synthetic pointer (2026-11-25).
+];
+
 /// Every automated shot. Each `file` must have an `<!-- IMAGE: file … -->`
 /// marker in `docs/guide` (checked by `shot_list_matches_image_markers`).
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -481,8 +523,85 @@ mod setup {
     /// Pane 1's own look in the Shaders tab, as the pane menu opens it.
     pub(super) fn shaders(app: &mut ButtonsApp, ctx: &egui::Context) {
         bundle_hero(app, ctx);
-        app.theme_editor_pane_mode = true;
+        app.theme_editor.pane_mode = true;
         settings(app, ThemeSettingsTab::Shaders);
+    }
+
+    /// QA: three plain panes and the theme editor on the shared theme.
+    pub(super) fn qa_editor(app: &mut ButtonsApp, ctx: &egui::Context) {
+        panes(app, ctx, 3, PaneLayout::Columns);
+        app.preferences.shader_backgrounds_enabled = false;
+        settings(app, ThemeSettingsTab::Edit);
+    }
+
+    /// QA: a loud color edit on the open draft, previewed, Settings closed
+    /// so the panes show.
+    fn qa_preview(app: &mut ButtonsApp) {
+        if app.theme_editor.draft().is_none() {
+            app.start_personal_theme_draft();
+        }
+        let draft = app.theme_editor.draft_mut().expect("a draft");
+        let terminal = &mut draft["theme"]["terminal"];
+        terminal["background"] = json!("#4a0a4a");
+        terminal["foreground"] = json!("#ffe060");
+        terminal["useGradient"] = json!(true);
+        terminal["gradientColors"] = json!(["#9a1090", "#200a40"]);
+        app.preview_personal_theme_draft();
+        assert!(
+            app.previewing_theme_draft(),
+            "{:?}",
+            app.theme_editor.status
+        );
+        app.show_settings = false;
+    }
+
+    pub(super) fn qa_shared_preview(app: &mut ButtonsApp, _ctx: &egui::Context) {
+        qa_preview(app);
+    }
+
+    /// QA: the same edit on pane 2 only.
+    pub(super) fn qa_pane_preview(app: &mut ButtonsApp, _ctx: &egui::Context) {
+        let pane = app.tabs[1].id;
+        app.retarget_theme_editor(Some(pane)).unwrap();
+        qa_preview(app);
+    }
+
+    /// QA: native.json holds an unreadable and a newer bundle.
+    pub(super) fn qa_held_bundles(app: &mut ButtonsApp, ctx: &egui::Context) {
+        panes(app, ctx, 1, PaneLayout::Columns);
+        let store = app.native_store.as_ref().unwrap();
+        let revision = store.save(None, &app.preferences).unwrap();
+        let path = store.profile_dir().join("native.json");
+        let mut file: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        file["preferences"]["theme_bundles"] = json!([
+            {"name": "Night shift", "visible_panes": "two"},
+            {"name": "From the future", "format_version": 99},
+        ]);
+        std::fs::write(&path, serde_json::to_vec_pretty(&file).unwrap()).unwrap();
+        app.native_revision = Some(revision);
+        settings(app, ThemeSettingsTab::Library);
+    }
+
+    /// QA: the Shaders tab (as `shaders`) with pane 1's shader saved to the
+    /// list, so Fork and the picker's saved entry show.
+    pub(super) fn qa_shaders_listed(app: &mut ButtonsApp, ctx: &egui::Context) {
+        shaders(app, ctx);
+        qa_list_pane_shader(app);
+    }
+
+    fn qa_list_pane_shader(app: &mut ButtonsApp) {
+        let pane = app.tabs[0].id;
+        let custom = app
+            .resolve_pane_look(pane)
+            .presentation
+            .effects
+            .shader_background
+            .and_then(|background| background.custom)
+            .expect("the hero bundle's pane 1 has shader code");
+        app.save_shader_to_list(crate::theme::SavedShader {
+            shader: custom,
+            colors: None,
+        });
     }
 }
 
@@ -546,6 +665,24 @@ fn shot_list_matches_image_markers() {
             "{}: docs images are .png (UI) or .jpg (shaders)",
             shot.file
         );
+    }
+}
+
+/// QA shots never land in the docs: their own names, never a docs image's.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[test]
+fn qa_shots_are_named_apart_from_docs_images() {
+    let markers = image_markers();
+    let mut seen = std::collections::BTreeSet::new();
+    for shot in QA_SHOTS {
+        assert!(shot.file.starts_with("qa-"), "{}", shot.file);
+        assert!(
+            !markers.contains(shot.file),
+            "{} is a docs image",
+            shot.file
+        );
+        assert!(seen.insert(shot.file), "{} is listed twice", shot.file);
+        assert!(!shot.parts.is_empty(), "{} has no parts", shot.file);
     }
 }
 
@@ -1192,7 +1329,14 @@ mod probe {
             .collect();
         let force = std::env::var_os("BUTTONSCLI_DOCS_CAPTURE_FORCE")
             .is_some_and(|value| !value.is_empty());
-        let shots: Vec<&'static Shot> = SHOTS
+        let qa =
+            std::env::var_os("BUTTONSCLI_DOCS_CAPTURE_QA").is_some_and(|value| !value.is_empty());
+        let out = if qa {
+            env_path("BUTTONSCLI_DOCS_CAPTURE_OUT", work.join("qa"))
+        } else {
+            out
+        };
+        let shots: Vec<&'static Shot> = if qa { QA_SHOTS } else { SHOTS }
             .iter()
             .filter(|shot| {
                 let stem = shot.file.split('.').next().unwrap();
